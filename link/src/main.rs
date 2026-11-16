@@ -189,13 +189,14 @@ impl Link {
             }
             "actor_delete" => {
                 self.need_uefn()?;
-                self.mcp.delete(&ids).await?;
+                // La sauvegarde repart vers POP, qui la garde dans l'action d'annulation.
+                out["saved"] = json!(self.mcp.delete(&ids).await?);
                 out["actors"] = json!(self.mcp.list_actors().await?);
             }
             "actor_restore" => {
                 self.need_uefn()?;
-                let want: Vec<String> = a["actors"].as_array().cloned().unwrap_or_default().iter().filter_map(|x| x["id"].as_str().map(String::from)).collect();
-                self.mcp.restore(&want).await?;
+                let expected = a["actors"].as_array().map(|x| x.len()).unwrap_or(ids.len());
+                out["created_ids"] = json!(self.mcp.restore(a["saved"].as_str().unwrap_or(""), expected).await?);
                 out["actors"] = json!(self.mcp.list_actors().await?);
             }
             "actor_props" => {

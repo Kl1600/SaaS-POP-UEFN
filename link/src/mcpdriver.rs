@@ -263,9 +263,17 @@ impl Mcp {
         Ok(serde_json::from_str(line.trim()).unwrap_or_default())
     }
 
-    pub async fn delete(&mut self, ids: &[String]) -> Result<()> {
+    /// Supprime des acteurs et renvoie leur sauvegarde (texte T3D, en base64) pour pouvoir les recréer.
+    /// Une suppression faite par Python n'entre pas dans l'historique d'annulation d'UEFN : sans cette
+    /// sauvegarde, elle serait définitive.
+    pub async fn delete(&mut self, ids: &[String]) -> Result<String> {
         let code = format!("IDS = {}\n{}", serde_json::to_string(ids)?, PY_DEL);
-        self.python(&code).await.map(|_| ())
+        let out = self.python(&code).await?;
+        let saved = out.lines().find_map(|l| l.strip_prefix("T3D=")).map(|s| s.trim().to_string()).unwrap_or_default();
+        if saved.is_empty() {
+            bail!("UEFN n'a pas pu sauvegarder les acteurs avant suppression : rien n'a été supprimé.");
+        }
+        Ok(saved)
     }
 
     pub async fn save_level(&mut self) -> Result<()> {
@@ -292,14 +300,20 @@ impl Mcp {
         self.known("checkin").is_some()
     }
 
-    /// Annule la dernière transaction POP de l'éditeur (suppression), puis vérifie que les acteurs sont revenus.
-    pub async fn restore(&mut self, ids: &[String]) -> Result<()> {
-        let code = format!("IDS = {}\n{}", serde_json::to_string(ids)?, PY_RESTORE);
-        let out = self.python(&code).await?;
-        if !out.contains("restored") {
-            bail!("UEFN n'a pas pu annuler la suppression (une autre action a eu lieu depuis) : utilisez Ctrl+Z dans UEFN.");
+    /// Recrée des acteurs supprimés à partir de leur sauvegarde (mêmes réglages, position, dossier, nom).
+    /// Les acteurs recréés ont un nouvel identifiant interne : on renvoie la liste des nouveaux.
+    pub async fn restore(&mut self, saved: &str, expected: usize) -> Result<Vec<String>> {
+        if saved.is_empty() {
+            bail!("Pas de sauvegarde pour cette suppression (faite avant cette version de pop-link) : elle ne peut pas être annulée.");
         }
-        Ok(())
+        let code = format!("SAVED = {}\n{}", serde_json::to_string(saved)?, PY_RESTORE);
+        let out = self.python(&code).await?;
+        let line = out.lines().rev().find(|l| l.trim_start().starts_with('[')).ok_or_else(|| anyhow!("UEFN n'a pas pu recréer les acteurs : {}", out.chars().take(200).collect::<String>()))?;
+        let ids: Vec<String> = serde_json::from_str(line.trim())?;
+        if ids.len() < expected {
+            bail!("UEFN n'a recréé que {} acteur(s) sur {expected}.", ids.len());
+        }
+        Ok(ids)
     }
 
     /// Remplit les arguments d'un outil d'appareil d'après son schéma (acteur, propriété, valeur).
@@ -546,11 +560,15 @@ pub fn parse_diagnostics(out: &str) -> Vec<Value> {
     d
 }
 
-const PY_RESTORE: &str = r#"import unreal
-unreal.SystemLibrary.execute_console_command(None, 'TRANSACTION UNDO')
+const PY_RESTORE: &str = r#"import unreal, json, base64
 sub = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
-have = set(a.get_path_name() for a in sub.get_all_level_actors())
-print('restored' if all(i in have for i in IDS) else 'missing')
+sel = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).get_selection_set()
+world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
+prev = sub.get_selected_level_actors()
+before = set(a.get_path_name() for a in sub.get_all_level_actors())
+unreal.TypedElementCommonActions().paste_elements_from_string(sel, world, unreal.TypedElementPasteOptions(), base64.b64decode(SAVED).decode('utf-8'))
+sub.set_selected_level_actors(prev)
+print(json.dumps([a.get_path_name() for a in sub.get_all_level_actors() if a.get_path_name() not in before]))
 "#;
 
 const PY_BOUNDS: &str = r#"import unreal, json
@@ -625,10 +643,18 @@ new = sub.duplicate_actors(src, None, unreal.Vector(300, 0, 0))
 print(json.dumps([a.get_path_name() for a in new]))
 "#;
 
-const PY_DEL: &str = r#"import unreal
+const PY_DEL: &str = r#"import unreal, base64
 sub = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
-sub.destroy_actors([a for a in sub.get_all_level_actors() if a.get_path_name() in IDS])
-print('ok')
+sel = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).get_selection_set()
+targets = [a for a in sub.get_all_level_actors() if a.get_path_name() in IDS]
+prev = sub.get_selected_level_actors()
+sub.set_selected_level_actors(targets)
+txt = unreal.TypedElementCommonActions().copy_selected_elements_to_string(sel) if targets else ''
+sub.set_selected_level_actors([a for a in prev if a not in targets])
+if targets and not txt:
+    raise RuntimeError('sauvegarde impossible')
+sub.destroy_actors(targets)
+print('T3D=' + base64.b64encode((txt or '').encode('utf-8')).decode('ascii'))
 "#;
 
 #[cfg(test)]
