@@ -16,10 +16,13 @@ const GROUPS: [string, [string, string, any][]][] = [
   ['Production', [['/planifier', 'Planifier', CalendarDays], ['/taches', 'Tâches', KanbanSquare]]],
   ['UEFN', [['/verse', 'Éditeur Verse', FileCode2], ['/organiseur', 'Organiseur', ListTree], ['/ia', 'IA connectées', Bot]]],
   ['Publication', [['/lancer', 'Lancer et suivre', Rocket]]],
-  ['Studio', [['/remunerer', 'Rémunérer', Coins], ['/equipe', 'Équipe et intégrations', Users]]],
+  ['Studio', [['/remunerer', 'Rémunérer', Coins], ['/equipe', 'Équipe', Users]]],
 ]
 const TITLES: Record<string, [string, string]> = {}
 GROUPS.forEach(([g, items]) => items.forEach(([p, l]) => (TITLES[p] = [g, l])))
+TITLES['/parametres'] = ['Compte', 'Paramètres']
+TITLES['/aide'] = ['Compte', 'Aide et support']
+TITLES['/equipe'] = ['Studio', 'Équipe et intégrations']
 
 export default function Layout() {
   const app = useApp()
@@ -70,7 +73,7 @@ export default function Layout() {
           ))}
         </nav>
         <nav className="nav" style={{ marginTop: 'auto' }} aria-label="Compte">
-          <NavLink to="/equipe?tab=compte"><Settings size={20} strokeWidth={1.5} /><span className="lbl">Paramètres du compte</span></NavLink>
+          <NavLink to="/parametres" className={({ isActive }) => (isActive ? 'on' : '')}><Settings size={20} strokeWidth={1.5} /><span className="lbl">Paramètres</span></NavLink>
           <NavLink to="/aide"><LifeBuoy size={20} strokeWidth={1.5} /><span className="lbl">Aide et support</span></NavLink>
         </nav>
       </aside>
@@ -98,6 +101,7 @@ export default function Layout() {
               <div className="menu" style={{ right: 0, top: 54 }}>
                 <div className="small muted" style={{ padding: '6px 10px' }}>{app.me?.user.email}</div>
                 <button onClick={() => { setAcct(false); nav('/equipe?tab=maps') }}><Plus size={16} />Nouveau studio ou map</button>
+                <button onClick={() => { setAcct(false); nav('/parametres') }}><Settings size={16} />Paramètres</button>
                 <button onClick={async () => { await api.post('/api/auth/logout'); location.href = '/' }}><LogOut size={16} />Se déconnecter</button>
               </div>
             )}

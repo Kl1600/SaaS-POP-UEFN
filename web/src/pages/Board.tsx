@@ -171,12 +171,26 @@ function Canvas({ id }: { id: number }) {
     }
     r.readAsDataURL(file)
   }
+  // Plein écran : vrai plein écran du navigateur quand il est permis (Chrome, Safari, Firefox), sinon tableau sur toute la fenêtre.
+  const fsEl = () => (document.fullscreenElement ?? (document as any).webkitFullscreenElement) as Element | null
   const toggleFs = async () => {
-    const el = wbRef.current
-    if (!fs) { setFs(true); try { await el?.requestFullscreen?.() } catch {} } else { setFs(false); if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {}) }
-    setTimeout(fit, 120)
+    const el: any = wbRef.current
+    if (!fs) {
+      setFs(true)
+      try { if (el?.requestFullscreen) await el.requestFullscreen(); else if (el?.webkitRequestFullscreen) el.webkitRequestFullscreen() } catch { /* le mode fenêtre suffit */ }
+    } else {
+      setFs(false)
+      const d: any = document
+      try { if (fsEl()) { if (d.exitFullscreen) await d.exitFullscreen(); else d.webkitExitFullscreen?.() } } catch {}
+    }
+    setTimeout(fit, 200)
   }
-  useEffect(() => { const h = () => { if (!document.fullscreenElement) setFs(false) }; document.addEventListener('fullscreenchange', h); return () => document.removeEventListener('fullscreenchange', h) }, [])
+  useEffect(() => {
+    const h = () => { if (!fsEl()) setFs(false) }
+    document.addEventListener('fullscreenchange', h); document.addEventListener('webkitfullscreenchange', h)
+    return () => { document.removeEventListener('fullscreenchange', h); document.removeEventListener('webkitfullscreenchange', h) }
+  }, [])
+  useEffect(() => { document.body.classList.toggle('wb-fs', fs); return () => document.body.classList.remove('wb-fs') }, [fs])
   const setMetaOp = (p: any) => app.send({ t: 'board', board: id, op: 'meta', ...p })
 
   const toWorld = (cx: number, cy: number) => { const r = box.current!.getBoundingClientRect(); return { x: (cx - r.left - view.x) / view.z, y: (cy - r.top - view.y) / view.z } }
@@ -486,6 +500,7 @@ function Canvas({ id }: { id: number }) {
               {follow && <button className="pill on" onClick={() => setFollow(null)}><UserRound size={14} />Ne plus suivre</button>}
             </div>
             <MiniMap objs={list} view={view} box={box} />
+            {fs && <button className="btn fsexit" onPointerDown={e => e.stopPropagation()} onClick={toggleFs}><Shrink size={16} />Quitter le plein écran</button>}
           </div>
         </div>
       </section>

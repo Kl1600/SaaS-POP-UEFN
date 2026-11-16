@@ -420,3 +420,9 @@ label.tool{cursor:pointer}label.tool.off{opacity:.4;cursor:default}
 @layer app{.top .acct,.top .iconbtn{flex:none}}
 /* La zone principale ne doit pas rétrécir sous son contenu : sinon la marge du bas disparaît au défilement. */
 @layer app{.scroll > .content{flex:1 0 auto;padding-bottom:40px}}
+@layer app{
+.wb.fs{position:fixed !important;inset:0 !important;width:100vw !important;height:100vh !important;z-index:1000 !important;border-radius:0 !important;border:0 !important;margin:0 !important;background:var(--surface)}
+.wb:fullscreen,.wb:-webkit-full-screen{width:100vw;height:100vh;background:var(--surface)}
+.fsexit{position:absolute;top:12px;right:12px;z-index:20;height:36px}
+body.wb-fs .side,body.wb-fs .top{visibility:hidden}
+}
