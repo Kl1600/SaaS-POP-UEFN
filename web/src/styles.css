@@ -418,3 +418,5 @@ label.tool{cursor:pointer}label.tool.off{opacity:.4;cursor:default}
 @media (max-width:1100px){.top .search{flex-basis:160px}}
 }
 @layer app{.top .acct,.top .iconbtn{flex:none}}
+/* La zone principale ne doit pas rétrécir sous son contenu : sinon la marge du bas disparaît au défilement. */
+@layer app{.scroll > .content{flex:1 0 auto;padding-bottom:40px}}
