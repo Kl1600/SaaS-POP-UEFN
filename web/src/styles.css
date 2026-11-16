@@ -385,3 +385,16 @@ label.tool{cursor:pointer}label.tool.off{opacity:.4;cursor:default}
 .aicard:hover{border-color:var(--text3)}.aicard:disabled{opacity:.5;cursor:default}
 }
 @layer app{.nav a .lbl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}}
+/* Accent orange (bouton « Découvrir nos offres ») : réservé aux actions principales et à quelques repères. */
+@layer app{
+.app,.auth{--accent:#ED753E;--accent2:#EF8D46;--accent-grad:linear-gradient(90deg,#ED753E,#EF8D46)}
+.btn.pri,.auth .btn.pri{background:var(--accent-grad) !important;color:#fff !important;border-color:transparent !important;box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 1px 2px rgba(237,117,62,.25)}
+.btn.pri:hover{opacity:1;filter:brightness(1.05)}
+.btn.pri:disabled{filter:grayscale(.4);opacity:.6}
+.nav a.on{position:relative}
+.nav a.on::before{content:'';position:absolute;left:-1px;top:9px;bottom:9px;width:3px;border-radius:3px;background:var(--accent-grad)}
+.app input[type=checkbox],.app input[type=radio]{accent-color:var(--accent)}
+.app ::selection{background:rgba(237,117,62,.25)}
+.app .field:focus,.app select.field:focus,.app textarea:focus{outline:2px solid rgba(237,117,62,.35);outline-offset:0}
+.top .iconbtn .dot{background:var(--accent)}
+}

@@ -1,4 +1,4 @@
-import{conf as t,language as e}from"./typescript-Cy4b97Xk.js";import"./VerseEditor-WI71V0W4.js";import"./index-DP6sJ5wV.js";/*!-----------------------------------------------------------------------------
+import{conf as t,language as e}from"./typescript-BN7BdIAt.js";import"./VerseEditor-D0ZyG37i.js";import"./index-B3o4JXiy.js";/*!-----------------------------------------------------------------------------
  * Copyright (c) Microsoft Corporation. All rights reserved.
  * Version: 0.52.0(f6dc0eb8fce67e57f6036f4769d92c1666cdf546)
  * Released under the MIT license
