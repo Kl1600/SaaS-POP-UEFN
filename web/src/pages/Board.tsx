@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import {
   MousePointer2, Lasso, StickyNote, Type, Square, Circle, Spline, Pen, Highlighter, Eraser, Frame, ImagePlus, MessageSquarePlus, ThumbsUp,
   Timer, Eye, EyeOff, LayoutGrid, Presentation, Download, Plus, Minus, Maximize, UserRound, ChevronLeft, ChevronRight, X, Network,
-  Expand, Shrink, Undo2, Redo2, Copy, Trash2, BringToFront, SendToBack, AlignStartVertical, AlignStartHorizontal, AlignCenterVertical, AlignCenterHorizontal, Upload, Pencil,
+  Expand, Shrink, Undo2, Redo2, MoreHorizontal, Users, Copy, Trash2, BringToFront, SendToBack, AlignStartVertical, AlignStartHorizontal, AlignCenterVertical, AlignCenterHorizontal, Upload, Pencil,
 } from 'lucide-react'
 import { api } from '../api'
 import { useApp, useLoad } from '../state'
@@ -78,6 +78,8 @@ function Canvas({ id }: { id: number }) {
   const [convert, setConvert] = useState({ assignee: '', tag: 'conception' })
   const [now, setNow] = useState(Date.now())
   const [fs, setFs] = useState(false)
+  const [menu, setMenu] = useState<string | null>(null)
+  const [lib, setLib] = useState(false)
   const wbRef = useRef<HTMLElement>(null)
   const hist = useRef<{ undo: [string, Obj | null][][]; redo: [string, Obj | null][][] }>({ undo: [], redo: [] })
   const clip = useRef<Obj[]>([])
@@ -280,13 +282,29 @@ function Canvas({ id }: { id: number }) {
       setLasso(null); setTool('select')
     }
   }
-  const onWheel = (e: React.WheelEvent) => {
-    if (!(e.ctrlKey || e.metaKey)) { setView(v => ({ ...v, x: v.x - e.deltaX, y: v.y - e.deltaY })); return }
-    const r = box.current!.getBoundingClientRect()
-    const mx = e.clientX - r.left, my = e.clientY - r.top
-    setView(v => { const z = Math.min(4, Math.max(0.1, v.z * Math.exp(-e.deltaY * 0.01))); return { z, x: mx - ((mx - v.x) / v.z) * z, y: my - ((my - v.y) / v.z) * z } })
-  }
-  const zoom = (k: number) => setView(v => ({ ...v, z: Math.min(3, Math.max(0.2, v.z * k)) }))
+  // Molette de souris = zoom ; trackpad : pincer = zoom, deux doigts = se déplacer.
+  // Écouteur natif non passif : sinon le navigateur zoome toute la page au lieu du tableau.
+  const viewRef = useRef(view); viewRef.current = view
+  useEffect(() => {
+    const el = box.current
+    if (!el) return
+    const h = (e: WheelEvent) => {
+      e.preventDefault()
+      const r = el.getBoundingClientRect()
+      const mx = e.clientX - r.left, my = e.clientY - r.top
+      const mouse = e.deltaMode !== 0 || (e.deltaX === 0 && Math.abs(e.deltaY) >= 40 && Number.isInteger(e.deltaY))
+      if (e.ctrlKey || e.metaKey || mouse) {
+        const k = Math.exp(-(e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY) * (e.ctrlKey && !mouse ? 0.012 : 0.0022))
+        setView(v => { const z = Math.min(4, Math.max(0.1, v.z * k)); return { z, x: mx - ((mx - v.x) / v.z) * z, y: my - ((my - v.y) / v.z) * z } })
+      } else {
+        setView(v => ({ ...v, x: v.x - e.deltaX, y: v.y - e.deltaY }))
+      }
+    }
+    el.addEventListener('wheel', h, { passive: false })
+    return () => el.removeEventListener('wheel', h)
+  }, [])
+  // Zoom des boutons : centré sur le milieu de l'écran.
+  const zoom = (k: number) => { const r = box.current?.getBoundingClientRect(); const mx = (r?.width ?? 0) / 2, my = (r?.height ?? 0) / 2; setView(v => { const z = Math.min(4, Math.max(0.1, v.z * k)); return { z, x: mx - ((mx - v.x) / v.z) * z, y: my - ((my - v.y) / v.z) * z } }) }
   const fit = () => {
     if (!list.length || !box.current) return
     const xs = list.filter(o => o.kind !== 'connector').flatMap(o => [o.x, o.x + (o.w ?? 40)]), ys = list.filter(o => o.kind !== 'connector').flatMap(o => [o.y, o.y + (o.h ?? 40)])
@@ -385,7 +403,8 @@ function Canvas({ id }: { id: number }) {
   const selSticky = sel.filter(s => objs[s]?.kind === 'sticky')
   const selFrame = sel.length === 1 && objs[sel[0]]?.kind === 'frame' ? sel[0] : null
   const ranking = list.filter(o => o.kind === 'sticky').map(o => ({ o, v: votesOf(o) })).filter(x => x.v > 0).sort((a, b) => b.v - a.v)
-  const TOOLS: [string, string, any][] = [['select', 'Sélection', MousePointer2], ['lasso', 'Lasso', Lasso], ['sticky', 'Post-it', StickyNote], ['text', 'Texte', Type], ['rect', 'Rectangle', Square], ['ellipse', 'Ellipse', Circle], ['connector', 'Connecteur', Spline], ['pen', 'Stylo', Pen], ['hl', 'Surligneur', Highlighter], ['erase', 'Gomme', Eraser], ['frame', 'Cadre (diapo)', Frame], ['comment', 'Commentaire épinglé', MessageSquarePlus]]
+  const TOOLS: [string, string, any][] = [['select', 'Sélectionner (V)', MousePointer2], ['sticky', 'Post-it (N)', StickyNote], ['text', 'Texte (T)', Type], ['rect', 'Rectangle (R)', Square], ['ellipse', 'Cercle (O)', Circle], ['connector', 'Flèche entre deux objets (C)', Spline], ['pen', 'Stylo (P)', Pen], ['erase', 'Gomme (E)', Eraser]]
+  const MORE: [string, string, any][] = [['lasso', 'Lasso (L)', Lasso], ['hl', 'Surligneur (H)', Highlighter], ['frame', 'Cadre / diapo (F)', Frame], ['comment', 'Commentaire épinglé (M)', MessageSquarePlus]]
 
   return (
     <>
@@ -393,8 +412,15 @@ function Canvas({ id }: { id: number }) {
         <div className="wbtop">
           <div className="toolbar" role="toolbar" aria-label="Outils">
             {TOOLS.map(([k, l, I]) => <button key={k} className={'tool' + (tool === k ? ' on' : '')} title={l} aria-label={l} aria-pressed={tool === k} onClick={() => { setTool(k); setConnFrom(null) }} disabled={!canEdit && k !== 'select'}><I size={18} strokeWidth={1.5} /></button>)}
-            <label className={'tool' + (canEdit ? '' : ' off')} title="Importer une image (ou glissez-la sur le tableau)" aria-label="Importer une image"><Upload size={18} strokeWidth={1.5} /><input type="file" accept="image/*" hidden disabled={!canEdit} onChange={e => { const f = e.target.files?.[0]; if (f) importImage(f); e.target.value = '' }} /></label>
-            <button className="tool" title="Image par lien" aria-label="Image par lien" disabled={!canEdit} onClick={() => { const u = prompt('Lien https de l’image (plan de map vu du dessus, capture…)'); if (u && /^https:\/\//.test(u)) add({ kind: 'image', url: u, w: 600, h: 400, locked: confirm('Utiliser comme fond « plan de map » (verrouillé derrière) ?') }) }}><ImagePlus size={18} strokeWidth={1.5} /></button>
+            <label className={'tool' + (canEdit ? '' : ' off')} title="Image (ou glissez-la sur le tableau)" aria-label="Importer une image"><ImagePlus size={18} strokeWidth={1.5} /><input type="file" accept="image/*" hidden disabled={!canEdit} onChange={e => { const f = e.target.files?.[0]; if (f) importImage(f); e.target.value = '' }} /></label>
+            <div style={{ position: 'relative' }}>
+              <button className={'tool' + (MORE.some(m => m[0] === tool) ? ' on' : '')} title="Plus d’outils" aria-label="Plus d’outils" aria-expanded={menu === 'tools'} onClick={() => setMenu(menu === 'tools' ? null : 'tools')}><MoreHorizontal size={18} strokeWidth={1.5} /></button>
+              {menu === 'tools' && <div className="menu" style={{ left: 0, top: 44 }} onMouseLeave={() => setMenu(null)}>
+                {MORE.map(([k, l, I]) => <button key={k} disabled={!canEdit} onClick={() => { setTool(k); setConnFrom(null); setMenu(null) }}><I size={16} />{l}</button>)}
+                <button disabled={!canEdit} onClick={() => { setMenu(null); const u = prompt('Lien https de l’image (plan de map vu du dessus, capture…)'); if (u && /^https:\/\//.test(u)) add({ kind: 'image', url: u, w: 600, h: 400, locked: confirm('Utiliser comme fond « plan de map » (verrouillé derrière) ?') }) }}><Upload size={16} />Image par lien</button>
+                <button onClick={() => { setLib(l => !l); setMenu(null) }}><LayoutGrid size={16} />{lib ? 'Masquer' : 'Afficher'} les formes UEFN</button>
+              </div>}
+            </div>
             <span className="tsep" />
             <button className="tool" title="Annuler (Ctrl+Z)" aria-label="Annuler" disabled={!canEdit} onClick={() => travel('undo')}><Undo2 size={18} strokeWidth={1.5} /></button>
             <button className="tool" title="Rétablir (Ctrl+Maj+Z)" aria-label="Rétablir" disabled={!canEdit} onClick={() => travel('redo')}><Redo2 size={18} strokeWidth={1.5} /></button>
@@ -402,30 +428,42 @@ function Canvas({ id }: { id: number }) {
             {tool === 'connector' && <select className="field" style={{ height: 34 }} value={connStyle} onChange={e => setConnStyle(e.target.value)} aria-label="Style"><option value="straight">Droit</option><option value="elbow">Coudé</option><option value="curve">Courbe</option></select>}
             {tool === 'connector' && <span className="small muted">{connFrom ? 'Cliquez l’objet d’arrivée' : 'Cliquez l’objet de départ'}</span>}
           </div>
-          <div className="toolbar" aria-label="Brainstorming">
-            <button className={'pill' + (timerLeft ? ' on' : '')} onClick={() => setMetaOp({ timer_end: timerLeft ? null : Date.now() + 5 * 60000 })} disabled={!canEdit}><Timer size={16} />{timerLeft ? `${String(Math.floor(timerLeft / 60)).padStart(2, '0')}:${String(timerLeft % 60).padStart(2, '0')}` : 'Minuteur 5 min'}</button>
-            <button className={'pill' + (voting ? ' on' : '')} onClick={() => setVoting(v => !v)}><ThumbsUp size={16} />Vote · {Math.max(0, meta.points - myVotes)} pts</button>
-            <button className={'pill' + (meta.hidden ? ' on' : '')} onClick={() => setMetaOp({ hidden: !meta.hidden })} disabled={!canEdit}>{meta.hidden ? <><Eye size={16} />Révéler</> : <><EyeOff size={16} />Idées cachées</>}</button>
-            <button className="pill" onClick={groupByShade} disabled={!canEdit}><LayoutGrid size={16} />Regrouper</button>
-            <select className="pill" value={follow ?? ''} onChange={e => setFollow(e.target.value ? Number(e.target.value) : null)} aria-label="Suivre un membre"><option value="">Suivre…</option>{Object.entries(cursors).map(([u, c]) => <option key={u} value={u}>{c.name}</option>)}</select>
-            <button className="pill" onClick={() => frames.length ? goFrame(0) : app.toast('Ajoutez des cadres pour présenter.')}><Presentation size={16} />Présenter</button>
-            <button className="pill" onClick={exportPng}><Download size={16} />PNG</button>
-            <button className="pill" onClick={exportSvg}>SVG</button>
-            <button className="pill" onClick={() => window.print()}>PDF</button>
+          <div className="toolbar" aria-label="Actions">
+            {timerLeft ? <button className="pill on" onClick={() => setMetaOp({ timer_end: null })} disabled={!canEdit}><Timer size={16} />{`${String(Math.floor(timerLeft / 60)).padStart(2, '0')}:${String(timerLeft % 60).padStart(2, '0')}`}</button> : null}
+            {voting && <button className="pill on" onClick={() => setVoting(false)}><ThumbsUp size={16} />Vote · {Math.max(0, meta.points - myVotes)} pts · Terminer</button>}
+            <div style={{ position: 'relative' }}>
+              <button className="pill" onClick={() => setMenu(menu === 'atelier' ? null : 'atelier')} aria-expanded={menu === 'atelier'}><Users size={16} />Atelier</button>
+              {menu === 'atelier' && <div className="menu" style={{ right: 0, top: 44 }} onMouseLeave={() => setMenu(null)}>
+                <button disabled={!canEdit} onClick={() => { setMetaOp({ timer_end: timerLeft ? null : Date.now() + 5 * 60000 }); setMenu(null) }}><Timer size={16} />{timerLeft ? 'Arrêter le minuteur' : 'Minuteur 5 min'}</button>
+                <button onClick={() => { setVoting(v => !v); setMenu(null) }}><ThumbsUp size={16} />{voting ? 'Terminer le vote' : 'Voter pour les post-it'}</button>
+                <button disabled={!canEdit} onClick={() => { setMetaOp({ hidden: !meta.hidden }); setMenu(null) }}>{meta.hidden ? <><Eye size={16} />Révéler les idées</> : <><EyeOff size={16} />Cacher les idées des autres</>}</button>
+                <button disabled={!canEdit} onClick={() => { groupByShade(); setMenu(null) }}><LayoutGrid size={16} />Regrouper par couleur</button>
+                {Object.entries(cursors).map(([u, c]) => <button key={u} onClick={() => { setFollow(Number(u)); setMenu(null) }}><UserRound size={16} />Suivre {c.name}</button>)}
+              </div>}
+            </div>
+            <button className="pill" onClick={() => frames.length ? goFrame(0) : app.toast('Ajoutez des cadres (menu « … ») pour présenter.')}><Presentation size={16} />Présenter</button>
+            <div style={{ position: 'relative' }}>
+              <button className="pill" onClick={() => setMenu(menu === 'export' ? null : 'export')} aria-expanded={menu === 'export'}><Download size={16} />Exporter</button>
+              {menu === 'export' && <div className="menu" style={{ right: 0, top: 44, minWidth: 160 }} onMouseLeave={() => setMenu(null)}>
+                <button onClick={() => { exportPng(); setMenu(null) }}>Image PNG</button>
+                <button onClick={() => { exportSvg(); setMenu(null) }}>Image SVG</button>
+                <button onClick={() => { setMenu(null); window.print() }}>PDF (impression)</button>
+              </div>}
+            </div>
             <button className={'pill' + (fs ? ' on' : '')} onClick={toggleFs} title="Plein écran (Échap pour sortir)">{fs ? <><Shrink size={16} />Quitter</> : <><Expand size={16} />Plein écran</>}</button>
           </div>
         </div>
         <div className="wbbody">
-          <aside className="lib" aria-label="Formes UEFN">
-            <div style={{ fontWeight: 500, marginBottom: 8 }}>Formes UEFN</div>
+          {lib && <aside className="lib" aria-label="Formes UEFN">
+            <div className="row" style={{ justifyContent: 'space-between' }}><b style={{ fontWeight: 500 }}>Formes UEFN</b><button className="iconbtn" style={{ width: 26, height: 26 }} aria-label="Masquer" onClick={() => setLib(false)}><X size={14} /></button></div>
             {UEFN.map(([k, l, ic]) => <button key={k} className="libitem" disabled={!canEdit} onClick={() => add(k === 'zone' ? { kind: 'shape', shape: 'rect', w: 240, h: 160, text: 'Zone', dashed: true } : k === 'road' || k === 'wall' ? { kind: 'shape', shape: 'rect', w: k === 'road' ? 260 : 160, h: k === 'road' ? 28 : 14, text: '' } : k === 'path' ? { kind: 'stroke', x: 0, y: 0, points: [[center().x - 100, center().y], [center().x + 100, center().y]], width: 3, color: 'path' } : { kind: 'uefn', shape: k, w: 38, h: 38, text: l })}><span className="lico">{ic}</span>{l}</button>)}
             {ranking.length > 0 && <>
               <div style={{ fontWeight: 500, margin: '16px 0 8px' }}>Classement</div>
               {ranking.slice(0, 8).map(({ o, v }, i) => <div key={o.id} className="small" style={{ padding: '4px 0' }}><span className="mono muted">{i + 1}.</span> {meta.hidden && o.author_id !== me ? 'Idée cachée' : o.text} <b style={{ fontWeight: 500 }}>· {v}</b></div>)}
             </>}
-          </aside>
+          </aside>}
           <div ref={box} className="canvas" style={{ backgroundSize: `${GRID * view.z}px ${GRID * view.z}px`, backgroundPosition: `${view.x}px ${view.y}px`, cursor: tool === 'select' ? 'default' : 'crosshair' }}
-            onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onWheel={onWheel}
+            onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp}
             onDragOver={e => { if (canEdit && e.dataTransfer.types.includes('Files')) e.preventDefault() }}
             onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f && canEdit) importImage(f, toWorld(e.clientX, e.clientY)) }} onDoubleClick={e => { const t = (e.target as HTMLElement).closest('[data-oid]') as HTMLElement | null; if (t && canEdit) setEditing(t.dataset.oid!) }}>
             <div className="layer" style={{ transform: `translate(${view.x}px,${view.y}px) scale(${view.z})` }}>
@@ -495,8 +533,8 @@ function Canvas({ id }: { id: number }) {
               <button className="iconbtn" aria-label="Dézoomer" onClick={() => zoom(0.85)}><Minus size={16} /></button>
               <span className="small mono" style={{ minWidth: 46, textAlign: 'center' }}>{Math.round(view.z * 100)} %</span>
               <button className="iconbtn" aria-label="Zoomer" onClick={() => zoom(1.15)}><Plus size={16} /></button>
-              <button className="iconbtn" aria-label="Tout afficher" onClick={fit}><Maximize size={16} /></button>
-              <button className={'pill' + (gridOn ? ' on' : '')} onClick={() => setGridOn(g => !g)}>Magnétisme</button>
+              <button className="pill" title="Recadrer pour voir tout le tableau (Ctrl+0)" onClick={fit}><Maximize size={14} />Tout voir</button>
+              <button className={'pill' + (gridOn ? ' on' : '')} title="Aligner les objets sur la grille en les déplaçant" onClick={() => setGridOn(g => !g)}>Grille</button>
               {follow && <button className="pill on" onClick={() => setFollow(null)}><UserRound size={14} />Ne plus suivre</button>}
             </div>
             <MiniMap objs={list} view={view} box={box} />
@@ -504,7 +542,7 @@ function Canvas({ id }: { id: number }) {
           </div>
         </div>
       </section>
-      <p className="small muted">Astuces : molette ou deux doigts pour se déplacer, Ctrl/⌘ + molette ou pincer pour zoomer, Espace + glisser pour se déplacer, raccourcis V L N T R O C P H E F M pour les outils, Ctrl+Z / Ctrl+Maj+Z, Ctrl+C / V / D / X, flèches pour déplacer, poignée en bas à droite pour redimensionner, glisser une image pour l’importer, double-clic pour écrire, Maj+clic pour sélectionner plusieurs objets, Tab / Entrée sur un post-it pour la carte mentale, Suppr pour effacer. En mode vote, cliquez un post-it pour voter (Maj+clic pour retirer).</p>
+      <p className="small muted">Astuces : molette de la souris ou pincer sur le trackpad pour zoomer, deux doigts ou Espace + glisser pour se déplacer, raccourcis V L N T R O C P H E F M pour les outils, Ctrl+Z / Ctrl+Maj+Z, Ctrl+C / V / D / X, flèches pour déplacer, poignée en bas à droite pour redimensionner, glisser une image pour l’importer, double-clic pour écrire, Maj+clic pour sélectionner plusieurs objets, Tab / Entrée sur un post-it pour la carte mentale, Suppr pour effacer. En mode vote, cliquez un post-it pour voter (Maj+clic pour retirer).</p>
     </>
   )
 }
