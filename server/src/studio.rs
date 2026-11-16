@@ -280,7 +280,7 @@ pub async fn integrations(State(st): State<AppState>, u: AuthUser, Path(sid): Pa
     let role = studio_role(&st, &u, sid).await?;
     let rows: Vec<(String, i64, String)> = sqlx::query_as("SELECT kind, enabled, config FROM integrations WHERE studio_id = ?").bind(sid).fetch_all(&st.db).await?;
     let mut out = serde_json::Map::new();
-    for kind in ["discord", "github", "lore"] {
+    for kind in ["discord", "github", "lore", "apify"] {
         let r = rows.iter().find(|r| r.0 == kind);
         let mut cfg: Value = r.map(|r| serde_json::from_str(&r.2).unwrap_or(json!({}))).unwrap_or(json!({}));
         if role < Role::Admin {
@@ -307,7 +307,7 @@ pub async fn set_integration(State(st): State<AppState>, u: AuthUser, Path((sid,
     if studio_role(&st, &u, sid).await? < Role::Admin {
         return Err(AppError::Forbidden);
     }
-    if !["discord", "github", "lore"].contains(&kind.as_str()) {
+    if !["discord", "github", "lore", "apify"].contains(&kind.as_str()) {
         return Err(AppError::NotFound);
     }
     let mut cfg = b.config.unwrap_or(json!({}));

@@ -2,7 +2,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import {
   Home, FileText, PenTool, CalendarDays, KanbanSquare, Rocket, Coins, Users, Settings, LifeBuoy, PanelLeft,
-  Search, Moon, Sun, Bell, Plus, ChevronDown, Hexagon, LogOut, FileCode2, ListTree, Bot,
+  Search, Moon, Sun, Bell, Plus, ChevronDown, Hexagon, LogOut, FileCode2, ListTree, Bot, ChartNoAxesCombined, Hash, Flame, Sparkle,
 } from 'lucide-react'
 import { useApp } from '../state'
 import { ago, api } from '../api'
@@ -15,6 +15,7 @@ const GROUPS: [string, [string, string, any][]][] = [
   ['Espace', [['/pages', 'Pages', FileText], ['/tableau', 'Tableau blanc', PenTool]]],
   ['Production', [['/planifier', 'Planifier', CalendarDays], ['/taches', 'Tâches', KanbanSquare]]],
   ['UEFN', [['/verse', 'Éditeur Verse', FileCode2], ['/organiseur', 'Organiseur', ListTree], ['/ia', 'IA connectées', Bot]]],
+  ['Analyse', [['/analyse/marche', 'Marché', ChartNoAxesCombined], ['/analyse/tiktok', 'Tendances TikTok', Hash], ['/analyse/tendances', 'Maps qui marchent', Flame], ['/analyse/lancements', 'Meilleurs démarrages', Sparkle]]],
   ['Publication', [['/lancer', 'Lancer et suivre', Rocket]]],
   ['Studio', [['/remunerer', 'Rémunérer', Coins], ['/equipe', 'Équipe', Users]]],
 ]
@@ -32,7 +33,7 @@ export default function Layout() {
   const [acct, setAcct] = useState(false)
   const [newTask, setNewTask] = useState(false)
   const key = '/' + (loc.pathname.split('/')[1] || '')
-  const [group, title] = TITLES[key] ?? ['Général', '']
+  const [group, title] = TITLES[loc.pathname] ?? TITLES[key] ?? ['Général', '']
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {

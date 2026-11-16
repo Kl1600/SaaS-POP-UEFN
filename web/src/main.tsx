@@ -16,6 +16,7 @@ import Team, { Account } from './pages/Team'
 import { PageHead } from './components/ui'
 import Help from './pages/Help'
 import AI from './pages/AI'
+import { Market, TikTok, Trending, Launches } from './pages/Analysis'
 const VerseEditor = lazy(() => import('./pages/VerseEditor'))
 const Organizer = lazy(() => import('./pages/Organizer'))
 const L = (C: any) => <Suspense fallback={<main className="content"><p className="muted" style={{ padding: 28 }}>Chargement…</p></main>}><C /></Suspense>
@@ -44,6 +45,10 @@ function Gate() {
         <Route path="aide" element={<Help />} />
         <Route path="parametres" element={<main className="content"><PageHead title="Paramètres" help="Votre compte : nom, mot de passe, données personnelles." /><Account /></main>} />
         <Route path="ia" element={<AI />} />
+        <Route path="analyse/marche" element={<Market />} />
+        <Route path="analyse/tiktok" element={<TikTok />} />
+        <Route path="analyse/tendances" element={<Trending />} />
+        <Route path="analyse/lancements" element={<Launches />} />
         <Route path="*" element={<Overview />} />
       </Route>
     </Routes>

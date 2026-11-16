@@ -426,3 +426,18 @@ label.tool{cursor:pointer}label.tool.off{opacity:.4;cursor:default}
 .fsexit{position:absolute;top:12px;right:12px;z-index:20;height:36px}
 body.wb-fs .side,body.wb-fs .top{visibility:hidden}
 }
+@layer app{
+.minibars{display:flex;align-items:flex-end;gap:6px;height:120px;margin-top:8px}
+.minibars.tall{height:180px}
+.minibars > div{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;gap:4px;min-width:0}
+.minibars span{display:block;width:100%;border-radius:4px 4px 0 0;background:var(--text3);min-height:2px}
+.minibars > div:last-child span{background:var(--accent-grad)}
+.minibars em{font-style:normal;font-size:11px;color:var(--text2);white-space:nowrap}
+.rowlink{cursor:pointer}.rowlink:hover{background:var(--hover)}
+.ttgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.ttcard{display:flex;flex-direction:column;gap:8px;padding:14px;border:1px solid var(--border);border-radius:14px;color:var(--text)}
+.ttcard:hover{border-color:var(--text3)}
+.tttext{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;font-size:14px}
+.tbl .badge svg{margin-right:2px}
+}
+@layer app{.minibars > div{max-width:64px}}

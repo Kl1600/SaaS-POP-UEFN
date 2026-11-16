@@ -1,5 +1,6 @@
 mod access;
 mod account;
+mod analytics;
 mod ai;
 mod mail;
 mod manage;
@@ -116,6 +117,16 @@ fn api() -> Router<AppState> {
         .route("/api/notifications/read", post(account::read_notifications))
         .route("/api/studios/{sid}/members/{uid}/reset-link", post(account::admin_reset_link))
         .route("/api/maps/{mid}/search", get(account::search))
+        .route("/api/analytics/status", get(analytics::status))
+        .route("/api/analytics/refresh", post(analytics::refresh))
+        .route("/api/analytics/trending", get(analytics::trending))
+        .route("/api/analytics/launches", get(analytics::launches))
+        .route("/api/analytics/market", get(analytics::market))
+        .route("/api/analytics/islands/{code}", get(analytics::island))
+        .route("/api/analytics/watch", get(analytics::watched).post(analytics::watch))
+        .route("/api/maps/{mid}/island", get(analytics::map_island).put(analytics::set_map_island))
+        .route("/api/studios/{sid}/tiktok", get(analytics::tiktok))
+        .route("/api/studios/{sid}/tiktok/refresh", post(analytics::tiktok_refresh))
         .route("/api/me", get(auth::me).delete(manage::delete_me))
         .route("/api/me/export", get(manage::export_me))
         .route("/api/studios/{sid}", patch(manage::rename_studio).delete(manage::delete_studio))
@@ -255,6 +266,7 @@ async fn main() -> anyhow::Result<()> {
         println!("Compte de test : identifiant « kl », mot de passe « kl »");
     }
     tokio::spawn(integrations::scheduler(st.clone()));
+    tokio::spawn(analytics::crawler(st.clone()));
     tokio::spawn(manage::backup_loop(st.clone(), db_url.clone()));
     let web = std::env::var("POP_WEB_DIR").unwrap_or_else(|_| "../web/dist".into());
     let spa = ServeDir::new(&web).fallback(ServeFile::new(format!("{web}/index.html")));
