@@ -9,6 +9,7 @@ import { api } from '../api'
 import { useApp, useLoad } from '../state'
 import { PageHead } from '../components/ui'
 import { useMembers } from './Tasks'
+import { FormatBar, PenBar, Rich, RichEdit, ShapeSvg, textStyle, vAlign, strokeColor, FONTS } from './BoardFormat'
 
 type Obj = { id: string; kind: string; x: number; y: number; w?: number; h?: number; text?: string; shade?: number; votes?: Record<string, number>; author?: string; author_id?: number; task_id?: number; task_number?: number; from?: string; to?: string; style?: string; dashed?: boolean; arrow?: boolean; points?: number[][]; color?: string; width?: number; shape?: string; url?: string; locked?: boolean; reactions?: number } & Record<string, any>
 
@@ -80,6 +81,7 @@ function Canvas({ id }: { id: number }) {
   const [fs, setFs] = useState(false)
   const [menu, setMenu] = useState<string | null>(null)
   const [lib, setLib] = useState(false)
+  const [pen, setPen] = useState({ color: '#1A1A1A', width: 3 })
   const wbRef = useRef<HTMLElement>(null)
   const hist = useRef<{ undo: [string, Obj | null][][]; redo: [string, Obj | null][][] }>({ undo: [], redo: [] })
   const clip = useRef<Obj[]>([])
@@ -127,10 +129,13 @@ function Canvas({ id }: { id: number }) {
     raw(e.filter(([, o]) => o).map(([, o]) => o!), e.filter(([, o]) => !o).map(([i]) => i))
     setSel([])
   }
+  const objsRef = useRef(objs); objsRef.current = objs
+  const editStart = useRef<{ text?: string; html?: string } | null>(null)
+  useEffect(() => { editStart.current = editing && objs[editing] ? { text: objs[editing].text, html: objs[editing].html } : null }, [editing])
   const typeTimer = useRef<any>(null)
-  const typeText = (o: Obj, text: string) => {
-    const n = { ...o, text: text.slice(0, 2000) }
-    setObjs(s => ({ ...s, [o.id]: { ...s[o.id], text: n.text } }))
+  const typeText = (o: Obj, html: string, text: string) => {
+    const n = { ...(objsRef.current[o.id] ?? o), text: text.slice(0, 2000), html }
+    setObjs(s => ({ ...s, [o.id]: { ...s[o.id], text: n.text, html } }))
     clearTimeout(typeTimer.current)
     typeTimer.current = setTimeout(() => app.send({ t: 'board', board: id, op: 'upsert', objs: [n] }), 250)
   }
@@ -219,7 +224,7 @@ function Canvas({ id }: { id: number }) {
     if (tool === 'select' && !oid) { setSel([]); setEditing(null); return startPan(e) }
     if (!canEdit && tool !== 'select') return
     if (tool === 'lasso') { setLasso({ x0: p.x, y0: p.y, x1: p.x, y1: p.y }); drag.current = { mode: 'lasso' }; return }
-    if (tool === 'pen' || tool === 'hl') { const o: Obj = { id: uid(), kind: 'stroke', x: 0, y: 0, points: [[p.x, p.y]], width: tool === 'hl' ? 16 : 2.5, color: tool === 'hl' ? 'hl' : 'pen' }; setObjs(s => ({ ...s, [o.id]: o })); drag.current = { mode: 'draw', id: o.id }; return }
+    if (tool === 'pen' || tool === 'hl') { const o: Obj = { id: uid(), kind: 'stroke', x: 0, y: 0, points: [[p.x, p.y]], width: tool === 'hl' ? 16 : pen.width, color: tool === 'hl' ? 'hl' : pen.color }; setObjs(s => ({ ...s, [o.id]: o })); drag.current = { mode: 'draw', id: o.id }; return }
     if (tool === 'erase') { if (oid) del([oid]); drag.current = { mode: 'erase' }; return }
     if (tool === 'connector') { if (oid) { if (!connFrom) setConnFrom(oid); else if (connFrom !== oid) { push([{ id: uid(), kind: 'connector', x: 0, y: 0, from: connFrom, to: oid, style: connStyle, arrow: true }]); setConnFrom(null) } } return }
     if (['sticky', 'text', 'rect', 'ellipse', 'frame', 'comment'].includes(tool) && !oid) {
@@ -238,10 +243,11 @@ function Canvas({ id }: { id: number }) {
       const nsel = e.shiftKey ? (sel.includes(oid) ? sel.filter(s => s !== oid) : [...sel, oid]) : sel.includes(oid) ? sel : [oid]
       setSel(nsel)
       if (!canEdit || editing === oid) return
+      if (nsel.every(s => objs[s]?.lk)) return
       // Déplacer une sélection (un cadre emporte ce qu'il contient).
       const ids = new Set(nsel)
       nsel.forEach(s => { const f = objs[s]; if (f?.kind === 'frame') list.forEach(x => { if (x.kind !== 'connector' && x.kind !== 'stroke' && x.x >= f.x && x.y >= f.y && x.x + (x.w ?? 0) <= f.x + (f.w ?? 0) && x.y + (x.h ?? 0) <= f.y + (f.h ?? 0)) ids.add(x.id) }) })
-      drag.current = { mode: 'move', start: p, orig: [...ids].map(i => ({ ...objs[i] })) }
+      drag.current = { mode: 'move', start: p, orig: [...ids].filter(i => !objs[i]?.lk).map(i => ({ ...objs[i] })) }
       ;(e.target as HTMLElement).setPointerCapture?.(e.pointerId)
     }
   }
@@ -329,6 +335,10 @@ function Canvas({ id }: { id: number }) {
       if (mod && (e.key === '=' || e.key === '+')) { e.preventDefault(); zoom(1.2); return }
       if (mod && e.key === '-') { e.preventDefault(); zoom(1 / 1.2); return }
       if (mod && e.key.toLowerCase() === 'a') { e.preventDefault(); setSel(list.filter(o => o.kind !== 'connector').map(o => o.id)); return }
+      if (mod && canEdit && sel.length && ['b', 'i', 'u'].includes(e.key.toLowerCase())) {
+        e.preventDefault(); const k = e.key.toLowerCase(); const t = sel.map(i => objs[i]).filter(o => o && ['sticky', 'text', 'shape', 'comment', 'frame'].includes(o.kind))
+        if (t.length) push(t.map(o => ({ ...o, [k]: !t.every(x => x[k]) }))); return
+      }
       if (mod && e.key.toLowerCase() === 'c' && sel.length) { clip.current = withLinks(sel).map(o => ({ ...o })); app.toast(`${sel.length} objet(s) copié(s)`); return }
       if (!canEdit) return
       if (mod && e.key.toLowerCase() === 'z') { e.preventDefault(); travel(e.shiftKey ? 'redo' : 'undo'); return }
@@ -374,11 +384,37 @@ function Canvas({ id }: { id: number }) {
     const xs = list.flatMap(o => [o.x, o.x + (o.w ?? 40)]), ys = list.flatMap(o => [o.y, o.y + (o.h ?? 40)])
     const [x0, y0] = [Math.min(...xs) - 40, Math.min(...ys) - 40], [w, h] = [Math.max(...xs) - x0 + 40, Math.max(...ys) - y0 + 40]
     const esc = (s: string) => s.replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' } as any)[c])
+    const fam = (o: Obj) => (FONTS[o.ff ?? 'sans']?.[1] ?? 'sans-serif').replace(/"/g, "'")
+    const txt = (o: Obj, x: number, y: number, w: number, h: number, def: { size: number; color: string; anchor?: string; va?: string }) => {
+      const size = o.fs ?? def.size, lines = (o.text ?? '').split('\n').slice(0, 40), lh = size * 1.3
+      const ta = o.ta ?? def.anchor ?? 'left', va = o.va ?? def.va ?? 'top'
+      const tx = ta === 'center' ? x + w / 2 : ta === 'right' ? x + w - 10 : x + 10
+      const total = lines.length * lh, ty = (va === 'middle' ? y + (h - total) / 2 : va === 'bottom' ? y + h - total - 8 : y + 8) + size
+      const deco = [o.u && 'underline', o.s && 'line-through'].filter(Boolean).join(' ')
+      return `<text x="${tx}" y="${ty}" font-size="${size}" fill="${o.tc ?? def.color}" font-family="${fam(o)}" text-anchor="${ta === 'center' ? 'middle' : ta === 'right' ? 'end' : 'start'}"${o.b ? ' font-weight="700"' : ''}${o.i ? ' font-style="italic"' : ''}${deco ? ` text-decoration="${deco}"` : ''}>${lines.map((l, i) => `<tspan x="${tx}" dy="${i ? lh : 0}">${esc(l)}</tspan>`).join('')}</text>`
+    }
+    const shp = (o: Obj) => {
+      const { x, y } = o, w = o.w ?? 140, h = o.h ?? 90, X = (v: number) => x + (v / 100) * w, Y = (v: number) => y + (v / 100) * h
+      const pts = (a: number[][]) => a.map(([u, v]) => `${X(u)},${Y(v)}`).join(' ')
+      const fill = o.bg && o.bg !== 'none' ? o.bg : o.fill !== undefined ? SHADES[o.fill]?.[0] : 'none'
+      const sw = o.bw ?? 1.5, st = `fill="${fill}" stroke="${sw ? o.bc ?? '#1a1a1a' : 'none'}" stroke-width="${sw}"${(o.bs ?? (o.dashed ? 'dashed' : '')) === 'dashed' ? ' stroke-dasharray="8 6"' : o.bs === 'dotted' ? ' stroke-dasharray="2 4"' : ''}`
+      const k = o.shape
+      if (k === 'ellipse') return `<ellipse cx="${x + w / 2}" cy="${y + h / 2}" rx="${w / 2}" ry="${h / 2}" ${st}/>`
+      const poly: Record<string, number[][]> = { diamond: [[50, 0], [100, 50], [50, 100], [0, 50]], triangle: [[50, 0], [100, 100], [0, 100]], hexagon: [[25, 0], [75, 0], [100, 50], [75, 100], [25, 100], [0, 50]], para: [[20, 0], [100, 0], [80, 100], [0, 100]], star: [[50, 2], [61, 37], [98, 37], [68, 59], [79, 96], [50, 74], [21, 96], [32, 59], [2, 37], [39, 37]], arrow: [[0, 30], [65, 30], [65, 4], [100, 50], [65, 96], [65, 70], [0, 70]], bubble: [[0, 0], [100, 0], [100, 75], [40, 75], [20, 98], [24, 75], [0, 75]] }
+      if (poly[k!]) return `<polygon points="${pts(poly[k!])}" ${st}/>`
+      return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${k === 'round' ? 16 : 4}" ${st}/>`
+    }
     const parts = ordered.map(o => {
-      if (o.kind === 'sticky') { const [bg, fg] = SHADES[o.shade ?? 0]; return `<rect x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" rx="6" fill="${bg}" stroke="#d4d4d4"/><text x="${o.x + 10}" y="${o.y + 24}" font-size="14" fill="${fg}" font-family="sans-serif">${esc(o.text ?? '')}</text>` }
-      if (o.kind === 'frame') return `<rect x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" rx="10" fill="none" stroke="#a3a3a3"/><text x="${o.x}" y="${o.y - 8}" font-size="13" font-family="sans-serif">${esc(o.text ?? '')}</text>`
-      if (o.kind === 'stroke') return `<polyline points="${o.points?.map(p => p.join(',')).join(' ')}" fill="none" stroke="#000" stroke-opacity="${o.color === 'hl' ? 0.25 : 1}" stroke-width="${o.width}" stroke-linecap="round"/>`
-      if (o.kind === 'text' || o.kind === 'shape' || o.kind === 'uefn') return `<text x="${o.x}" y="${o.y + 20}" font-size="14" font-family="sans-serif">${esc(o.text ?? '')}</text>`
+      const op = o.op !== undefined ? ` opacity="${o.op}"` : ''
+      const g = (inner: string) => `<g${op}>${inner}</g>`
+      if (o.kind === 'sticky') { const [bg, fg] = SHADES[o.shade ?? 0]; return g(`<rect x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" rx="6" fill="${o.bg && o.bg !== 'none' ? o.bg : bg}" stroke="#d4d4d4"/>${txt(o, o.x, o.y, o.w ?? 160, o.h ?? 120, { size: 14, color: fg })}`) }
+      if (o.kind === 'frame') return g(`<rect x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" rx="10" fill="${o.bg && o.bg !== 'none' ? o.bg : 'none'}" stroke="${o.bc ?? '#a3a3a3'}" stroke-width="${o.bw ?? 1.5}"/><text x="${o.x}" y="${o.y - 8}" font-size="13" font-family="sans-serif">${esc(o.text ?? '')}</text>`)
+      if (o.kind === 'stroke') return g(`<polyline points="${o.points?.map(p => p.join(',')).join(' ')}" fill="none" stroke="${o.color?.startsWith('#') ? o.color : '#1a1a1a'}" stroke-opacity="${o.color === 'hl' ? 0.25 : 1}" stroke-width="${o.width}" stroke-linecap="round" stroke-linejoin="round"${o.dashed || o.color === 'path' ? ' stroke-dasharray="10 8"' : ''}/>`)
+      if (o.kind === 'connector') { const col = o.color?.startsWith('#') ? o.color : '#555', w = o.width ?? 1.6; return g(`<defs><marker id="m${o.id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="${Math.max(7, w * 3.5)}" markerHeight="${Math.max(7, w * 3.5)}" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="${col}"/></marker></defs><path d="${path(o)}" fill="none" stroke="${col}" stroke-width="${w}"${o.dashed ? ` stroke-dasharray="${w * 4} ${w * 3}"` : ''}${o.arrow ? ` marker-end="url(#m${o.id})"` : ''}${o.arrowStart ? ` marker-start="url(#m${o.id})"` : ''}/>`) }
+      if (o.kind === 'shape') return g(shp(o) + txt(o, o.x, o.y, o.w ?? 140, o.h ?? 90, { size: 13, color: o.fill !== undefined ? SHADES[o.fill]?.[1] ?? '#1a1a1a' : '#1a1a1a', anchor: 'center', va: 'middle' }))
+      if (o.kind === 'text' || o.kind === 'comment') return g(`${o.bg && o.bg !== 'none' ? `<rect x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" fill="${o.bg}"/>` : ''}${o.bw ? `<rect x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" fill="none" stroke="${o.bc ?? '#1a1a1a'}" stroke-width="${o.bw}"/>` : ''}${txt(o, o.x - 10, o.y - 8, (o.w ?? 220) + 10, o.h ?? 40, { size: o.kind === 'text' ? 18 : 14, color: '#1a1a1a' })}`)
+      if (o.kind === 'uefn') return `<circle cx="${o.x + 19}" cy="${o.y + 19}" r="19" fill="#fff" stroke="#1a1a1a" stroke-width="1.5"/><text x="${o.x + 19}" y="${o.y + 60}" font-size="11" text-anchor="middle" font-family="sans-serif">${esc(o.text ?? '')}</text>`
+      if (o.kind === 'image' && o.url) return g(`<image href="${esc(o.url)}" x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" preserveAspectRatio="xMidYMid meet"/>`)
       return ''
     })
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${x0} ${y0} ${w} ${h}" width="${w}" height="${h}"><rect x="${x0}" y="${y0}" width="${w}" height="${h}" fill="#fff"/>${parts.join('')}</svg>`
@@ -395,12 +431,20 @@ function Canvas({ id }: { id: number }) {
   const anchor = (o: Obj) => ({ x: o.x + (o.w ?? 38) / 2, y: o.y + (o.h ?? 38) / 2 })
   const path = (c: Obj) => {
     const a = objs[c.from!], b = objs[c.to!]; if (!a || !b) return ''
-    const p = anchor(a), q = anchor(b)
+    const edge = (o: Obj, t: { x: number; y: number }) => { const c = anchor(o), hw = (o.w ?? 38) / 2 + 4, hh = (o.h ?? 38) / 2 + 4, dx = t.x - c.x, dy = t.y - c.y; if (!dx && !dy) return c; const k = Math.min(dx ? hw / Math.abs(dx) : 1e9, dy ? hh / Math.abs(dy) : 1e9); return { x: c.x + dx * k, y: c.y + dy * k } }
+    const p = edge(a, anchor(b)), q = edge(b, anchor(a))
     if (c.style === 'straight') return `M${p.x},${p.y} L${q.x},${q.y}`
     if (c.style === 'elbow') return `M${p.x},${p.y} L${(p.x + q.x) / 2},${p.y} L${(p.x + q.x) / 2},${q.y} L${q.x},${q.y}`
     return `M${p.x},${p.y} C${(p.x + q.x) / 2},${p.y} ${(p.x + q.x) / 2},${q.y} ${q.x},${q.y}`
   }
   const selSticky = sel.filter(s => objs[s]?.kind === 'sticky')
+  // Barre de mise en forme au-dessus de la sélection (comme Miro), sinon en dessous si pas la place.
+  const barPos = (so: Obj[]) => {
+    const pts = so.flatMap(o => o.kind === 'stroke' ? (o.points ?? []) : o.kind === 'connector' ? [objs[o.from!], objs[o.to!]].filter(Boolean).map(a => [a.x + (a.w ?? 38) / 2, a.y + (a.h ?? 38) / 2]) : [[o.x, o.y], [o.x + (o.w ?? 40), o.y + (o.h ?? 40)]])
+    if (!pts.length) return null
+    const xs = pts.map(p => p[0]), ys = pts.map(p => p[1])
+    return { left: ((Math.min(...xs) + Math.max(...xs)) / 2) * view.z + view.x, top: Math.min(...ys) * view.z + view.y, bottom: Math.max(...ys) * view.z + view.y }
+  }
   const selFrame = sel.length === 1 && objs[sel[0]]?.kind === 'frame' ? sel[0] : null
   const ranking = list.filter(o => o.kind === 'sticky').map(o => ({ o, v: votesOf(o) })).filter(x => x.v > 0).sort((a, b) => b.v - a.v)
   const TOOLS: [string, string, any][] = [['select', 'Sélectionner (V)', MousePointer2], ['sticky', 'Post-it (N)', StickyNote], ['text', 'Texte (T)', Type], ['rect', 'Rectangle (R)', Square], ['ellipse', 'Cercle (O)', Circle], ['connector', 'Flèche entre deux objets (C)', Spline], ['pen', 'Stylo (P)', Pen], ['erase', 'Gomme (E)', Eraser]]
@@ -425,6 +469,7 @@ function Canvas({ id }: { id: number }) {
             <button className="tool" title="Annuler (Ctrl+Z)" aria-label="Annuler" disabled={!canEdit} onClick={() => travel('undo')}><Undo2 size={18} strokeWidth={1.5} /></button>
             <button className="tool" title="Rétablir (Ctrl+Maj+Z)" aria-label="Rétablir" disabled={!canEdit} onClick={() => travel('redo')}><Redo2 size={18} strokeWidth={1.5} /></button>
             {tool === 'sticky' && SHADES.map(([bg], i) => <button key={i} className="tool" title={SHADE_NAMES[i]} aria-label={SHADE_NAMES[i]} onClick={() => setShade(i)}><span style={{ width: 18, height: 18, borderRadius: 4, background: bg, border: shade === i ? '2px solid var(--text)' : '1px solid var(--border)' }} /></button>)}
+            {(tool === 'pen') && <PenBar color={pen.color} width={pen.width} onColor={c => setPen(p => ({ ...p, color: c }))} onWidth={w => setPen(p => ({ ...p, width: w }))} />}
             {tool === 'connector' && <select className="field" style={{ height: 34 }} value={connStyle} onChange={e => setConnStyle(e.target.value)} aria-label="Style"><option value="straight">Droit</option><option value="elbow">Coudé</option><option value="curve">Courbe</option></select>}
             {tool === 'connector' && <span className="small muted">{connFrom ? 'Cliquez l’objet d’arrivée' : 'Cliquez l’objet de départ'}</span>}
           </div>
@@ -465,69 +510,86 @@ function Canvas({ id }: { id: number }) {
           <div ref={box} className="canvas" style={{ backgroundSize: `${GRID * view.z}px ${GRID * view.z}px`, backgroundPosition: `${view.x}px ${view.y}px`, cursor: tool === 'select' ? 'default' : 'crosshair' }}
             onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp}
             onDragOver={e => { if (canEdit && e.dataTransfer.types.includes('Files')) e.preventDefault() }}
-            onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f && canEdit) importImage(f, toWorld(e.clientX, e.clientY)) }} onDoubleClick={e => { const t = (e.target as HTMLElement).closest('[data-oid]') as HTMLElement | null; if (t && canEdit) setEditing(t.dataset.oid!) }}>
+            onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f && canEdit) importImage(f, toWorld(e.clientX, e.clientY)) }} onDoubleClick={e => { const t = (e.target as HTMLElement).closest('[data-oid]') as HTMLElement | null; if (t && canEdit && !objs[t.dataset.oid!]?.lk && !['image', 'stroke', 'connector', 'uefn'].includes(objs[t.dataset.oid!]?.kind)) { setSel([t.dataset.oid!]); setEditing(t.dataset.oid!) } }}>
             <div className="layer" style={{ transform: `translate(${view.x}px,${view.y}px) scale(${view.z})` }}>
               <svg style={{ position: 'absolute', left: 0, top: 0, overflow: 'visible', pointerEvents: 'none' }} width="1" height="1">
-                <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor" /></marker></defs>
-                {list.filter(o => o.kind === 'connector').map(c => <path key={c.id} data-oid={c.id} d={path(c)} fill="none" stroke="var(--text2)" strokeWidth={sel.includes(c.id) ? 3 : 1.6} strokeDasharray={c.dashed ? '8 6' : undefined} markerEnd={c.arrow ? 'url(#arr)' : undefined} style={{ color: 'var(--text2)', pointerEvents: 'stroke' }} />)}
-                {list.filter(o => o.kind === 'stroke').map(s => <polyline key={s.id} data-oid={s.id} points={s.points?.map(p => p.join(',')).join(' ')} fill="none" stroke="var(--text)" strokeOpacity={s.color === 'hl' ? 0.25 : 1} strokeWidth={s.width} strokeDasharray={s.color === 'path' ? '10 8' : undefined} strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'stroke' }} />)}
+                                {list.filter(o => o.kind === 'connector').map(c => { const w = c.width ?? 1.6; const col = strokeColor(c, 'var(--text2)'); return <g key={c.id} opacity={c.op}>
+                  <defs><marker id={'arr-' + c.id} viewBox="0 0 10 10" refX="9" refY="5" markerWidth={Math.max(7, w * 3.5)} markerHeight={Math.max(7, w * 3.5)} markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill={col} /></marker></defs>
+                  {sel.includes(c.id) && <path d={path(c)} fill="none" stroke="#ED753E" strokeOpacity={0.35} strokeWidth={w + 8} />}
+                  <path data-oid={c.id} d={path(c)} fill="none" stroke={col} strokeWidth={w} strokeDasharray={c.dashed ? `${w * 4} ${w * 3}` : undefined} markerEnd={c.arrow ? `url(#arr-${c.id})` : undefined} markerStart={c.arrowStart ? `url(#arr-${c.id})` : undefined} style={{ pointerEvents: 'stroke' }} />
+                  <path data-oid={c.id} d={path(c)} fill="none" stroke="transparent" strokeWidth={Math.max(12, w + 8)} style={{ pointerEvents: 'stroke' }} />
+                </g> })}
+                {list.filter(o => o.kind === 'stroke').map(s => <g key={s.id} opacity={s.op}>
+                  {sel.includes(s.id) && <polyline points={s.points?.map(p => p.join(',')).join(' ')} fill="none" stroke="#ED753E" strokeOpacity={0.35} strokeWidth={(s.width ?? 2) + 8} strokeLinecap="round" strokeLinejoin="round" />}
+                  <polyline data-oid={s.id} points={s.points?.map(p => p.join(',')).join(' ')} fill="none" stroke={s.color === 'hl' ? 'var(--text)' : strokeColor(s)} strokeOpacity={s.color === 'hl' ? 0.25 : 1} strokeWidth={s.width} strokeDasharray={s.color === 'path' || s.dashed ? '10 8' : undefined} strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'stroke' }} />
+                </g>)}
               </svg>
               {ordered.filter(o => !['connector', 'stroke'].includes(o.kind)).map(o => {
                 const isSel = sel.includes(o.id) ? ' sel' : ''
                 const st = { left: o.x, top: o.y, width: o.w, height: o.h }
                 const ed = editing === o.id
-                const input = <textarea className="edit-in" autoFocus defaultValue={o.text} onPointerDown={e => e.stopPropagation()} onChange={e => typeText(o, e.target.value)} onBlur={e => { push([{ ...o, text: e.target.value.slice(0, 2000) }]); setEditing(null) }} onKeyDown={e => { if (e.key === 'Escape' || (e.key === 'Enter' && (e.metaKey || e.ctrlKey))) (e.target as HTMLTextAreaElement).blur() }} />
-                if (o.kind === 'image') return <img key={o.id} data-oid={o.id} className={'obj' + isSel} src={o.url} alt="" draggable={false} style={{ ...st, opacity: o.locked ? 0.5 : 1, pointerEvents: o.locked ? 'none' : 'auto', objectFit: 'contain' }} />
-                if (o.kind === 'frame') return <div key={o.id} data-oid={o.id} className={'obj frame' + isSel} style={st}><span className="fname">{ed ? <input autoFocus defaultValue={o.text} onPointerDown={e => e.stopPropagation()} onBlur={e => { push([{ ...o, text: e.target.value }]); setEditing(null) }} className="field" style={{ height: 26 }} /> : o.text}</span></div>
+                const ts = textStyle(o)
+                const input = <RichEdit o={o} style={ts} onType={(h, t) => typeText(o, h, t)} onDone={(h, t) => { const cur = objsRef.current[o.id]; setEditing(e => e === o.id ? null : e); if (!cur) return; push([{ ...cur, text: t.slice(0, 2000), html: h }], [{ ...cur, text: editStart.current?.text, html: editStart.current?.html }]) }} />
+                const bx = (def = 'flex-start'): React.CSSProperties => ({ ...st, opacity: o.op, justifyContent: vAlign(o, def) })
+                const border = (o.bw ?? 0) > 0 ? { border: `${o.bw}px ${o.bs ?? 'solid'} ${o.bc ?? 'var(--text)'}` } : {}
+                const lk = o.lk ? ' locked' : ''
+                if (o.kind === 'image') return <img key={o.id} data-oid={o.id} className={'obj' + isSel + lk} src={o.url} alt="" draggable={false} style={{ ...st, opacity: o.locked ? 0.5 : o.op ?? 1, pointerEvents: o.locked ? 'none' : 'auto', objectFit: 'contain' }} />
+                if (o.kind === 'frame') return <div key={o.id} data-oid={o.id} className={'obj frame' + isSel + lk} style={{ ...st, opacity: o.op, background: o.bg && o.bg !== 'none' ? o.bg : undefined, ...(o.bw !== undefined ? { border: o.bw ? `${o.bw}px ${o.bs ?? 'solid'} ${o.bc ?? 'var(--text3)'}` : '0' } : {}) }}><span className="fname" style={ts}>{ed ? <input autoFocus defaultValue={o.text} onPointerDown={e => e.stopPropagation()} onBlur={e => { push([{ ...o, text: e.target.value }]); setEditing(null) }} className="field" style={{ height: 26 }} /> : o.text}</span></div>
                 if (o.kind === 'sticky') {
-                  const [bg, fg] = SHADES[o.shade ?? 0]; const hide = meta.hidden && o.author_id !== me; const t = taskOf(o.task_number)
-                  return <div key={o.id} data-oid={o.id} className={'obj sticky' + isSel} style={{ ...st, background: bg, color: fg }}>
-                    {ed ? input : hide ? <div className="hiddenidea">Idée cachée<div className="small">de {o.author?.split(' ')[0]}</div></div> : <div style={{ fontWeight: 500, lineHeight: 1.3, overflow: 'hidden' }}>{o.text || <span style={{ opacity: 0.4 }}>Double-clic pour écrire</span>}</div>}
-                    <div className="row" style={{ justifyContent: 'space-between', marginTop: 'auto', gap: 6 }}><span className="small" style={{ opacity: 0.7 }}>{o.author?.split(' ')[0]}</span>{votesOf(o) > 0 && <span className="votes">{votesOf(o)} vote{votesOf(o) > 1 ? 's' : ''}</span>}</div>
+                  const [sbg, sfg] = SHADES[o.shade ?? 0]; const bg = o.bg && o.bg !== 'none' ? o.bg : sbg; const hide = meta.hidden && o.author_id !== me; const t = taskOf(o.task_number)
+                  return <div key={o.id} data-oid={o.id} className={'obj sticky' + isSel + lk} style={{ ...bx(), background: bg, color: sfg }}>
+                    <div className="tbody" style={{ ...ts, justifyContent: vAlign(o) }}>{ed ? input : hide ? <div className="hiddenidea">Idée cachée<div className="small">de {o.author?.split(' ')[0]}</div></div> : <Rich o={o} placeholder="Double-clic pour écrire" />}</div>
+                    <div className="row" style={{ justifyContent: 'space-between', gap: 6, flex: 'none' }}><span className="small" style={{ opacity: 0.7 }}>{o.author?.split(' ')[0]}</span>{votesOf(o) > 0 && <span className="votes">{votesOf(o)} vote{votesOf(o) > 1 ? 's' : ''}</span>}</div>
                     {o.task_number && <span className="tasklink badge" style={{ background: 'var(--surface)' }}>#{o.task_number} · {t ? ({ todo: 'À faire', doing: 'En cours', blocked: 'Bloqué', done: 'Fait' } as any)[t.status] : '…'}</span>}
                   </div>
                 }
-                if (o.kind === 'uefn') return <div key={o.id} data-oid={o.id} className={'obj uefn' + isSel} style={{ left: o.x, top: o.y }} title={o.text}>{UEFN.find(u => u[0] === o.shape)?.[2] ?? '•'}<span className="ulab">{o.text}</span></div>
-                if (o.kind === 'shape') return <div key={o.id} data-oid={o.id} className={'obj shape' + isSel} style={{ ...st, borderRadius: o.shape === 'ellipse' ? '50%' : 6, borderStyle: o.dashed ? 'dashed' : 'solid', background: o.fill !== undefined ? SHADES[o.fill]?.[0] : undefined, color: o.fill !== undefined ? SHADES[o.fill]?.[1] : undefined }}>{ed ? input : o.text}</div>
-                if (o.kind === 'comment') return <div key={o.id} data-oid={o.id} className={'obj sticky' + isSel} style={{ ...st, background: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)' }}><span className="small muted">Commentaire · {o.author?.split(' ')[0]}</span>{ed ? input : <div>{o.text}</div>}</div>
-                return <div key={o.id} data-oid={o.id} className={'obj wtext' + isSel} style={st}>{ed ? input : o.text}</div>
+                if (o.kind === 'uefn') return <div key={o.id} data-oid={o.id} className={'obj uefn' + isSel + lk} style={{ left: o.x, top: o.y, opacity: o.op }} title={o.text}>{UEFN.find(u => u[0] === o.shape)?.[2] ?? '•'}<span className="ulab">{o.text}</span></div>
+                if (o.kind === 'shape') {
+                  const so = { ...o, bg: o.bg ?? (o.fill !== undefined ? SHADES[o.fill]?.[0] : undefined) }
+                  return <div key={o.id} data-oid={o.id} className={'obj shape' + isSel + lk} style={{ ...bx('center'), color: o.tc ?? (o.fill !== undefined ? SHADES[o.fill]?.[1] : undefined) }}>
+                    <ShapeSvg o={so} />
+                    <div className="tbody" style={{ ...ts, textAlign: o.ta ?? 'center', justifyContent: vAlign(o, 'center') }}>{ed ? input : <Rich o={o} />}</div>
+                  </div>
+                }
+                if (o.kind === 'comment') return <div key={o.id} data-oid={o.id} className={'obj sticky' + isSel + lk} style={{ ...bx(), background: o.bg && o.bg !== 'none' ? o.bg : 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)', ...border }}><span className="small muted">Commentaire · {o.author?.split(' ')[0]}</span><div className="tbody" style={ts}>{ed ? input : <Rich o={o} />}</div></div>
+                return <div key={o.id} data-oid={o.id} className={'obj wtext' + isSel + lk} style={{ ...bx(), background: o.bg && o.bg !== 'none' ? o.bg : undefined, ...border, padding: o.bg || o.bw ? 8 : undefined }}><div className="tbody" style={ts}>{ed ? input : <Rich o={o} />}</div></div>
               })}
-              {canEdit && sel.length === 1 && objs[sel[0]] && !['connector', 'stroke', 'uefn'].includes(objs[sel[0]].kind) && editing !== sel[0] && (() => { const o = objs[sel[0]]; return <div data-handle={o.id} className="rhandle" title="Redimensionner (Maj : garder les proportions)" style={{ left: o.x + (o.w ?? 40) - 6, top: o.y + (o.h ?? 40) - 6, transform: `scale(${1 / view.z})` }} /> })()}
+              {canEdit && sel.length === 1 && objs[sel[0]] && !['connector', 'stroke', 'uefn'].includes(objs[sel[0]].kind) && !objs[sel[0]].lk && editing !== sel[0] && (() => { const o = objs[sel[0]]; return <div data-handle={o.id} className="rhandle" title="Redimensionner (Maj : garder les proportions)" style={{ left: o.x + (o.w ?? 40) - 6, top: o.y + (o.h ?? 40) - 6, transform: `scale(${1 / view.z})` }} /> })()}
               {lasso && <div style={{ position: 'absolute', left: Math.min(lasso.x0, lasso.x1), top: Math.min(lasso.y0, lasso.y1), width: Math.abs(lasso.x1 - lasso.x0), height: Math.abs(lasso.y1 - lasso.y0), border: '1px dashed var(--text)', background: 'rgba(127,127,127,.08)' }} />}
               {Object.entries(cursors).filter(([, c]) => Date.now() - c.t < 15000).map(([u, c]) => (
                 <div key={u} className="wcursor" style={{ left: c.x, top: c.y, transform: `scale(${1 / view.z})`, transformOrigin: '0 0' }}><svg width="16" height="16" viewBox="0 0 24 24"><path d="M3 2l7 19 2.5-8.5L21 10z" fill="var(--text)" /></svg><span>{c.name.split(' ')[0]}</span></div>
               ))}
             </div>
 
-            {sel.length > 0 && selSticky.length === 0 && !selFrame && canEdit && (
-              <div className="selbar" onPointerDown={e => e.stopPropagation()}>
-                <span>{sel.length} objet(s)</span>
-                {sel.some(i => objs[i]?.kind === 'shape') && <select className="field" style={{ height: 34 }} value="" onChange={e => push(sel.filter(i => objs[i]?.kind === 'shape').map(i => ({ ...objs[i], fill: e.target.value === 'none' ? undefined : Number(e.target.value) })))} aria-label="Couleur"><option value="">Couleur…</option><option value="none">Aucune</option>{SHADE_NAMES.map((l, i) => <option key={i} value={i}>{l}</option>)}</select>}
-                {sel.length > 1 && <>
-                  <button className="iconbtn" title="Aligner à gauche" aria-label="Aligner à gauche" onClick={() => align('left')}><AlignStartVertical size={16} /></button>
-                  <button className="iconbtn" title="Centrer horizontalement" aria-label="Centrer horizontalement" onClick={() => align('hcenter')}><AlignCenterVertical size={16} /></button>
-                  <button className="iconbtn" title="Aligner en haut" aria-label="Aligner en haut" onClick={() => align('top')}><AlignStartHorizontal size={16} /></button>
-                  <button className="iconbtn" title="Centrer verticalement" aria-label="Centrer verticalement" onClick={() => align('vcenter')}><AlignCenterHorizontal size={16} /></button>
-                  {sel.length > 2 && <button className="pill" onClick={() => align('hdist')}>Répartir</button>}
+            {canEdit && sel.length > 0 && (() => {
+              const so = sel.map(i => objs[i]).filter(Boolean)
+              if (!so.length) return null
+              const ed = editing && sel.includes(editing)
+              return <FormatBar sel={so} editing={!!ed} push={l => push(l as Obj[])} pos={barPos(so)} extra={<>
+                {selSticky.length > 0 && selSticky.length === sel.length && <>
+                  <div className="fpop"><button className={'fbtn' + (menu === 'shade' ? ' on' : '')} title="Couleur du post-it" aria-label="Couleur du post-it" onClick={() => setMenu(menu === 'shade' ? null : 'shade')}><span className="sw" style={{ width: 16, height: 16, background: objs[selSticky[0]]?.bg ?? SHADES[objs[selSticky[0]]?.shade ?? 0][0] }} /></button>
+                    {menu === 'shade' && <div className="fmenu"><div className="row" style={{ gap: 6 }}>{SHADES.map(([bg], i) => <button key={i} className="sw" style={{ background: bg, width: 22, height: 22 }} title={SHADE_NAMES[i]} aria-label={SHADE_NAMES[i]} onClick={() => { push(selSticky.map(s => ({ ...objs[s], shade: i, bg: undefined }))); setMenu(null) }} />)}</div></div>}</div>
+                  <div className="fpop"><button className={'fbtn' + (menu === 'conv' ? ' on' : '')} title="Convertir en tâches" onClick={() => setMenu(menu === 'conv' ? null : 'conv')} style={{ width: 'auto', padding: '0 8px' }}>Tâches</button>
+                    {menu === 'conv' && <div className="fmenu" style={{ display: 'grid', gap: 8, width: 220 }}>
+                      <select className="field" style={{ height: 34 }} value={convert.assignee} onChange={e => setConvert({ ...convert, assignee: e.target.value })} aria-label="Assigné"><option value="">Assigné…</option>{mem?.members.map((m: any) => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
+                      <select className="field" style={{ height: 34 }} value={convert.tag} onChange={e => setConvert({ ...convert, tag: e.target.value })} aria-label="Étiquette">{['code', 'carte', 'conception', 'test'].map(t => <option key={t}>{t}</option>)}</select>
+                      <button className="btn pri" style={{ height: 34 }} onClick={() => { doConvert(); setMenu(null) }}>Convertir {selSticky.length} post-it</button>
+                    </div>}</div>
                 </>}
-                <button className="iconbtn" title="Premier plan" aria-label="Premier plan" onClick={() => push(sel.map(i => ({ ...objs[i], z: zTop() })))}><BringToFront size={16} /></button>
-                <button className="iconbtn" title="Arrière-plan" aria-label="Arrière-plan" onClick={() => push(sel.map(i => ({ ...objs[i], z: zBottom() })))}><SendToBack size={16} /></button>
-                <button className="iconbtn" title="Dupliquer (Ctrl+D)" aria-label="Dupliquer" onClick={() => paste(withLinks(sel))}><Copy size={16} /></button>
-                <button className="iconbtn" title="Supprimer (Suppr)" aria-label="Supprimer" onClick={() => del(sel)}><Trash2 size={16} /></button>
-              </div>
-            )}
-            {selSticky.length > 0 && canEdit && (
-              <div className="selbar" onPointerDown={e => e.stopPropagation()}>
-                <span>{selSticky.length} post-it</span>
-                <select className="field" style={{ height: 34 }} value={convert.assignee} onChange={e => setConvert({ ...convert, assignee: e.target.value })} aria-label="Assigné"><option value="">Assigné…</option>{mem?.members.map((m: any) => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
-                <select className="field" style={{ height: 34 }} value={convert.tag} onChange={e => setConvert({ ...convert, tag: e.target.value })} aria-label="Étiquette">{['code', 'carte', 'conception', 'test'].map(t => <option key={t}>{t}</option>)}</select>
-                <button className="btn pri" style={{ height: 34 }} onClick={doConvert}>Convertir en tâches</button>
-                <select className="field" style={{ height: 34 }} value="" onChange={e => { push(selSticky.map(s => ({ ...objs[s], shade: Number(e.target.value) }))) }} aria-label="Nuance"><option value="">Couleur…</option>{SHADE_NAMES.map((l, i) => <option key={i} value={i}>{l}</option>)}</select>
-                <button className="iconbtn" title="Dupliquer (Ctrl+D)" aria-label="Dupliquer" onClick={() => paste(withLinks(sel))}><Copy size={16} /></button>
-                <button className="btn" style={{ height: 34 }} onClick={() => del(sel)}>Supprimer</button>
-              </div>
-            )}
-            {selFrame && canEdit && <div className="selbar" onPointerDown={e => e.stopPropagation()}><span>Cadre</span><button className="btn" style={{ height: 34 }} onClick={() => frameToPage(selFrame)}>Cadre → page</button><button className="btn" style={{ height: 34 }} onClick={() => del([selFrame])}>Supprimer</button></div>}
+                {selFrame && <button className="fbtn" style={{ width: 'auto', padding: '0 8px' }} onClick={() => frameToPage(selFrame)}>Cadre → page</button>}
+                {sel.length > 1 && <>
+                  <button className="fbtn" title="Aligner à gauche" aria-label="Aligner à gauche" onClick={() => align('left')}><AlignStartVertical size={16} /></button>
+                  <button className="fbtn" title="Centrer horizontalement" aria-label="Centrer horizontalement" onClick={() => align('hcenter')}><AlignCenterVertical size={16} /></button>
+                  <button className="fbtn" title="Aligner en haut" aria-label="Aligner en haut" onClick={() => align('top')}><AlignStartHorizontal size={16} /></button>
+                  <button className="fbtn" title="Centrer verticalement" aria-label="Centrer verticalement" onClick={() => align('vcenter')}><AlignCenterHorizontal size={16} /></button>
+                  {sel.length > 2 && <button className="fbtn" style={{ width: 'auto', padding: '0 8px' }} onClick={() => align('hdist')}>Répartir</button>}
+                </>}
+                <button className="fbtn" title="Premier plan" aria-label="Premier plan" onClick={() => push(sel.map(i => ({ ...objs[i], z: zTop() })))}><BringToFront size={16} /></button>
+                <button className="fbtn" title="Arrière-plan" aria-label="Arrière-plan" onClick={() => push(sel.map(i => ({ ...objs[i], z: zBottom() })))}><SendToBack size={16} /></button>
+                <button className="fbtn" title="Dupliquer (Ctrl+D)" aria-label="Dupliquer" onClick={() => paste(withLinks(sel))}><Copy size={16} /></button>
+                <button className="fbtn" title="Supprimer (Suppr)" aria-label="Supprimer" onClick={() => del(sel)}><Trash2 size={16} /></button>
+              </>} />
+            })()}
             {present !== null && <div className="selbar" onPointerDown={e => e.stopPropagation()}><button className="iconbtn" aria-label="Cadre précédent" onClick={() => goFrame(Math.max(0, present - 1))}><ChevronLeft size={18} /></button><span>{frames[present]?.text} · {present + 1}/{frames.length}</span><button className="iconbtn" aria-label="Cadre suivant" onClick={() => goFrame(Math.min(frames.length - 1, present + 1))}><ChevronRight size={18} /></button><button className="iconbtn" aria-label="Quitter" onClick={() => setPresent(null)}><X size={18} /></button></div>}
             <div className="zoombox" onPointerDown={e => e.stopPropagation()}>
               <button className="iconbtn" aria-label="Dézoomer" onClick={() => zoom(0.85)}><Minus size={16} /></button>
