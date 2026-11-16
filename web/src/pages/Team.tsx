@@ -88,7 +88,6 @@ function Integrations() {
         </>}
       </section>
     </div>
-    <McpTokens />
     <section className="card">
       <CardHead title="Rapport du soir" sub={`À poster dans ${data.discord.config.channel || 'votre salon'}`}><button className="btn" onClick={() => { navigator.clipboard?.writeText(report?.text ?? ''); toast('Rapport copié') }}><Copy size={16} />Copier</button></CardHead>
       <pre className="report">{report?.text}</pre>

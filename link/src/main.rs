@@ -37,6 +37,49 @@ struct Config {
     /// Noms d'outils MCP imposés si la détection automatique se trompe : python, compile, push.
     #[serde(default)]
     tools: HashMap<String, String>,
+    /// Liaison simplifiée : un projet UEFN = une map POP, chacun avec son jeton.
+    #[serde(default)]
+    links: Vec<ProjLink>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Default)]
+struct ProjLink {
+    project: String,
+    map: String,
+    token: String,
+}
+
+/// Adresse de POP et code intégrés à la fin de pop-link.exe quand il est téléchargé depuis POP.
+fn embedded() -> Option<Value> {
+    let exe = std::fs::read(std::env::current_exe().ok()?).ok()?;
+    let tail = &exe[exe.len().saturating_sub(4096)..];
+    let txt = String::from_utf8_lossy(tail);
+    let i = txt.rfind("#POPLINK#")?;
+    let j = txt[i..].find("#END#")? + i;
+    serde_json::from_str(&txt[i + 9..j]).ok()
+}
+
+/// Projet ouvert dans UEFN, partagé entre les projets reliés (vérifié toutes les 15 s).
+#[derive(Default)]
+struct OpenCache {
+    at: Option<std::time::Instant>,
+    open: Option<String>,
+}
+type Open = Arc<tokio::sync::Mutex<OpenCache>>;
+
+fn newest_mtime(dir: &std::path::Path, depth: usize) -> std::time::SystemTime {
+    let mut best = std::fs::metadata(dir).and_then(|m| m.modified()).unwrap_or(std::time::UNIX_EPOCH);
+    if depth == 0 { return best }
+    if let Ok(rd) = std::fs::read_dir(dir) {
+        for e in rd.flatten() {
+            let n = e.file_name().to_string_lossy().to_string();
+            if ["Intermediate", "DerivedDataCache", ".git", "Binaries"].contains(&n.as_str()) { continue }
+            let p = e.path();
+            let t = if p.is_dir() { newest_mtime(&p, depth - 1) } else { e.metadata().and_then(|m| m.modified()).unwrap_or(std::time::UNIX_EPOCH) };
+            if t > best { best = t }
+        }
+    }
+    best
 }
 
 fn config_path() -> PathBuf {
@@ -93,6 +136,8 @@ fn log(ui: &Shared, action: &str, res: &str) {
 // ---------- Pilote : le vrai UEFN via son serveur MCP ----------
 
 struct Link {
+    open: Open,
+    all_projects: Vec<String>,
     cfg: Config,
     mcp: mcpdriver::Mcp,
     scan: files::Scanner,
@@ -102,6 +147,22 @@ struct Link {
 }
 
 impl Link {
+    /// UEFN est « connecté » pour ce projet seulement si c'est le projet ouvert dans l'éditeur.
+    async fn uefn_here(&mut self) -> bool {
+        if !self.mcp.alive().await { return false }
+        if self.all_projects.len() <= 1 { return true }
+        let mut c = self.open.lock().await;
+        if c.at.map(|t| t.elapsed() > Duration::from_secs(15)).unwrap_or(true) {
+            let names: Vec<String> = self.all_projects.iter().map(|p| PathBuf::from(p).file_name().map(|n| n.to_string_lossy().to_lowercase()).unwrap_or_default()).collect();
+            let out = self.mcp.python("import unreal\nprint(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_dir()))\nprint(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_plugins_dir()))\ntry:\n    print(unreal.EditorLevelLibrary.get_editor_world().get_path_name())\nexcept Exception: pass").await.unwrap_or_default().to_lowercase();
+            let by_python = self.all_projects.iter().zip(&names).find(|(_, n)| !n.is_empty() && out.contains(n.as_str())).map(|(p, _)| p.clone());
+            // Sinon : le projet modifié le plus récemment (UEFN écrit dans le projet ouvert).
+            c.open = by_python.or_else(|| self.all_projects.iter().max_by_key(|p| newest_mtime(&PathBuf::from(p), 3)).cloned());
+            c.at = Some(std::time::Instant::now());
+        }
+        c.open.as_deref() == Some(self.cfg.project.as_str())
+    }
+
     fn need_uefn(&self) -> Result<()> {
         if !self.uefn {
             bail!("UEFN est fermé ou son serveur MCP n'est pas démarré.");
@@ -194,29 +255,49 @@ impl Link {
 
 async fn run(port: u16) -> Result<()> {
     let cfg = load()?;
-    let root = PathBuf::from(&cfg.project);
-    if !root.is_dir() {
-        bail!("Dossier du projet introuvable : {}", root.display());
-    }
-    let mcp_url = mcpdriver::find_url(cfg.uefn_mcp_url.as_deref(), &root);
-    let ui: Shared = Arc::new(Mutex::new(Ui { relay: "connexion…".into(), uefn: "?".into(), project: cfg.project.clone(), map: cfg.map.clone(), mcp_url: mcp_url.clone(), ..Default::default() }));
-    tokio::spawn(local_page(ui.clone(), port));
-    let mut link = Link { scan: files::Scanner::new(root), mcp: mcpdriver::Mcp::new(mcp_url.clone(), cfg.tools.clone()), cfg, uefn: false, last_actors: String::new(), ui: ui.clone() };
-    println!("UEFN Link · projet {} · map {}", link.cfg.project, link.cfg.map);
-    println!("UEFN MCP : {mcp_url}");
-    println!("Page d'état : http://127.0.0.1:{port}  (laissez cette fenêtre ouverte)");
-    let mut backoff = 1;
-    loop {
-        match session(&mut link).await {
-            Ok(()) => backoff = 1,
-            Err(e) => {
-                ui.lock().unwrap().relay = "hors ligne".into();
-                log(&ui, "connexion", &format!("{e:#}"));
-            }
+    // Liste des projets reliés : liaison simplifiée (plusieurs) ou appairage classique (un seul).
+    let links: Vec<ProjLink> = if cfg.links.is_empty() { vec![ProjLink { project: cfg.project.clone(), map: cfg.map.clone(), token: cfg.token.clone() }] } else { cfg.links.clone() };
+    let all: Vec<String> = links.iter().map(|l| l.project.clone()).collect();
+    let open: Open = Default::default();
+    let mut uis = vec![];
+    println!("UEFN Link · {} projet(s) relié(s) à {}", links.len(), cfg.server);
+    for l in &links {
+        let root = PathBuf::from(&l.project);
+        if !root.is_dir() {
+            println!("  ! dossier introuvable, ignoré : {}", root.display());
+            continue;
         }
-        tokio::time::sleep(Duration::from_secs(backoff)).await;
-        backoff = (backoff * 2).min(30);
+        let mut c = cfg.clone();
+        c.project = l.project.clone();
+        c.map = l.map.clone();
+        c.token = l.token.clone();
+        let mcp_url = mcpdriver::find_url(c.uefn_mcp_url.as_deref(), &root);
+        let ui: Shared = Arc::new(Mutex::new(Ui { relay: "connexion…".into(), uefn: "?".into(), project: c.project.clone(), map: c.map.clone(), mcp_url: mcp_url.clone(), ..Default::default() }));
+        uis.push(ui.clone());
+        println!("  · {} → map « {} »", c.project, c.map);
+        let mut link = Link { open: open.clone(), all_projects: all.clone(), scan: files::Scanner::new(root), mcp: mcpdriver::Mcp::new(mcp_url, c.tools.clone()), cfg: c, uefn: false, last_actors: String::new(), ui: ui.clone() };
+        tokio::spawn(async move {
+            let mut backoff = 1;
+            loop {
+                match session(&mut link).await {
+                    Ok(()) => backoff = 1,
+                    Err(e) => {
+                        link.ui.lock().unwrap().relay = "hors ligne".into();
+                        log(&link.ui, "connexion", &format!("{e:#}"));
+                    }
+                }
+                tokio::time::sleep(Duration::from_secs(backoff)).await;
+                backoff = (backoff * 2).min(30);
+            }
+        });
     }
+    if uis.is_empty() {
+        bail!("Aucun projet UEFN valide dans la configuration ({}).", config_path().display());
+    }
+    println!("Page d'état : http://127.0.0.1:{port}  (laissez cette fenêtre ouverte)");
+    local_page(uis, port).await;
+    futures::future::pending::<()>().await;
+    Ok(())
 }
 
 async fn session(link: &mut Link) -> Result<()> {
@@ -235,7 +316,7 @@ async fn session(link: &mut Link) -> Result<()> {
     });
     link.ui.lock().unwrap().relay = "connecté".into();
     log(&link.ui, "connexion", "relié à POP");
-    link.uefn = link.mcp.alive().await;
+    link.uefn = link.uefn_here().await;
     link.ui.lock().unwrap().uefn = if link.uefn { "connecté".into() } else { "fermé".into() };
     link.ui.lock().unwrap().tools = link.mcp.tools.iter().filter_map(|t| t["name"].as_str().map(String::from)).collect();
     tx.send(json!({ "t": "tools", "url": link.mcp.url.clone(), "tools": link.mcp.tools.iter().map(|t| json!({ "name": t["name"], "description": t["description"] })).collect::<Vec<_>>(), "roles": link.mcp.roles() })).ok();
@@ -266,7 +347,7 @@ async fn session(link: &mut Link) -> Result<()> {
             _ = tick.tick() => {
                 n += 1;
                 if n % 2 == 0 {
-                    let alive = link.mcp.alive().await;
+                    let alive = link.uefn_here().await;
                     if alive != link.uefn {
                         link.uefn = alive;
                         link.ui.lock().unwrap().uefn = if alive { "connecté".into() } else { "fermé".into() };
@@ -323,14 +404,15 @@ async fn sync(link: &mut Link, tx: &mpsc::UnboundedSender<Value>, full: bool) {
 
 // ---------- Page d'état locale ----------
 
-async fn local_page(ui: Shared, port: u16) {
+async fn local_page(uis: Vec<Shared>, port: u16) {
     use axum::{routing::get, Router};
     let app = Router::new().route("/", get(move || {
-        let u = ui.lock().unwrap().clone();
-        async move { axum::response::Html(page(&u)) }
+        let list: Vec<Ui> = uis.iter().map(|u| u.lock().unwrap().clone()).collect();
+        async move { axum::response::Html(list.iter().map(page).collect::<Vec<_>>().join("")) }
     }));
-    if let Ok(l) = tokio::net::TcpListener::bind(("127.0.0.1", port)).await {
-        let _ = axum::serve(l, app).await;
+    match tokio::net::TcpListener::bind(("127.0.0.1", port)).await {
+        Ok(l) => { let _ = axum::serve(l, app).await; }
+        Err(e) => println!("Page d'état indisponible ({e}) : un autre pop-link est peut-être déjà ouvert."),
     }
 }
 
@@ -389,6 +471,31 @@ fn find_projects() -> Vec<PathBuf> {
     out
 }
 
+/// pop-link.exe téléchargé depuis POP : tout est automatique (adresse et code intégrés).
+async fn auto_pair(emb: &Value) -> Result<()> {
+    let server = emb["server"].as_str().unwrap_or("").trim_end_matches('/').to_string();
+    let code = emb["code"].as_str().unwrap_or("").to_string();
+    let projects = find_projects();
+    let projects = if projects.is_empty() {
+        println!("Aucun projet trouvé dans Documents\\Fortnite Projects.");
+        vec![PathBuf::from(ask("Dossier du projet UEFN (glissez le dossier ici) :"))]
+    } else { projects };
+    println!("Projets UEFN trouvés :");
+    for p in &projects { println!("  · {}", p.display()) }
+    let device = std::env::var("COMPUTERNAME").unwrap_or_else(|_| "PC UEFN".into());
+    let body = json!({ "code": code, "device": device, "projects": projects.iter().map(|p| json!({ "name": p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default() })).collect::<Vec<_>>() });
+    let r: Value = reqwest::Client::new().post(format!("{server}/api/relay/pair-studio")).json(&body).send().await.context("POP injoignable")?.json().await?;
+    let list = r["links"].as_array().ok_or_else(|| anyhow!("{}", r["error"].as_str().unwrap_or("liaison refusée")))?;
+    let mut links = vec![];
+    for (l, p) in list.iter().zip(projects.iter()) {
+        links.push(ProjLink { project: std::path::absolute(p)?.to_string_lossy().to_string(), map: l["project"].as_str().unwrap_or("").into(), token: l["token"].as_str().unwrap_or("").into() });
+    }
+    let first = links.first().cloned().ok_or_else(|| anyhow!("aucun projet relié"))?;
+    save(&Config { server, token: first.token, project: first.project, map: first.map, links, ..Default::default() })?;
+    println!("\nC'est relié : {} projet(s) synchronisé(s) avec POP.\n", list.len());
+    Ok(())
+}
+
 /// Premier lancement par double-clic : questions simples dans la console.
 async fn guided_pair() -> Result<()> {
     println!("UEFN Link · première configuration\n");
@@ -441,7 +548,8 @@ async fn main() {
         Some("run") => run(port).await,
         None => {
             if load().is_err() {
-                if let Err(e) = guided_pair().await { println!("\nAppairage impossible : {e:#}"); pause(); return; }
+                let r = match embedded() { Some(emb) => auto_pair(&emb).await, None => guided_pair().await };
+                if let Err(e) = r { println!("\nLiaison impossible : {e:#}"); pause(); return; }
             }
             run(port).await
         }

@@ -2,7 +2,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import {
   Home, FileText, PenTool, CalendarDays, KanbanSquare, Rocket, Coins, Users, Settings, LifeBuoy, PanelLeft,
-  Search, Moon, Sun, Bell, Plus, ChevronDown, Hexagon, LogOut, FileCode2, ListTree,
+  Search, Moon, Sun, Bell, Plus, ChevronDown, Hexagon, LogOut, FileCode2, ListTree, Bot,
 } from 'lucide-react'
 import { useApp } from '../state'
 import { ago, api } from '../api'
@@ -14,7 +14,7 @@ const GROUPS: [string, [string, string, any][]][] = [
   ['Général', [['/', "Vue d'ensemble", Home]]],
   ['Espace', [['/pages', 'Pages', FileText], ['/tableau', 'Tableau blanc', PenTool]]],
   ['Production', [['/planifier', 'Planifier', CalendarDays], ['/taches', 'Tâches', KanbanSquare]]],
-  ['UEFN', [['/verse', 'Éditeur Verse', FileCode2], ['/organiseur', 'Organiseur', ListTree]]],
+  ['UEFN', [['/verse', 'Éditeur Verse', FileCode2], ['/organiseur', 'Organiseur', ListTree], ['/ia', 'IA connectées', Bot]]],
   ['Publication', [['/lancer', 'Lancer et suivre', Rocket]]],
   ['Studio', [['/remunerer', 'Rémunérer', Coins], ['/equipe', 'Équipe et intégrations', Users]]],
 ]

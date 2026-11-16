@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
-  GripVertical, Plus, Star, FileText, Copy, Trash2, Type, Heading1, Heading2, Heading3, List, ListOrdered, CheckSquare, ChevronRight, ChevronDown,
-  AlertCircle, Quote, Code, Table, Image, Video, Paperclip, Columns2, ListTree, Link2, PenTool, Database, Minus, Download, History, Share2, MessageSquare,
+  GripVertical, Plus, Star, FileText, Copy, Trash2, Type, Heading1, Heading2, Heading3, List, ListOrdered, CheckSquare, ChevronRight, ChevronDown, MoreHorizontal,
+  AlertCircle, Quote, Code, Table, Image, Video, Paperclip, Columns2, ListTree, Link2, PenTool, Database, Minus, Download, History, Share2, MessageSquare, RotateCcw, X,
 } from 'lucide-react'
 import { ago, api, frDate } from '../api'
 import { useApp, useLive, useLoad } from '../state'
@@ -70,7 +70,9 @@ export function BlockView({ b }: { b: Block }) {
 export default function Pages() {
   const { pid } = useParams()
   const nav = useNavigate()
-  const { map, canEdit, toast } = useApp()
+  const { map, canEdit, toast, role } = useApp()
+  const canDelete = ['owner', 'admin', 'member'].includes(role)
+  const [menu, setMenu] = useState<number | null>(null)
   const { data: tree, reload: reloadTree } = useLoad<any[]>(map ? `/api/maps/${map.id}/pages` : null, [map?.id])
   const { data: templates } = useLoad<any[]>('/api/page-templates')
   const [tplOpen, setTplOpen] = useState(false)
@@ -80,14 +82,34 @@ export default function Pages() {
   const create = async (template?: string, parent_id?: number) => {
     try { const r = await api.post(`/api/maps/${map!.id}/pages`, { template, parent_id }); setTplOpen(false); await reloadTree(); nav(`/pages/${r.id}`) } catch (e: any) { toast(e.message, true) }
   }
+  const removePage = async (p: any) => {
+    const n = (tree ?? []).filter(x => x.parent_id === p.id).length
+    if (!confirm(`Supprimer « ${p.title || 'Sans titre'} »${n ? ` et ses ${n} sous-page(s)` : ''} ? Elle ira dans la corbeille (restaurable).`)) return
+    try { await api.del(`/api/pages/${p.id}`); setMenu(null); await reloadTree(); if (p.id === id) nav('/pages'); toast('Page mise à la corbeille') } catch (e: any) { toast(e.message, true) }
+  }
+  const renamePage = async (p: any) => {
+    const t = prompt('Nouveau titre', p.title); if (!t) return
+    try { await api.patch(`/api/pages/${p.id}`, { title: t }); setMenu(null); reloadTree() } catch (e: any) { toast(e.message, true) }
+  }
   const children = (p: number | null) => (tree ?? []).filter(x => (x.parent_id ?? null) === p)
   const Node = ({ p, depth }: { p: any; depth: number }) => {
     const [open, setOpen] = useState(true)
     const kids = children(p.id)
     return <>
-      <div className="row" style={{ gap: 0 }}>
+      <div className="row tnode" style={{ gap: 0, position: 'relative' }}>
         <button className="titem" style={{ width: 24, padding: 0, justifyContent: 'center', marginLeft: depth * 14 }} aria-label={open ? 'Replier' : 'Déplier'} onClick={() => setOpen(!open)}>{kids.length ? (open ? <ChevronDown size={14} /> : <ChevronRight size={14} />) : null}</button>
-        <button className={'titem' + (p.id === id ? ' on' : '')} onClick={() => nav(`/pages/${p.id}`)}><span className="pico">{p.icon || <FileText size={12} />}</span><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title || 'Sans titre'}</span></button>
+        <button className={'titem' + (p.id === id ? ' on' : '')} onClick={() => nav(`/pages/${p.id}`)} onContextMenu={e => { e.preventDefault(); setMenu(p.id) }}><span className="pico">{p.icon || <FileText size={12} />}</span><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title || 'Sans titre'}</span></button>
+        {canEdit && <span className="tacts">
+          <button className="iconbtn" style={{ width: 26, height: 26 }} aria-label="Ajouter une sous-page" title="Sous-page" onClick={() => create(undefined, p.id)}><Plus size={14} /></button>
+          <button className="iconbtn" style={{ width: 26, height: 26 }} aria-label="Actions de la page" title="Actions" onClick={() => setMenu(menu === p.id ? null : p.id)}><MoreHorizontal size={14} /></button>
+        </span>}
+        {menu === p.id && <div className="menu" style={{ right: 0, top: 30, minWidth: 190 }} onMouseLeave={() => setMenu(null)}>
+          <button onClick={() => { setMenu(null); nav(`/pages/${p.id}`) }}><FileText size={16} />Ouvrir</button>
+          <button onClick={() => renamePage(p)}><Type size={16} />Renommer</button>
+          <button onClick={() => { setMenu(null); create(undefined, p.id) }}><Plus size={16} />Ajouter une sous-page</button>
+          <button onClick={async () => { setMenu(null); try { const r = await api.post(`/api/pages/${p.id}/duplicate`); await reloadTree(); nav(`/pages/${r.id}`) } catch (e: any) { toast(e.message, true) } }}><Copy size={16} />Dupliquer</button>
+          {canDelete && <button style={{ color: 'var(--tr)' }} onClick={() => removePage(p)}><Trash2 size={16} />Supprimer</button>}
+        </div>}
       </div>
       {open && kids.map(k => <Node key={k.id} p={k} depth={depth + 1} />)}
     </>
@@ -109,6 +131,7 @@ export default function Pages() {
           <div className="tsec">Pages de la map</div>
           {children(null).map(p => <Node key={p.id} p={p} depth={0} />)}
           {tree?.length === 0 && <Empty text="Aucune page pour l'instant." />}
+          <Trash />
         </nav>
         {id ? <Editor key={id} id={id} tree={tree ?? []} onNewChild={() => create(undefined, id)} /> : <div className="card"><Empty text="Créez votre première page." /></div>}
       </div>
@@ -215,6 +238,12 @@ function Editor({ id, tree, onNewChild }: { id: number; tree: any[]; onNewChild:
           <span className="small muted">{saving === 'saving' ? 'Enregistrement…' : saving === 'saved' ? 'Enregistré' : `Modifié par ${page.updated_by ?? '—'} ${ago(page.updated_at)}`}</span>
           <button className="iconbtn" aria-label={page.favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'} onClick={async () => { await api.patch(`/api/pages/${id}`, { favorite: !page.favorite }); setPage({ ...page, favorite: !page.favorite }) }}><Star size={18} fill={page.favorite ? 'currentColor' : 'none'} /></button>
           {!disabled && <button className="btn" onClick={onNewChild}>Sous-page</button>}
+          {!disabled && <button className="iconbtn" aria-label="Dupliquer la page" title="Dupliquer" onClick={async () => { try { const r = await api.post(`/api/pages/${id}/duplicate`); nav(`/pages/${r.id}`) } catch (e: any) { app.toast(e.message, true) } }}><Copy size={18} /></button>}
+          {['owner', 'admin', 'member'].includes(app.role) && <button className="iconbtn" aria-label="Mettre la page à la corbeille" title="Supprimer (corbeille)" onClick={async () => {
+            const kids = tree.filter(x => x.parent_id === id).length
+            if (!confirm(`Mettre « ${page.title || 'Sans titre'} »${kids ? ` et ses ${kids} sous-page(s)` : ''} à la corbeille ? Vous pourrez la restaurer.`)) return
+            try { await api.del(`/api/pages/${id}`); app.toast('Page mise à la corbeille'); nav('/pages') } catch (e: any) { app.toast(e.message, true) }
+          }}><Trash2 size={18} /></button>}
         </div>
       </div>
       <input className="field" style={{ width: 60, textAlign: 'center', fontSize: 20, height: 48, marginBottom: 8 }} defaultValue={page.icon} maxLength={2} aria-label="Icône" disabled={disabled}
@@ -433,4 +462,24 @@ function Share({ page, setPage }: { page: any; setPage: (p: any) => void }) {
     {page.share === 'link' && !link && <p className="small muted">Un lien est actif. Repassez en « Équipe » pour le désactiver, puis en « Lien » pour en créer un nouveau.</p>}
     <div className="row"><a className="btn" style={{ flex: 1 }} href={`/api/pages/${page.id}/export.md`}><Download size={16} />Markdown</a><button className="btn" style={{ flex: 1 }} onClick={() => window.print()}><Share2 size={16} />PDF</button></div>
   </div>
+}
+
+function Trash() {
+  const { map, role, toast } = useApp()
+  const nav = useNavigate()
+  const [open, setOpen] = useState(false)
+  const { data, reload } = useLoad<any>(map && open ? `/api/maps/${map.id}/trash` : null, [map?.id, open])
+  useLive(['pages', 'boards'], () => open && reload())
+  const can = ['owner', 'admin', 'member'].includes(role)
+  return <>
+    <button className="titem" style={{ marginTop: 10 }} onClick={() => setOpen(o => !o)}><Trash2 size={14} />Corbeille{data ? ` (${data.pages.length})` : ''}</button>
+    {open && <div className="stack" style={{ gap: 2, paddingLeft: 8 }}>
+      {data?.pages.length === 0 && <span className="small muted" style={{ padding: '4px 8px' }}>Vide</span>}
+      {data?.pages.map((p: any) => <div key={p.id} className="row small" style={{ gap: 4 }}>
+        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`Supprimée ${ago(p.deleted_at)}`}>{p.title || 'Sans titre'}</span>
+        {can && <button className="iconbtn" style={{ width: 28, height: 28 }} aria-label="Restaurer" title="Restaurer" onClick={async () => { await api.post(`/api/pages/${p.id}/restore`); reload(); nav(`/pages/${p.id}`) }}><RotateCcw size={14} /></button>}
+        {can && <button className="iconbtn" style={{ width: 28, height: 28 }} aria-label="Supprimer définitivement" title="Supprimer définitivement" onClick={async () => { if (confirm(`Supprimer définitivement « ${p.title} » ? Impossible à annuler.`)) { try { await api.del(`/api/pages/${p.id}?purge=true`); reload() } catch (e: any) { toast(e.message, true) } } }}><X size={14} /></button>}
+      </div>)}
+    </div>}
+  </>
 }

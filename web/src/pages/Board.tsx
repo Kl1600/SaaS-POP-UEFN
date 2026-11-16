@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import {
   MousePointer2, Lasso, StickyNote, Type, Square, Circle, Spline, Pen, Highlighter, Eraser, Frame, ImagePlus, MessageSquarePlus, ThumbsUp,
   Timer, Eye, EyeOff, LayoutGrid, Presentation, Download, Plus, Minus, Maximize, UserRound, ChevronLeft, ChevronRight, X, Network,
+  Expand, Shrink, Undo2, Redo2, Copy, Trash2, BringToFront, SendToBack, AlignStartVertical, AlignStartHorizontal, AlignCenterVertical, AlignCenterHorizontal, Upload, Pencil,
 } from 'lucide-react'
 import { api } from '../api'
 import { useApp, useLoad } from '../state'
@@ -12,7 +13,9 @@ import { useMembers } from './Tasks'
 type Obj = { id: string; kind: string; x: number; y: number; w?: number; h?: number; text?: string; shade?: number; votes?: Record<string, number>; author?: string; author_id?: number; task_id?: number; task_number?: number; from?: string; to?: string; style?: string; dashed?: boolean; arrow?: boolean; points?: number[][]; color?: string; width?: number; shape?: string; url?: string; locked?: boolean; reactions?: number } & Record<string, any>
 
 const uid = () => Math.random().toString(36).slice(2, 12)
-const SHADES = [['#FFFFFF', '#0A0A0A'], ['#E5E5E5', '#0A0A0A'], ['#A3A3A3', '#0A0A0A'], ['#404040', '#FFFFFF']]
+const SHADES = [['#FFFFFF', '#0A0A0A'], ['#E5E5E5', '#0A0A0A'], ['#A3A3A3', '#0A0A0A'], ['#404040', '#FFFFFF'], ['#FDF0A6', '#0A0A0A'], ['#C9EDD0', '#0A0A0A'], ['#CBE0FA', '#0A0A0A'], ['#F8D0E1', '#0A0A0A'], ['#FCD9B8', '#0A0A0A']]
+const SHADE_NAMES = ['Blanc', 'Gris clair', 'Gris moyen', 'Gris foncé', 'Jaune', 'Vert', 'Bleu', 'Rose', 'Orange']
+const KEYS: Record<string, string> = { v: 'select', l: 'lasso', n: 'sticky', t: 'text', r: 'rect', o: 'ellipse', c: 'connector', p: 'pen', h: 'hl', e: 'erase', f: 'frame', m: 'comment' }
 const GRID = 24
 const snap = (v: number, on: boolean) => (on ? Math.round(v / GRID) * GRID : v)
 const UEFN: [string, string, string][] = [
@@ -23,7 +26,7 @@ const UEFN: [string, string, string][] = [
 export default function Board() {
   const { bid } = useParams()
   const nav = useNavigate()
-  const { map, canEdit, toast } = useApp()
+  const { map, canEdit, toast, role } = useApp()
   const { data: list, reload } = useLoad<any[]>(map ? `/api/maps/${map.id}/boards` : null, [map?.id])
   const [tplOpen, setTplOpen] = useState(false)
   const id = bid ? Number(bid) : list?.[0]?.id
@@ -39,8 +42,13 @@ export default function Board() {
           <button className="btn" onClick={() => setTplOpen(o => !o)}>Nouveau tableau</button>
           {tplOpen && <div className="menu" style={{ right: 0, top: 48 }}><button onClick={() => create()}>Tableau vide</button>{TPL.map(([k, l]) => <button key={k} onClick={() => create(k)}>{l}</button>)}</div>}
         </div>}
+        {canEdit && id && <>
+          <button className="iconbtn" title="Renommer le tableau" aria-label="Renommer le tableau" onClick={async () => { const t = prompt('Nom du tableau', list?.find(b => b.id === id)?.title); if (t) { try { await api.patch(`/api/boards/${id}`, { title: t }); reload() } catch (e: any) { toast(e.message, true) } } }}><Pencil size={18} /></button>
+          <button className="iconbtn" title="Dupliquer le tableau" aria-label="Dupliquer le tableau" onClick={async () => { try { const r = await api.post(`/api/boards/${id}/duplicate`); await reload(); nav(`/tableau/${r.id}`) } catch (e: any) { toast(e.message, true) } }}><Copy size={18} /></button>
+          {['owner', 'admin', 'member'].includes(role) && <button className="iconbtn" title="Supprimer le tableau" aria-label="Supprimer le tableau" onClick={async () => { if (!confirm(`Mettre « ${list?.find(b => b.id === id)?.title} » à la corbeille ? (restaurable depuis la corbeille des Pages)`)) return; try { await api.del(`/api/boards/${id}`); await reload(); nav('/tableau') } catch (e: any) { toast(e.message, true) } }}><Trash2 size={18} /></button>}
+        </>}
       </PageHead>
-      {id && <Canvas key={id} id={id} />}
+      {id ? <Canvas key={id} id={id} /> : list && <div className="card"><p className="muted">Aucun tableau. Créez-en un avec « Nouveau tableau ».</p></div>}
     </main>
   )
 }
@@ -69,6 +77,11 @@ function Canvas({ id }: { id: number }) {
   const [shade, setShade] = useState(0)
   const [convert, setConvert] = useState({ assignee: '', tag: 'conception' })
   const [now, setNow] = useState(Date.now())
+  const [fs, setFs] = useState(false)
+  const wbRef = useRef<HTMLElement>(null)
+  const hist = useRef<{ undo: [string, Obj | null][][]; redo: [string, Obj | null][][] }>({ undo: [], redo: [] })
+  const clip = useRef<Obj[]>([])
+  const space = useRef(false)
   const box = useRef<HTMLDivElement>(null)
   const drag = useRef<any>(null)
   const lastSend = useRef(0)
@@ -94,7 +107,24 @@ function Canvas({ id }: { id: number }) {
   }), [id, app.subscribe])
   useEffect(() => { if (follow && cursors[follow] && box.current) { const r = box.current.getBoundingClientRect(); setView(v => ({ ...v, x: r.width / 2 - cursors[follow].x * v.z, y: r.height / 2 - cursors[follow].y * v.z })) } }, [follow, cursors])
 
-  const push = (list: Obj[]) => { setObjs(o => { const n = { ...o }; list.forEach(x => (n[x.id] = x)); return n }); app.send({ t: 'board', board: id, op: 'upsert', objs: list }) }
+  // Historique local : chaque changement garde l'état précédent des objets touchés (Ctrl+Z / Ctrl+Maj+Z).
+  const record = (entries: [string, Obj | null][]) => { hist.current.undo.push(entries); if (hist.current.undo.length > 200) hist.current.undo.shift(); hist.current.redo = [] }
+  const raw = (list: Obj[], ids: string[]) => {
+    setObjs(o => { const n = { ...o }; list.forEach(x => (n[x.id] = x)); ids.forEach(i => delete n[i]); return n })
+    if (list.length) app.send({ t: 'board', board: id, op: 'upsert', objs: list })
+    if (ids.length) app.send({ t: 'board', board: id, op: 'delete', ids })
+  }
+  const push = (list: Obj[], prev?: Obj[]) => {
+    record(list.map(x => [x.id, prev?.find(p => p.id === x.id) ?? (objs[x.id] ? { ...objs[x.id] } : null)]))
+    raw(list, [])
+  }
+  const travel = (from: 'undo' | 'redo') => {
+    const e = hist.current[from].pop(); if (!e) return
+    const back: [string, Obj | null][] = e.map(([i]) => [i, objs[i] ? { ...objs[i] } : null])
+    hist.current[from === 'undo' ? 'redo' : 'undo'].push(back)
+    raw(e.filter(([, o]) => o).map(([, o]) => o!), e.filter(([, o]) => !o).map(([i]) => i))
+    setSel([])
+  }
   const typeTimer = useRef<any>(null)
   const typeText = (o: Obj, text: string) => {
     const n = { ...o, text: text.slice(0, 2000) }
@@ -102,7 +132,51 @@ function Canvas({ id }: { id: number }) {
     clearTimeout(typeTimer.current)
     typeTimer.current = setTimeout(() => app.send({ t: 'board', board: id, op: 'upsert', objs: [n] }), 250)
   }
-  const del = (ids: string[]) => { if (!ids.length) return; const linked = Object.values(objs).filter(o => o.kind === 'connector' && (ids.includes(o.from!) || ids.includes(o.to!))).map(o => o.id); const all = [...ids, ...linked]; setObjs(o => { const n = { ...o }; all.forEach(i => delete n[i]); return n }); app.send({ t: 'board', board: id, op: 'delete', ids: all }); setSel([]) }
+  const del = (ids: string[]) => { if (!ids.length) return; const linked = Object.values(objs).filter(o => o.kind === 'connector' && (ids.includes(o.from!) || ids.includes(o.to!))).map(o => o.id); const all = [...new Set([...ids, ...linked])]; record(all.filter(i => objs[i]).map(i => [i, { ...objs[i] }])); raw([], all); setSel([]) }
+  const paste = (src: Obj[], dx = 24, dy = 24) => {
+    if (!src.length) return
+    const map: Record<string, string> = {}; src.forEach(o => (map[o.id] = uid()))
+    const out = src.filter(o => o.kind !== 'connector' || (map[o.from!] && map[o.to!])).map(o => ({ ...o, id: map[o.id], x: o.x + (o.kind === 'stroke' ? 0 : dx), y: o.y + (o.kind === 'stroke' ? 0 : dy), points: o.points?.map(p => [p[0] + dx, p[1] + dy]), from: o.from ? map[o.from] : undefined, to: o.to ? map[o.to] : undefined, votes: {}, task_id: undefined, task_number: undefined }))
+    push(out); setSel(out.filter(o => o.kind !== 'connector').map(o => o.id))
+  }
+  const withLinks = (ids: string[]) => [...ids.map(i => objs[i]).filter(Boolean), ...Object.values(objs).filter(o => o.kind === 'connector' && ids.includes(o.from!) && ids.includes(o.to!))]
+  const zTop = () => Math.max(0, ...Object.values(objs).map(o => o.z ?? 0)) + 1
+  const zBottom = () => Math.min(0, ...Object.values(objs).map(o => o.z ?? 0)) - 1
+  const align = (how: 'left' | 'top' | 'hcenter' | 'vcenter' | 'hdist') => {
+    const it = sel.map(i => objs[i]).filter(o => o && o.kind !== 'connector' && o.kind !== 'stroke'); if (it.length < 2) return
+    const minX = Math.min(...it.map(o => o.x)), minY = Math.min(...it.map(o => o.y))
+    const cx = (minX + Math.max(...it.map(o => o.x + (o.w ?? 38)))) / 2, cy = (minY + Math.max(...it.map(o => o.y + (o.h ?? 38)))) / 2
+    let out: Obj[]
+    if (how === 'hdist') {
+      const sorted = [...it].sort((a, b) => a.x - b.x); const total = sorted.reduce((s, o) => s + (o.w ?? 38), 0)
+      const span = Math.max(...it.map(o => o.x + (o.w ?? 38))) - minX; const gap = (span - total) / (sorted.length - 1); let x = minX
+      out = sorted.map(o => { const n = { ...o, x }; x += (o.w ?? 38) + gap; return n })
+    } else out = it.map(o => ({ ...o, x: how === 'left' ? minX : how === 'hcenter' ? cx - (o.w ?? 38) / 2 : o.x, y: how === 'top' ? minY : how === 'vcenter' ? cy - (o.h ?? 38) / 2 : o.y }))
+    push(out)
+  }
+  const importImage = (file: File, at?: { x: number; y: number }) => {
+    if (!file.type.startsWith('image/')) return app.toast('Seules les images sont acceptées.', true)
+    const r = new FileReader()
+    r.onload = () => {
+      const img = new window.Image()
+      img.onload = () => {
+        const k = Math.min(1, 1600 / Math.max(img.width, img.height)); const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k)
+        c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height)
+        const url = c.toDataURL('image/jpeg', 0.82)
+        if (url.length > 1_300_000) return app.toast('Image trop lourde, même compressée.', true)
+        const w = Math.min(600, c.width), h = Math.round(w * c.height / c.width), p = at ?? center()
+        push([{ id: uid(), kind: 'image', url, x: p.x - w / 2, y: p.y - h / 2, w, h, z: zBottom() }])
+      }
+      img.src = r.result as string
+    }
+    r.readAsDataURL(file)
+  }
+  const toggleFs = async () => {
+    const el = wbRef.current
+    if (!fs) { setFs(true); try { await el?.requestFullscreen?.() } catch {} } else { setFs(false); if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {}) }
+    setTimeout(fit, 120)
+  }
+  useEffect(() => { const h = () => { if (!document.fullscreenElement) setFs(false) }; document.addEventListener('fullscreenchange', h); return () => document.removeEventListener('fullscreenchange', h) }, [])
   const setMetaOp = (p: any) => app.send({ t: 'board', board: id, op: 'meta', ...p })
 
   const toWorld = (cx: number, cy: number) => { const r = box.current!.getBoundingClientRect(); return { x: (cx - r.left - view.x) / view.z, y: (cy - r.top - view.y) / view.z } }
@@ -110,7 +184,8 @@ function Canvas({ id }: { id: number }) {
   const add = (o: Partial<Obj>) => { const c = center(); const n = { id: uid(), x: snap(c.x - 80, gridOn), y: snap(c.y - 60, gridOn), ...o } as Obj; push([n]); setSel([n.id]); return n }
 
   const list = Object.values(objs)
-  const ordered = useMemo(() => [...list].sort((a, b) => (a.kind === 'image' && a.locked ? -2 : a.kind === 'frame' ? -1 : 0) - (b.kind === 'image' && b.locked ? -2 : b.kind === 'frame' ? -1 : 0)), [objs])
+  const rank = (o: Obj) => (o.kind === 'image' && o.locked ? -1e6 : o.kind === 'frame' ? -1e5 : 0) + (o.z ?? 0)
+  const ordered = useMemo(() => [...list].sort((a, b) => rank(a) - rank(b)), [objs])
   const taskOf = (n?: number) => tasks?.find(t => t.number === n)
   const myVotes = list.reduce((s, o) => s + (o.votes?.[String(me)] ?? 0), 0)
   const votesOf = (o: Obj) => Object.values(o.votes ?? {}).reduce((a, b) => a + b, 0)
@@ -118,6 +193,9 @@ function Canvas({ id }: { id: number }) {
   const frames = list.filter(o => o.kind === 'frame').sort((a, b) => a.y - b.y || a.x - b.x)
 
   const onDown = (e: React.PointerEvent) => {
+    const hd = (e.target as HTMLElement).closest('[data-handle]') as HTMLElement | null
+    if (hd && canEdit) { const o = objs[hd.dataset.handle!]; drag.current = { mode: 'resize', start: toWorld(e.clientX, e.clientY), orig: { ...o } }; (e.target as HTMLElement).setPointerCapture?.(e.pointerId); return }
+    if (space.current) return startPan(e)
     if (e.button === 1 || (e.button === 0 && (e.target as HTMLElement).closest('[data-oid]') === null && (tool === 'select' && !e.shiftKey && e.altKey))) return startPan(e)
     const p = toWorld(e.clientX, e.clientY)
     const target = (e.target as HTMLElement).closest('[data-oid]') as HTMLElement | null
@@ -158,6 +236,12 @@ function Canvas({ id }: { id: number }) {
     const d = drag.current
     if (!d) return
     if (d.mode === 'pan') setView(v => ({ ...v, x: d.vx + e.clientX - d.sx, y: d.vy + e.clientY - d.sy }))
+    if (d.mode === 'resize') {
+      const o = d.orig; const nw = Math.max(30, snap((o.w ?? 40) + p.x - d.start.x, gridOn)), nh = Math.max(24, snap((o.h ?? 40) + p.y - d.start.y, gridOn))
+      const r = e.shiftKey && o.w && o.h ? { w: nw, h: Math.round(nw * o.h / o.w) } : { w: nw, h: nh }
+      setObjs(s => ({ ...s, [o.id]: { ...s[o.id], ...r } })); d.cur = { ...o, ...r }
+      if (Date.now() - (d.last ?? 0) > 90) { d.last = Date.now(); app.send({ t: 'board', board: id, op: 'upsert', objs: [d.cur] }) }
+    }
     if (d.mode === 'lasso') setLasso(l => l && { ...l, x1: p.x, y1: p.y })
     if (d.mode === 'draw') setObjs(s => ({ ...s, [d.id]: { ...s[d.id], points: [...(s[d.id].points ?? []), [Math.round(p.x), Math.round(p.y)]] } }))
     if (d.mode === 'erase') { const t = (e.target as HTMLElement).closest('[data-oid]') as HTMLElement | null; if (t?.dataset.oid) del([t.dataset.oid]) }
@@ -173,8 +257,9 @@ function Canvas({ id }: { id: number }) {
     const d = drag.current
     drag.current = null
     if (!d) return
-    if (d.mode === 'move' && d.moved) push(d.moved)
-    if (d.mode === 'draw') { const o = objs[d.id]; if (o && (o.points?.length ?? 0) > 1) push([o]) }
+    if (d.mode === 'move' && d.moved) push(d.moved, d.orig)
+    if (d.mode === 'resize' && d.cur) push([d.cur], [d.orig])
+    if (d.mode === 'draw') { const o = objs[d.id]; if (o && (o.points?.length ?? 0) > 1) push([o], []) }
     if (d.mode === 'lasso' && lasso) {
       const [x0, x1] = [Math.min(lasso.x0, lasso.x1), Math.max(lasso.x0, lasso.x1)], [y0, y1] = [Math.min(lasso.y0, lasso.y1), Math.max(lasso.y0, lasso.y1)]
       setSel(list.filter(o => o.kind !== 'connector' && o.kind !== 'stroke' && o.x >= x0 && o.y >= y0 && o.x + (o.w ?? 40) <= x1 && o.y + (o.h ?? 40) <= y1).map(o => o.id))
@@ -182,9 +267,10 @@ function Canvas({ id }: { id: number }) {
     }
   }
   const onWheel = (e: React.WheelEvent) => {
+    if (!(e.ctrlKey || e.metaKey)) { setView(v => ({ ...v, x: v.x - e.deltaX, y: v.y - e.deltaY })); return }
     const r = box.current!.getBoundingClientRect()
     const mx = e.clientX - r.left, my = e.clientY - r.top
-    setView(v => { const z = Math.min(3, Math.max(0.2, v.z * (e.deltaY < 0 ? 1.1 : 0.9))); return { z, x: mx - ((mx - v.x) / v.z) * z, y: my - ((my - v.y) / v.z) * z } })
+    setView(v => { const z = Math.min(4, Math.max(0.1, v.z * Math.exp(-e.deltaY * 0.01))); return { z, x: mx - ((mx - v.x) / v.z) * z, y: my - ((my - v.y) / v.z) * z } })
   }
   const zoom = (k: number) => setView(v => ({ ...v, z: Math.min(3, Math.max(0.2, v.z * k)) }))
   const fit = () => {
@@ -205,7 +291,26 @@ function Canvas({ id }: { id: number }) {
     const h = (e: KeyboardEvent) => {
       if (editing || (e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'TEXTAREA' || (e.target as HTMLElement).isContentEditable) return
       if (present !== null) { if (e.key === 'ArrowRight') goFrame(Math.min(frames.length - 1, present + 1)); if (e.key === 'ArrowLeft') goFrame(Math.max(0, present - 1)); if (e.key === 'Escape') setPresent(null); return }
+      const mod = e.metaKey || e.ctrlKey
+      if (e.key === 'Escape' && fs) { toggleFs(); return }
+      if (mod && e.key === '0') { e.preventDefault(); fit(); return }
+      if (mod && (e.key === '=' || e.key === '+')) { e.preventDefault(); zoom(1.2); return }
+      if (mod && e.key === '-') { e.preventDefault(); zoom(1 / 1.2); return }
+      if (mod && e.key.toLowerCase() === 'a') { e.preventDefault(); setSel(list.filter(o => o.kind !== 'connector').map(o => o.id)); return }
+      if (mod && e.key.toLowerCase() === 'c' && sel.length) { clip.current = withLinks(sel).map(o => ({ ...o })); app.toast(`${sel.length} objet(s) copié(s)`); return }
       if (!canEdit) return
+      if (mod && e.key.toLowerCase() === 'z') { e.preventDefault(); travel(e.shiftKey ? 'redo' : 'undo'); return }
+      if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); travel('redo'); return }
+      if (mod && e.key.toLowerCase() === 'v') { e.preventDefault(); paste(clip.current); return }
+      if (mod && e.key.toLowerCase() === 'd') { e.preventDefault(); paste(withLinks(sel)); return }
+      if (mod && e.key.toLowerCase() === 'x' && sel.length) { clip.current = withLinks(sel).map(o => ({ ...o })); del(sel); return }
+      if (!mod && !e.altKey && KEYS[e.key.toLowerCase()] && !(e.key === 'Tab')) { setTool(KEYS[e.key.toLowerCase()]); setConnFrom(null); return }
+      if (e.key.startsWith('Arrow') && sel.length) {
+        e.preventDefault(); const k = e.shiftKey ? GRID : 2
+        const dx = e.key === 'ArrowLeft' ? -k : e.key === 'ArrowRight' ? k : 0, dy = e.key === 'ArrowUp' ? -k : e.key === 'ArrowDown' ? k : 0
+        push(sel.map(i => objs[i]).filter(o => o && o.kind !== 'connector').map(o => ({ ...o, x: o.x + dx, y: o.y + dy, points: o.points?.map(p => [p[0] + dx, p[1] + dy]) })))
+        return
+      }
       if ((e.key === 'Delete' || e.key === 'Backspace') && sel.length) { e.preventDefault(); del(sel) }
       const s = sel.length === 1 ? objs[sel[0]] : null
       if (s && (s.kind === 'sticky' || s.kind === 'shape') && (e.key === 'Tab' || e.key === 'Enter')) {
@@ -216,13 +321,14 @@ function Canvas({ id }: { id: number }) {
         push(parent ? [n, { id: uid(), kind: 'connector', x: 0, y: 0, from: parent.id, to: n.id, style: 'elbow' }] : [n]); setSel([n.id]); setEditing(n.id)
       }
     }
-    window.addEventListener('keydown', h)
-    return () => window.removeEventListener('keydown', h)
+    const sd = (e: KeyboardEvent) => { if (e.code === 'Space' && !(e.target as HTMLElement).closest('input,textarea,[contenteditable]')) { space.current = e.type === 'keydown'; if (e.type === 'keydown') e.preventDefault() } }
+    window.addEventListener('keydown', h); window.addEventListener('keydown', sd); window.addEventListener('keyup', sd)
+    return () => { window.removeEventListener('keydown', h); window.removeEventListener('keydown', sd); window.removeEventListener('keyup', sd) }
   })
 
   const groupByShade = () => {
     const st = list.filter(o => o.kind === 'sticky'); const c = center(); const moved: Obj[] = []
-    ;[0, 1, 2, 3].forEach(sh => st.filter(o => (o.shade ?? 0) === sh).forEach((o, i) => moved.push({ ...o, x: c.x - 400 + sh * 200, y: c.y - 200 + i * 140 })))
+    ;SHADES.forEach((_, sh) => st.filter(o => (o.shade ?? 0) === sh).forEach((o, i) => moved.push({ ...o, x: c.x - 900 + sh * 200, y: c.y - 200 + i * 140 })))
     push(moved)
   }
   const doConvert = async () => {
@@ -269,12 +375,16 @@ function Canvas({ id }: { id: number }) {
 
   return (
     <>
-      <section className="wb" aria-label="Canevas">
+      <section ref={wbRef} className={'wb' + (fs ? ' fs' : '')} aria-label="Canevas">
         <div className="wbtop">
           <div className="toolbar" role="toolbar" aria-label="Outils">
             {TOOLS.map(([k, l, I]) => <button key={k} className={'tool' + (tool === k ? ' on' : '')} title={l} aria-label={l} aria-pressed={tool === k} onClick={() => { setTool(k); setConnFrom(null) }} disabled={!canEdit && k !== 'select'}><I size={18} strokeWidth={1.5} /></button>)}
-            <button className="tool" title="Image (lien)" aria-label="Image" disabled={!canEdit} onClick={() => { const u = prompt('Lien https de l’image (plan de map vu du dessus, capture…)'); if (u && /^https:\/\//.test(u)) add({ kind: 'image', url: u, w: 600, h: 400, locked: confirm('Utiliser comme fond « plan de map » (verrouillé derrière) ?') }) }}><ImagePlus size={18} strokeWidth={1.5} /></button>
-            {tool === 'sticky' && SHADES.map(([bg], i) => <button key={i} className="tool" aria-label={`Nuance ${i + 1}`} onClick={() => setShade(i)}><span style={{ width: 18, height: 18, borderRadius: 4, background: bg, border: shade === i ? '2px solid var(--text)' : '1px solid var(--border)' }} /></button>)}
+            <label className={'tool' + (canEdit ? '' : ' off')} title="Importer une image (ou glissez-la sur le tableau)" aria-label="Importer une image"><Upload size={18} strokeWidth={1.5} /><input type="file" accept="image/*" hidden disabled={!canEdit} onChange={e => { const f = e.target.files?.[0]; if (f) importImage(f); e.target.value = '' }} /></label>
+            <button className="tool" title="Image par lien" aria-label="Image par lien" disabled={!canEdit} onClick={() => { const u = prompt('Lien https de l’image (plan de map vu du dessus, capture…)'); if (u && /^https:\/\//.test(u)) add({ kind: 'image', url: u, w: 600, h: 400, locked: confirm('Utiliser comme fond « plan de map » (verrouillé derrière) ?') }) }}><ImagePlus size={18} strokeWidth={1.5} /></button>
+            <span className="tsep" />
+            <button className="tool" title="Annuler (Ctrl+Z)" aria-label="Annuler" disabled={!canEdit} onClick={() => travel('undo')}><Undo2 size={18} strokeWidth={1.5} /></button>
+            <button className="tool" title="Rétablir (Ctrl+Maj+Z)" aria-label="Rétablir" disabled={!canEdit} onClick={() => travel('redo')}><Redo2 size={18} strokeWidth={1.5} /></button>
+            {tool === 'sticky' && SHADES.map(([bg], i) => <button key={i} className="tool" title={SHADE_NAMES[i]} aria-label={SHADE_NAMES[i]} onClick={() => setShade(i)}><span style={{ width: 18, height: 18, borderRadius: 4, background: bg, border: shade === i ? '2px solid var(--text)' : '1px solid var(--border)' }} /></button>)}
             {tool === 'connector' && <select className="field" style={{ height: 34 }} value={connStyle} onChange={e => setConnStyle(e.target.value)} aria-label="Style"><option value="straight">Droit</option><option value="elbow">Coudé</option><option value="curve">Courbe</option></select>}
             {tool === 'connector' && <span className="small muted">{connFrom ? 'Cliquez l’objet d’arrivée' : 'Cliquez l’objet de départ'}</span>}
           </div>
@@ -288,6 +398,7 @@ function Canvas({ id }: { id: number }) {
             <button className="pill" onClick={exportPng}><Download size={16} />PNG</button>
             <button className="pill" onClick={exportSvg}>SVG</button>
             <button className="pill" onClick={() => window.print()}>PDF</button>
+            <button className={'pill' + (fs ? ' on' : '')} onClick={toggleFs} title="Plein écran (Échap pour sortir)">{fs ? <><Shrink size={16} />Quitter</> : <><Expand size={16} />Plein écran</>}</button>
           </div>
         </div>
         <div className="wbbody">
@@ -300,7 +411,9 @@ function Canvas({ id }: { id: number }) {
             </>}
           </aside>
           <div ref={box} className="canvas" style={{ backgroundSize: `${GRID * view.z}px ${GRID * view.z}px`, backgroundPosition: `${view.x}px ${view.y}px`, cursor: tool === 'select' ? 'default' : 'crosshair' }}
-            onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onWheel={onWheel} onDoubleClick={e => { const t = (e.target as HTMLElement).closest('[data-oid]') as HTMLElement | null; if (t && canEdit) setEditing(t.dataset.oid!) }}>
+            onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onWheel={onWheel}
+            onDragOver={e => { if (canEdit && e.dataTransfer.types.includes('Files')) e.preventDefault() }}
+            onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f && canEdit) importImage(f, toWorld(e.clientX, e.clientY)) }} onDoubleClick={e => { const t = (e.target as HTMLElement).closest('[data-oid]') as HTMLElement | null; if (t && canEdit) setEditing(t.dataset.oid!) }}>
             <div className="layer" style={{ transform: `translate(${view.x}px,${view.y}px) scale(${view.z})` }}>
               <svg style={{ position: 'absolute', left: 0, top: 0, overflow: 'visible', pointerEvents: 'none' }} width="1" height="1">
                 <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor" /></marker></defs>
@@ -323,23 +436,42 @@ function Canvas({ id }: { id: number }) {
                   </div>
                 }
                 if (o.kind === 'uefn') return <div key={o.id} data-oid={o.id} className={'obj uefn' + isSel} style={{ left: o.x, top: o.y }} title={o.text}>{UEFN.find(u => u[0] === o.shape)?.[2] ?? '•'}<span className="ulab">{o.text}</span></div>
-                if (o.kind === 'shape') return <div key={o.id} data-oid={o.id} className={'obj shape' + isSel} style={{ ...st, borderRadius: o.shape === 'ellipse' ? '50%' : 6, borderStyle: o.dashed ? 'dashed' : 'solid' }}>{ed ? input : o.text}</div>
+                if (o.kind === 'shape') return <div key={o.id} data-oid={o.id} className={'obj shape' + isSel} style={{ ...st, borderRadius: o.shape === 'ellipse' ? '50%' : 6, borderStyle: o.dashed ? 'dashed' : 'solid', background: o.fill !== undefined ? SHADES[o.fill]?.[0] : undefined, color: o.fill !== undefined ? SHADES[o.fill]?.[1] : undefined }}>{ed ? input : o.text}</div>
                 if (o.kind === 'comment') return <div key={o.id} data-oid={o.id} className={'obj sticky' + isSel} style={{ ...st, background: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)' }}><span className="small muted">Commentaire · {o.author?.split(' ')[0]}</span>{ed ? input : <div>{o.text}</div>}</div>
                 return <div key={o.id} data-oid={o.id} className={'obj wtext' + isSel} style={st}>{ed ? input : o.text}</div>
               })}
+              {canEdit && sel.length === 1 && objs[sel[0]] && !['connector', 'stroke', 'uefn'].includes(objs[sel[0]].kind) && editing !== sel[0] && (() => { const o = objs[sel[0]]; return <div data-handle={o.id} className="rhandle" title="Redimensionner (Maj : garder les proportions)" style={{ left: o.x + (o.w ?? 40) - 6, top: o.y + (o.h ?? 40) - 6, transform: `scale(${1 / view.z})` }} /> })()}
               {lasso && <div style={{ position: 'absolute', left: Math.min(lasso.x0, lasso.x1), top: Math.min(lasso.y0, lasso.y1), width: Math.abs(lasso.x1 - lasso.x0), height: Math.abs(lasso.y1 - lasso.y0), border: '1px dashed var(--text)', background: 'rgba(127,127,127,.08)' }} />}
               {Object.entries(cursors).filter(([, c]) => Date.now() - c.t < 15000).map(([u, c]) => (
                 <div key={u} className="wcursor" style={{ left: c.x, top: c.y, transform: `scale(${1 / view.z})`, transformOrigin: '0 0' }}><svg width="16" height="16" viewBox="0 0 24 24"><path d="M3 2l7 19 2.5-8.5L21 10z" fill="var(--text)" /></svg><span>{c.name.split(' ')[0]}</span></div>
               ))}
             </div>
 
+            {sel.length > 0 && selSticky.length === 0 && !selFrame && canEdit && (
+              <div className="selbar" onPointerDown={e => e.stopPropagation()}>
+                <span>{sel.length} objet(s)</span>
+                {sel.some(i => objs[i]?.kind === 'shape') && <select className="field" style={{ height: 34 }} value="" onChange={e => push(sel.filter(i => objs[i]?.kind === 'shape').map(i => ({ ...objs[i], fill: e.target.value === 'none' ? undefined : Number(e.target.value) })))} aria-label="Couleur"><option value="">Couleur…</option><option value="none">Aucune</option>{SHADE_NAMES.map((l, i) => <option key={i} value={i}>{l}</option>)}</select>}
+                {sel.length > 1 && <>
+                  <button className="iconbtn" title="Aligner à gauche" aria-label="Aligner à gauche" onClick={() => align('left')}><AlignStartVertical size={16} /></button>
+                  <button className="iconbtn" title="Centrer horizontalement" aria-label="Centrer horizontalement" onClick={() => align('hcenter')}><AlignCenterVertical size={16} /></button>
+                  <button className="iconbtn" title="Aligner en haut" aria-label="Aligner en haut" onClick={() => align('top')}><AlignStartHorizontal size={16} /></button>
+                  <button className="iconbtn" title="Centrer verticalement" aria-label="Centrer verticalement" onClick={() => align('vcenter')}><AlignCenterHorizontal size={16} /></button>
+                  {sel.length > 2 && <button className="pill" onClick={() => align('hdist')}>Répartir</button>}
+                </>}
+                <button className="iconbtn" title="Premier plan" aria-label="Premier plan" onClick={() => push(sel.map(i => ({ ...objs[i], z: zTop() })))}><BringToFront size={16} /></button>
+                <button className="iconbtn" title="Arrière-plan" aria-label="Arrière-plan" onClick={() => push(sel.map(i => ({ ...objs[i], z: zBottom() })))}><SendToBack size={16} /></button>
+                <button className="iconbtn" title="Dupliquer (Ctrl+D)" aria-label="Dupliquer" onClick={() => paste(withLinks(sel))}><Copy size={16} /></button>
+                <button className="iconbtn" title="Supprimer (Suppr)" aria-label="Supprimer" onClick={() => del(sel)}><Trash2 size={16} /></button>
+              </div>
+            )}
             {selSticky.length > 0 && canEdit && (
               <div className="selbar" onPointerDown={e => e.stopPropagation()}>
                 <span>{selSticky.length} post-it</span>
                 <select className="field" style={{ height: 34 }} value={convert.assignee} onChange={e => setConvert({ ...convert, assignee: e.target.value })} aria-label="Assigné"><option value="">Assigné…</option>{mem?.members.map((m: any) => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
                 <select className="field" style={{ height: 34 }} value={convert.tag} onChange={e => setConvert({ ...convert, tag: e.target.value })} aria-label="Étiquette">{['code', 'carte', 'conception', 'test'].map(t => <option key={t}>{t}</option>)}</select>
                 <button className="btn pri" style={{ height: 34 }} onClick={doConvert}>Convertir en tâches</button>
-                <select className="field" style={{ height: 34 }} value="" onChange={e => { push(selSticky.map(s => ({ ...objs[s], shade: Number(e.target.value) }))) }} aria-label="Nuance"><option value="">Nuance…</option>{['Blanc', 'Gris clair', 'Gris moyen', 'Gris foncé'].map((l, i) => <option key={i} value={i}>{l}</option>)}</select>
+                <select className="field" style={{ height: 34 }} value="" onChange={e => { push(selSticky.map(s => ({ ...objs[s], shade: Number(e.target.value) }))) }} aria-label="Nuance"><option value="">Couleur…</option>{SHADE_NAMES.map((l, i) => <option key={i} value={i}>{l}</option>)}</select>
+                <button className="iconbtn" title="Dupliquer (Ctrl+D)" aria-label="Dupliquer" onClick={() => paste(withLinks(sel))}><Copy size={16} /></button>
                 <button className="btn" style={{ height: 34 }} onClick={() => del(sel)}>Supprimer</button>
               </div>
             )}
@@ -357,7 +489,7 @@ function Canvas({ id }: { id: number }) {
           </div>
         </div>
       </section>
-      <p className="small muted">Astuces : molette pour zoomer, glisser le fond pour se déplacer, double-clic pour écrire, Maj+clic pour sélectionner plusieurs objets, Tab / Entrée sur un post-it pour la carte mentale, Suppr pour effacer. En mode vote, cliquez un post-it pour voter (Maj+clic pour retirer).</p>
+      <p className="small muted">Astuces : molette ou deux doigts pour se déplacer, Ctrl/⌘ + molette ou pincer pour zoomer, Espace + glisser pour se déplacer, raccourcis V L N T R O C P H E F M pour les outils, Ctrl+Z / Ctrl+Maj+Z, Ctrl+C / V / D / X, flèches pour déplacer, poignée en bas à droite pour redimensionner, glisser une image pour l’importer, double-clic pour écrire, Maj+clic pour sélectionner plusieurs objets, Tab / Entrée sur un post-it pour la carte mentale, Suppr pour effacer. En mode vote, cliquez un post-it pour voter (Maj+clic pour retirer).</p>
     </>
   )
 }

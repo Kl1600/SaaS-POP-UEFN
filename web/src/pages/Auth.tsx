@@ -117,3 +117,42 @@ export function ResetPassword({ token }: { token: string }) {
     </div>
   )
 }
+
+/** Premier écran : relier UEFN pour importer ses projets (une map par projet), ou commencer sans. */
+export function Welcome() {
+  const { me, reload } = useApp()
+  const studio = me!.studios[0]
+  const [dl, setDl] = useState(false)
+  const [name, setName] = useState('')
+  const [err, setErr] = useState('')
+  useEffect(() => {
+    const t = setInterval(async () => {
+      try { const r = await api.get(`/api/studios/${studio.id}/link-status`); if (r.maps.length) { clearInterval(t); await reload() } } catch {}
+    }, 2500)
+    return () => clearInterval(t)
+  }, [studio.id])
+  return (
+    <div className="auth app">
+      <div className="card stack" style={{ gap: 16, width: 'min(620px, 100%)' }}>
+        <img src="/logo.png" alt="POP" style={{ filter: 'invert(1)', width: 90 }} />
+        <h1 style={{ margin: 0, fontSize: 26, fontWeight: 400 }}>Bienvenue, {me!.user.name.split(' ')[0]}</h1>
+        <p className="muted" style={{ margin: 0 }}>Reliez UEFN : POP importe vos projets (une map par projet), leurs fichiers Verse et leurs acteurs, et les garde synchronisés.</p>
+        <ol className="welcome-steps">
+          <li><b>Sur le PC où UEFN est installé</b>, ouvrez un projet puis : Projet → Paramètres du projet → <b>Enable Project Python Scripts</b>, et Édition → Préférences de l’éditeur → Model Context Protocol → <b>Start Server</b>.</li>
+          <li><a className="btn pri" href={`/api/studios/${studio.id}/relay/download`} onClick={() => setDl(true)} download>Télécharger UEFN Link (Windows)</a><div className="small muted" style={{ marginTop: 6 }}>Ce fichier est fait pour votre compte : rien à configurer. Valable 24 h. Ouvrez cette page sur le PC pour le télécharger directement dessus.</div></li>
+          <li><b>Double-cliquez sur pop-link.exe.</b> Si Windows affiche « Windows a protégé votre ordinateur » : Informations complémentaires → Exécuter quand même. Laissez la fenêtre ouverte.</li>
+        </ol>
+        <div className="b-callout small">{dl ? 'En attente du PC… cette page s’ouvrira toute seule dès que vos projets seront importés.' : 'Cette page se mettra à jour toute seule dès que vos projets seront importés.'}</div>
+        <details>
+          <summary className="small" style={{ cursor: 'pointer' }}>Commencer sans UEFN</summary>
+          <form className="row" style={{ marginTop: 10 }} onSubmit={async e => { e.preventDefault(); try { await api.post(`/api/studios/${studio.id}/skip-uefn`, { name }); await reload() } catch (er: any) { setErr(er.message) } }}>
+            <input className="field" style={{ flex: 1 }} placeholder="Nom de la map (ex. VaultRush)" value={name} onChange={e => setName(e.target.value)} />
+            <button className="btn">Continuer</button>
+          </form>
+          {err && <div className="err">{err}</div>}
+        </details>
+        <button className="link small" style={{ alignSelf: 'flex-start' }} onClick={async () => { await api.post('/api/auth/logout'); location.href = '/' }}>Se déconnecter</button>
+      </div>
+    </div>
+  )
+}

@@ -4,7 +4,7 @@ import { BrowserRouter, Route, Routes, useParams } from 'react-router-dom'
 import './styles.css'
 import { AppProvider, useApp } from './state'
 import Layout from './components/Layout'
-import { Login, Onboarding, InviteAccept, PublicPage, ResetPassword } from './pages/Auth'
+import { Login, Onboarding, InviteAccept, PublicPage, ResetPassword, Welcome } from './pages/Auth'
 import Overview from './pages/Overview'
 import Pages from './pages/Pages'
 import Board from './pages/Board'
@@ -14,6 +14,7 @@ import Launch from './pages/Launch'
 import Money from './pages/Money'
 import Team from './pages/Team'
 import Help from './pages/Help'
+import AI from './pages/AI'
 const VerseEditor = lazy(() => import('./pages/VerseEditor'))
 const Organizer = lazy(() => import('./pages/Organizer'))
 const L = (C: any) => <Suspense fallback={<main className="content"><p className="muted" style={{ padding: 28 }}>Chargement…</p></main>}><C /></Suspense>
@@ -23,6 +24,7 @@ function Gate() {
   if (loading) return <div className="auth" />
   if (!me) return <Login />
   if (me.studios.length === 0) return <Onboarding />
+  if (me.studios.every(s => s.maps.length === 0)) return <Welcome />
   return (
     <Routes>
       <Route element={<Layout />}>
@@ -39,6 +41,7 @@ function Gate() {
         <Route path="verse" element={L(VerseEditor)} />
         <Route path="organiseur" element={L(Organizer)} />
         <Route path="aide" element={<Help />} />
+        <Route path="ia" element={<AI />} />
         <Route path="*" element={<Overview />} />
       </Route>
     </Routes>

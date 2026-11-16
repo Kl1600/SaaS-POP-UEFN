@@ -177,6 +177,12 @@ pub async fn logout(State(st): State<AppState>, jar: CookieJar) -> Result<(Cooki
 }
 
 pub async fn me(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
+    // Chaque compte a d'office son studio : pas de formulaire à l'arrivée.
+    let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM memberships WHERE user_id = ?").bind(u.id).fetch_one(&st.db).await?;
+    if n == 0 {
+        let sid: i64 = sqlx::query_scalar("INSERT INTO studios (name) VALUES (?) RETURNING id").bind(format!("Studio de {}", u.name.split_whitespace().next().unwrap_or(&u.name))).fetch_one(&st.db).await?;
+        sqlx::query("INSERT INTO memberships (studio_id, user_id, role) VALUES (?, ?, 'owner')").bind(sid).bind(u.id).execute(&st.db).await?;
+    }
     let credits: i64 = sqlx::query_scalar("SELECT credits FROM users WHERE id = ?").bind(u.id).fetch_one(&st.db).await?;
     let studios: Vec<(i64, String, String)> = sqlx::query_as(
         "SELECT s.id, s.name, m.role FROM memberships m JOIN studios s ON s.id = m.studio_id WHERE m.user_id = ? ORDER BY s.id",

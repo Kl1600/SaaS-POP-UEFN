@@ -79,7 +79,7 @@ async fn page_ctx(st: &AppState, u: &AuthUser, pid: i64) -> Result<(MapCtx, Valu
 pub async fn tree(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64>) -> ApiResult<Value> {
     map_ctx(&st, &u, mid).await?;
     let rows: Vec<(i64, Option<i64>, String, String, i64, String)> = sqlx::query_as(
-        "SELECT id, parent_id, title, icon, favorite, share FROM pages WHERE map_id = ? AND (share <> 'private' OR created_by = ?) ORDER BY position, id",
+        "SELECT id, parent_id, title, icon, favorite, share FROM pages WHERE map_id = ? AND deleted_at IS NULL AND (share <> 'private' OR created_by = ?) ORDER BY position, id",
     )
     .bind(mid)
     .bind(u.id)
@@ -211,12 +211,55 @@ pub async fn update(State(st): State<AppState>, u: AuthUser, Path(pid): Path<i64
     Ok(Json(json!({ "ok": true, "version": version })))
 }
 
-pub async fn delete(State(st): State<AppState>, u: AuthUser, Path(pid): Path<i64>) -> ApiResult<Value> {
-    let (ctx, _) = page_ctx(&st, &u, pid).await?;
+#[derive(Deserialize)]
+pub struct DeleteQ {
+    purge: Option<bool>,
+}
+
+/// Supprimer une page : elle va à la corbeille avec ses sous-pages ; « purge » l'efface définitivement.
+pub async fn delete(State(st): State<AppState>, u: AuthUser, Path(pid): Path<i64>, axum::extract::Query(q): axum::extract::Query<DeleteQ>) -> ApiResult<Value> {
+    let (ctx, p) = page_ctx(&st, &u, pid).await?;
     ctx.require(Role::Member)?;
-    sqlx::query("DELETE FROM pages WHERE id = ?").bind(pid).execute(&st.db).await?;
+    if q.purge.unwrap_or(false) {
+        sqlx::query("DELETE FROM pages WHERE id = ?").bind(pid).execute(&st.db).await?;
+    } else {
+        sqlx::query("WITH RECURSIVE sub(id) AS (SELECT ? UNION ALL SELECT p.id FROM pages p JOIN sub ON p.parent_id = sub.id) UPDATE pages SET deleted_at = datetime('now') WHERE id IN (SELECT id FROM sub) AND deleted_at IS NULL")
+            .bind(pid).execute(&st.db).await?;
+        log_activity(&st, ctx.map_id, Some(u.id), "page", "Page mise à la corbeille", p["title"].as_str().unwrap_or("")).await?;
+    }
     notify(&st, ctx.map_id, json!({ "t": "refresh", "what": "pages" }));
     Ok(Json(json!({ "ok": true })))
+}
+
+pub async fn trash(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64>) -> ApiResult<Value> {
+    map_ctx(&st, &u, mid).await?;
+    let pages: Vec<(i64, String, String)> = sqlx::query_as("SELECT id, title, deleted_at FROM pages WHERE map_id = ? AND deleted_at IS NOT NULL AND (share <> 'private' OR created_by = ?) AND (parent_id IS NULL OR parent_id NOT IN (SELECT id FROM pages WHERE deleted_at IS NOT NULL)) ORDER BY deleted_at DESC").bind(mid).bind(u.id).fetch_all(&st.db).await?;
+    let boards: Vec<(i64, String, String)> = sqlx::query_as("SELECT id, title, deleted_at FROM boards WHERE map_id = ? AND deleted_at IS NOT NULL ORDER BY deleted_at DESC").bind(mid).fetch_all(&st.db).await?;
+    Ok(Json(json!({
+        "pages": pages.into_iter().map(|(id, t, at)| json!({ "id": id, "title": t, "deleted_at": at })).collect::<Vec<_>>(),
+        "boards": boards.into_iter().map(|(id, t, at)| json!({ "id": id, "title": t, "deleted_at": at })).collect::<Vec<_>>(),
+    })))
+}
+
+pub async fn restore_page(State(st): State<AppState>, u: AuthUser, Path(pid): Path<i64>) -> ApiResult<Value> {
+    let (ctx, _) = page_ctx(&st, &u, pid).await?;
+    ctx.require(Role::Member)?;
+    sqlx::query("WITH RECURSIVE sub(id) AS (SELECT ? UNION ALL SELECT p.id FROM pages p JOIN sub ON p.parent_id = sub.id) UPDATE pages SET deleted_at = NULL WHERE id IN (SELECT id FROM sub)")
+        .bind(pid).execute(&st.db).await?;
+    // Une page restaurée dont le parent est encore à la corbeille remonte à la racine.
+    sqlx::query("UPDATE pages SET parent_id = NULL WHERE id = ? AND parent_id IN (SELECT id FROM pages WHERE deleted_at IS NOT NULL)").bind(pid).execute(&st.db).await?;
+    notify(&st, ctx.map_id, json!({ "t": "refresh", "what": "pages" }));
+    Ok(Json(json!({ "ok": true })))
+}
+
+pub async fn duplicate(State(st): State<AppState>, u: AuthUser, Path(pid): Path<i64>) -> ApiResult<Value> {
+    let (ctx, p) = page_ctx(&st, &u, pid).await?;
+    ctx.require(Role::Freelance)?;
+    let id: i64 = sqlx::query_scalar("INSERT INTO pages (map_id, parent_id, title, icon, blocks, share, created_by, updated_by) SELECT map_id, parent_id, title || ' (copie)', icon, blocks, share, ?, ? FROM pages WHERE id = ? RETURNING id")
+        .bind(u.id).bind(u.id).bind(pid).fetch_one(&st.db).await?;
+    let _ = p;
+    notify(&st, ctx.map_id, json!({ "t": "refresh", "what": "pages" }));
+    Ok(Json(json!({ "id": id })))
 }
 
 pub async fn versions(State(st): State<AppState>, u: AuthUser, Path(pid): Path<i64>) -> ApiResult<Value> {

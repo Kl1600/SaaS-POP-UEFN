@@ -183,7 +183,7 @@ function Timeline() {
                 <span className="gname" title={t.title}><span className="mono muted small">#{t.number}</span> {t.title}</span>
                 <div className="gtrack">
                   {days.map((d, k) => <span key={d} className={'gcell' + ([0, 6].includes(new Date(d + 'T12:00').getDay()) ? ' we' : '')} style={{ left: `${k * W}%`, width: `${W}%` }} />)}
-                  <span className="today" style={{ left: `${(pos(data.today) + 0.5) * W}%` }} />
+                  <span className="today gline" style={{ left: `${(pos(data.today) + 0.5) * W}%` }} />
                   {i >= 0 && <div className={'gbar' + (t.critical ? ' crit' : '') + (t.status === 'done' ? ' done' : '')} style={{ left: `${i * W}%`, width: `max(${W}%, 26px)`, outline: shifted.includes(t.number) ? '2px dashed var(--text)' : undefined }}
                     onPointerDown={e => onDown(e, t)} onDoubleClick={() => nav(`/taches?q=%23${t.number}`)} title={`${t.title} · ${t.assignee ?? '—'} · ${frDate(t.planned_day)}${t.deps.length ? ' · dépend de ' + t.deps.length + ' tâche(s)' : ''}`}>
                     {t.assignee && <span className="mono">{t.assignee.split(' ').map((w: string) => w[0]).join('')}</span>}

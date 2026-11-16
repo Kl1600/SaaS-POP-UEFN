@@ -48,7 +48,7 @@ fn to_map(list: Vec<Value>) -> Value {
 
 pub async fn list(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64>) -> ApiResult<Value> {
     map_ctx(&st, &u, mid).await?;
-    let rows: Vec<(i64, String, String)> = sqlx::query_as("SELECT id, title, updated_at FROM boards WHERE map_id = ? ORDER BY id").bind(mid).fetch_all(&st.db).await?;
+    let rows: Vec<(i64, String, String)> = sqlx::query_as("SELECT id, title, updated_at FROM boards WHERE map_id = ? AND deleted_at IS NULL ORDER BY id").bind(mid).fetch_all(&st.db).await?;
     Ok(Json(json!(rows.into_iter().map(|(id, t, at)| json!({"id": id, "title": t, "updated_at": at})).collect::<Vec<_>>())))
 }
 
@@ -85,6 +85,54 @@ pub async fn get(State(st): State<AppState>, u: AuthUser, Path(bid): Path<i64>) 
         objs["__meta"] = json!({ "points": 3, "hidden": false, "timer_end": null });
     }
     Ok(Json(json!({ "id": bid, "map_id": mid, "title": title, "objects": objs, "can_edit": ctx.can_edit().is_ok(), "me": u.id })))
+}
+
+#[derive(Deserialize)]
+pub struct BoardPatch {
+    title: Option<String>,
+}
+
+pub async fn update(State(st): State<AppState>, u: AuthUser, Path(bid): Path<i64>, Json(b): Json<BoardPatch>) -> ApiResult<Value> {
+    let mid: i64 = sqlx::query_scalar("SELECT map_id FROM boards WHERE id = ?").bind(bid).fetch_one(&st.db).await?;
+    let ctx = map_ctx(&st, &u, mid).await?;
+    ctx.require(Role::Freelance)?;
+    if let Some(t) = &b.title {
+        check_len("Titre", t, 1, 80)?;
+        sqlx::query("UPDATE boards SET title = ? WHERE id = ?").bind(t.trim()).bind(bid).execute(&st.db).await?;
+    }
+    crate::access::notify(&st, mid, json!({ "t": "refresh", "what": "boards" }));
+    Ok(Json(json!({ "ok": true })))
+}
+
+#[derive(Deserialize)]
+pub struct DeleteQ {
+    purge: Option<bool>,
+    restore: Option<bool>,
+}
+
+/// Corbeille des tableaux : supprimer, restaurer, ou effacer définitivement.
+pub async fn delete(State(st): State<AppState>, u: AuthUser, Path(bid): Path<i64>, axum::extract::Query(q): axum::extract::Query<DeleteQ>) -> ApiResult<Value> {
+    let mid: i64 = sqlx::query_scalar("SELECT map_id FROM boards WHERE id = ?").bind(bid).fetch_one(&st.db).await?;
+    let ctx = map_ctx(&st, &u, mid).await?;
+    ctx.require(Role::Member)?;
+    if q.purge.unwrap_or(false) {
+        sqlx::query("DELETE FROM boards WHERE id = ?").bind(bid).execute(&st.db).await?;
+    } else if q.restore.unwrap_or(false) {
+        sqlx::query("UPDATE boards SET deleted_at = NULL WHERE id = ?").bind(bid).execute(&st.db).await?;
+    } else {
+        sqlx::query("UPDATE boards SET deleted_at = datetime('now') WHERE id = ?").bind(bid).execute(&st.db).await?;
+    }
+    crate::access::notify(&st, mid, json!({ "t": "refresh", "what": "boards" }));
+    Ok(Json(json!({ "ok": true })))
+}
+
+pub async fn duplicate(State(st): State<AppState>, u: AuthUser, Path(bid): Path<i64>) -> ApiResult<Value> {
+    let mid: i64 = sqlx::query_scalar("SELECT map_id FROM boards WHERE id = ?").bind(bid).fetch_one(&st.db).await?;
+    let ctx = map_ctx(&st, &u, mid).await?;
+    ctx.require(Role::Member)?;
+    let id: i64 = sqlx::query_scalar("INSERT INTO boards (map_id, title, objects) SELECT map_id, title || ' (copie)', objects FROM boards WHERE id = ? RETURNING id").bind(bid).fetch_one(&st.db).await?;
+    crate::access::notify(&st, mid, json!({ "t": "refresh", "what": "boards" }));
+    Ok(Json(json!({ "id": id })))
 }
 
 async fn load(st: &AppState, bid: i64, map_id: i64) -> Result<Map<String, Value>, AppError> {

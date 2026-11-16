@@ -21,20 +21,37 @@ use serde_json::{json, Value};
 #[derive(Deserialize)]
 pub struct TokenIn {
     name: String,
+    kind: Option<String>,
+    scope: Option<String>,
 }
+
+const KINDS: &[&str] = &["claude_code", "claude_desktop", "cursor", "codex", "windsurf", "vscode", "gemini", "autre"];
 
 pub async fn create_token(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64>, Json(b): Json<TokenIn>) -> ApiResult<Value> {
     map_ctx(&st, &u, mid).await?.require(Role::Freelance)?;
     check_len("Nom", &b.name, 1, 60)?;
     let token = format!("pop_{}", random_token());
-    sqlx::query("INSERT INTO api_tokens (user_id, map_id, name, token_hash) VALUES (?, ?, ?, ?)").bind(u.id).bind(mid).bind(b.name.trim()).bind(sha256_hex(&token)).execute(&st.db).await?;
-    Ok(Json(json!({ "token": token })))
+    let kind = b.kind.filter(|k| KINDS.contains(&k.as_str())).unwrap_or_else(|| "autre".into());
+    let scope = if b.scope.as_deref() == Some("read") { "read" } else { "write" };
+    let id: i64 = sqlx::query_scalar("INSERT INTO api_tokens (user_id, map_id, name, token_hash, kind, scope) VALUES (?, ?, ?, ?, ?, ?) RETURNING id").bind(u.id).bind(mid).bind(b.name.trim()).bind(sha256_hex(&token)).bind(&kind).bind(scope).fetch_one(&st.db).await?;
+    Ok(Json(json!({ "token": token, "id": id })))
 }
 
 pub async fn tokens(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64>) -> ApiResult<Value> {
     map_ctx(&st, &u, mid).await?;
-    let rows: Vec<(i64, String, String)> = sqlx::query_as("SELECT id, name, created_at FROM api_tokens WHERE user_id = ? AND map_id = ? ORDER BY id DESC").bind(u.id).bind(mid).fetch_all(&st.db).await?;
-    Ok(Json(json!(rows.into_iter().map(|(id, n, at)| json!({"id": id, "name": n, "created_at": at})).collect::<Vec<_>>())))
+    let rows: Vec<(i64, String, String, String, String, Option<String>, i64)> = sqlx::query_as("SELECT id, name, created_at, kind, scope, last_used, calls FROM api_tokens WHERE user_id = ? AND map_id = ? ORDER BY id DESC").bind(u.id).bind(mid).fetch_all(&st.db).await?;
+    Ok(Json(json!(rows.into_iter().map(|(id, n, at, kind, scope, last, calls)| json!({"id": id, "name": n, "created_at": at, "kind": kind, "scope": scope, "last_used": last, "calls": calls})).collect::<Vec<_>>())))
+}
+
+#[derive(Deserialize)]
+pub struct ScopeIn {
+    scope: String,
+}
+
+pub async fn set_scope(State(st): State<AppState>, u: AuthUser, Path(id): Path<i64>, Json(b): Json<ScopeIn>) -> ApiResult<Value> {
+    let scope = if b.scope == "read" { "read" } else { "write" };
+    sqlx::query("UPDATE api_tokens SET scope = ? WHERE id = ? AND user_id = ?").bind(scope).bind(id).bind(u.id).execute(&st.db).await?;
+    Ok(Json(json!({ "ok": true })))
 }
 
 pub async fn delete_token(State(st): State<AppState>, u: AuthUser, Path(id): Path<i64>) -> ApiResult<Value> {
@@ -69,6 +86,8 @@ fn tools() -> Value {
     ])
 }
 
+const READ_TOOLS: &[&str] = &["uefn_status", "list_actors", "get_actor", "list_verse_files", "read_verse_file"];
+
 fn rpc_ok(id: Value, result: Value) -> Response {
     Json(json!({ "jsonrpc": "2.0", "id": id, "result": result })).into_response()
 }
@@ -79,18 +98,27 @@ fn text(v: impl Into<String>, is_error: bool) -> Value {
     json!({ "content": [{ "type": "text", "text": v.into() }], "isError": is_error })
 }
 
-pub async fn mcp(State(st): State<AppState>, headers: HeaderMap, Json(req): Json<Value>) -> Response {
+#[derive(Deserialize)]
+pub struct McpQ {
+    token: Option<String>,
+}
+
+pub async fn mcp(State(st): State<AppState>, headers: HeaderMap, axum::extract::Query(q): axum::extract::Query<McpQ>, Json(req): Json<Value>) -> Response {
     let id = req.get("id").cloned().unwrap_or(Value::Null);
-    let token = headers.get("authorization").and_then(|v| v.to_str().ok()).and_then(|v| v.strip_prefix("Bearer ")).unwrap_or("");
-    let row: Option<(i64, i64, String, String)> = match sqlx::query_as(
-        "SELECT t.user_id, t.map_id, u.email, u.name FROM api_tokens t JOIN users u ON u.id = t.user_id WHERE t.token_hash = ?",
+    // Jeton dans l'en-tête Authorization, ou dans l'adresse (?token=) pour les applications qui ne gèrent pas les en-têtes.
+    let token = headers.get("authorization").and_then(|v| v.to_str().ok()).and_then(|v| v.strip_prefix("Bearer ")).map(String::from).or(q.token).unwrap_or_default();
+    let token = token.as_str();
+    let row: Option<(i64, i64, String, String, String)> = match sqlx::query_as(
+        "SELECT t.user_id, t.map_id, u.email, u.name, t.scope FROM api_tokens t JOIN users u ON u.id = t.user_id WHERE t.token_hash = ?",
     ).bind(sha256_hex(token)).fetch_optional(&st.db).await {
         Ok(r) => r,
         Err(_) => return rpc_err(id, -32603, "Erreur interne"),
     };
-    let Some((uid, mid, email, name)) = row else {
+    let Some((uid, mid, email, name, scope)) = row else {
         return (StatusCode::UNAUTHORIZED, Json(json!({ "error": "Jeton POP invalide." }))).into_response();
     };
+    let _ = sqlx::query("UPDATE api_tokens SET last_used = datetime('now'), calls = calls + 1 WHERE token_hash = ?").bind(sha256_hex(token)).execute(&st.db).await;
+    crate::access::notify(&st, mid, json!({ "t": "refresh", "what": "ai" }));
     let user = AuthUser { id: uid, email, name };
     let method = req["method"].as_str().unwrap_or("");
     match method {
@@ -102,9 +130,12 @@ pub async fn mcp(State(st): State<AppState>, headers: HeaderMap, Json(req): Json
         })),
         m if m.starts_with("notifications/") => StatusCode::ACCEPTED.into_response(),
         "ping" => rpc_ok(id, json!({})),
-        "tools/list" => rpc_ok(id, json!({ "tools": tools() })),
+        "tools/list" => rpc_ok(id, json!({ "tools": tools().as_array().cloned().unwrap_or_default().into_iter().filter(|t| scope != "read" || READ_TOOLS.contains(&t["name"].as_str().unwrap_or(""))).collect::<Vec<_>>() })),
         "tools/call" => {
             let name = req["params"]["name"].as_str().unwrap_or("");
+            if scope == "read" && !READ_TOOLS.contains(&name) {
+                return rpc_ok(id, text("Cette IA est en lecture seule dans POP (IA connectées → autoriser les modifications).", true));
+            }
             let args = req["params"]["arguments"].clone();
             match call(&st, &user, mid, name, args).await {
                 Ok(v) => rpc_ok(id, text(serde_json::to_string_pretty(&v).unwrap_or_default(), false)),

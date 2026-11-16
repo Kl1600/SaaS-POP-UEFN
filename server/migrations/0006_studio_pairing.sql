@@ -1,0 +1,11 @@
+CREATE TABLE studio_pairings (
+  code_hash TEXT PRIMARY KEY,
+  studio_id INTEGER NOT NULL REFERENCES studios(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  expires_at TEXT NOT NULL,
+  used_at TEXT
+);
+ALTER TABLE api_tokens ADD COLUMN kind TEXT NOT NULL DEFAULT 'autre';
+ALTER TABLE api_tokens ADD COLUMN last_used TEXT;
+ALTER TABLE api_tokens ADD COLUMN calls INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE api_tokens ADD COLUMN scope TEXT NOT NULL DEFAULT 'write';

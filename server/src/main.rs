@@ -5,6 +5,7 @@ mod mail;
 mod manage;
 mod engine;
 mod integrations;
+mod link;
 mod catalog;
 mod mcp;
 mod uefn;
@@ -119,6 +120,10 @@ fn api() -> Router<AppState> {
         .route("/api/me/export", get(manage::export_me))
         .route("/api/studios/{sid}", patch(manage::rename_studio).delete(manage::delete_studio))
         .route("/api/studios/{sid}/transfer", post(manage::transfer))
+        .route("/api/studios/{sid}/relay/download", get(link::download))
+        .route("/api/studios/{sid}/link-status", get(link::studio_status))
+        .route("/api/studios/{sid}/skip-uefn", post(link::skip))
+        .route("/api/relay/pair-studio", post(link::pair_studio))
         .route("/api/studios/{sid}/leave", post(manage::leave))
         .route("/api/studios/{sid}/export", get(manage::export_studio))
         .route("/api/invitations/{id}", axum::routing::delete(manage::cancel_invite))
@@ -162,7 +167,11 @@ fn api() -> Router<AppState> {
         .route("/api/public/pages/{token}", get(pages::public_page))
         // Tableau blanc
         .route("/api/maps/{mid}/boards", get(boards::list).post(boards::create))
-        .route("/api/boards/{bid}", get(boards::get))
+        .route("/api/boards/{bid}", get(boards::get).patch(boards::update).delete(boards::delete))
+        .route("/api/boards/{bid}/duplicate", post(boards::duplicate))
+        .route("/api/maps/{mid}/trash", get(pages::trash))
+        .route("/api/pages/{pid}/restore", post(pages::restore_page))
+        .route("/api/pages/{pid}/duplicate", post(pages::duplicate))
         .route("/api/boards/{bid}/convert", post(boards::convert))
         .route("/api/boards/{bid}/frame-to-page", post(boards::frame_to_page))
         // Planifier
@@ -214,6 +223,7 @@ fn api() -> Router<AppState> {
         .route("/api/maps/{mid}/verse/send", post(verse::send))
         .route("/api/maps/{mid}/ai/verse", post(ai::verse_ai))
         .route("/api/maps/{mid}/tokens", get(mcp::tokens).post(mcp::create_token))
+        .route("/api/tokens/{id}/scope", post(mcp::set_scope))
         .route("/api/tokens/{id}", delete(mcp::delete_token))
         .route("/mcp", post(mcp::mcp))
 }

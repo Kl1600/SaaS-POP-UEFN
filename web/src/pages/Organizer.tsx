@@ -360,7 +360,7 @@ function Journal({ st, task, setTask, tasks, act, reload }: { st: any; task: num
 }
 
 function Pairing({ status, tools }: { status: string; tools: any }) {
-  const { map, canEdit, toast } = useApp()
+  const { map, studio, canEdit, toast } = useApp()
   const { data: devices, reload } = useLoad<any[]>(map ? `/api/maps/${map.id}/relay` : null, [map?.id])
   const [code, setCode] = useState<string | null>(null)
   const local = ['localhost', '127.0.0.1', '::1'].includes(location.hostname)
@@ -368,14 +368,17 @@ function Pairing({ status, tools }: { status: string; tools: any }) {
   return <section className="card">
     <CardHead title="Relier UEFN avec UEFN Link" sub="Le relais tourne sur le PC Windows où UEFN est ouvert. Il ne touche qu’au projet choisi et pilote UEFN par son serveur MCP officiel." />
     <ol style={{ margin: 0, paddingLeft: 20, lineHeight: 1.9 }}>
-      <li>Dans UEFN, projet ouvert : <b style={{ fontWeight: 500 }}>Projet → Paramètres du projet → Enable Project Python Scripts</b>, puis <b style={{ fontWeight: 500 }}>Édition → Préférences de l’éditeur → Agentic Workflows → Model Context Protocol → Start Server</b> (port 8000).</li>
-      <li>Télécharger le relais sur ce PC : <a className="btn" style={{ height: 34 }} href="/downloads/pop-link.exe" download>pop-link.exe (Windows)</a> <span className="small muted">Windows peut afficher « Windows a protégé votre ordinateur » : Informations complémentaires → Exécuter quand même.</span></li>
-      <li>Générer un code : {canEdit && <button className="btn" style={{ height: 34 }} onClick={async () => { try { setCode((await api.post(`/api/maps/${map!.id}/relay/pair`)).code) } catch (e: any) { toast(e.message, true) } }}>Obtenir un code</button>}
-        {code && <span> → <b className="mono" style={{ fontSize: 18, letterSpacing: 2 }}>{code}</b> <span className="small muted">(valable 10 minutes)</span></span>}</li>
-      <li>Double-cliquer sur pop-link.exe et répondre : adresse de POP <b className="mono" style={{ fontWeight: 500 }}>{local ? 'http://<adresse-réseau-du-Mac>:8080' : location.origin}</b>, le code, puis le numéro du projet UEFN. Laisser la fenêtre ouverte.
-        {local && <div className="small muted">Vous êtes sur l’adresse locale du Mac : le PC ne peut pas l’utiliser. Lancez POP avec <span className="mono">./start.sh --reseau</span>, qui affiche l’adresse à taper sur le PC (même réseau Wi-Fi), ou mettez POP en ligne.</div>}</li>
-      <li>En cas de souci : <span className="mono">pop-link.exe diagnostic</span> dans un terminal liste ce qu’UEFN expose.</li>
+      <li>Dans UEFN, projet ouvert : <b style={{ fontWeight: 500 }}>Projet → Paramètres du projet → Enable Project Python Scripts</b>, puis <b style={{ fontWeight: 500 }}>Édition → Préférences de l’éditeur → Model Context Protocol → Start Server</b>.</li>
+      <li><a className="btn pri" style={{ height: 34 }} href={`/api/studios/${studio!.id}/relay/download`} download>Télécharger UEFN Link</a> <span className="small muted">déjà configuré pour votre compte (valable 24 h) : rien à taper.</span></li>
+      <li>Double-cliquez sur <b style={{ fontWeight: 500 }}>pop-link.exe</b> sur le PC (Windows peut demander « Exécuter quand même »). Tous vos projets UEFN sont importés : une map par projet, synchronisée. Laissez la fenêtre ouverte.</li>
     </ol>
+    <details style={{ marginTop: 10 }}>
+      <summary className="small" style={{ cursor: 'pointer' }}>Autre méthode : code d’appairage pour cette map seulement</summary>
+      <div style={{ marginTop: 8 }}>{canEdit && <button className="btn" style={{ height: 34 }} onClick={async () => { try { setCode((await api.post(`/api/maps/${map!.id}/relay/pair`)).code) } catch (e: any) { toast(e.message, true) } }}>Obtenir un code</button>}
+        {code && <span> → <b className="mono" style={{ fontSize: 18, letterSpacing: 2 }}>{code}</b> <span className="small muted">(10 minutes)</span></span>}
+        <p className="small muted">Puis sur le PC : <span className="mono">pop-link.exe pair {local ? 'http://<adresse-du-serveur>:8080' : location.origin} {code ?? '<code>'} "C:\Users\vous\Documents\Fortnite Projects\MonIle"</span>. En cas de souci : <span className="mono">pop-link.exe diagnostic</span>.</p>
+      </div>
+    </details>
     <div className="row small" style={{ flexWrap: 'wrap', marginTop: 12 }}>
       <span>État : <b style={{ fontWeight: 500 }}>{STATUS_LABEL[status]}</b></span>
       {tools?.url && <span className="muted">MCP : {tools.url}</span>}

@@ -156,7 +156,7 @@ pub async fn search(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64
     let num = term.trim_start_matches('#').parse::<i64>().ok();
     let tasks: Vec<(i64, i64, String, String)> = sqlx::query_as("SELECT id, number, title, status FROM tasks WHERE map_id = ? AND (lower(title) LIKE ? OR lower(description) LIKE ? OR number = ?) ORDER BY number = ? DESC, number DESC LIMIT 8").bind(mid).bind(&like).bind(&like).bind(num.unwrap_or(-1)).bind(num.unwrap_or(-1)).fetch_all(&st.db).await?;
     for (id, n, t, s) in tasks { out.push(json!({ "kind": "Tâche", "title": format!("#{n} {t}"), "detail": crate::tasks::status_label(&s), "link": format!("/taches?t={id}") })) }
-    let pages: Vec<(i64, String, String, String, i64)> = sqlx::query_as("SELECT id, title, blocks, share, created_by FROM pages WHERE map_id = ? AND (lower(title) LIKE ? OR lower(blocks) LIKE ?) ORDER BY updated_at DESC LIMIT 20").bind(mid).bind(&like).bind(&like).fetch_all(&st.db).await?;
+    let pages: Vec<(i64, String, String, String, i64)> = sqlx::query_as("SELECT id, title, blocks, share, created_by FROM pages WHERE map_id = ? AND deleted_at IS NULL AND (lower(title) LIKE ? OR lower(blocks) LIKE ?) ORDER BY updated_at DESC LIMIT 20").bind(mid).bind(&like).bind(&like).fetch_all(&st.db).await?;
     for (id, t, blocks, share, by) in pages.into_iter().filter(|p| p.3 != "private" || p.4 == ctx.user.id).take(6) {
         let text: String = serde_json::from_str::<Value>(&blocks).ok().and_then(|v| v.as_array().cloned()).unwrap_or_default().iter().filter_map(|b| b["text"].as_str().map(String::from)).find(|x| x.to_lowercase().contains(&term)).unwrap_or_default();
         let _ = share; let _ = by;
