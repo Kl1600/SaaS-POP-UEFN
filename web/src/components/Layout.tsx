@@ -89,10 +89,10 @@ export default function Layout() {
           <Notifications />
           {app.canEdit && <button className="btn pri" onClick={() => setNewTask(true)}><Plus size={18} strokeWidth={1.5} />Nouvelle tâche</button>}
           <div style={{ position: 'relative' }}>
-            <button className="acct" onClick={() => setAcct(a => !a)} aria-expanded={acct}>
-              <span className="sq"><Hexagon size={20} strokeWidth={1.5} /></span>
-              <span><span style={{ display: 'block', fontWeight: 500 }}>{app.studio?.name}</span><span className="small muted">{app.me?.user.name}</span></span>
-              <ChevronDown size={18} strokeWidth={1.5} />
+            <button className="acct" onClick={() => setAcct(a => !a)} aria-expanded={acct} aria-label="Compte et studio">
+              <span className="acct-av">{(app.me?.user.name ?? '?').split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()}</span>
+              <span className="acct-txt"><span className="acct-name">{app.me?.user.name}</span><span className="acct-studio">{app.studio?.name}</span></span>
+              <ChevronDown size={16} strokeWidth={1.75} className="acct-chev" />
             </button>
             {acct && (
               <div className="menu" style={{ right: 0, top: 54 }}>
