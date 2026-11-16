@@ -2,6 +2,7 @@ mod access;
 mod account;
 mod ai;
 mod mail;
+mod manage;
 mod engine;
 mod integrations;
 mod catalog;
@@ -114,7 +115,13 @@ fn api() -> Router<AppState> {
         .route("/api/notifications/read", post(account::read_notifications))
         .route("/api/studios/{sid}/members/{uid}/reset-link", post(account::admin_reset_link))
         .route("/api/maps/{mid}/search", get(account::search))
-        .route("/api/me", get(auth::me))
+        .route("/api/me", get(auth::me).delete(manage::delete_me))
+        .route("/api/me/export", get(manage::export_me))
+        .route("/api/studios/{sid}", patch(manage::rename_studio).delete(manage::delete_studio))
+        .route("/api/studios/{sid}/transfer", post(manage::transfer))
+        .route("/api/studios/{sid}/leave", post(manage::leave))
+        .route("/api/studios/{sid}/export", get(manage::export_studio))
+        .route("/api/invitations/{id}", axum::routing::delete(manage::cancel_invite))
         .route("/api/studios", post(studio::create_studio))
         .route("/api/studios/{sid}/maps", post(studio::create_map).get(studio::maps_summary))
         .route("/api/studios/{sid}/members", get(studio::members))
@@ -129,7 +136,7 @@ fn api() -> Router<AppState> {
         .route("/api/studios/{sid}/discord/send", post(integrations::discord_send))
         .route("/api/studios/{sid}/discord/register", post(integrations::discord_register))
         .route("/api/studios/{sid}/github/sync", post(integrations::github_sync))
-        .route("/api/maps/{mid}", patch(studio::update_map))
+        .route("/api/maps/{mid}", patch(studio::update_map).delete(manage::delete_map))
         .route("/api/maps/{mid}/ws", get(ws::ws_handler))
         .route("/api/maps/{mid}/overview", get(plan::overview))
         .route("/api/maps/{mid}/report", get(report))
@@ -228,7 +235,17 @@ async fn main() -> anyhow::Result<()> {
         relays: Arc::new(uefn::RelayHub::default()),
         http: reqwest::Client::builder().timeout(std::time::Duration::from_secs(30)).build()?,
     };
+    // Compte de test local « kl » / « kl » (activé par start.sh et Lancer POP.bat, jamais dans l'image Docker).
+    if std::env::var("POP_DEV_ACCOUNT").map(|v| v == "1").unwrap_or(false) {
+        let exists: Option<i64> = sqlx::query_scalar("SELECT id FROM users WHERE email = 'kl'").fetch_optional(&st.db).await?;
+        if exists.is_none() {
+            let h = auth::hash_password("kl").map_err(|e| anyhow::anyhow!("{e:?}"))?;
+            sqlx::query("INSERT INTO users (email, name, password_hash) VALUES ('kl', 'KL', ?)").bind(h).execute(&st.db).await?;
+        }
+        println!("Compte de test : identifiant « kl », mot de passe « kl »");
+    }
     tokio::spawn(integrations::scheduler(st.clone()));
+    tokio::spawn(manage::backup_loop(st.clone(), db_url.clone()));
     let web = std::env::var("POP_WEB_DIR").unwrap_or_else(|_| "../web/dist".into());
     let spa = ServeDir::new(&web).fallback(ServeFile::new(format!("{web}/index.html")));
     let app = api()

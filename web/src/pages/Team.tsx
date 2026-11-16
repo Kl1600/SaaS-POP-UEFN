@@ -44,7 +44,7 @@ function Members() {
             </tr>
           )
         })}
-        {data.invitations.map((i: any) => <tr key={'i' + i.id}><td className="muted">{i.email}</td><td><span className="badge">{ROLE[i.role]}</span></td><td colSpan={4} className="muted small">Invitation en attente</td></tr>)}
+        {data.invitations.map((i: any) => <tr key={'i' + i.id}><td className="muted">{i.email}</td><td><span className="badge">{ROLE[i.role]}</span></td><td colSpan={3} className="muted small">Invitation en attente</td><td>{isAdmin && <button className="iconbtn" aria-label={`Annuler l’invitation de ${i.email}`} onClick={async () => { await api.del(`/api/invitations/${i.id}`); reload() }}><Trash2 size={16} /></button>}</td></tr>)}
       </tbody></table></div>
     </section>
     <div className="two">
@@ -114,6 +114,7 @@ function Maps() {
           <div className="bar" style={{ margin: '16px 0' }}><span style={{ width: `${m.progress}%` }} /></div>
           <div className="row">
             <button className="btn" onClick={() => setMapId(m.id)}>Ouvrir</button>
+            {isAdmin && (data?.length ?? 0) > 1 && <button className="btn" onClick={async () => { const c = prompt(`Supprimer définitivement « ${m.name} » et tout son contenu (tâches, pages, Verse, gains) ?\nTapez le nom de la map pour confirmer :`); if (c === null) return; try { await api.del(`/api/maps/${m.id}`, { confirm: c }); await reloadMe(); reload(); toast('Map supprimée') } catch (er: any) { toast(er.message, true) } }}>Supprimer</button>}
             {isAdmin && <input className="field" type="date" defaultValue={m.release_date ?? ''} aria-label="Date de sortie" onBlur={async e => { await api.patch(`/api/maps/${m.id}`, { release_date: e.target.value }); reloadMe(); reload() }} />}
           </div>
         </section>
@@ -137,6 +138,7 @@ function Maps() {
           <button className="btn" style={{ alignSelf: 'flex-start' }}>Créer le studio</button>
         </form>
       </section>
+      <StudioSettings />
     </div>
   </>
 }
@@ -154,7 +156,11 @@ function Account() {
           <label className="label" style={{ flex: 1 }}>Nom affiché<input className="field" value={name} onChange={e => setName(e.target.value)} maxLength={80} required /></label>
           <button className="btn" style={{ alignSelf: 'flex-end' }}>Enregistrer</button>
         </form>
-        <button className="btn" style={{ marginTop: 20 }} onClick={async () => { await api.post('/api/auth/logout'); location.href = '/' }}>Se déconnecter</button>
+        <div className="row" style={{ marginTop: 20, flexWrap: 'wrap' }}>
+          <button className="btn" onClick={async () => { await api.post('/api/auth/logout'); location.href = '/' }}>Se déconnecter</button>
+          <a className="btn" href="/api/me/export" download>Télécharger mes données</a>
+          <button className="btn" style={{ color: 'var(--tr)' }} onClick={async () => { const p = prompt('Supprimer définitivement votre compte ? Vos studios sans autre membre seront supprimés aussi.\nTapez votre mot de passe pour confirmer :'); if (!p) return; try { await api.del('/api/me', { password: p }); location.href = '/' } catch (er: any) { toast(er.message, true) } }}>Supprimer mon compte</button>
+        </div>
       </section>
       <section className="card">
         <CardHead title="Mot de passe" sub="Changer le mot de passe déconnecte vos autres appareils." />
@@ -238,5 +244,31 @@ function GitHub({ data, set }: { data: any; set: (k: string, e: boolean, c: any)
       <p className="small muted" style={{ margin: 0 }}>Dépôt → Settings → Webhooks → Add webhook : Payload URL ci-dessous, Content type application/json, Secret ci-dessous, événement « Issues ».</p>
       <pre className="report mono" style={{ fontSize: 12 }}>{`${location.origin}/api/hooks/github/${studio!.id}\nSecret : ${cfg.secret ?? '(activez puis rechargez)'}`}</pre>
     </>}
+  </section>
+}
+
+function StudioSettings() {
+  const { studio, me, isAdmin, reload: reloadMe, toast } = useApp()
+  const owner = me?.studios.find(s => s.id === studio?.id)?.role === 'owner'
+  const { data } = useLoad<any>(studio ? `/api/studios/${studio.id}/members` : null, [studio?.id])
+  const [name, setName] = useState(studio?.name ?? '')
+  const [to, setTo] = useState('')
+  if (!studio) return null
+  return <section className="card">
+    <CardHead title={`Studio ${studio.name}`} sub="Nom, sauvegarde, propriété" />
+    {isAdmin && <form className="row" onSubmit={async e => { e.preventDefault(); try { await api.patch(`/api/studios/${studio.id}`, { name }); await reloadMe(); toast('Studio renommé') } catch (er: any) { toast(er.message, true) } }}>
+      <label className="label" style={{ flex: 1 }}>Nom du studio<input className="field" value={name} onChange={e => setName(e.target.value)} required maxLength={80} /></label>
+      <button className="btn" style={{ alignSelf: 'flex-end' }}>Renommer</button>
+    </form>}
+    {isAdmin && <><div className="dsec">Sauvegarde</div><p className="small muted" style={{ margin: 0 }}>Téléchargez tout le travail du studio (maps, tâches, pages, tableaux, Verse, gains) dans un fichier.</p>
+      <a className="btn" style={{ marginTop: 8 }} href={`/api/studios/${studio.id}/export`} download>Exporter le studio</a></>}
+    {owner && <><div className="dsec">Transférer la propriété</div>
+      <div className="row"><select className="field" style={{ flex: 1 }} value={to} onChange={e => setTo(e.target.value)} aria-label="Nouveau propriétaire"><option value="">Choisir un membre…</option>{data?.members.filter((m: any) => m.id !== me?.user.id).map((m: any) => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
+        <button className="btn" disabled={!to} onClick={async () => { if (!confirm('Transférer la propriété ? Vous deviendrez admin.')) return; try { await api.post(`/api/studios/${studio.id}/transfer`, { user_id: Number(to) }); await reloadMe(); toast('Propriété transférée') } catch (er: any) { toast(er.message, true) } }}>Transférer</button></div></>}
+    <div className="dsec">Zone sensible</div>
+    <div className="row" style={{ flexWrap: 'wrap' }}>
+      {!owner && <button className="btn" onClick={async () => { if (!confirm(`Quitter le studio ${studio.name} ?`)) return; try { await api.post(`/api/studios/${studio.id}/leave`); await reloadMe(); location.href = '/' } catch (er: any) { toast(er.message, true) } }}>Quitter le studio</button>}
+      {owner && <button className="btn" style={{ color: 'var(--tr)' }} onClick={async () => { const c = prompt(`Supprimer définitivement le studio et TOUTES ses maps ?\nTapez « ${studio.name} » pour confirmer :`); if (c === null) return; try { await api.del(`/api/studios/${studio.id}`, { confirm: c }); await reloadMe(); location.href = '/' } catch (er: any) { toast(er.message, true) } }}>Supprimer le studio</button>}
+    </div>
   </section>
 }

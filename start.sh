@@ -18,4 +18,5 @@ if [ "$1" = "--reseau" ]; then
   echo "  (macOS peut demander d'autoriser les connexions entrantes : acceptez.)"
   echo ""
 fi
+export POP_DEV_ACCOUNT=1
 cd server && cargo run --release

@@ -26,7 +26,7 @@ export const api = {
   post: <T = any>(u: string, b?: unknown) => req<T>('POST', u, b ?? {}),
   put: <T = any>(u: string, b?: unknown) => req<T>('PUT', u, b ?? {}),
   patch: <T = any>(u: string, b?: unknown) => req<T>('PATCH', u, b ?? {}),
-  del: <T = any>(u: string) => req<T>('DELETE', u),
+  del: <T = any>(u: string, b?: unknown) => req<T>('DELETE', u, b),
 }
 
 export const euros = (cents: number, digits = 2) =>
