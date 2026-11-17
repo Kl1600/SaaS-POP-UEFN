@@ -267,6 +267,7 @@ async fn main() -> anyhow::Result<()> {
     }
     tokio::spawn(integrations::scheduler(st.clone()));
     tokio::spawn(analytics::crawler(st.clone()));
+    tokio::spawn(analytics::social_loop(st.clone()));
     tokio::spawn(manage::backup_loop(st.clone(), db_url.clone()));
     let web = std::env::var("POP_WEB_DIR").unwrap_or_else(|_| "../web/dist".into());
     let spa = ServeDir::new(&web).fallback(ServeFile::new(format!("{web}/index.html")));

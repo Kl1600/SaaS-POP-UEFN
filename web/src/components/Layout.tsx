@@ -15,7 +15,7 @@ const GROUPS: [string, [string, string, any][]][] = [
   ['Espace', [['/pages', 'Pages', FileText], ['/tableau', 'Tableau blanc', PenTool]]],
   ['Production', [['/planifier', 'Planifier', CalendarDays], ['/taches', 'Tâches', KanbanSquare]]],
   ['UEFN', [['/verse', 'Éditeur Verse', FileCode2], ['/organiseur', 'Organiseur', ListTree], ['/ia', 'IA connectées', Bot]]],
-  ['Analyse', [['/analyse/marche', 'Marché', ChartNoAxesCombined], ['/analyse/tiktok', 'Tendances TikTok', Hash], ['/analyse/tendances', 'Maps qui marchent', Flame], ['/analyse/lancements', 'Meilleurs démarrages', Sparkle]]],
+  ['Analyse', [['/analyse/marche', 'Marché', ChartNoAxesCombined], ['/analyse/tiktok', 'Tendances vidéo', Hash], ['/analyse/tendances', 'Maps qui marchent', Flame], ['/analyse/lancements', 'Meilleurs démarrages', Sparkle]]],
   ['Publication', [['/lancer', 'Lancer et suivre', Rocket]]],
   ['Studio', [['/remunerer', 'Rémunérer', Coins], ['/equipe', 'Équipe', Users]]],
 ]

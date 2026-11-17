@@ -1,4 +1,4 @@
-import{m as lt}from"./VerseEditor-CgYj1Cnf.js";import"./index-CJuSCmxI.js";/*!-----------------------------------------------------------------------------
+import{m as lt}from"./VerseEditor-D98PrDAS.js";import"./index-r92X1a5v.js";/*!-----------------------------------------------------------------------------
  * Copyright (c) Microsoft Corporation. All rights reserved.
  * Version: 0.52.0(f6dc0eb8fce67e57f6036f4769d92c1666cdf546)
  * Released under the MIT license

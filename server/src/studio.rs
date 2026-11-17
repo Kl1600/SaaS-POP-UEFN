@@ -280,14 +280,14 @@ pub async fn integrations(State(st): State<AppState>, u: AuthUser, Path(sid): Pa
     let role = studio_role(&st, &u, sid).await?;
     let rows: Vec<(String, i64, String)> = sqlx::query_as("SELECT kind, enabled, config FROM integrations WHERE studio_id = ?").bind(sid).fetch_all(&st.db).await?;
     let mut out = serde_json::Map::new();
-    for kind in ["discord", "github", "lore", "apify"] {
+    for kind in ["discord", "github", "lore", "apify", "youtube"] {
         let r = rows.iter().find(|r| r.0 == kind);
         let mut cfg: Value = r.map(|r| serde_json::from_str(&r.2).unwrap_or(json!({}))).unwrap_or(json!({}));
         if role < Role::Admin {
             cfg = json!({});
         }
         // Les secrets ne repartent jamais vers le navigateur.
-        for k in ["bot_token", "token"] {
+        for k in ["bot_token", "token", "key"] {
             if cfg.get(k).and_then(|v| v.as_str()).map(|v| !v.is_empty()).unwrap_or(false) && !(kind == "lore" && k == "token") {
                 cfg[k] = json!(SECRET_MASK);
             }
@@ -307,7 +307,7 @@ pub async fn set_integration(State(st): State<AppState>, u: AuthUser, Path((sid,
     if studio_role(&st, &u, sid).await? < Role::Admin {
         return Err(AppError::Forbidden);
     }
-    if !["discord", "github", "lore", "apify"].contains(&kind.as_str()) {
+    if !["discord", "github", "lore", "apify", "youtube"].contains(&kind.as_str()) {
         return Err(AppError::NotFound);
     }
     let mut cfg = b.config.unwrap_or(json!({}));
@@ -317,7 +317,7 @@ pub async fn set_integration(State(st): State<AppState>, u: AuthUser, Path((sid,
     // Secrets masqués côté navigateur : on garde la valeur enregistrée.
     let old: Option<String> = sqlx::query_scalar("SELECT config FROM integrations WHERE studio_id = ? AND kind = ?").bind(sid).bind(&kind).fetch_optional(&st.db).await?;
     let old: Value = old.and_then(|o| serde_json::from_str(&o).ok()).unwrap_or(json!({}));
-    for k in ["bot_token", "token", "last_report", "secret"] {
+    for k in ["bot_token", "token", "last_report", "secret", "key"] {
         let masked = cfg.get(k).and_then(|v| v.as_str()) == Some(SECRET_MASK) || (cfg.get(k).is_none() && old.get(k).is_some());
         if masked && !(kind == "lore" && k == "token") {
             cfg[k] = old.get(k).cloned().unwrap_or(json!(""));
