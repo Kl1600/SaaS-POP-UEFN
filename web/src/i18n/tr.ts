@@ -1,22 +1,22 @@
 import type { Dict } from './fr'
 const tr: Dict = {
-  meta: { title: 'POP · Fortnite içerik üreticilerinin stüdyosu' },
-  nav: { features: 'Özellikler', boussole: 'Boussole', pricing: 'Fiyatlar', faq: 'SSS', login: 'Giriş yap', join: 'Betaya katıl', home: 'POP, ana sayfa', lang: 'Dil', search: 'Ülke ara' },
+  meta: { title: 'POP · UEFN üreticileri için SaaS' },
+  nav: { features: 'Özellikler', pricing: 'Fiyatlar', faq: 'SSS', login: 'Giriş yap', join: 'Betaya katıl', home: 'POP, ana sayfa', lang: 'Dil', search: 'Ülke ara' },
   hero: {
-    announce: 'Yeni: Boussole, yerleşik asistan', h1a: 'Fortnite haritalarınız.', h1b: 'Birlikte. Kaos olmadan.',
-    subA: 'POP tüm UEFN stüdyonuzu tek bir yerde toplar: ', subB: 'bir saatlik görevler', subC: ', UEFN’e bağlı Verse, beyaz tahta, pazar analizi ve gelir paylaşımı.',
+    announce: 'Kapalı beta UEFN üreticilerine açık', h1a: 'UEFN’de üret.', h1b: 'Tek başına ya da ekiple, kaos olmadan.',
+    subA: 'POP, UEFN üreticilerine fikirden çıkışa kadar yardım eden SaaS’tır: ', subB: 'bir saatlik görevler', subC: ', UEFN’e bağlı Verse, beyaz tahta, pazar analizi ve gelir paylaşımı.',
     cta: 'Bekleme listesine katıl', see: 'Özellikleri gör', micro1: 'Kapalı beta', micro2: 'Bekleme listesiyle erişim', micro3: 'UEFN’e bağlı',
   },
   marquee: { label: 'Araçlarınızla çalışır', epic: 'Epic’in Fortnite API’si' },
   pain: {
-    eyebrow: 'Sorun', h2a: 'Discord, üç Google Docs,', h2b: 've kimse kimin ne yaptığını bilmiyor.', without: 'POP olmadan', with: 'POP ile',
+    eyebrow: 'Sorun', h2a: 'Discord, Google Docs, .txt içinde Verse…', h2b: 've harita ilerlemiyor.', without: 'POP olmadan', with: 'POP ile',
     bad: ['“Spawner’a kim dokundu?”', 'Verse Discord’da .txt olarak dolaşıyor', 'Google Doc’ta bir görev listesi', 'Gelir tablosu, sürüm 7', '“Ne zaman çıkıyorduk?”', 'Türün işe yarayıp yaramadığını bilmeden inşa etmek'],
-    good: ['Her işlem kaydedilir ve geri alınabilir', 'Ctrl+S Verse’ü UEFN’e gönderir', 'Bağımlılıklarıyla bir saatlik görevler', 'Herkes için net bir döküm', 'Boussole kilometre taşlarını ve gecikmeleri izler', 'Gerçek rakamlarla tür başına karar'],
+    good: ['Her işlem kaydedilir ve geri alınabilir', 'Ctrl+S Verse’ü UEFN’e gönderir', 'Bağımlılıklarıyla bir saatlik görevler', 'Herkes için net bir döküm', 'Kilometre taşları ve gecikmeler otomatik izlenir', 'Gerçek rakamlarla tür başına karar'],
   },
   feat: {
-    eyebrow: 'Özellikler', h2: 'Fikirden çıkış gününe kadar tüm stüdyo.', p: 'Burada gördükleriniz POP’un gerçek ekranlarının sadeleştirilmiş hâli.',
+    eyebrow: 'Özellikler', h2: 'Fikirden çıkış gününe kadar UEFN’de üretmek için her şey.', p: 'Burada gördükleriniz POP’un gerçek ekranlarının sadeleştirilmiş hâli.',
     items: [
-      { tag: 'Görevler ve Boussole', h: 'Bir saatlik görevler. Her sabah bir asistan.', p: 'Oluşturucu haritayı bağımlılıklarıyla bir saatlik görevlere böler. Boussole günü özetler, gecikmeleri bildirir ve önce neyi alacağınızı önerir.', pts: ['Kanban ve bağımlılıklar', 'Gecikme ve kilometre taşı takibi', 'Tek tıkla “Al”'] },
+      { tag: 'Görevler ve planlama', h: 'Bir saatlik görevler. Tutan bir plan.', p: 'Oluşturucu haritayı bağımlılıklarıyla bir saatlik görevlere böler. Plan kilometre taşlarını izler ve gecikmeleri bildirir; yerleşik bir asistan günü özetler.', pts: ['Kanban ve bağımlılıklar', 'Kilometre taşı ve gecikme takibi', 'Günün özeti'] },
       { tag: 'Verse editörü', h: 'Ctrl+S ve UEFN’de.', p: 'Verse POP’ta yazılır ve doğrudan projenize gider: derleme, doğru satırda hatalar, test oturumu. Asistan harici hizmet olmadan açıklar ve düzeltir.', pts: ['UEFN’de derleme', 'Satırda hatalar', 'Önerilen düzeltmeler'] },
       { tag: 'Düzenleyici', h: 'Tüm cihazlarınız. Üç saniyede düzenli.', p: 'Etiket, tür veya klasöre göre arayın, yirmisini seçin ve tek seferde yeniden adlandırın, taşıyın ya da çoğaltın. Ctrl+Z geri alır. UEFN kapalıysa değişiklikler bekler.', pts: ['tag:, type:, klasör: ile arama', 'Toplu düzenleme', 'Her şey geri alınabilir'] },
       { tag: 'Beyaz tahta', h: 'Haritayı birlikte çizin.', p: 'Yapışkan notlar, şekiller, oklar, renkler, kalın, altı çizili: fikirleri yerleştirmek için her şey. Oylayın, en iyi notları göreve dönüştürün.', pts: ['Tam biçimlendirme', 'Gerçek zamanlı ortak çalışma', 'Notlar → görevler'] },
@@ -24,18 +24,6 @@ const tr: Dict = {
       { tag: 'Ödemeler', h: 'Herkes ne kazandığını bilir.', p: 'Yüzde, sabit tutar veya görev başına paylaşım kuralları, gelir içe aktarma, kişi başına döküm. Discord’da kaybolan tablolara son.', pts: ['Yüzde, sabit, görev başına', 'CSV içe aktarma', 'Herkese döküm'] },
     ],
     aiB: 'Zaten bir yapay zekâ mı kullanıyorsunuz?', aiText: 'Claude, Cursor, Codex veya MCP uyumlu başka bir yapay zekâyı bağlayın: görevi alır, Verse yazar, derler ve görevi bir notla kapatır. Her işlem kaydedilir ve geri alınabilir.',
-  },
-  bou: {
-    eyebrow: 'Yerleşik asistan', h2a: 'Sorunuzu sorun.', h2b: 'Boussole cevaplasın.',
-    p: 'Boussole görevlerinizi, kilometre taşlarınızı ve ekibinizi bilir. Neyin geciktiğini, kimin ne üzerinde çalıştığını ve nereden başlanacağını söyler; POP’u yeni keşfedenleri adım adım yönlendirir. Verileriniz POP’tan çıkmaz.',
-    sub: 'yerleşik asistan', ask: 'Nasıl…?',
-    demo: [
-      { q: 'Şimdi ne yapmalıyım?', a: ['**Merhaba Léa, açığı kapatalım mı?**', '[r] 2 görev gecikmede.', '[g] Dün 3 görev tamamladınız.', 'Şimdi: **#42 Puan sistemi**, 3 görevin önünü açıyor.'] },
-      { q: 'UEFN’i nasıl bağlarım?', a: ['**UEFN POP’a nasıl bağlanır?**', '1. Düzenleyici → UEFN Link’i indir.', '2. Bilgisayarda pop-link.exe’ye çift tıklayın.', '3. UEFN’de: Model Context Protocol → Start Server.'] },
-      { q: 'Betaya yetişecek miyiz?', a: ['[o] “Beta” kilometre taşına 5 gün: 9 görev kaldı.', 'Mevcut hızla (günde 1,5) 6 gün sürer. **Beklenen gecikme: 1 gün.**'] },
-      { q: 'Hugo ne üzerinde çalışıyor?', a: ['**Hugo**’nun 1 görevi sürüyor, 2 görevi bekliyor:', '• **#38** Bölge 2 dekoru · dünden beri sürüyor', '• **#44** Bitiş ekranı · #42’yi bekliyor', '[g] Bu hafta 4 görev tamamlandı.'] },
-      { q: 'Yapay zekâm görevleri kapatabilir mi?', a: ['Evet: “Bağlı yapay zekâlar”da bağlandığında **next_task**, **set_task_status** ve **comment_task** kullanır. Her işlem geçmişte “YZ” olarak işaretlenir.'] },
-    ],
   },
   stats: [['1 sa', 'görev başına, her gün ilerlemek için'], ['0', 'zorunlu harici yapay zekâ hizmeti'], ['7 gün', 'harita başına istatistik, Epic API’sinden'], ['%100', 'UEFN işlemleri geri alınabilir']],
   pricing: {
@@ -46,14 +34,14 @@ const tr: Dict = {
       { name: 'Studio', tag: 'En kapsamlı', desc: 'Ekip olarak harita çıkaran stüdyolar için.', cta: 'Listeye katıl' },
       { name: 'Studio+', tag: 'Yakında', desc: 'Studio’daki her şey artı POP Forge: UEFN içinde inşa eden masaüstü uygulaması.', cta: 'Listeye katıl' },
     ],
-    rows: ['Organizasyon', 'Bir saatlik görevler, Kanban, bağımlılıklar', 'Boussole, yerleşik asistan', 'Sayfalar, beyaz tahta, planlama ve kilometre taşları', 'Haritalar', 'Üyeler', 'UEFN', 'UEFN Link: senkronize projeler', 'Bağlı Verse editörü (derleme, satırda hatalar)', 'Aktör düzenleyici ve toplu düzenleme', 'Bağlı yapay zekâlar (Claude, Cursor, Codex…)', 'POP Forge: UEFN’de destekli inşa', 'Büyüme', 'Pazar analizi ve işe yarayan haritalar', 'TikTok ve YouTube Shorts video trendleri', 'Playtest takası ve çıkış günü', 'Gelir paylaşımı ve dökümler', 'Discord, GitHub, Lore'],
+    rows: ['Organizasyon', 'Bir saatlik görevler, Kanban, bağımlılıklar', 'Yerleşik asistan (günün özeti, gecikmeler)', 'Sayfalar, beyaz tahta, planlama ve kilometre taşları', 'Haritalar', 'Üyeler', 'UEFN', 'UEFN Link: senkronize projeler', 'Bağlı Verse editörü (derleme, satırda hatalar)', 'Aktör düzenleyici ve toplu düzenleme', 'Bağlı yapay zekâlar (Claude, Cursor, Codex…)', 'POP Forge: UEFN’de destekli inşa', 'Büyüme', 'Pazar analizi ve işe yarayan haritalar', 'TikTok ve YouTube Shorts video trendleri', 'Playtest takası ve çıkış günü', 'Gelir paylaşımı ve dökümler', 'Discord, GitHub, Lore'],
   },
   faq: {
     eyebrow: 'SSS', h2: 'Bize sorulan sorular.',
     items: [
       ['Windows bilgisayar gerekli mi?', 'UEFN’i bağlamak için evet: UEFN yalnızca Windows’ta çalışır ve UEFN Link o bilgisayarda açılır. POP’un geri kalanı Mac dahil her tarayıcıda çalışır.'],
       ['POP haritamı yayımlar mı?', 'Hayır. POP her şeyi hazırlar (yayın öncesi kontrol, playtest’ler, çıkış günü planı), ancak yayın her zaman Epic’in içerik üretici portalında yapılır.'],
-      ['Boussole asistanı nasıl çalışır?', 'Boussole POP’a yerleşiktir: günü özetlemek, sorularınızı cevaplamak (“ne gecikti?”, “Hugo ne üzerinde çalışıyor?”) ve POP’un nasıl kullanılacağını anlatmak için görevlerinizi, tarihlerini, bağımlılıklarını ve kilometre taşlarınızı okur. Tamamen POP içinde çalışır: verileriniz hiçbir harici hizmete gitmez.'],
+      ['Tek başıma üretirsem POP işe yarar mı?', 'Evet. POP hem tek başına üretenler hem ekipler içindir: Üretici planı bir harita için ücretsizdir, üyeleri daha sonra hiçbir şeyi değiştirmeden davet edebilirsiniz.'],
       ['Kendi yapay zekâmı kullanmak istersem?', 'Claude, Cursor, Codex veya MCP uyumlu başka bir yapay zekâyı “Bağlı yapay zekâlar”da bağlayın. Görevlerinizi, Verse’ünüzü ve UEFN aktörlerinizi okuyup düzenleyebilir; her işlem kaydedilir ve geri alınabilir.'],
       ['Analizdeki rakamlar nereden geliyor?', 'Epic’in resmî Fortnite API’sinden: her herkese açık harita için 7 günlük oyuncu sayısı, eşzamanlı oyuncu zirvesi, oynama süresi ve elde tutma.'],
       ['Nasıl erişim alırım?', 'POP kapalı betada. Bekleme listesine katılın: talepleri tek tek inceliyor, ardından kullanıcı adınızı ve ilk girişte değiştireceğiniz geçici bir şifre gönderiyoruz.'],
@@ -74,7 +62,7 @@ const tr: Dict = {
     earnings: 'Ekim gelirleri', roles: ['Kod · %40', 'Harita · %35', 'Müzik · sabit', 'Kalan'], noTransfer: 'POP hesaplar, asla para transferi yapmaz.',
   },
   wl: {
-    eyebrow: 'Kapalı beta', title: 'Bekleme listesine katıl', intro: 'Her stüdyoya destek olabilmek için POP’u adım adım açıyoruz. Kim olduğunuzu anlatın, erişiminizi en kısa sürede gönderelim.',
+    eyebrow: 'Kapalı beta', title: 'Bekleme listesine katıl', intro: 'Her üreticiye destek olabilmek için POP’u adım adım açıyoruz. Kim olduğunuzu anlatın, erişiminizi en kısa sürede gönderelim.',
     pageIntro: 'Beta süresince POP hesaplarını ekip oluşturur. Kim olduğunuzu anlatın: erişiminiz onaylanınca kullanıcı adınızı ve geçici bir şifre alacaksınız.',
     invalid: 'Bu erişim bağlantısı geçersiz, zaten kullanılmış veya süresi dolmuş. Yeniden başvurun ya da POP ekibine yazın.',
     name: 'Ad veya takma ad', email: 'E-posta', studio: 'Stüdyo', optional: '(isteğe bağlı)', studioPh: 'Stüdyo adı', team: 'Ekip büyüklüğü',

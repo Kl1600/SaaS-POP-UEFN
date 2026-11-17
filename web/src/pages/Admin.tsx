@@ -5,9 +5,10 @@ import { actionLabel } from '../components/Security'
 import { ago, api, frDate } from '../api'
 import { useApp, useLoad } from '../state'
 import { CardHead, Empty, PageHead } from '../components/ui'
+import { tr, LOCALE } from '../i18n/t'
 
-const n = (v?: number) => (v ?? 0).toLocaleString('fr-FR')
-const STATUS: Record<string, [string, string]> = { pending: ['En attente', 'b-o'], approved: ['Accepté, sans compte', 'b-b'], refused: ['Refusée', 'b-r'], registered: ['Compte créé', 'b-g'] }
+const n = (v?: number) => (v ?? 0).toLocaleString(LOCALE)
+const STATUS: Record<string, [string, string]> = { pending: [tr("En attente"), 'b-o'], approved: [tr("Accepté, sans compte"), 'b-b'], refused: [tr("Refusée"), 'b-r'], registered: [tr("Compte créé"), 'b-g'] }
 
 /** Identifiant proposé à partir du nom (ou de l'e-mail) : minuscules, sans accent, points à la place des espaces. */
 export const suggestUsername = (name: string, email = '') => {
@@ -19,19 +20,19 @@ type Cred = { username: string; password: string; url: string; name?: string }
 /** Identifiants à transmettre : affichés une seule fois. */
 function CredBox({ c, onClose }: { c: Cred; onClose?: () => void }) {
   const { toast } = useApp()
-  const msg = `Bonjour${c.name ? ' ' + c.name.split(' ')[0] : ''},\n\nTon accès à la bêta de POP est prêt.\n\nAdresse : ${c.url}\nIdentifiant : ${c.username}\nMot de passe provisoire : ${c.password}\n\nTu choisiras ton propre mot de passe à la première connexion.\n\nÀ très vite,\nL’équipe POP`
+  const msg = tr("Bonjour{0},\n\nTon accès à la bêta de POP est prêt.\n\nAdresse : {1}\nIdentifiant : {2}\nMot de passe provisoire : {3}\n\nTu choisiras ton propre mot de passe à la première connexion.\n\nÀ très vite,\nL’équipe POP", [c.name ? ' ' + c.name.split(' ')[0] : '', c.url, c.username, c.password])
   return <div className="b-callout" style={{ display: 'grid', gap: 10, marginTop: 10 }}>
-    <b style={{ fontWeight: 500 }}>Identifiants à transmettre (affichés une seule fois)</b>
+    <b style={{ fontWeight: 500 }}>{tr("Identifiants à transmettre (affichés une seule fois)")}</b>
     <div className="mono" style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 14px', fontSize: 14 }}>
-      <span className="muted">Identifiant</span><span>{c.username}</span>
-      <span className="muted">Mot de passe</span><span>{c.password}</span>
-      <span className="muted">Adresse</span><span style={{ wordBreak: 'break-all' }}>{c.url}</span>
+      <span className="muted">{tr("Identifiant")}</span><span>{c.username}</span>
+      <span className="muted">{tr("Mot de passe")}</span><span>{c.password}</span>
+      <span className="muted">{tr("Adresse")}</span><span style={{ wordBreak: 'break-all' }}>{c.url}</span>
     </div>
-    <span className="small muted">La personne devra choisir son propre mot de passe à sa première connexion. Envoyez-lui ces informations en message privé (Discord, e-mail…).</span>
+    <span className="small muted">{tr("La personne devra choisir son propre mot de passe à sa première connexion. Envoyez-lui ces informations en message privé (Discord, e-mail…).")}</span>
     <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-      <button className="btn pri" onClick={() => { navigator.clipboard?.writeText(msg); toast('Message copié') }}><Copy size={15} />Copier le message</button>
-      <button className="btn" onClick={() => { navigator.clipboard?.writeText(c.password); toast('Mot de passe copié') }}><Copy size={15} />Mot de passe seul</button>
-      {onClose && <button className="btn" onClick={onClose}>Fermer</button>}
+      <button className="btn pri" onClick={() => { navigator.clipboard?.writeText(msg); toast(tr("Message copié")) }}><Copy size={15} />{tr("Copier le message")}</button>
+      <button className="btn" onClick={() => { navigator.clipboard?.writeText(c.password); toast(tr("Mot de passe copié")) }}><Copy size={15} />{tr("Mot de passe seul")}</button>
+      {onClose && <button className="btn" onClick={onClose}>{tr("Fermer")}</button>}
     </div>
   </div>
 }
@@ -50,19 +51,19 @@ function AccountForm({ init, waitlistId, onCreated, onCancel }: { init?: { name:
   }
   return <form className="stack" style={{ marginTop: 10 }} onSubmit={async e => {
     e.preventDefault(); setBusy(true)
-    try { const r = await api.post('/api/admin/accounts', { ...f, waitlist_id: waitlistId }); onCreated({ ...r, name: r.name }); toast('Compte créé') } catch (er: any) { toast(er.message, true) } finally { setBusy(false) }
+    try { const r = await api.post('/api/admin/accounts', { ...f, waitlist_id: waitlistId }); onCreated({ ...r, name: r.name }); toast(tr("Compte créé")) } catch (er: any) { toast(er.message, true) } finally { setBusy(false) }
   }}>
     <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-      <label className="label" style={{ flex: '1 1 180px' }}>Nom affiché<input className="field" required maxLength={80} value={f.name} onChange={up('name')} /></label>
+      <label className="label" style={{ flex: '1 1 180px' }}>{tr("Nom affiché")}<input className="field" required maxLength={80} value={f.name} onChange={up('name')} /></label>
       <label className="label" style={{ flex: '1 1 220px' }}>E-mail<input className="field" type="email" required maxLength={200} value={f.email} onChange={up('email')} /></label>
     </div>
     <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-      <label className="label" style={{ flex: '1 1 180px' }}>Identifiant<input className="field mono" required minLength={3} maxLength={32} pattern="[a-zA-Z0-9._\-]+" title="Lettres sans accent, chiffres, points, tirets" autoCapitalize="off" spellCheck={false} value={f.username} onChange={up('username')} /></label>
-      <label className="label" style={{ flex: '1 1 220px' }}>Mot de passe provisoire<input className="field mono" placeholder="Généré automatiquement si vide" value={f.password} onChange={up('password')} autoComplete="off" /></label>
+      <label className="label" style={{ flex: '1 1 180px' }}>{tr("Identifiant")}<input className="field mono" required minLength={3} maxLength={32} pattern="[a-zA-Z0-9._\-]+" title={tr("Lettres sans accent, chiffres, points, tirets")} autoCapitalize="off" spellCheck={false} value={f.username} onChange={up('username')} /></label>
+      <label className="label" style={{ flex: '1 1 220px' }}>{tr("Mot de passe provisoire")}<input className="field mono" placeholder={tr("Généré automatiquement si vide")} value={f.password} onChange={up('password')} autoComplete="off" /></label>
     </div>
     <div className="row" style={{ gap: 8 }}>
-      {onCancel && <button type="button" className="btn" onClick={onCancel}>Annuler</button>}
-      <button className="btn pri" disabled={busy}><UserPlus size={16} />Créer le compte</button>
+      {onCancel && <button type="button" className="btn" onClick={onCancel}>{tr("Annuler")}</button>}
+      <button className="btn pri" disabled={busy}><UserPlus size={16} />{tr("Créer le compte")}</button>
     </div>
   </form>
 }
@@ -73,22 +74,22 @@ function Overview() {
   const max = Math.max(1, ...data.requests_per_day.map((d: any) => d.count))
   return <>
     <div className="tiles">
-      <div className="card"><div className="lab">Demandes en attente</div><div className="num">{n(data.waitlist.pending)}</div><div className="muted">{n(data.waitlist.registered)} comptes créés</div></div>
-      <div className="card"><div className="lab">Utilisateurs</div><div className="num">{n(data.users)}</div><div className="muted">+{n(data.users_7d)} cette semaine · {n(data.active_7d)} actifs sur 7 j</div></div>
-      <div className="card"><div className="lab">Studios et maps</div><div className="num">{n(data.studios)}</div><div className="muted">{n(data.maps)} maps</div></div>
-      <div className="card"><div className="lab">Tâches</div><div className="num">{n(data.tasks)}</div><div className="muted">{n(data.tasks_done_7d)} finies sur 7 j</div></div>
+      <div className="card"><div className="lab">{tr("Demandes en attente")}</div><div className="num">{n(data.waitlist.pending)}</div><div className="muted">{tr("{0} comptes créés", [n(data.waitlist.registered)])}</div></div>
+      <div className="card"><div className="lab">{tr("Utilisateurs")}</div><div className="num">{n(data.users)}</div><div className="muted">{tr("+{0} cette semaine · {1} actifs sur 7 j", [n(data.users_7d), n(data.active_7d)])}</div></div>
+      <div className="card"><div className="lab">{tr("Studios et maps")}</div><div className="num">{n(data.studios)}</div><div className="muted">{n(data.maps)} maps</div></div>
+      <div className="card"><div className="lab">{tr("Tâches")}</div><div className="num">{n(data.tasks)}</div><div className="muted">{tr("{0} finies sur 7 j", [n(data.tasks_done_7d)])}</div></div>
     </div>
     <div className="grid2">
-      <section className="card"><CardHead title="Demandes d’accès" sub="30 derniers jours" />
-        {data.requests_per_day.length === 0 ? <p className="small muted">Aucune demande pour l’instant.</p> :
+      <section className="card"><CardHead title={tr("Demandes d’accès")} sub={tr("30 derniers jours")} />
+        {data.requests_per_day.length === 0 ? <p className="small muted">{tr("Aucune demande pour l’instant.")}</p> :
           <div className="minibars">{data.requests_per_day.map((d: any) => <div key={d.day} title={`${frDate(d.day)} : ${d.count}`}><span style={{ height: `${(d.count / max) * 100}%` }} /><em>{frDate(d.day).replace('.', '')}</em></div>)}</div>}
       </section>
-      <section className="card"><CardHead title="Plateforme" />
+      <section className="card"><CardHead title={tr("Plateforme")} />
         <div className="list">
-          <div className="li"><span style={{ flex: 1 }}>Relais UEFN en ligne</span><b style={{ fontWeight: 500 }}>{n(data.relays_online)}</b></div>
-          <div className="li"><span style={{ flex: 1 }}>IA connectées actives (7 j)</span><b style={{ fontWeight: 500 }}>{n(data.ai_tokens_active)}</b></div>
-          <div className="li"><span style={{ flex: 1 }}>Envoi d’e-mails</span>{data.mail ? <span className="badge b-g">Configuré</span> : <span className="badge" title="Variables POP_SMTP_HOST, POP_SMTP_USER, POP_SMTP_PASS, POP_SMTP_FROM">Non configuré</span>}</div>
-          <div className="li"><span style={{ flex: 1 }}>Comptes</span>{data.open_signup ? <span className="badge b-o">Inscriptions ouvertes à tous (POP_OPEN_SIGNUP=1)</span> : <span className="badge">Créés par l’administrateur</span>}</div>
+          <div className="li"><span style={{ flex: 1 }}>{tr("Relais UEFN en ligne")}</span><b style={{ fontWeight: 500 }}>{n(data.relays_online)}</b></div>
+          <div className="li"><span style={{ flex: 1 }}>{tr("IA connectées actives (7 j)")}</span><b style={{ fontWeight: 500 }}>{n(data.ai_tokens_active)}</b></div>
+          <div className="li"><span style={{ flex: 1 }}>{tr("Envoi d’e-mails")}</span>{data.mail ? <span className="badge b-g">{tr("Configuré")}</span> : <span className="badge" title={tr("Variables POP_SMTP_HOST, POP_SMTP_USER, POP_SMTP_PASS, POP_SMTP_FROM")}>{tr("Non configuré")}</span>}</div>
+          <div className="li"><span style={{ flex: 1 }}>{tr("Comptes")}</span>{data.open_signup ? <span className="badge b-o">{tr("Inscriptions ouvertes à tous (POP_OPEN_SIGNUP=1)")}</span> : <span className="badge">{tr("Créés par l’administrateur")}</span>}</div>
         </div>
       </section>
     </div>
@@ -104,26 +105,26 @@ function Waitlist() {
   const act = async (fn: () => Promise<any>, msg: string) => { try { await fn(); toast(msg); reload(); reloadMe() } catch (e: any) { toast(e.message, true) } }
   return <section className="card">
     <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
-      {[['pending', 'En attente'], ['registered', 'Compte créé'], ['refused', 'Refusées'], ['all', 'Toutes']].map(([k, l]) => <button key={k} className={'chip' + (status === k ? ' on' : '')} style={{ height: 32 }} onClick={() => setStatus(k)}>{l}</button>)}
+      {[['pending', tr("En attente")], ['registered', tr("Compte créé")], ['refused', tr("Refusées")], ['all', tr("Toutes")]].map(([k, l]) => <button key={k} className={'chip' + (status === k ? ' on' : '')} style={{ height: 32 }} onClick={() => setStatus(k)}>{l}</button>)}
     </div>
-    {!data ? null : data.length === 0 ? <Empty text={status === 'pending' ? 'Aucune demande en attente.' : 'Rien ici.'} /> :
+    {!data ? null : data.length === 0 ? <Empty text={status === 'pending' ? tr("Aucune demande en attente.") : tr("Rien ici.")} /> :
       <div style={{ display: 'grid', gap: 10 }}>{data.map(w => <div key={w.id} className="adm-req">
         <div className="row" style={{ justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
           <div style={{ minWidth: 0 }}>
             <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}><b style={{ fontWeight: 500, fontSize: 16 }}>{w.name}</b><span className="small muted">{w.email}</span><span className={'badge ' + STATUS[w.status][1]}>{STATUS[w.status][0]}</span></div>
-            <div className="small muted" style={{ marginTop: 2 }}>{[w.studio && `Studio ${w.studio}`, w.team && `Équipe : ${w.team}`, w.experience].filter(Boolean).join(' · ')} · demandé {ago(w.created_at)}{w.decided_by ? ` · traité par ${w.decided_by}` : ''}</div>
+            <div className="small muted" style={{ marginTop: 2 }}>{tr("{0} · demandé {1}{2}", [[w.studio && tr("Studio {0}", [w.studio]), w.team && tr("Équipe : {0}", [w.team]), w.experience].filter(Boolean).join(' · '), ago(w.created_at), w.decided_by ? tr(" · traité par {0}", [w.decided_by]) : ''])}</div>
           </div>
           <div className="row" style={{ gap: 6 }}>
-            {w.status !== 'registered' && !creds[w.id] && <button className="btn pri" style={{ height: 34 }} onClick={() => setOpen(open === w.id ? null : w.id)}><Check size={15} />Accepter et créer le compte</button>}
-            {w.status === 'pending' && <button className="btn" style={{ height: 34 }} onClick={() => act(() => api.post(`/api/admin/waitlist/${w.id}/refuse`), 'Demande refusée')}><X size={15} />Refuser</button>}
-            {(w.status === 'refused' || w.status === 'approved') && <button className="iconbtn" title="Remettre en attente" aria-label="Remettre en attente" onClick={() => act(() => api.post(`/api/admin/waitlist/${w.id}/reopen`), 'Remise en attente')}><RotateCcw size={16} /></button>}
-            <button className="iconbtn" title="Supprimer la demande" aria-label="Supprimer la demande" onClick={() => { if (confirm(`Supprimer la demande de ${w.name} ?`)) act(() => api.del(`/api/admin/waitlist/${w.id}`), 'Demande supprimée') }}><Trash2 size={16} /></button>
+            {w.status !== 'registered' && !creds[w.id] && <button className="btn pri" style={{ height: 34 }} onClick={() => setOpen(open === w.id ? null : w.id)}><Check size={15} />{tr("Accepter et créer le compte")}</button>}
+            {w.status === 'pending' && <button className="btn" style={{ height: 34 }} onClick={() => act(() => api.post(`/api/admin/waitlist/${w.id}/refuse`), tr("Demande refusée"))}><X size={15} />{tr("Refuser")}</button>}
+            {(w.status === 'refused' || w.status === 'approved') && <button className="iconbtn" title={tr("Remettre en attente")} aria-label={tr("Remettre en attente")} onClick={() => act(() => api.post(`/api/admin/waitlist/${w.id}/reopen`), tr("Remise en attente"))}><RotateCcw size={16} /></button>}
+            <button className="iconbtn" title={tr("Supprimer la demande")} aria-label={tr("Supprimer la demande")} onClick={() => { if (confirm(tr("Supprimer la demande de {0} ?", [w.name]))) act(() => api.del(`/api/admin/waitlist/${w.id}`), tr("Demande supprimée")) }}><Trash2 size={16} /></button>
           </div>
         </div>
-        {w.links && <p className="small" style={{ margin: '8px 0 0' }}><span className="muted">Maps / réseaux : </span>{w.links}</p>}
+        {w.links && <p className="small" style={{ margin: '8px 0 0' }}><span className="muted">{tr("Maps / réseaux :")}{' '}</span>{w.links}</p>}
         {w.message && <p style={{ margin: '8px 0 0', whiteSpace: 'pre-wrap' }}>{w.message}</p>}
-        <input className="field small" style={{ marginTop: 10, height: 32, width: '100%' }} placeholder="Note interne (visible seulement par les admins)" defaultValue={w.note}
-          onBlur={e => { if (e.target.value !== w.note) api.post(`/api/admin/waitlist/${w.id}/note`, { note: e.target.value }).then(() => toast('Note enregistrée')).catch(er => toast(er.message, true)) }} />
+        <input className="field small" style={{ marginTop: 10, height: 32, width: '100%' }} placeholder={tr("Note interne (visible seulement par les admins)")} defaultValue={w.note}
+          onBlur={e => { if (e.target.value !== w.note) api.post(`/api/admin/waitlist/${w.id}/note`, { note: e.target.value }).then(() => toast(tr("Note enregistrée"))).catch(er => toast(er.message, true)) }} />
         {open === w.id && !creds[w.id] && <AccountForm init={{ name: w.name, email: w.email }} waitlistId={w.id} onCancel={() => setOpen(null)} onCreated={c => { w.status = 'registered'; setCreds(x => ({ ...x, [w.id]: c })); setOpen(null); reloadMe() }} />}
         {creds[w.id] && <CredBox c={creds[w.id]} onClose={() => { setCreds(x => { const y = { ...x }; delete y[w.id]; return y }); reload() }} />}
       </div>)}</div>}
@@ -134,7 +135,7 @@ function CreateAccount() {
   const [res, setRes] = useState<Cred | null>(null)
   const [k, setK] = useState(0)
   return <section className="card">
-    <CardHead title="Créer un compte bêta" sub="Pour donner un accès sans demande sur la liste d’attente. Vous transmettez l’identifiant et le mot de passe provisoire ; la personne choisit son mot de passe à la première connexion." />
+    <CardHead title={tr("Créer un compte bêta")} sub={tr("Pour donner un accès sans demande sur la liste d’attente. Vous transmettez l’identifiant et le mot de passe provisoire ; la personne choisit son mot de passe à la première connexion.")} />
     {res ? <CredBox c={res} onClose={() => { setRes(null); setK(k + 1) }} /> : <AccountForm key={k} onCreated={setRes} />}
   </section>
 }
@@ -147,18 +148,18 @@ function Users() {
   const set = async (id: number, patch: any, msg: string) => { try { await api.post(`/api/admin/users/${id}`, patch); toast(msg); reload() } catch (e: any) { toast(e.message, true) } }
   const list = (data ?? []).filter(u => !q || (u.name + ' ' + u.email + ' ' + (u.username ?? '')).toLowerCase().includes(q.toLowerCase()))
   return <section className="card">
-    <CardHead title="Utilisateurs" sub={data ? `${data.length} comptes` : ''}><input className="field" style={{ height: 34, width: 220 }} placeholder="Chercher" value={q} onChange={e => setQ(e.target.value)} /></CardHead>
+    <CardHead title={tr("Utilisateurs")} sub={data ? `${data.length} comptes` : ''}><input className="field" style={{ height: 34, width: 220 }} placeholder={tr("Chercher")} value={q} onChange={e => setQ(e.target.value)} /></CardHead>
     {cred && <CredBox c={cred} onClose={() => setCred(null)} />}
-    <div style={{ overflowX: 'auto' }}><table className="tbl"><thead><tr><th>Nom</th><th>Identifiant</th><th>E-mail</th><th>Inscrit</th><th>Vu</th><th>Studios</th><th>Tâches faites</th><th>Rôle</th><th /></tr></thead>
+    <div style={{ overflowX: 'auto' }}><table className="tbl"><thead><tr><th>{tr("Nom")}</th><th>{tr("Identifiant")}</th><th>E-mail</th><th>{tr("Inscrit")}</th><th>Vu</th><th>{tr("Studios")}</th><th>{tr("Tâches faites")}</th><th>{tr("Rôle")}</th><th /></tr></thead>
       <tbody>{list.map(u => <tr key={u.id} style={{ opacity: u.disabled ? 0.5 : 1 }}>
-        <td><b style={{ fontWeight: 500 }}>{u.name}</b>{u.me && <span className="small muted"> (vous)</span>}{u.must_change && <span className="badge b-o" style={{ marginLeft: 6 }} title="N’a pas encore choisi son mot de passe">Mot de passe provisoire</span>}</td><td className="small mono">{u.username ?? '—'}</td><td className="small">{u.email}</td>
+        <td><b style={{ fontWeight: 500 }}>{u.name}</b>{u.me && <span className="small muted"> {tr("(vous)")}</span>}{u.must_change && <span className="badge b-o" style={{ marginLeft: 6 }} title={tr("N’a pas encore choisi son mot de passe")}>{tr("Mot de passe provisoire")}</span>}</td><td className="small mono">{u.username ?? '—'}</td><td className="small">{u.email}</td>
         <td className="small muted">{frDate(u.created_at)}</td><td className="small muted">{u.last_seen ? ago(u.last_seen) : '—'}</td>
         <td>{u.studios}</td><td>{u.tasks_done}</td>
-        <td>{u.disabled ? <span className="badge b-r">Désactivé</span> : u.is_admin ? <span className="badge b-v">Admin</span> : <span className="badge">Utilisateur</span>}</td>
+        <td>{u.disabled ? <span className="badge b-r">{tr("Désactivé")}</span> : u.is_admin ? <span className="badge b-v">{tr("Admin")}</span> : <span className="badge">{tr("Utilisateur")}</span>}</td>
         <td>{!u.me && <div className="row" style={{ gap: 4, justifyContent: 'flex-end' }}>
-          <button className="iconbtn" title="Nouveau mot de passe provisoire" aria-label="Réinitialiser le mot de passe" onClick={async () => { if (!confirm(`Donner un nouveau mot de passe provisoire à ${u.name} ? Son mot de passe actuel ne marchera plus et il sera déconnecté.`)) return; try { const r = await api.post(`/api/admin/users/${u.id}/password`); setCred({ ...r, name: u.name }); reload() } catch (e: any) { toast(e.message, true) } }}><KeyRound size={16} /></button>
-          <button className="iconbtn" title={u.is_admin ? 'Retirer les droits admin' : 'Rendre admin'} aria-label="Droits admin" onClick={() => { if (confirm(u.is_admin ? `Retirer les droits admin de ${u.name} ?` : `Donner les droits admin à ${u.name} ? Il pourra gérer la liste d’attente et les comptes.`)) set(u.id, { is_admin: !u.is_admin }, 'Droits mis à jour') }}><ShieldCheck size={16} /></button>
-          <button className="iconbtn" title={u.disabled ? 'Réactiver' : 'Désactiver le compte'} aria-label="Désactiver" onClick={() => { if (confirm(u.disabled ? `Réactiver le compte de ${u.name} ?` : `Désactiver le compte de ${u.name} ? Il sera déconnecté et ne pourra plus se connecter.`)) set(u.id, { disabled: !u.disabled }, u.disabled ? 'Compte réactivé' : 'Compte désactivé') }}><Ban size={16} /></button>
+          <button className="iconbtn" title={tr("Nouveau mot de passe provisoire")} aria-label={tr("Réinitialiser le mot de passe")} onClick={async () => { if (!confirm(tr("Donner un nouveau mot de passe provisoire à {0} ? Son mot de passe actuel ne marchera plus et il sera déconnecté.", [u.name]))) return; try { const r = await api.post(`/api/admin/users/${u.id}/password`); setCred({ ...r, name: u.name }); reload() } catch (e: any) { toast(e.message, true) } }}><KeyRound size={16} /></button>
+          <button className="iconbtn" title={u.is_admin ? tr("Retirer les droits admin") : tr("Rendre admin")} aria-label={tr("Droits admin")} onClick={() => { if (confirm(u.is_admin ? tr("Retirer les droits admin de {0} ?", [u.name]) : tr("Donner les droits admin à {0} ? Il pourra gérer la liste d’attente et les comptes.", [u.name]))) set(u.id, { is_admin: !u.is_admin }, tr("Droits mis à jour")) }}><ShieldCheck size={16} /></button>
+          <button className="iconbtn" title={u.disabled ? tr("Réactiver") : tr("Désactiver le compte")} aria-label={tr("Désactiver")} onClick={() => { if (confirm(u.disabled ? tr("Réactiver le compte de {0} ?", [u.name]) : tr("Désactiver le compte de {0} ? Il sera déconnecté et ne pourra plus se connecter.", [u.name]))) set(u.id, { disabled: !u.disabled }, u.disabled ? tr("Compte réactivé") : tr("Compte désactivé")) }}><Ban size={16} /></button>
         </div>}</td>
       </tr>)}</tbody></table></div>
   </section>
@@ -166,9 +167,9 @@ function Users() {
 
 function Audit() {
   const { data } = useLoad<any[]>('/api/admin/audit')
-  return <section className="card"><CardHead title="Journal de sécurité" sub="Connexions, échecs, blocages et actions d’administration (300 derniers événements)." />
-    {!data ? null : data.length === 0 ? <Empty text="Rien pour l’instant." /> :
-      <div style={{ overflowX: 'auto' }}><table className="tbl"><thead><tr><th>Quand</th><th>Qui</th><th>Événement</th><th>Détail</th><th>Adresse IP</th></tr></thead>
+  return <section className="card"><CardHead title={tr("Journal de sécurité")} sub={tr("Connexions, échecs, blocages et actions d’administration (300 derniers événements).")} />
+    {!data ? null : data.length === 0 ? <Empty text={tr("Rien pour l’instant.")} /> :
+      <div style={{ overflowX: 'auto' }}><table className="tbl"><thead><tr><th>{tr("Quand")}</th><th>{tr("Qui")}</th><th>{tr("Événement")}</th><th>{tr("Détail")}</th><th>{tr("Adresse IP")}</th></tr></thead>
         <tbody>{data.map((e, i) => <tr key={i}><td className="small muted">{ago(e.at)}</td><td>{e.who ?? '—'}</td><td className={/échou|faux|bloqué|refus/.test(e.action) ? 'err' : ''}>{actionLabel(e.action)}</td><td className="small">{e.detail}</td><td className="small mono">{e.ip || '—'}</td></tr>)}</tbody></table></div>}
   </section>
 }
@@ -178,11 +179,11 @@ function Gate({ code, msg, onOk }: { code: string; msg: string; onOk: () => void
   const { toast } = useApp()
   const [password, setPassword] = useState('')
   return <section className="card" style={{ maxWidth: 520 }}>
-    <div className="row" style={{ gap: 10, marginBottom: 8 }}><Lock size={22} style={{ color: 'var(--to)' }} /><b style={{ fontWeight: 500, fontSize: 17 }}>Accès protégé</b></div>
+    <div className="row" style={{ gap: 10, marginBottom: 8 }}><Lock size={22} style={{ color: 'var(--to)' }} /><b style={{ fontWeight: 500, fontSize: 17 }}>{tr("Accès protégé")}</b></div>
     <p style={{ marginTop: 0 }}>{msg}</p>
     {code === 'sudo' && <form className="stack" onSubmit={async e => { e.preventDefault(); try { await api.post('/api/admin/unlock', { password }); onOk() } catch (er: any) { toast(er.message, true) } }}>
-      <label className="label">Mot de passe<input className="field" type="password" required autoFocus autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} /></label>
-      <button className="btn pri"><Lock size={15} />Déverrouiller pour 30 minutes</button>
+      <label className="label">{tr("Mot de passe")}<input className="field" type="password" required autoFocus autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} /></label>
+      <button className="btn pri"><Lock size={15} />{tr("Déverrouiller pour 30 minutes")}</button>
     </form>}
   </section>
 }
@@ -193,14 +194,14 @@ export default function Admin() {
   const [gate, setGate] = useState<{ code: string; msg: string } | null | 'ok'>(null)
   const check = () => api.get('/api/admin/overview').then(() => setGate('ok')).catch((e: any) => setGate({ code: e.code ?? 'forbidden', msg: e.message }))
   useEffect(() => { if (me?.admin) check() }, [me?.admin])
-  if (!me?.admin) return <main className="content"><PageHead title="Administration" help="Réservé aux administrateurs de POP." /><section className="card"><Empty text="Vous n’avez pas accès à cette page." /></section></main>
+  if (!me?.admin) return <main className="content"><PageHead title={tr("Administration")} help={tr("Réservé aux administrateurs de POP.")} /><section className="card"><Empty text={tr("Vous n’avez pas accès à cette page.")} /></section></main>
   return <main className="content">
-    <PageHead title="Administration" help="Gérer la plateforme POP : demandes d’accès à la bêta, comptes des bêta-testeurs et utilisateurs.">
-      {gate === 'ok' && <button className="btn" onClick={async () => { await api.post('/api/admin/lock'); setGate(null); check() }}><Lock size={15} />Verrouiller</button>}
+    <PageHead title={tr("Administration")} help={tr("Gérer la plateforme POP : demandes d’accès à la bêta, comptes des bêta-testeurs et utilisateurs.")}>
+      {gate === 'ok' && <button className="btn" onClick={async () => { await api.post('/api/admin/lock'); setGate(null); check() }}><Lock size={15} />{tr("Verrouiller")}</button>}
     </PageHead>
     {gate === null ? null : gate !== 'ok' ? <Gate code={gate.code} msg={gate.msg} onOk={() => { setGate(null); check() }} /> : <>
       <div className="tabs" role="tablist" style={{ alignSelf: 'flex-start' }}>
-        {([['overview', 'Vue générale'], ['waitlist', `Liste d’attente${me.admin_pending ? ` (${me.admin_pending})` : ''}`], ['create', 'Créer un compte'], ['users', 'Utilisateurs'], ['audit', 'Sécurité']] as const).map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}
+        {([['overview', tr("Vue générale")], ['waitlist', tr("Liste d’attente{0}", [me.admin_pending ? ` (${me.admin_pending})` : ''])], ['create', tr("Créer un compte")], ['users', tr("Utilisateurs")], ['audit', tr("Sécurité")]] as const).map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}
       </div>
       {tab === 'overview' && <Overview />}
       {tab === 'waitlist' && <Waitlist />}

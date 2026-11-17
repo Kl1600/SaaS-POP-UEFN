@@ -2,6 +2,7 @@
 // modèles de modules et fiches d'aide des erreurs de compilation fréquentes.
 import * as monaco from 'monaco-editor'
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
+import { tr } from './i18n/t'
 
 ;(self as any).MonacoEnvironment = { getWorker: () => new editorWorker() }
 
@@ -14,42 +15,42 @@ export const ctx: Ctx = { symbols: [], tags: [], devices: [] }
 const KEYWORDS = ['using', 'class', 'struct', 'enum', 'interface', 'module', 'if', 'else', 'then', 'for', 'loop', 'block', 'break', 'return', 'var', 'set', 'case', 'spawn', 'sync', 'race', 'rush', 'branch', 'defer', 'not', 'and', 'or', 'where', 'of', 'ref', 'external', 'self', 'super', 'option', 'array', 'map', 'tuple', 'type', 'subtype', 'false', 'true', 'at', 'do']
 const TYPES = ['int', 'float', 'string', 'logic', 'void', 'agent', 'any', 'char', 'rational', 'comparable', 'message', 'player', 'fort_character', 'creative_device', 'listenable', 'cancelable', 'event', 'transform', 'vector3', 'rotation']
 const EFFECT_HELP: Record<string, string> = {
-  decides: 'peut échouer : à appeler dans un contexte qui gère l’échec (if, [ ], or…).',
-  transacts: 'peut lire et écrire l’état ; annulable en cas d’échec.',
-  suspends: 'peut attendre (asynchrone) : à appeler depuis une fonction <suspends>, spawn ou une branche concurrente.',
-  computes: 'calcul pur, sans effet de bord.',
-  varies: 'peut renvoyer un résultat différent à chaque appel.',
-  no_rollback: 'ne peut pas être annulé : interdit dans un contexte <decides>.',
+  decides: tr("peut échouer : à appeler dans un contexte qui gère l’échec (if, [ ], or…)."),
+  transacts: tr("peut lire et écrire l’état ; annulable en cas d’échec."),
+  suspends: tr("peut attendre (asynchrone) : à appeler depuis une fonction <suspends>, spawn ou une branche concurrente."),
+  computes: tr("calcul pur, sans effet de bord."),
+  varies: tr("peut renvoyer un résultat différent à chaque appel."),
+  no_rollback: tr("ne peut pas être annulé : interdit dans un contexte <decides>."),
 }
 
 export const SNIPPETS: [string, string, string][] = [
-  ['creative_device', 'Appareil Verse', 'using { /Fortnite.com/Devices }\nusing { /Verse.org/Simulation }\n\n${1:my_device} := class(creative_device):\n\n    OnBegin<override>()<suspends> : void =\n        ${0:Print("Prêt")}\n'],
-  ['class', 'Classe', '${1:my_class} := class:\n    var ${2:Value} : ${3:int} = ${4:0}\n\n    ${5:Method}() : void =\n        ${0}\n'],
-  ['for', 'Boucle for', 'for (${1:Item} : ${2:Items}):\n    ${0}\n'],
-  ['if', 'Condition if', 'if (${1:Condition[]}):\n    ${2}\nelse:\n    ${0}\n'],
-  ['loop', 'Boucle loop', 'loop:\n    ${1:Sleep(1.0)}\n    ${0}\n'],
-  ['spawn', 'spawn (tâche asynchrone)', 'spawn{ ${1:Task}() }\n'],
-  ['subscribe', 'Abonnement à un événement', '${1:Device}.${2:InteractedWithEvent}.Subscribe(${3:OnInteracted})\n'],
-  ['handler', 'Classe handler', '${1:my}_handler := class:\n    ${2:Target} : ${3:creative_device}\n\n    Handle(Agent : agent) : void =\n        ${0}\n'],
+  ['creative_device', tr("Appareil Verse"), tr("using { /Fortnite.com/Devices }\nusing { /Verse.org/Simulation }\n\n${1:my_device} := class(creative_device):\n\n    OnBegin<override>()<suspends> : void =\n        ${0:Print(\"Prêt\")}\n")],
+  ['class', tr("Classe"), tr("${1:my_class} := class:\n    var ${2:Value} : ${3:int} = ${4:0}\n\n    ${5:Method}() : void =\n        ${0}\n")],
+  ['for', tr("Boucle for"), tr("for (${1:Item} : ${2:Items}):\n    ${0}\n")],
+  ['if', tr("Condition if"), tr("if (${1:Condition[]}):\n    ${2}\nelse:\n    ${0}\n")],
+  ['loop', tr("Boucle loop"), tr("loop:\n    ${1:Sleep(1.0)}\n    ${0}\n")],
+  ['spawn', tr("spawn (tâche asynchrone)"), 'spawn{ ${1:Task}() }\n'],
+  ['subscribe', tr("Abonnement à un événement"), '${1:Device}.${2:InteractedWithEvent}.Subscribe(${3:OnInteracted})\n'],
+  ['handler', tr("Classe handler"), tr("${1:my}_handler := class:\n    ${2:Target} : ${3:creative_device}\n\n    Handle(Agent : agent) : void =\n        ${0}\n")],
 ]
 
 export const MODULES: [string, string, string][] = [
-  ['economy', 'Économie', 'using { /Fortnite.com/Devices }\nusing { /Verse.org/Simulation }\n\n# Monnaie par joueur : gagner, dépenser, consulter.\neconomy_manager := class(creative_device):\n\n    var Balances : [agent]int = map{}\n\n    Earn(Agent : agent, Amount : int) : void =\n        Current := Balances[Agent] or 0\n        if (set Balances[Agent] = Current + Amount) {}\n\n    Spend(Agent : agent, Amount : int)<decides><transacts> : void =\n        Current := Balances[Agent]\n        Current >= Amount\n        set Balances[Agent] = Current - Amount\n\n    GetBalance(Agent : agent) : int =\n        Balances[Agent] or 0\n'],
-  ['inventory', 'Inventaire', 'using { /Verse.org/Simulation }\n\n# Objets possédés par joueur.\ninventory_manager := class(creative_device):\n\n    var Items : [agent][]string = map{}\n\n    Add(Agent : agent, Item : string) : void =\n        Current := Items[Agent] or array{}\n        if (set Items[Agent] = Current + array{Item}) {}\n\n    Has(Agent : agent, Item : string)<decides><transacts> : void =\n        List := Items[Agent]\n        List.Find[Item]\n'],
-  ['hud', 'HUD', 'using { /Fortnite.com/Devices }\nusing { /Fortnite.com/UI }\nusing { /UnrealEngine.com/Temporary/UI }\nusing { /Verse.org/Simulation }\n\n# Affiche un texte à l’écran du joueur.\nhud_manager := class(creative_device):\n\n    MakeLabel<localizes>(Value : string) : message = "{Value}"\n\n    Show(Player : player, Value : string) : void =\n        if (PlayerUI := GetPlayerUI[Player]):\n            Widget := text_block{DefaultText := MakeLabel(Value)}\n            PlayerUI.AddWidget(Widget)\n'],
-  ['save', 'Sauvegarde du profil', 'using { /Verse.org/Simulation }\n\n# Données persistantes par joueur (weak_map de session persistante).\nplayer_profile := class<final><persistable>:\n    Gold : int = 0\n    Level : int = 1\n\nvar Profiles : weak_map(player, player_profile) = map{}\n\nprofile_manager := class(creative_device):\n\n    Load(Player : player) : player_profile =\n        Profiles[Player] or player_profile{}\n\n    Save(Player : player, Profile : player_profile) : void =\n        if (set Profiles[Player] = Profile) {}\n'],
-  ['teams', 'Équipes', 'using { /Fortnite.com/Devices }\nusing { /Fortnite.com/Teams }\nusing { /Verse.org/Simulation }\n\n# Répartition et lecture des équipes.\nteam_manager := class(creative_device):\n\n    GetTeamIndex(Agent : agent)<decides><transacts> : int =\n        Teams := GetPlayspace().GetTeamCollection().GetTeams()\n        Team := GetPlayspace().GetTeamCollection().GetTeam[Agent]\n        for (Index -> T : Teams, T = Team):\n            Index\n        0\n'],
-  ['timer', 'Minuteur', 'using { /Fortnite.com/Devices }\nusing { /Verse.org/Simulation }\n\n# Compte à rebours de manche.\nround_timer := class(creative_device):\n\n    @editable\n    Seconds : float = 480.0\n\n    OnBegin<override>()<suspends> : void =\n        Sleep(Seconds)\n        Print("Fin de la manche")\n'],
+  ['economy', tr("Économie"), tr("using { /Fortnite.com/Devices }\nusing { /Verse.org/Simulation }\n\n# Monnaie par joueur : gagner, dépenser, consulter.\neconomy_manager := class(creative_device):\n\n    var Balances : [agent]int = map{}\n\n    Earn(Agent : agent, Amount : int) : void =\n        Current := Balances[Agent] or 0\n        if (set Balances[Agent] = Current + Amount) {}\n\n    Spend(Agent : agent, Amount : int)<decides><transacts> : void =\n        Current := Balances[Agent]\n        Current >= Amount\n        set Balances[Agent] = Current - Amount\n\n    GetBalance(Agent : agent) : int =\n        Balances[Agent] or 0\n")],
+  ['inventory', tr("Inventaire"), tr("using { /Verse.org/Simulation }\n\n# Objets possédés par joueur.\ninventory_manager := class(creative_device):\n\n    var Items : [agent][]string = map{}\n\n    Add(Agent : agent, Item : string) : void =\n        Current := Items[Agent] or array{}\n        if (set Items[Agent] = Current + array{Item}) {}\n\n    Has(Agent : agent, Item : string)<decides><transacts> : void =\n        List := Items[Agent]\n        List.Find[Item]\n")],
+  ['hud', 'HUD', tr("using { /Fortnite.com/Devices }\nusing { /Fortnite.com/UI }\nusing { /UnrealEngine.com/Temporary/UI }\nusing { /Verse.org/Simulation }\n\n# Affiche un texte à l’écran du joueur.\nhud_manager := class(creative_device):\n\n    MakeLabel<localizes>(Value : string) : message = \"{Value}\"\n\n    Show(Player : player, Value : string) : void =\n        if (PlayerUI := GetPlayerUI[Player]):\n            Widget := text_block{DefaultText := MakeLabel(Value)}\n            PlayerUI.AddWidget(Widget)\n")],
+  ['save', tr("Sauvegarde du profil"), tr("using { /Verse.org/Simulation }\n\n# Données persistantes par joueur (weak_map de session persistante).\nplayer_profile := class<final><persistable>:\n    Gold : int = 0\n    Level : int = 1\n\nvar Profiles : weak_map(player, player_profile) = map{}\n\nprofile_manager := class(creative_device):\n\n    Load(Player : player) : player_profile =\n        Profiles[Player] or player_profile{}\n\n    Save(Player : player, Profile : player_profile) : void =\n        if (set Profiles[Player] = Profile) {}\n")],
+  ['teams', tr("Équipes"), tr("using { /Fortnite.com/Devices }\nusing { /Fortnite.com/Teams }\nusing { /Verse.org/Simulation }\n\n# Répartition et lecture des équipes.\nteam_manager := class(creative_device):\n\n    GetTeamIndex(Agent : agent)<decides><transacts> : int =\n        Teams := GetPlayspace().GetTeamCollection().GetTeams()\n        Team := GetPlayspace().GetTeamCollection().GetTeam[Agent]\n        for (Index -> T : Teams, T = Team):\n            Index\n        0\n")],
+  ['timer', tr("Minuteur"), tr("using { /Fortnite.com/Devices }\nusing { /Verse.org/Simulation }\n\n# Compte à rebours de manche.\nround_timer := class(creative_device):\n\n    @editable\n    Seconds : float = 480.0\n\n    OnBegin<override>()<suspends> : void =\n        Sleep(Seconds)\n        Print(\"Fin de la manche\")\n")],
 ]
 
 // Fiches d'aide des erreurs fréquentes (le code dépend de la version d'UEFN ; la détection se fait aussi par mots-clés).
 export const ERROR_HELP: { match: (code: string, msg: string) => boolean; title: string; why: string; before: string; after: string }[] = [
-  { match: (c, m) => c === '3512' || /no_rollback/i.test(m), title: 'Effet no_rollback dans une condition', why: 'Une condition (if, [ ]) peut être annulée si elle échoue. Une fonction no_rollback (comme Print ou un appel d’appareil) ne peut pas l’être : sortez-la de la condition.', before: 'if (Print("x"), Player := Agent[]):\n    …', after: 'if (Player := player[Agent]):\n    Print("x")' },
-  { match: (c, m) => /ambig/i.test(m), title: 'Identifiant ambigu', why: 'Le même nom existe dans plusieurs modules importés. Précisez le chemin complet ou renommez votre déclaration.', before: 'Teams := GetTeams()', after: 'Teams := GetPlayspace().GetTeamCollection().GetTeams()' },
-  { match: (c, m) => /incompatible|expected .* but|type mismatch|n’est pas du type/i.test(m), title: 'Type incompatible', why: 'La valeur n’a pas le type attendu. Convertissez-la (Floor, Int, ToString) ou changez le type déclaré.', before: 'var Score : int = 1.5', after: 'var Score : float = 1.5   # ou Floor[1.5]' },
-  { match: (c, m) => /effect|effet/i.test(m) && !/no_rollback/i.test(m), title: 'Effet manquant', why: 'La fonction appelle quelque chose qui a un effet (<suspends>, <decides>, <transacts>) qu’elle ne déclare pas. Ajoutez l’effet à sa signature ou appelez-la depuis le bon contexte.', before: 'Wait() : void =\n    Sleep(1.0)', after: 'Wait()<suspends> : void =\n    Sleep(1.0)' },
-  { match: (c, m) => c === '3506' || /unknown identifier|identifiant inconnu/i.test(m), title: 'Identifiant inconnu', why: 'Le nom n’est pas visible ici : il manque souvent un using { … } en haut du fichier, ou il y a une faute de frappe.', before: 'my_device := class(creative_device):', after: 'using { /Fortnite.com/Devices }\n\nmy_device := class(creative_device):' },
-  { match: (c) => c === '3100', title: 'Parenthèse, crochet ou accolade non fermé', why: 'Chaque ( [ { doit être refermé sur la même expression. Vérifiez la ligne indiquée et la précédente.', before: 'Print("x"', after: 'Print("x")' },
+  { match: (c, m) => c === '3512' || /no_rollback/i.test(m), title: tr("Effet no_rollback dans une condition"), why: tr("Une condition (if, [ ]) peut être annulée si elle échoue. Une fonction no_rollback (comme Print ou un appel d’appareil) ne peut pas l’être : sortez-la de la condition."), before: tr("if (Print(\"x\"), Player := Agent[]):\n    …"), after: tr("if (Player := player[Agent]):\n    Print(\"x\")") },
+  { match: (c, m) => /ambig/i.test(m), title: tr("Identifiant ambigu"), why: tr("Le même nom existe dans plusieurs modules importés. Précisez le chemin complet ou renommez votre déclaration."), before: tr("Teams := GetTeams()"), after: tr("Teams := GetPlayspace().GetTeamCollection().GetTeams()") },
+  { match: (c, m) => /incompatible|expected .* but|type mismatch|n’est pas du type/i.test(m), title: tr("Type incompatible"), why: tr("La valeur n’a pas le type attendu. Convertissez-la (Floor, Int, ToString) ou changez le type déclaré."), before: tr("var Score : int = 1.5"), after: tr("var Score : float = 1.5   # ou Floor[1.5]") },
+  { match: (c, m) => /effect|effet/i.test(m) && !/no_rollback/i.test(m), title: tr("Effet manquant"), why: tr("La fonction appelle quelque chose qui a un effet (<suspends>, <decides>, <transacts>) qu’elle ne déclare pas. Ajoutez l’effet à sa signature ou appelez-la depuis le bon contexte."), before: tr("Wait() : void =\n    Sleep(1.0)"), after: tr("Wait()<suspends> : void =\n    Sleep(1.0)") },
+  { match: (c, m) => c === '3506' || /unknown identifier|identifiant inconnu/i.test(m), title: tr("Identifiant inconnu"), why: tr("Le nom n’est pas visible ici : il manque souvent un using { … } en haut du fichier, ou il y a une faute de frappe."), before: tr("my_device := class(creative_device):"), after: tr("using { /Fortnite.com/Devices }\n\nmy_device := class(creative_device):") },
+  { match: (c) => c === '3100', title: tr("Parenthèse, crochet ou accolade non fermé"), why: tr("Chaque ( [ { doit être refermé sur la même expression. Vérifiez la ligne indiquée et la précédente."), before: tr("Print(\"x\""), after: tr("Print(\"x\")") },
 ]
 
 export function helpFor(code: string, message: string) {
@@ -109,8 +110,8 @@ export function setup() {
         if (items.length > 4000) break
       }
       if (!afterDot) {
-        ctx.devices.forEach(d => items.push({ label: { label: d.name, description: d.class }, kind: K.Reference, insertText: d.name, range, detail: `Appareil de la map · ${d.class}` }))
-        ctx.tags.forEach(t => items.push({ label: { label: t, description: 'tag' }, kind: K.Constant, insertText: t, range, detail: 'Tag Verse du projet' }))
+        ctx.devices.forEach(d => items.push({ label: { label: d.name, description: d.class }, kind: K.Reference, insertText: d.name, range, detail: tr("Appareil de la map · {0}", [d.class]) }))
+        ctx.tags.forEach(t => items.push({ label: { label: t, description: 'tag' }, kind: K.Constant, insertText: t, range, detail: tr("Tag Verse du projet") }))
         KEYWORDS.forEach(k => items.push({ label: k, kind: K.Keyword, insertText: k, range }))
         SNIPPETS.forEach(([k, l, body]) => items.push({ label: { label: k, description: 'snippet' }, kind: K.Snippet, insertText: body, insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet, range, detail: l }))
       }

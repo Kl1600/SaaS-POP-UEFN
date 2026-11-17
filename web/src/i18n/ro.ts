@@ -1,22 +1,22 @@
 import type { Dict } from './fr'
 const ro: Dict = {
-  meta: { title: 'POP · Studioul creatorilor Fortnite' },
-  nav: { features: 'Funcționalități', boussole: 'Boussole', pricing: 'Prețuri', faq: 'Întrebări', login: 'Conectare', join: 'Intră în beta', home: 'POP, acasă', lang: 'Limbă', search: 'Caută o țară' },
+  meta: { title: 'POP · SaaS-ul creatorilor UEFN' },
+  nav: { features: 'Funcționalități', pricing: 'Prețuri', faq: 'Întrebări', login: 'Conectare', join: 'Intră în beta', home: 'POP, acasă', lang: 'Limbă', search: 'Caută o țară' },
   hero: {
-    announce: 'Nou: Boussole, asistentul integrat', h1a: 'Hărțile tale Fortnite.', h1b: 'Împreună. Fără haos.',
-    subA: 'POP adună tot studioul UEFN într-un singur loc: ', subB: 'sarcini de o oră', subC: ', Verse legat de UEFN, tablă albă, analiza pieței și împărțirea câștigurilor.',
+    announce: 'Beta privată deschisă creatorilor UEFN', h1a: 'Creează în UEFN.', h1b: 'Singur sau în echipă, fără haos.',
+    subA: 'POP este SaaS-ul care îi ajută pe creatorii UEFN de la idee la lansare: ', subB: 'sarcini de o oră', subC: ', Verse legat de UEFN, tablă albă, analiza pieței și împărțirea câștigurilor.',
     cta: 'Intră pe lista de așteptare', see: 'Vezi funcționalitățile', micro1: 'Beta privată', micro2: 'Acces pe lista de așteptare', micro3: 'Legat de UEFN',
   },
   marquee: { label: 'Funcționează cu instrumentele tale', epic: 'API-ul Fortnite de la Epic' },
   pain: {
-    eyebrow: 'Problema', h2a: 'Discord, trei Google Docs,', h2b: 'și nimeni nu știe cine ce face.', without: 'Fără POP', with: 'Cu POP',
+    eyebrow: 'Problema', h2a: 'Discord, Google Docs, Verse în .txt…', h2b: 'iar harta nu avansează.', without: 'Fără POP', with: 'Cu POP',
     bad: ['„Cine s-a atins de spawner?”', 'Verse-ul circulă pe Discord în .txt', 'O listă de sarcini într-un Google Doc', 'Tabelul câștigurilor, versiunea 7', '„Deci când lansăm?”', 'Construim fără să știm dacă genul merge'],
-    good: ['Fiecare acțiune e înregistrată și reversibilă', 'Ctrl+S trimite Verse-ul în UEFN', 'Sarcini de o oră, cu dependențe', 'Un extras clar pentru fiecare', 'Boussole urmărește etapele și întârzierile', 'Un verdict pe gen, cu cifre reale'],
+    good: ['Fiecare acțiune e înregistrată și reversibilă', 'Ctrl+S trimite Verse-ul în UEFN', 'Sarcini de o oră, cu dependențe', 'Un extras clar pentru fiecare', 'Etape și întârzieri urmărite automat', 'Un verdict pe gen, cu cifre reale'],
   },
   feat: {
-    eyebrow: 'Funcționalități', h2: 'Tot studioul, de la idee la ziua lansării.', p: 'Ce vezi aici sunt ecranele reale din POP, simplificate.',
+    eyebrow: 'Funcționalități', h2: 'Tot ce trebuie ca să creezi în UEFN, de la idee la ziua lansării.', p: 'Ce vezi aici sunt ecranele reale din POP, simplificate.',
     items: [
-      { tag: 'Sarcini și Boussole', h: 'Sarcini de o oră. Un asistent în fiecare dimineață.', p: 'Generatorul împarte harta în sarcini de o oră, cu dependențele lor. Boussole rezumă ziua, semnalează întârzierile și propune ce să iei mai întâi.', pts: ['Kanban și dependențe', 'Întârzieri și etape urmărite', '„Preia” dintr-un clic'] },
+      { tag: 'Sarcini și planificare', h: 'Sarcini de o oră. O planificare care ține.', p: 'Generatorul împarte harta în sarcini de o oră, cu dependențele lor. Planificarea urmărește etapele și semnalează întârzierile, iar un asistent integrat rezumă ziua.', pts: ['Kanban și dependențe', 'Etape și întârzieri urmărite', 'Rezumatul zilei'] },
       { tag: 'Editor Verse', h: 'Ctrl+S și e deja în UEFN.', p: 'Verse-ul se scrie în POP și ajunge direct în proiect: compilare, erori la linia corectă, sesiune de test. Asistentul explică și corectează, fără serviciu extern.', pts: ['Compilare în UEFN', 'Erori la linie', 'Corecturi propuse'] },
       { tag: 'Organizator', h: 'Toate dispozitivele. Ordonate în trei secunde.', p: 'Caută după tag, tip sau dosar, selectează douăzeci și redenumește, mută sau duplică dintr-odată. Ctrl+Z anulează. Dacă UEFN e închis, modificările așteaptă.', pts: ['Căutare tag:, type:, dosar:', 'Modificări în masă', 'Totul e reversibil'] },
       { tag: 'Tablă albă', h: 'Desenați harta împreună.', p: 'Notițe, forme, săgeți, culori, aldin, subliniat: tot ce trebuie pentru idei. Votați, apoi transformați cele mai bune notițe în sarcini.', pts: ['Formatare completă', 'Colaborare în timp real', 'Notițe → sarcini'] },
@@ -24,18 +24,6 @@ const ro: Dict = {
       { tag: 'Plăți', h: 'Fiecare știe cât câștigă.', p: 'Reguli de împărțire procentuale, fixe sau pe sarcină, import de câștiguri, extras pe persoană. Gata cu tabelele pierdute pe Discord.', pts: ['Procent, fix, pe sarcină', 'Import CSV', 'Extrasul fiecăruia'] },
     ],
     aiB: 'Folosești deja o IA?', aiText: 'Conectează Claude, Cursor, Codex sau altă IA compatibilă MCP: preia o sarcină, scrie Verse-ul, compilează, apoi închide sarcina cu o notă. Fiecare acțiune e înregistrată și reversibilă.',
-  },
-  bou: {
-    eyebrow: 'Asistent integrat', h2a: 'Pune întrebarea.', h2b: 'Boussole răspunde.',
-    p: 'Boussole îți cunoaște sarcinile, etapele și echipa. Îți spune ce e întârziat, cine la ce lucrează și cu ce să începi, și îi ghidează pas cu pas pe cei care descoperă POP. Totul fără ca datele tale să părăsească POP.',
-    sub: 'asistent integrat', ask: 'Cum fac să…?',
-    demo: [
-      { q: 'Ce fac acum?', a: ['**Bună, Léa, recuperăm întârzierea?**', '[r] 2 sarcini sunt întârziate.', '[g] Ieri ai terminat 3 sarcini.', 'Acum: **#42 Sistem de scor**, care deblochează alte 3 sarcini.'] },
-      { q: 'Cum conectez UEFN?', a: ['**Cum legi UEFN de POP?**', '1. Organizator → Descarcă UEFN Link.', '2. Dublu clic pe pop-link.exe pe PC.', '3. În UEFN: Model Context Protocol → Start Server.'] },
-      { q: 'Suntem în întârziere pentru beta?', a: ['[o] Etapa „Beta” în 5 zile: mai sunt 9 sarcini.', 'În ritmul actual (1,5 pe zi), ar dura 6 zile. **Întârziere estimată: 1 zi.**'] },
-      { q: 'La ce lucrează Hugo?', a: ['**Hugo** are 1 sarcină în lucru și 2 de făcut:', '• **#38** Decor zona 2 · în lucru de ieri', '• **#44** Ecran final · așteaptă #42', '[g] 4 sarcini terminate săptămâna asta.'] },
-      { q: 'IA mea poate închide sarcini?', a: ['Da: conectată în „IA conectate”, folosește **next_task**, **set_task_status** și **comment_task**. Fiecare acțiune e marcată „IA” în istoric.'] },
-    ],
   },
   stats: [['1 h', 'pe sarcină, ca să avansezi zilnic'], ['0', 'servicii IA externe obligatorii'], ['7 zile', 'de statistici pe hartă, din API-ul Epic'], ['100%', 'din acțiunile UEFN reversibile']],
   pricing: {
@@ -46,14 +34,14 @@ const ro: Dict = {
       { name: 'Studio', tag: 'Cel mai complet', desc: 'Pentru studiourile care lansează hărți în echipă.', cta: 'Intră pe listă' },
       { name: 'Studio+', tag: 'În curând', desc: 'Tot din Studio, plus POP Forge: aplicația desktop care construiește în UEFN.', cta: 'Intră pe listă' },
     ],
-    rows: ['Organizare', 'Sarcini de o oră, Kanban, dependențe', 'Boussole, asistentul integrat', 'Pagini, tablă albă, planificare și etape', 'Hărți', 'Membri', 'UEFN', 'UEFN Link: proiecte sincronizate', 'Editor Verse legat (compilare, erori la linie)', 'Organizator de actori și modificări în masă', 'IA conectate (Claude, Cursor, Codex…)', 'POP Forge: construcție asistată în UEFN', 'Creștere', 'Analiza pieței și hărți care merg', 'Trenduri video TikTok și YouTube Shorts', 'Schimb de playtesturi și ziua lansării', 'Împărțirea câștigurilor și extrase', 'Discord, GitHub, Lore'],
+    rows: ['Organizare', 'Sarcini de o oră, Kanban, dependențe', 'Asistent integrat (rezumatul zilei, întârzieri)', 'Pagini, tablă albă, planificare și etape', 'Hărți', 'Membri', 'UEFN', 'UEFN Link: proiecte sincronizate', 'Editor Verse legat (compilare, erori la linie)', 'Organizator de actori și modificări în masă', 'IA conectate (Claude, Cursor, Codex…)', 'POP Forge: construcție asistată în UEFN', 'Creștere', 'Analiza pieței și hărți care merg', 'Trenduri video TikTok și YouTube Shorts', 'Schimb de playtesturi și ziua lansării', 'Împărțirea câștigurilor și extrase', 'Discord, GitHub, Lore'],
   },
   faq: {
     eyebrow: 'Întrebări', h2: 'Întrebările pe care le primim.',
     items: [
       ['Am nevoie de un PC cu Windows?', 'Pentru a lega UEFN, da: UEFN rulează doar pe Windows, iar UEFN Link pornește pe acel PC. Restul POP merge în orice browser, inclusiv pe Mac.'],
       ['POP îmi publică harta?', 'Nu. POP pregătește totul (verificare înainte de publicare, playtesturi, planul zilei lansării), dar publicarea se face mereu în portalul de creatori Epic.'],
-      ['Cum funcționează asistentul Boussole?', 'Boussole e integrat în POP: îți citește sarcinile, datele, dependențele și etapele ca să rezume ziua, să răspundă la întrebări („ce e întârziat?”, „la ce lucrează Hugo?”) și să explice cum se folosește POP. Rulează în întregime în POP: datele tale nu pleacă spre niciun serviciu extern.'],
+      ['Merge POP dacă lucrez singur?', 'Da. POP e făcut atât pentru creatorii care lucrează singuri, cât și pentru echipe: planul Creator e gratuit pentru o hartă și poți invita membri mai târziu fără să schimbi nimic.'],
       ['Și dacă vreau să folosesc IA mea?', 'Conectează Claude, Cursor, Codex sau altă IA compatibilă MCP în „IA conectate”. Poate citi și modifica sarcinile, Verse-ul și actorii UEFN, iar fiecare acțiune e înregistrată și reversibilă.'],
       ['De unde vin cifrele din analiză?', 'Din API-ul oficial Fortnite de la Epic: jucători, vârf de jucători simultani, timp de joc și retenție pentru fiecare hartă publică, pe 7 zile.'],
       ['Cum obțin acces?', 'POP e în beta privată. Intră pe lista de așteptare: verificăm cererile una câte una, apoi îți trimitem numele de utilizator și o parolă provizorie, pe care o schimbi la prima conectare.'],
@@ -74,7 +62,7 @@ const ro: Dict = {
     earnings: 'Câștigurile din octombrie', roles: ['Cod · 40%', 'Hartă · 35%', 'Muzică · fix', 'Rest'], noTransfer: 'POP calculează, nu face niciun transfer.',
   },
   wl: {
-    eyebrow: 'Beta privată', title: 'Intră pe lista de așteptare', intro: 'Deschidem POP treptat, ca să fim alături de fiecare studio. Spune-ne cine ești și îți trimitem accesul cât mai repede.',
+    eyebrow: 'Beta privată', title: 'Intră pe lista de așteptare', intro: 'Deschidem POP treptat, ca să fim alături de fiecare creator. Spune-ne cine ești și îți trimitem accesul cât mai repede.',
     pageIntro: 'În timpul beta, conturile POP sunt create de echipă. Spune-ne cine ești: după ce accesul e aprobat, primești numele de utilizator și o parolă provizorie.',
     invalid: 'Acest link de acces e invalid, deja folosit sau expirat. Trimite o nouă cerere sau scrie echipei POP.',
     name: 'Nume sau pseudonim', email: 'E-mail', studio: 'Studio', optional: '(opțional)', studioPh: 'Numele studioului', team: 'Mărimea echipei',

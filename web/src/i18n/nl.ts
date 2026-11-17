@@ -1,22 +1,22 @@
 import type { Dict } from './fr'
 const nl: Dict = {
-  meta: { title: 'POP · De studio voor Fortnite-creators' },
-  nav: { features: 'Functies', boussole: 'Boussole', pricing: 'Prijzen', faq: 'FAQ', login: 'Inloggen', join: 'Doe mee aan de bèta', home: 'POP, home', lang: 'Taal', search: 'Zoek een land' },
+  meta: { title: 'POP · De SaaS voor UEFN-makers' },
+  nav: { features: 'Functies', pricing: 'Prijzen', faq: 'FAQ', login: 'Inloggen', join: 'Doe mee aan de bèta', home: 'POP, home', lang: 'Taal', search: 'Zoek een land' },
   hero: {
-    announce: 'Nieuw: Boussole, de ingebouwde assistent', h1a: 'Je Fortnite-maps.', h1b: 'Samen. Zonder chaos.',
-    subA: 'POP brengt je hele UEFN-studio samen op één plek: ', subB: 'taken van een uur', subC: ', Verse gekoppeld aan UEFN, whiteboard, marktanalyse en verdeling van inkomsten.',
+    announce: 'Besloten bèta open voor UEFN-makers', h1a: 'Maak in UEFN.', h1b: 'Alleen of als team, zonder chaos.',
+    subA: 'POP is de SaaS die UEFN-makers helpt van idee tot release: ', subB: 'taken van een uur', subC: ', Verse gekoppeld aan UEFN, whiteboard, marktanalyse en verdeling van inkomsten.',
     cta: 'Op de wachtlijst', see: 'Bekijk de functies', micro1: 'Privébèta', micro2: 'Toegang via wachtlijst', micro3: 'Gekoppeld aan UEFN',
   },
   marquee: { label: 'Werkt met je tools', epic: 'Fortnite-API van Epic' },
   pain: {
-    eyebrow: 'Het probleem', h2a: 'Discord, drie Google Docs,', h2b: 'en niemand weet wie wat doet.', without: 'Zonder POP', with: 'Met POP',
+    eyebrow: 'Het probleem', h2a: 'Discord, Google Docs, Verse in .txt…', h2b: 'en de map schiet niet op.', without: 'Zonder POP', with: 'Met POP',
     bad: ['“Wie heeft aan de spawner gezeten?”', 'Verse gaat als .txt rond in Discord', 'Een takenlijst in een Google Doc', 'Het inkomstenblad, versie 7', '“Wanneer lanceren we ook alweer?”', 'Bouwen zonder te weten of het genre werkt'],
-    good: ['Elke actie wordt vastgelegd en kan ongedaan', 'Ctrl+S stuurt de Verse naar UEFN', 'Taken van een uur, met afhankelijkheden', 'Een duidelijk overzicht voor iedereen', 'Boussole volgt mijlpaal en vertraging', 'Een oordeel per genre, met echte cijfers'],
+    good: ['Elke actie wordt vastgelegd en kan ongedaan', 'Ctrl+S stuurt de Verse naar UEFN', 'Taken van een uur, met afhankelijkheden', 'Een duidelijk overzicht voor iedereen', 'Mijlpalen en vertraging automatisch gevolgd', 'Een oordeel per genre, met echte cijfers'],
   },
   feat: {
-    eyebrow: 'Functies', h2: 'De hele studio, van idee tot lanceerdag.', p: 'Wat je hier ziet zijn de echte schermen van POP, vereenvoudigd.',
+    eyebrow: 'Functies', h2: 'Alles om in UEFN te maken, van idee tot releasedag.', p: 'Wat je hier ziet zijn de echte schermen van POP, vereenvoudigd.',
     items: [
-      { tag: 'Taken en Boussole', h: 'Taken van een uur. Elke ochtend een assistent.', p: 'De generator deelt de map op in taken van een uur met hun afhankelijkheden. Boussole vat de dag samen, meldt vertragingen en stelt voor wat eerst moet.', pts: ['Kanban en afhankelijkheden', 'Vertragingen en mijlpalen gevolgd', '“Oppakken” in één klik'] },
+      { tag: 'Taken en planning', h: 'Taken van een uur. Een planning die standhoudt.', p: 'De generator verdeelt je map in taken van een uur met hun afhankelijkheden. De planning volgt mijlpalen en meldt vertraging, en een ingebouwde assistent vat de dag samen.', pts: ['Kanban en afhankelijkheden', 'Mijlpalen en vertraging gevolgd', 'Dagoverzicht'] },
       { tag: 'Verse-editor', h: 'Ctrl+S, en het staat in UEFN.', p: 'Verse schrijf je in POP en gaat direct naar je project: compileren, fouten op de juiste regel, testsessie. De assistent legt uit en corrigeert, zonder externe dienst.', pts: ['Compileren in UEFN', 'Fouten op de regel', 'Voorgestelde correcties'] },
       { tag: 'Organizer', h: 'Al je apparaten. In drie seconden geordend.', p: 'Zoek op tag, type of map, selecteer er twintig en hernoem, verplaats of dupliceer ze in één keer. Ctrl+Z maakt ongedaan. Is UEFN gesloten, dan wachten de wijzigingen.', pts: ['Zoeken op tag:, type:, map:', 'Bulkbewerking', 'Alles kan ongedaan'] },
       { tag: 'Whiteboard', h: 'Teken de map samen.', p: 'Notities, vormen, pijlen, kleuren, vet, onderstreept: alles om ideeën neer te zetten. Stem en maak van de beste notities taken.', pts: ['Volledige opmaak', 'Realtime samen', 'Notities → taken'] },
@@ -24,18 +24,6 @@ const nl: Dict = {
       { tag: 'Uitbetalingen', h: 'Iedereen weet wat hij verdient.', p: 'Verdeelregels per percentage, vast bedrag of per taak, import van inkomsten, overzicht per persoon. Geen spreadsheet meer die in Discord verdwijnt.', pts: ['Percentage, vast, per taak', 'CSV-import', 'Overzicht per persoon'] },
     ],
     aiB: 'Gebruik je al een AI?', aiText: 'Koppel Claude, Cursor, Codex of een andere MCP-compatibele AI: die pakt een taak op, schrijft de Verse, compileert en sluit de taak af met een notitie. Elke actie wordt vastgelegd en kan ongedaan.',
-  },
-  bou: {
-    eyebrow: 'Ingebouwde assistent', h2a: 'Stel de vraag.', h2b: 'Boussole antwoordt.',
-    p: 'Boussole kent je taken, mijlpalen en team. Hij vertelt wat achterloopt, wie waaraan werkt en waar je begint, en begeleidt nieuwkomers stap voor stap door POP. Zonder dat je gegevens POP verlaten.',
-    sub: 'ingebouwde assistent', ask: 'Hoe kan ik…?',
-    demo: [
-      { q: 'Wat moet ik nu doen?', a: ['**Hoi Léa, gaan we de achterstand inhalen?**', '[r] 2 taken lopen achter.', '[g] Gisteren heb je 3 taken afgerond.', 'Nu: **#42 Scoresysteem**, dat 3 andere taken vrijgeeft.'] },
-      { q: 'Hoe koppel ik UEFN?', a: ['**Hoe koppel je UEFN aan POP?**', '1. Organizer → UEFN Link downloaden.', '2. Dubbelklik op pop-link.exe op de pc.', '3. In UEFN: Model Context Protocol → Start Server.'] },
-      { q: 'Lopen we achter voor de bèta?', a: ['[o] Mijlpaal “Bèta” over 5 dagen: nog 9 taken.', 'In het huidige tempo (1,5 per dag) zou het 6 dagen duren. **Verwachte vertraging: 1 dag.**'] },
-      { q: 'Waar werkt Hugo aan?', a: ['**Hugo** heeft 1 taak bezig en 2 te doen:', '• **#38** Decor zone 2 · bezig sinds gisteren', '• **#44** Eindscherm · wacht op #42', '[g] 4 taken afgerond deze week.'] },
-      { q: 'Kan mijn AI taken afsluiten?', a: ['Ja: gekoppeld in “Gekoppelde AI’s” gebruikt hij **next_task**, **set_task_status** en **comment_task**. Elke actie staat als “AI” in de geschiedenis.'] },
-    ],
   },
   stats: [['1 u', 'per taak, om elke dag vooruit te gaan'], ['0', 'externe AI-diensten verplicht'], ['7 dagen', 'statistieken per map, uit de API van Epic'], ['100%', 'van de UEFN-acties kan ongedaan']],
   pricing: {
@@ -46,14 +34,14 @@ const nl: Dict = {
       { name: 'Studio', tag: 'Het meest compleet', desc: 'Voor studio’s die als team maps uitbrengen.', cta: 'Op de lijst' },
       { name: 'Studio+', tag: 'Binnenkort', desc: 'Alles van Studio, plus POP Forge: de desktop-app die in UEFN bouwt.', cta: 'Op de lijst' },
     ],
-    rows: ['Organisatie', 'Taken van een uur, Kanban, afhankelijkheden', 'Boussole, de ingebouwde assistent', 'Pagina’s, whiteboard, planning en mijlpalen', 'Maps', 'Leden', 'UEFN', 'UEFN Link: gesynchroniseerde projecten', 'Gekoppelde Verse-editor (compileren, fouten per regel)', 'Actor-organizer en bulkbewerking', 'Gekoppelde AI’s (Claude, Cursor, Codex…)', 'POP Forge: ondersteund bouwen in UEFN', 'Groei', 'Marktanalyse en maps die werken', 'Videotrends TikTok en YouTube Shorts', 'Playtest-uitwisseling en lanceerdag', 'Verdeling van inkomsten en overzichten', 'Discord, GitHub, Lore'],
+    rows: ['Organisatie', 'Taken van een uur, Kanban, afhankelijkheden', 'Ingebouwde assistent (dagoverzicht, vertraging)', 'Pagina’s, whiteboard, planning en mijlpalen', 'Maps', 'Leden', 'UEFN', 'UEFN Link: gesynchroniseerde projecten', 'Gekoppelde Verse-editor (compileren, fouten per regel)', 'Actor-organizer en bulkbewerking', 'Gekoppelde AI’s (Claude, Cursor, Codex…)', 'POP Forge: ondersteund bouwen in UEFN', 'Groei', 'Marktanalyse en maps die werken', 'Videotrends TikTok en YouTube Shorts', 'Playtest-uitwisseling en lanceerdag', 'Verdeling van inkomsten en overzichten', 'Discord, GitHub, Lore'],
   },
   faq: {
     eyebrow: 'FAQ', h2: 'Vragen die we krijgen.',
     items: [
       ['Heb ik een Windows-pc nodig?', 'Om UEFN te koppelen wel: UEFN draait alleen op Windows en UEFN Link draait op die pc. De rest van POP werkt in elke browser, ook op Mac.'],
       ['Publiceert POP mijn map?', 'Nee. POP bereidt alles voor (controle vóór publicatie, playtests, plan voor de lanceerdag), maar publiceren gebeurt altijd in het creatorportaal van Epic.'],
-      ['Hoe werkt de assistent Boussole?', 'Boussole is ingebouwd in POP: hij leest je taken, data, afhankelijkheden en mijlpalen om de dag samen te vatten, je vragen te beantwoorden (“wat loopt achter?”, “waar werkt Hugo aan?”) en uit te leggen hoe POP werkt. Hij draait volledig in POP: je gegevens gaan naar geen enkele externe dienst.'],
+      ['Werkt POP ook als ik alleen maak?', 'Ja. POP is er voor solomakers én teams: het Creator-plan is gratis voor één map, en je kunt later leden uitnodigen zonder iets te veranderen.'],
       ['En als ik mijn eigen AI wil gebruiken?', 'Koppel Claude, Cursor, Codex of een andere MCP-compatibele AI in “Gekoppelde AI’s”. Die kan je taken, Verse en UEFN-actors lezen en wijzigen, en elke actie wordt vastgelegd en kan ongedaan.'],
       ['Waar komen de cijfers van de analyse vandaan?', 'Uit de officiële Fortnite-API van Epic: spelers, piek gelijktijdige spelers, speeltijd en retentie van elke openbare map, over 7 dagen.'],
       ['Hoe krijg ik toegang?', 'POP is in besloten bèta. Meld je aan voor de wachtlijst: we bekijken de aanvragen één voor één en sturen je daarna je gebruikersnaam en een tijdelijk wachtwoord, dat je bij de eerste keer inloggen wijzigt.'],
@@ -74,7 +62,7 @@ const nl: Dict = {
     earnings: 'Inkomsten oktober', roles: ['Code · 40%', 'Map · 35%', 'Muziek · vast', 'Rest'], noTransfer: 'POP rekent, maar maakt geen geld over.',
   },
   wl: {
-    eyebrow: 'Privébèta', title: 'Op de wachtlijst', intro: 'We openen POP stap voor stap om elke studio goed te begeleiden. Vertel wie je bent en we sturen je zo snel mogelijk toegang.',
+    eyebrow: 'Privébèta', title: 'Op de wachtlijst', intro: 'We openen POP stap voor stap om elke maker goed te begeleiden. Vertel ons wie je bent, dan sturen we je zo snel mogelijk toegang.',
     pageIntro: 'Tijdens de bèta maakt het team de POP-accounts aan. Vertel ons wie je bent: zodra je toegang is goedgekeurd, krijg je je gebruikersnaam en een tijdelijk wachtwoord.',
     invalid: 'Deze toegangslink is ongeldig, al gebruikt of verlopen. Vraag opnieuw aan of schrijf het POP-team.',
     name: 'Naam of bijnaam', email: 'E-mail', studio: 'Studio', optional: '(optioneel)', studioPh: 'Naam van de studio', team: 'Teamgrootte',

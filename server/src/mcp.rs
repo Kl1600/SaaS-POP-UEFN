@@ -178,7 +178,7 @@ async fn call(st: &AppState, user: &AuthUser, mid: i64, name: &str, a: Value) ->
             Ok(v)
         }
         "next_task" => {
-            let crate::Json(v) = crate::guide::guide(State(st.clone()), user.clone(), axum::extract::Path(mid)).await?;
+            let crate::Json(v) = crate::guide::guide(State(st.clone()), user.clone(), axum::extract::Path(mid), axum::extract::Query(Default::default())).await?;
             Ok(json!({ "résumé": v["points"], "suggestions": v["suggestions"] }))
         }
         "create_task" => {

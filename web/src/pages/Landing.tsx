@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  ArrowRight, Check, ChevronDown, Compass, ListChecks, Code2, Boxes, PenTool, LineChart, Coins, Bot, Minus, Sparkles, Send, AlertTriangle, AlertCircle, CheckCircle2,
+  ArrowRight, Check, ChevronDown, Compass, ListChecks, Code2, Boxes, PenTool, LineChart, Coins, Bot, Minus, Sparkles, AlertTriangle, AlertCircle,
 } from 'lucide-react'
 import '../landing.css'
 import { WaitlistModal } from '../components/Waitlist'
@@ -22,27 +22,6 @@ const ROWS: (string | boolean)[][] = [
   [], [true, true, true], [true, true, true], [false, true, true], ['1', 'U', 'U'], [false, false, 'S'],
   [], [true, true, true], [false, true, true], [true, true, true], [false, true, true], [false, true, true],
 ]
-
-/** Texte avec **gras**. */
-function Rich({ s }: { s: string }) {
-  return <>{s.split(/(\*\*[^*]+\*\*)/g).map((x, i) => x.startsWith('**') && x.endsWith('**') ? <b key={i}>{x.slice(2, -2)}</b> : x)}</>
-}
-/** Réponse de démo : [r] [o] [g] = icône, « 1. » = étape numérotée. */
-function Answer({ lines }: { lines: string[] }) {
-  const out: React.ReactNode[] = []
-  let steps: string[] = []
-  const flush = () => { if (steps.length) { out.push(<ol key={'o' + out.length}>{steps.map((x, i) => <li key={i}><Rich s={x} /></li>)}</ol>); steps = [] } }
-  lines.forEach(l => {
-    const m = l.match(/^\d+\.\s+(.*)$/)
-    if (m) { steps.push(m[1]); return }
-    flush()
-    const ic = l.match(/^\[(r|o|g)\]\s*(.*)$/)
-    const Icon = ic ? (ic[1] === 'r' ? AlertCircle : ic[1] === 'o' ? AlertTriangle : CheckCircle2) : null
-    out.push(<p key={out.length}>{Icon && <Icon size={13} className={ic![1]} />}<span><Rich s={ic ? ic[2] : l} /></span></p>)
-  })
-  flush()
-  return <>{out}</>
-}
 
 function useReveal() {
   useEffect(() => {
@@ -140,25 +119,21 @@ export default function Landing() {
   const { t, lang } = useI18n()
   const root = useRef<HTMLDivElement>(null)
   const [faq, setFaq] = useState<number | null>(0)
-  const [demo, setDemo] = useState(0)
   const [scrolled, setScrolled] = useState(false)
   useReveal()
   useEffect(() => { document.title = t.meta.title }, [t])
   useEffect(() => resetHtmlLang, [])
-  useEffect(() => { const i = setInterval(() => setDemo(d => (d + 1) % t.bou.demo.length), 6000); return () => clearInterval(i) }, [demo, t])
   const go = (id: string) => (e: React.MouseEvent) => { e.preventDefault(); document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
   const [wait, setWait] = useState(false)
   const signup = () => setWait(true)
   const P = t.pricing
   const cell = (v: string | boolean) => v === true ? <Check size={16} className="ok" /> : v === false ? <Minus size={16} className="no" />
     : v === 'S' ? <span className="ltag soon">{P.soon}</span> : <span>{v === 'U' ? P.unlimited : v}</span>
-  const D = t.bou.demo[demo] || t.bou.demo[0]
   return <div className="lp" ref={root} dir={lang.rtl ? 'rtl' : 'ltr'} lang={lang.html} onScroll={e => setScrolled((e.target as HTMLDivElement).scrollTop > 10)}>
     <nav className={'lnav' + (scrolled ? ' solid' : '')}>
       <a href="#top" onClick={go('top')} className="lbrand" aria-label={t.nav.home}><img src="/logo.png" alt="POP" /></a>
       <div className="llinks">
         <a href="#fonctionnalites" onClick={go('fonctionnalites')}>{t.nav.features}</a>
-        <a href="#boussole" onClick={go('boussole')}>{t.nav.boussole}</a>
         <a href="#tarifs" onClick={go('tarifs')}>{t.nav.pricing}</a>
         <a href="#faq" onClick={go('faq')}>{t.nav.faq}</a>
       </div>
@@ -171,7 +146,7 @@ export default function Landing() {
 
     <header className="lhero" id="top">
       <div className="lglow" />
-      <a className="lannounce" href="#boussole" onClick={go('boussole')}><Sparkles size={14} /> {t.hero.announce} <ArrowRight size={14} /></a>
+      <a className="lannounce" href="#beta" onClick={e => { e.preventDefault(); signup() }}><Sparkles size={14} /> {t.hero.announce} <ArrowRight size={14} /></a>
       <h1 data-reveal>{t.hero.h1a}<br /><span className="grad">{t.hero.h1b}</span></h1>
       <p className="lsub" data-reveal>{t.hero.subA}<b>{t.hero.subB}</b>{t.hero.subC}</p>
       <div className="lctas" data-reveal>
@@ -213,25 +188,6 @@ export default function Landing() {
       </div>
     </section>
 
-    <section className="lsec lboussole" id="boussole">
-      <div className="lsplit">
-        <div className="ltxt" data-reveal>
-          <span className="leyebrow">{t.bou.eyebrow}</span>
-          <h2>{t.bou.h2a}<br />{t.bou.h2b}</h2>
-          <p>{t.bou.p}</p>
-          <div className="lchips">{t.bou.demo.map((d, i) => <button key={d.q} className={i === demo ? 'on' : ''} onClick={() => setDemo(i)}>{d.q}</button>)}</div>
-        </div>
-        <div className="lchat" data-reveal>
-          <div className="lchath"><span className="gico"><Compass size={15} /></span>Boussole<small>{t.bou.sub}</small></div>
-          <div className="lmsgs" key={demo + lang.code}>
-            <div className="lm me">{D.q}</div>
-            <div className="lm bot"><Answer lines={D.a} /></div>
-          </div>
-          <div className="lask"><span>{t.bou.ask}</span><Send size={15} /></div>
-        </div>
-      </div>
-    </section>
-
     <section className="lstats" data-reveal>
       {t.stats.map(s => <div key={s[0]}><b>{s[0]}</b><span>{s[1]}</span></div>)}
     </section>
@@ -270,7 +226,7 @@ export default function Landing() {
     <footer className="lfoot">
       <div className="lfb"><img src="/logo.png" alt="POP" /><span>© {new Date().getFullYear()} POP · {t.foot.made}</span><small>{t.foot.legal}</small></div>
       <div className="lfcols">
-        <div><h4>{t.foot.product}</h4><a href="#fonctionnalites" onClick={go('fonctionnalites')}>{t.nav.features}</a><a href="#boussole" onClick={go('boussole')}>{t.nav.boussole}</a><a href="#tarifs" onClick={go('tarifs')}>{t.nav.pricing}</a></div>
+        <div><h4>{t.foot.product}</h4><a href="#fonctionnalites" onClick={go('fonctionnalites')}>{t.nav.features}</a><a href="#tarifs" onClick={go('tarifs')}>{t.nav.pricing}</a></div>
         <div><h4>{t.foot.help}</h4><a href="#faq" onClick={go('faq')}>{t.nav.faq}</a></div>
         <div><h4>{t.foot.account}</h4><a href="/connexion" onClick={e => { e.preventDefault(); nav('/connexion') }}>{t.nav.login}</a><a href="#beta" onClick={e => { e.preventDefault(); signup() }}>{t.nav.join}</a></div>
       </div>

@@ -1,23 +1,23 @@
 import type { Dict } from './fr'
 // Português de Portugal (dérivé de pt-BR).
 const ptPT: Dict = {
-  meta: { title: 'POP · O estúdio dos criadores de Fortnite' },
-  nav: { features: 'Funcionalidades', boussole: 'Boussole', pricing: 'Preços', faq: 'FAQ', login: 'Entrar', join: 'Entrar na beta', home: 'POP, início', lang: 'Idioma', search: 'Procurar um país' },
+  meta: { title: 'POP · O SaaS dos criadores de UEFN' },
+  nav: { features: 'Funcionalidades', pricing: 'Preços', faq: 'FAQ', login: 'Entrar', join: 'Entrar na beta', home: 'POP, início', lang: 'Idioma', search: 'Procurar um país' },
   hero: {
-    announce: 'Novo: Boussole, o assistente integrado', h1a: 'Os seus mapas de Fortnite.', h1b: 'Em equipa. Sem caos.',
-    subA: 'O POP reúne todo o seu estúdio UEFN num só lugar: ', subB: 'tarefas de uma hora', subC: ', Verse ligado ao UEFN, quadro branco, análise de mercado e divisão de ganhos.',
+    announce: 'Beta fechada aberta a criadores de UEFN', h1a: 'Crie no UEFN.', h1b: 'Sozinho ou em equipa, sem caos.',
+    subA: 'O POP é o SaaS que ajuda os criadores de UEFN da ideia ao lançamento: ', subB: 'tarefas de uma hora', subC: ', Verse ligado ao UEFN, quadro branco, análise de mercado e divisão de ganhos.',
     cta: 'Entrar na lista de espera', see: 'Ver as funcionalidades', micro1: 'Beta fechada', micro2: 'Acesso por lista de espera', micro3: 'Ligado ao UEFN',
   },
   marquee: { label: 'Funciona com as suas ferramentas', epic: 'API do Fortnite da Epic' },
   pain: {
-    eyebrow: 'O problema', h2a: 'Discord, três Google Docs,', h2b: 'e ninguém sabe quem faz o quê.', without: 'Sem POP', with: 'Com POP',
+    eyebrow: 'O problema', h2a: 'Discord, Google Docs, Verse em .txt…', h2b: 'e o mapa não avança.', without: 'Sem POP', with: 'Com POP',
     bad: ['“Quem mexeu no spawner?”', 'O Verse circula no Discord em .txt', 'Uma lista de tarefas num Google Doc', 'A folha de cálculo dos ganhos, versão 7', '“Lançamos quando, afinal?”', 'Construir sem saber se o género funciona'],
-    good: ['Cada ação é registada e pode ser desfeita', 'Ctrl+S envia o Verse para o UEFN', 'Tarefas de uma hora, com dependências', 'Um extrato claro para cada um', 'O Boussole acompanha o marco e o atraso', 'Um veredito por género, com números reais'],
+    good: ['Cada ação é registada e pode ser desfeita', 'Ctrl+S envia o Verse para o UEFN', 'Tarefas de uma hora, com dependências', 'Um extrato claro para cada um', 'Marcos e atrasos acompanhados automaticamente', 'Um veredito por género, com números reais'],
   },
   feat: {
-    eyebrow: 'Funcionalidades', h2: 'O estúdio inteiro, da ideia ao dia do lançamento.', p: 'O que vê aqui são os ecrãs reais do POP, simplificadas.',
+    eyebrow: 'Funcionalidades', h2: 'Tudo para criar no UEFN, da ideia ao dia do lançamento.', p: 'O que vê aqui são os ecrãs reais do POP, simplificadas.',
     items: [
-      { tag: 'Tarefas e Boussole', h: 'Tarefas de uma hora. Um assistente todas as manhãs.', p: 'O gerador divide o mapa em tarefas de uma hora com as suas dependências. O Boussole resume o dia, aponta atrasos e sugere o que assumir primeiro.', pts: ['Kanban e dependências', 'Atrasos e marcos acompanhados', '“Assumir” num clique'] },
+      { tag: 'Tarefas e planeamento', h: 'Tarefas de uma hora. Um planeamento que se cumpre.', p: 'O gerador divide o mapa em tarefas de uma hora com as suas dependências. O planeamento acompanha os marcos e assinala atrasos, e um assistente integrado resume o dia.', pts: ['Kanban e dependências', 'Marcos e atrasos acompanhados', 'Resumo do dia'] },
       { tag: 'Editor Verse', h: 'Ctrl+S, e já está no UEFN.', p: 'O Verse é escrito no POP e vai direto para o seu projeto: compilação, erros na linha certa, sessão de teste. O assistente explica e corrige, sem serviço externo.', pts: ['Compilação no UEFN', 'Erros na linha', 'Correções sugeridas'] },
       { tag: 'Organizador', h: 'Todos os seus dispositivos. Organizados em três segundos.', p: 'Procure por tag, tipo ou pasta, selecione vinte e renomeie, mova ou duplique de uma vez. Ctrl+Z desfaz. Se o UEFN estiver fechado, as mudanças esperam.', pts: ['Pesquisa tag:, type:, pasta:', 'Edição em lote', 'Tudo pode ser desfeito'] },
       { tag: 'Quadro branco', h: 'Desenhe o mapa em equipa.', p: 'Post-its, formas, setas, cores, negrito, sublinhado: tudo para organizar as ideias. Votem e transformem os melhores post-its em tarefas.', pts: ['Formatação completa', 'Tempo real em equipa', 'Post-its → tarefas'] },
@@ -25,18 +25,6 @@ const ptPT: Dict = {
       { tag: 'Pagamentos', h: 'Cada um sabe quanto recebe.', p: 'Regras de divisão por porcentagem, valor fixo ou por tarefa, importação de ganhos, extrato por pessoa. Acabou a folha de cálculo perdida no Discord.', pts: ['Porcentagem, fixo, por tarefa', 'Importação CSV', 'Extrato de cada um'] },
     ],
     aiB: 'Já usa uma IA?', aiText: 'Ligue Claude, Cursor, Codex ou outra IA compatível com MCP: ela assume uma tarefa, escreve o Verse, compila e fecha a tarefa com uma nota. Cada ação é registada e pode ser desfeita.',
-  },
-  bou: {
-    eyebrow: 'Assistente integrado', h2a: 'Faça a pergunta.', h2b: 'O Boussole responde.',
-    p: 'O Boussole conhece as suas tarefas, marcos e equipa. Ele diz o que está atrasado, quem trabalha em quê e por onde começar, e guia passo a passo quem está a descobrir o POP. Sem que os seus dados saiam do POP.',
-    sub: 'assistente integrado', ask: 'Como é que…?',
-    demo: [
-      { q: 'O que faço agora?', a: ['**Olá Léa, vamos recuperar o atraso?**', '[r] 2 tarefas atrasadas.', '[g] Ontem concluiu 3 tarefas.', 'Agora: **#42 Sistema de pontuação**, que desbloqueia outras 3 tarefas.'] },
-      { q: 'Como ligo o UEFN?', a: ['**Como ligar o UEFN ao POP?**', '1. Organizador → Transferir o UEFN Link.', '2. Faça duplo clique em pop-link.exe no PC.', '3. No UEFN: Model Context Protocol → Start Server.'] },
-      { q: 'Estamos atrasados para a beta?', a: ['[o] Marco “Beta” em 5 dias: faltam 9 tarefas.', 'No ritmo atual (1,5 por dia), levaria 6 dias. **Atraso previsto: 1 dia.**'] },
-      { q: 'Em que está o Hugo a trabalhar?', a: ['**Hugo** tem 1 tarefa em curso e 2 a fazer:', '• **#38** Cenário da zona 2 · em curso desde ontem', '• **#44** Ecrã final · aguarda #42', '[g] 4 tarefas concluídas nesta semana.'] },
-      { q: 'A minha IA pode fechar tarefas?', a: ['Sim: ligada em “IAs ligadas”, ela usa **next_task**, **set_task_status** e **comment_task**. Cada ação aparece como “IA” no histórico.'] },
-    ],
   },
   stats: [['1 h', 'por tarefa, para avançar todos os dias'], ['0', 'serviço de IA externo obrigatório'], ['7 dias', 'de estatísticas por mapa, da API da Epic'], ['100%', 'das ações no UEFN podem ser desfeitas']],
   pricing: {
@@ -47,14 +35,14 @@ const ptPT: Dict = {
       { name: 'Studio', tag: 'O mais completo', desc: 'Para estúdios que lançam mapas em equipa.', cta: 'Entrar na lista' },
       { name: 'Studio+', tag: 'Em breve', desc: 'Tudo do Studio, mais o POP Forge: a aplicação de computador que constrói no UEFN.', cta: 'Entrar na lista' },
     ],
-    rows: ['Organização', 'Tarefas de uma hora, Kanban, dependências', 'Boussole, o assistente integrado', 'Páginas, quadro branco, planejamento e marcos', 'Mapas', 'Membros', 'UEFN', 'UEFN Link: projetos sincronizados', 'Editor Verse ligado (compilação, erros por linha)', 'Organizador de atores e edição em lote', 'IAs ligadas (Claude, Cursor, Codex…)', 'POP Forge: construção assistida no UEFN', 'Crescimento', 'Análise de mercado e mapas que funcionam', 'Tendências de vídeo TikTok e YouTube Shorts', 'Troca de playtests e dia do lançamento', 'Divisão de ganhos e extratos', 'Discord, GitHub, Lore'],
+    rows: ['Organização', 'Tarefas de uma hora, Kanban, dependências', 'Assistente integrado (resumo do dia, atrasos)', 'Páginas, quadro branco, planejamento e marcos', 'Mapas', 'Membros', 'UEFN', 'UEFN Link: projetos sincronizados', 'Editor Verse ligado (compilação, erros por linha)', 'Organizador de atores e edição em lote', 'IAs ligadas (Claude, Cursor, Codex…)', 'POP Forge: construção assistida no UEFN', 'Crescimento', 'Análise de mercado e mapas que funcionam', 'Tendências de vídeo TikTok e YouTube Shorts', 'Troca de playtests e dia do lançamento', 'Divisão de ganhos e extratos', 'Discord, GitHub, Lore'],
   },
   faq: {
     eyebrow: 'FAQ', h2: 'As perguntas que nos fazem.',
     items: [
       ['Preciso de um PC com Windows?', 'Para ligar o UEFN, sim: o UEFN só corre no Windows, e o UEFN Link corre nesse PC. O resto do POP funciona em qualquer navegador, inclusive no Mac.'],
       ['O POP publica o meu mapa?', 'Não. O POP prepara tudo (verificação antes da publicação, playtests, plano do dia do lançamento), mas a publicação é sempre feita no portal de criadores da Epic.'],
-      ['Como funciona o assistente Boussole?', 'O Boussole é integrado ao POP: ele lê as suas tarefas, datas, dependências e marcos para resumir o dia, responder às suas perguntas (“o que está atrasado?”, “em que está o Hugo a trabalhar?”) e explicar como usar o POP. Funciona totalmente dentro do POP: os seus dados não vão para nenhum serviço externo.'],
+      ['O POP funciona se eu criar sozinho?', 'Sim. O POP serve tanto quem cria sozinho como equipas: o plano Criador é gratuito para um mapa e pode convidar membros mais tarde sem mudar nada.'],
       ['E se eu quiser usar a minha própria IA?', 'Ligue Claude, Cursor, Codex ou outra IA compatível com MCP em “IAs ligadas”. Ela pode ler e editar as suas tarefas, o seu Verse e os seus atores no UEFN, e cada ação é registada e pode ser desfeita.'],
       ['De onde vêm os números da análise?', 'Da API oficial do Fortnite da Epic: jogadores, pico de jogadores simultâneos, tempo de jogo e retenção de cada mapa público, por 7 dias.'],
       ['Como consigo acesso?', 'O POP está em beta fechada. Entre na lista de espera: analisamos os pedidos um a um e depois enviamos o seu utilizador e uma palavra-passe provisória, que muda no primeiro acesso.'],
@@ -75,7 +63,7 @@ const ptPT: Dict = {
     earnings: 'Ganhos de outubro', roles: ['Código · 40%', 'Mapa · 35%', 'Música · fixo', 'Restante'], noTransfer: 'O POP calcula, não faz nenhuma transferência.',
   },
   wl: {
-    eyebrow: 'Beta fechada', title: 'Entrar na lista de espera', intro: 'Estamos a abrir o POP aos poucos para acompanhar cada estúdio. Diga-nos quem é e enviamos o seu acesso o quanto antes.',
+    eyebrow: 'Beta fechada', title: 'Entrar na lista de espera', intro: 'Estamos a abrir o POP aos poucos para acompanhar cada criador. Diga-nos quem é e enviamos o seu acesso o quanto antes.',
     pageIntro: 'Durante a beta, as contas do POP são criadas pela equipa. Diga-nos quem é: quando o seu acesso for aprovado, recebe o seu utilizador e uma palavra-passe provisória.',
     invalid: 'Este link de acesso é inválido, já foi usado ou expirou. Peça de novo ou escreva à equipa do POP.',
     name: 'Nome ou apelido', email: 'E-mail', studio: 'Estúdio', optional: '(opcional)', studioPh: 'Nome do estúdio', team: 'Tamanho da equipa',

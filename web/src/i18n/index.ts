@@ -2,6 +2,7 @@
 // Le français est chargé d'office ; les autres langues sont chargées à la demande.
 import { useSyncExternalStore } from 'react'
 import fr, { type Dict } from './fr'
+import { LANG as APP_LANG } from './t'
 import fFR from 'flag-icons/flags/4x3/fr.svg'
 import fGB from 'flag-icons/flags/4x3/gb.svg'
 import fES from 'flag-icons/flags/4x3/es.svg'
@@ -98,4 +99,4 @@ export function useI18n() {
 }
 
 /** Remet la page en français à la sortie du site (l'app reste en français pour l'instant). */
-export function resetHtmlLang() { document.documentElement.lang = 'fr' }
+export function resetHtmlLang() { document.documentElement.lang = APP_LANG }

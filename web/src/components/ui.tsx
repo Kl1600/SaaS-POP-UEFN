@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { initials } from '../api'
+import { tr } from '../i18n/t'
 
 export const Avatar = ({ name, small }: { name?: string | null; small?: boolean }) => (
   <span className={'avatar' + (small ? ' av-s' : '')} title={name ?? ''} aria-label={name ?? ''}>{initials(name)}</span>
@@ -41,9 +42,11 @@ export const Modal = ({ onClose, label, children }: { onClose: () => void; label
   </>
 )
 
-export const STATUS: Record<string, string> = { todo: 'À faire', doing: 'En cours', blocked: 'Bloqué', done: 'Fait' }
-export const ROLE: Record<string, string> = { owner: 'Propriétaire', admin: 'Admin', member: 'Membre', freelance: 'Freelance', viewer: 'Invité en lecture' }
+export const STATUS: Record<string, string> = { todo: tr("À faire"), doing: tr("En cours"), blocked: tr("Bloqué"), done: tr("Fait") }
+export const ROLE: Record<string, string> = { owner: tr("Propriétaire"), admin: tr("Admin"), member: tr("Membre"), freelance: tr("Freelance"), viewer: tr("Invité en lecture") }
 export const TAGS = ['code', 'carte', 'conception', 'test']
+/** Libellé affiché d'une étiquette de tâche (la valeur enregistrée reste en français). */
+export const tagLabel = (t: string) => tr(t)
 
 export const Empty = ({ text, action }: { text: string; action?: ReactNode }) => (
   <div className="empty"><p style={{ margin: '0 0 12px' }}>{text}</p>{action}</div>

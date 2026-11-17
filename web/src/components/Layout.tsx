@@ -11,22 +11,24 @@ import { NewTaskModal } from '../pages/Tasks'
 import { GuideDrawer } from './Guide'
 import { Compass, ShieldCheck } from 'lucide-react'
 import { useUefnStatus, STATUS_LABEL } from '../uefnState'
+import { tr, tx } from '../i18n/t'
+import LangPicker from './LangPicker'
 
 const GROUPS: [string, [string, string, any][]][] = [
-  ['Général', [['/', "Vue d'ensemble", Home]]],
-  ['Espace', [['/pages', 'Pages', FileText], ['/tableau', 'Tableau blanc', PenTool]]],
-  ['Production', [['/planifier', 'Planifier', CalendarDays], ['/taches', 'Tâches', KanbanSquare]]],
-  ['UEFN', [['/verse', 'Éditeur Verse', FileCode2], ['/organiseur', 'Organiseur', ListTree], ['/ia', 'IA connectées', Bot]]],
-  ['Analyse', [['/analyse/marche', 'Marché', ChartNoAxesCombined], ['/analyse/tiktok', 'Tendances vidéo', Hash], ['/analyse/tendances', 'Maps qui marchent', Flame], ['/analyse/lancements', 'Meilleurs démarrages', Sparkle]]],
-  ['Publication', [['/lancer', 'Lancer et suivre', Rocket]]],
-  ['Studio', [['/remunerer', 'Rémunérer', Coins], ['/equipe', 'Équipe', Users]]],
+  [tr("Général"), [['/', tr("Vue d'ensemble"), Home]]],
+  [tr("Espace"), [['/pages', tr("Pages"), FileText], ['/tableau', tr("Tableau blanc"), PenTool]]],
+  [tr("Production"), [['/planifier', tr("Planifier"), CalendarDays], ['/taches', tr("Tâches"), KanbanSquare]]],
+  ['UEFN', [['/verse', tr("Éditeur Verse"), FileCode2], ['/organiseur', tr("Organiseur"), ListTree], ['/ia', tr("IA connectées"), Bot]]],
+  [tr("Analyse"), [['/analyse/marche', tr("Marché"), ChartNoAxesCombined], ['/analyse/tiktok', tr("Tendances vidéo"), Hash], ['/analyse/tendances', tr("Maps qui marchent"), Flame], ['/analyse/lancements', tr("Meilleurs démarrages"), Sparkle]]],
+  [tr("Publication"), [['/lancer', tr("Lancer et suivre"), Rocket]]],
+  [tr("Studio"), [['/remunerer', tr("Rémunérer"), Coins], ['/equipe', tr("Équipe"), Users]]],
 ]
 const TITLES: Record<string, [string, string]> = {}
 GROUPS.forEach(([g, items]) => items.forEach(([p, l]) => (TITLES[p] = [g, l])))
-TITLES['/parametres'] = ['Compte', 'Paramètres']
-TITLES['/aide'] = ['Compte', 'Aide et support']
-TITLES['/admin'] = ['POP', 'Administration']
-TITLES['/equipe'] = ['Studio', 'Équipe et intégrations']
+TITLES['/parametres'] = [tr("Compte"), tr("Paramètres")]
+TITLES['/aide'] = [tr("Compte"), tr("Aide et support")]
+TITLES['/admin'] = ['POP', tr("Administration")]
+TITLES['/equipe'] = [tr("Studio"), tr("Équipe et intégrations")]
 
 export default function Layout() {
   const app = useApp()
@@ -39,7 +41,7 @@ export default function Layout() {
   const [guide, setGuide] = useState<false | { ask?: string }>(false)
   useEffect(() => { const h = (e: Event) => setGuide({ ask: (e as CustomEvent).detail ?? '' }); window.addEventListener('boussole', h); return () => window.removeEventListener('boussole', h) }, [])
   const key = '/' + (loc.pathname.split('/')[1] || '')
-  const [group, title] = TITLES[loc.pathname] ?? TITLES[key] ?? ['Général', '']
+  const [group, title] = TITLES[loc.pathname] ?? TITLES[key] ?? [tr("Général"), '']
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -59,15 +61,15 @@ export default function Layout() {
       <aside className="side">
         <div className="brand"><img src="/logo.png" alt="POP" /></div>
         <label className="projsel lbl">
-          <span className="navsec" style={{ padding: '0 4px 2px' }}>Map</span>
-          <select aria-label="Map" value={app.map?.id ?? ''} onChange={e => {
+          <span className="navsec" style={{ padding: '0 4px 2px' }}>{tr("Map")}</span>
+          <select aria-label={tr("Map")} value={app.map?.id ?? ''} onChange={e => {
             if (e.target.value === 'new') nav('/equipe?tab=maps'); else app.setMapId(Number(e.target.value))
           }}>
             {allMaps.map(({ s, m }) => <option key={m.id} value={m.id}>{m.name}{app.me!.studios.length > 1 ? ` · ${s.name}` : ''}</option>)}
-            <option value="new">+ Nouvelle map</option>
+            <option value="new">{tr("+ Nouvelle map")}</option>
           </select>
         </label>
-        <nav className="nav" aria-label="Sections">
+        <nav className="nav" aria-label={tr("Sections")}>
           {GROUPS.map(([g, items]) => (
             <div key={g} className="nav">
               <span className="navsec lbl">{g}</span>
@@ -79,29 +81,30 @@ export default function Layout() {
             </div>
           ))}
         </nav>
-        <nav className="nav" style={{ marginTop: 'auto' }} aria-label="Compte">
-          <NavLink to="/parametres" className={({ isActive }) => (isActive ? 'on' : '')}><Settings size={20} strokeWidth={1.5} /><span className="lbl">Paramètres</span></NavLink>
-          <NavLink to="/aide"><LifeBuoy size={20} strokeWidth={1.5} /><span className="lbl">Aide et support</span></NavLink>
-          {app.me?.admin && <NavLink to="/admin" className={({ isActive }) => (isActive ? 'on' : '')}><ShieldCheck size={20} strokeWidth={1.5} /><span className="lbl">Administration</span>{!!app.me.admin_pending && <span className="nav-count">{app.me.admin_pending}</span>}</NavLink>}
+        <nav className="nav" style={{ marginTop: 'auto' }} aria-label={tr("Compte")}>
+          <NavLink to="/parametres" className={({ isActive }) => (isActive ? 'on' : '')}><Settings size={20} strokeWidth={1.5} /><span className="lbl">{tr("Paramètres")}</span></NavLink>
+          <NavLink to="/aide"><LifeBuoy size={20} strokeWidth={1.5} /><span className="lbl">{tr("Aide et support")}</span></NavLink>
+          {app.me?.admin && <NavLink to="/admin" className={({ isActive }) => (isActive ? 'on' : '')}><ShieldCheck size={20} strokeWidth={1.5} /><span className="lbl">{tr("Administration")}</span>{!!app.me.admin_pending && <span className="nav-count">{app.me.admin_pending}</span>}</NavLink>}
         </nav>
       </aside>
       <div className="main">
         <header className="top">
-          <button className="iconbtn" aria-label="Replier la barre latérale" onClick={() => setCollapsed(c => !c)}><PanelLeft size={20} strokeWidth={1.5} /></button>
-          <nav className="crumb" aria-label="Fil d'Ariane"><span>{group}</span><span>/</span>{title}</nav>
+          <button className="iconbtn" aria-label={tr("Replier la barre latérale")} onClick={() => setCollapsed(c => !c)}><PanelLeft size={20} strokeWidth={1.5} /></button>
+          <nav className="crumb" aria-label={tr("Fil d'Ariane")}><span>{group}</span><span>/</span>{title}</nav>
           {others.length > 0 && (
             <div className="presence" title={others.map(o => `${o.name}${o.place ? ' · ' + o.place : ''}`).join('\n')}>
               {others.slice(0, 4).map(o => <span key={o.uid} className="pr"><Avatar name={o.name} small /></span>)}
             </div>
           )}
-          <button className={'upill ' + uefn.status} onClick={() => nav('/organiseur')} title={uefn.project ? `Projet ${uefn.project}` : 'UEFN Link'}><span className="udot" />{STATUS_LABEL[uefn.status]}{uefn.pending ? ` · ${uefn.pending}` : ''}</button>
+          <button className={'upill ' + uefn.status} onClick={() => nav('/organiseur')} title={uefn.project ? tr("Projet {0}", [uefn.project]) : 'UEFN Link'}><span className="udot" />{STATUS_LABEL[uefn.status]}{uefn.pending ? ` · ${uefn.pending}` : ''}</button>
           <GlobalSearch />
-          <button className="iconbtn" aria-label={app.dark ? 'Thème clair' : 'Thème sombre'} onClick={app.toggleDark}>{app.dark ? <Sun size={20} strokeWidth={1.5} /> : <Moon size={20} strokeWidth={1.5} />}</button>
-          {app.map && <button className="iconbtn" aria-label="Boussole, assistant intégré" title="Boussole : assistant intégré" onClick={() => setGuide({})}><Compass size={20} strokeWidth={1.5} /></button>}
+          <button className="iconbtn" aria-label={app.dark ? tr("Thème clair") : tr("Thème sombre")} onClick={app.toggleDark}>{app.dark ? <Sun size={20} strokeWidth={1.5} /> : <Moon size={20} strokeWidth={1.5} />}</button>
+          <LangPicker app />
+          {app.map && <button className="iconbtn" aria-label={tr("Boussole, assistant intégré")} title={tr("Boussole : assistant intégré")} onClick={() => setGuide({})}><Compass size={20} strokeWidth={1.5} /></button>}
           <Notifications />
-          {app.canEdit && <button className="btn pri" onClick={() => setNewTask(true)}><Plus size={18} strokeWidth={1.5} />Nouvelle tâche</button>}
+          {app.canEdit && <button className="btn pri" onClick={() => setNewTask(true)}><Plus size={18} strokeWidth={1.5} />{tr("Nouvelle tâche")}</button>}
           <div style={{ position: 'relative' }} ref={acctBox}>
-            <button className="acct" onClick={() => setAcct(a => !a)} aria-expanded={acct} aria-label="Compte et studio">
+            <button className="acct" onClick={() => setAcct(a => !a)} aria-expanded={acct} aria-label={tr("Compte et studio")}>
               <span className="acct-av">{(app.me?.user.name ?? '?').split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()}</span>
               <span className="acct-txt"><span className="acct-name">{app.me?.user.name}</span><span className="acct-studio">{app.studio?.name}</span></span>
               <ChevronDown size={16} strokeWidth={1.75} className="acct-chev" />
@@ -109,9 +112,9 @@ export default function Layout() {
             {acct && (
               <div className="menu" style={{ right: 0, top: 54 }}>
                 <div className="small muted" style={{ padding: '6px 10px' }}>{app.me?.user.email}</div>
-                <button onClick={() => { setAcct(false); nav('/equipe?tab=maps') }}><Plus size={16} />Nouveau studio ou map</button>
-                <button onClick={() => { setAcct(false); nav('/parametres') }}><Settings size={16} />Paramètres</button>
-                <button onClick={async () => { await api.post('/api/auth/logout'); location.href = '/' }}><LogOut size={16} />Se déconnecter</button>
+                <button onClick={() => { setAcct(false); nav('/equipe?tab=maps') }}><Plus size={16} />{tr("Nouveau studio ou map")}</button>
+                <button onClick={() => { setAcct(false); nav('/parametres') }}><Settings size={16} />{tr("Paramètres")}</button>
+                <button onClick={async () => { await api.post('/api/auth/logout'); location.href = '/' }}><LogOut size={16} />{tr("Se déconnecter")}</button>
               </div>
             )}
           </div>
@@ -153,16 +156,16 @@ function GlobalSearch() {
   return <div style={{ position: 'relative' }} className="gsearch-wrap">
     <form className="search" onSubmit={e => { e.preventDefault(); if (res[sel]) go(res[sel]) }}>
       <Search size={18} strokeWidth={1.5} />
-      <input id="gsearch" type="search" placeholder="Chercher" aria-label="Recherche globale" value={q} autoComplete="off"
+      <input id="gsearch" type="search" placeholder={tr("Chercher")} aria-label={tr("Recherche globale")} value={q} autoComplete="off"
         onChange={e => { setQ(e.target.value); setOpen(true) }} onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)}
         onKeyDown={e => { if (e.key === 'ArrowDown') { e.preventDefault(); setSel(s => Math.min(res.length - 1, s + 1)) } if (e.key === 'ArrowUp') { e.preventDefault(); setSel(s => Math.max(0, s - 1)) } if (e.key === 'Escape') (e.target as HTMLInputElement).blur() }} />
-      <span className="kbd">Ctrl K</span>
+      <span className="kbd">{tr("Ctrl K")}</span>
     </form>
     {open && q.trim().length >= 2 && <div className="menu gresults">
-      {res.length === 0 ? <div className="small muted" style={{ padding: 10 }}>Aucun résultat pour « {q} »</div> : res.map((r, i) => (<div key={i}>
-        {(i === 0 || res[i - 1].kind !== r.kind) && <div className="gr-head">{({ Tâche: 'Tâches', Page: 'Pages', Tableau: 'Tableaux', Verse: 'Fichiers Verse', Acteur: 'Acteurs UEFN', Jalon: 'Jalons', Membre: 'Membres', Action: 'Actions récentes' } as any)[r.kind] ?? r.kind}</div>}
+      {res.length === 0 ? <div className="small muted" style={{ padding: 10 }}>{tr("Aucun résultat pour « {0} »", [q])}</div> : res.map((r, i) => (<div key={i}>
+        {(i === 0 || res[i - 1].kind !== r.kind) && <div className="gr-head">{({ Tâche: tr("Tâches"), Page: tr("Pages"), Tableau: tr("Tableaux"), Verse: tr("Fichiers Verse"), Acteur: tr("Acteurs UEFN"), Jalon: tr("Jalons"), Membre: tr("Membres"), Action: tr("Actions récentes") } as any)[r.kind] ?? r.kind}</div>}
         <button className={i === sel ? 'on' : ''} onMouseDown={e => { e.preventDefault(); go(r) }} onMouseEnter={() => setSel(i)}>
-          <span style={{ minWidth: 0, flex: 1, textAlign: 'left' }}><span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>{r.detail && <span className="small muted" style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.detail}</span>}</span>
+          <span style={{ minWidth: 0, flex: 1, textAlign: 'left' }}><span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>{r.detail && <span className="small muted" style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tx(r.detail)}</span>}</span>
         </button></div>))}
     </div>}
   </div>
@@ -178,12 +181,12 @@ function Notifications() {
   useEffect(() => { load() }, [app.me?.user.id])
   useEffect(() => app.subscribe(m => { if (m.t === 'notif' && m.uid === app.me?.user.id) load() }), [app.subscribe, app.me?.user.id])
   return <div style={{ position: 'relative' }} ref={box}>
-    <button className="iconbtn" aria-label={`Notifications${data.unread ? ` (${data.unread} non lues)` : ''}`} aria-expanded={open} onClick={async () => { setOpen(o => !o); if (!open && data.unread) { await api.post('/api/notifications/read'); setTimeout(load, 300) } }}>
+    <button className="iconbtn" aria-label={tr("Notifications{0}", [data.unread ? tr(" ({0} non lues)", [data.unread]) : ''])} aria-expanded={open} onClick={async () => { setOpen(o => !o); if (!open && data.unread) { await api.post('/api/notifications/read'); setTimeout(load, 300) } }}>
       <Bell size={20} strokeWidth={1.5} />{data.unread > 0 && <span className="dot" />}
     </button>
     {open && <div className="menu notif" style={{ right: 0, top: 50 }}>
-      <div className="small muted" style={{ padding: '6px 10px' }}>Notifications</div>
-      {data.items.length === 0 ? <div className="small muted" style={{ padding: 10 }}>Rien pour l’instant. Vous serez prévenu quand on vous assigne une tâche, qu’on vous mentionne avec @, ou qu’une tâche se débloque.</div> :
+      <div className="small muted" style={{ padding: '6px 10px' }}>{tr("Notifications")}</div>
+      {data.items.length === 0 ? <div className="small muted" style={{ padding: 10 }}>{tr("Rien pour l’instant. Vous serez prévenu quand on vous assigne une tâche, qu’on vous mentionne avec @, ou qu’une tâche se débloque.")}</div> :
         data.items.map(n => <button key={n.id} onClick={() => { setOpen(false); if (n.map_id && n.map_id !== app.map?.id) app.setMapId(n.map_id); if (n.link) nav(n.link) }} style={{ alignItems: 'flex-start' }}>
           {!n.read && <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--red)', marginTop: 7, flex: 'none' }} />}
           <span style={{ flex: 1, textAlign: 'left' }}><span style={{ display: 'block' }}>{n.text}</span><span className="small muted">{ago(n.at)}</span></span>

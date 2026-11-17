@@ -1,22 +1,22 @@
 import type { Dict } from './fr'
 const cs: Dict = {
-  meta: { title: 'POP · Studio pro tvůrce Fortnite' },
-  nav: { features: 'Funkce', boussole: 'Boussole', pricing: 'Ceník', faq: 'Otázky', login: 'Přihlásit se', join: 'Do bety', home: 'POP, domů', lang: 'Jazyk', search: 'Hledat zemi' },
+  meta: { title: 'POP · SaaS pro tvůrce v UEFN' },
+  nav: { features: 'Funkce', pricing: 'Ceník', faq: 'Otázky', login: 'Přihlásit se', join: 'Do bety', home: 'POP, domů', lang: 'Jazyk', search: 'Hledat zemi' },
   hero: {
-    announce: 'Novinka: Boussole, vestavěný asistent', h1a: 'Vaše mapy ve Fortnite.', h1b: 'Společně. Bez chaosu.',
-    subA: 'POP spojí celé vaše studio UEFN na jednom místě: ', subB: 'hodinové úkoly', subC: ', Verse propojený s UEFN, tabule, analýza trhu a dělení výdělků.',
+    announce: 'Uzavřená beta otevřená tvůrcům v UEFN', h1a: 'Tvořte v UEFN.', h1b: 'Sami nebo v týmu, bez chaosu.',
+    subA: 'POP je SaaS, který pomáhá tvůrcům v UEFN od nápadu po vydání: ', subB: 'hodinové úkoly', subC: ', Verse propojený s UEFN, tabule, analýza trhu a dělení výdělků.',
     cta: 'Zapsat se na čekací listinu', see: 'Zobrazit funkce', micro1: 'Uzavřená beta', micro2: 'Přístup přes čekací listinu', micro3: 'Propojeno s UEFN',
   },
   marquee: { label: 'Funguje s vašimi nástroji', epic: 'Fortnite API od Epicu' },
   pain: {
-    eyebrow: 'Problém', h2a: 'Discord, tři Google Docs,', h2b: 'a nikdo neví, kdo co dělá.', without: 'Bez POP', with: 'S POP',
+    eyebrow: 'Problém', h2a: 'Discord, Google Docs, Verse v .txt…', h2b: 'a mapa se nehýbe.', without: 'Bez POP', with: 'S POP',
     bad: ['„Kdo sahal na spawner?“', 'Verse koluje po Discordu jako .txt', 'Seznam úkolů v Google Docu', 'Tabulka výdělků, verze 7', '„Tak kdy to vlastně vydáme?“', 'Stavíme, aniž víme, jestli žánr funguje'],
-    good: ['Každá akce je zaznamenaná a vratná', 'Ctrl+S pošle Verse do UEFN', 'Hodinové úkoly se závislostmi', 'Přehledný výpis pro každého', 'Boussole hlídá milníky a zpoždění', 'Verdikt pro každý žánr podle skutečných čísel'],
+    good: ['Každá akce je zaznamenaná a vratná', 'Ctrl+S pošle Verse do UEFN', 'Hodinové úkoly se závislostmi', 'Přehledný výpis pro každého', 'Milníky a zpoždění se sledují automaticky', 'Verdikt pro každý žánr podle skutečných čísel'],
   },
   feat: {
-    eyebrow: 'Funkce', h2: 'Celé studio, od nápadu po den vydání.', p: 'To, co tu vidíte, jsou skutečné obrazovky POP, jen zjednodušené.',
+    eyebrow: 'Funkce', h2: 'Vše pro tvorbu v UEFN, od nápadu po den vydání.', p: 'To, co tu vidíte, jsou skutečné obrazovky POP, jen zjednodušené.',
     items: [
-      { tag: 'Úkoly a Boussole', h: 'Hodinové úkoly. Asistent každé ráno.', p: 'Generátor rozdělí mapu na hodinové úkoly i se závislostmi. Boussole shrne den, upozorní na zpoždění a navrhne, čím začít.', pts: ['Kanban a závislosti', 'Sledování zpoždění a milníků', '„Vzít“ jedním kliknutím'] },
+      { tag: 'Úkoly a plánování', h: 'Hodinové úkoly. Plán, který platí.', p: 'Generátor rozdělí mapu na hodinové úkoly i se závislostmi. Plán sleduje milníky a upozorní na zpoždění a vestavěný asistent shrne den.', pts: ['Kanban a závislosti', 'Sledování milníků a zpoždění', 'Shrnutí dne'] },
       { tag: 'Editor Verse', h: 'Ctrl+S a je to v UEFN.', p: 'Verse píšete v POP a jde rovnou do projektu: kompilace, chyby na správném řádku, testovací relace. Asistent vysvětluje a opravuje bez externí služby.', pts: ['Kompilace v UEFN', 'Chyby na řádku', 'Navržené opravy'] },
       { tag: 'Organizér', h: 'Všechna zařízení. Uklizená za tři vteřiny.', p: 'Hledejte podle tagu, typu nebo složky, vyberte dvacet a přejmenujte, přesuňte nebo duplikujte najednou. Ctrl+Z vrací. Když je UEFN zavřený, změny počkají.', pts: ['Hledání tag:, type:, složka:', 'Hromadné úpravy', 'Vše jde vrátit'] },
       { tag: 'Tabule', h: 'Kreslete mapu společně.', p: 'Lístečky, tvary, šipky, barvy, tučné písmo, podtržení: vše pro rozvržení nápadů. Hlasujte a z nejlepších lístečků udělejte úkoly.', pts: ['Kompletní formátování', 'Spolupráce v reálném čase', 'Lístečky → úkoly'] },
@@ -24,18 +24,6 @@ const cs: Dict = {
       { tag: 'Výplaty', h: 'Každý ví, kolik dostane.', p: 'Pravidla dělení v procentech, pevnou částkou nebo za úkol, import výdělků, výpis pro každého. Konec tabulek ztracených na Discordu.', pts: ['Procenta, pevně, za úkol', 'Import CSV', 'Výpis pro každého'] },
     ],
     aiB: 'Už používáte AI?', aiText: 'Připojte Claude, Cursor, Codex nebo jinou AI kompatibilní s MCP: vezme úkol, napíše Verse, zkompiluje a úkol uzavře s poznámkou. Každá akce je zaznamenaná a vratná.',
-  },
-  bou: {
-    eyebrow: 'Vestavěný asistent', h2a: 'Zeptejte se.', h2b: 'Boussole odpoví.',
-    p: 'Boussole zná vaše úkoly, milníky i tým. Řekne, co je ve zpoždění, kdo na čem pracuje a čím začít, a nováčky provede POP krok za krokem. Vaše data přitom POP neopouštějí.',
-    sub: 'vestavěný asistent', ask: 'Jak mám…?',
-    demo: [
-      { q: 'Co mám teď dělat?', a: ['**Ahoj Léo, dohoníme to?**', '[r] 2 úkoly jsou ve zpoždění.', '[g] Včera jste dokončila 3 úkoly.', 'Teď: **#42 Systém skóre**, který odemkne 3 další úkoly.'] },
-      { q: 'Jak propojím UEFN?', a: ['**Jak propojit UEFN s POP?**', '1. Organizér → Stáhnout UEFN Link.', '2. Dvakrát klikněte na pop-link.exe v PC.', '3. V UEFN: Model Context Protocol → Start Server.'] },
-      { q: 'Stihneme betu?', a: ['[o] Milník „Beta“ za 5 dní: zbývá 9 úkolů.', 'Při současném tempu (1,5 denně) to zabere 6 dní. **Očekávané zpoždění: 1 den.**'] },
-      { q: 'Na čem pracuje Hugo?', a: ['**Hugo** má 1 úkol rozpracovaný a 2 k udělání:', '• **#38** Dekorace zóny 2 · rozpracováno od včera', '• **#44** Závěrečná obrazovka · čeká na #42', '[g] Tento týden dokončeny 4 úkoly.'] },
-      { q: 'Může moje AI uzavírat úkoly?', a: ['Ano: po připojení v „Připojené AI“ používá **next_task**, **set_task_status** a **comment_task**. Každá akce je v historii označena „AI“.'] },
-    ],
   },
   stats: [['1 h', 'na úkol, abyste se každý den posunuli'], ['0', 'povinných externích AI služeb'], ['7 dní', 'statistik na mapu z API Epicu'], ['100 %', 'akcí v UEFN lze vrátit']],
   pricing: {
@@ -46,14 +34,14 @@ const cs: Dict = {
       { name: 'Studio', tag: 'Nejkompletnější', desc: 'Pro studia, která vydávají mapy v týmu.', cta: 'Zapsat se' },
       { name: 'Studio+', tag: 'Brzy', desc: 'Vše ze Studia plus POP Forge: desktopová aplikace, která staví v UEFN.', cta: 'Zapsat se' },
     ],
-    rows: ['Organizace', 'Hodinové úkoly, Kanban, závislosti', 'Boussole, vestavěný asistent', 'Stránky, tabule, plánování a milníky', 'Mapy', 'Členové', 'UEFN', 'UEFN Link: synchronizované projekty', 'Propojený editor Verse (kompilace, chyby na řádku)', 'Organizér aktérů a hromadné úpravy', 'Připojené AI (Claude, Cursor, Codex…)', 'POP Forge: asistované stavění v UEFN', 'Růst', 'Analýza trhu a mapy, které fungují', 'Video trendy TikTok a YouTube Shorts', 'Výměna playtestů a den vydání', 'Dělení výdělků a výpisy', 'Discord, GitHub, Lore'],
+    rows: ['Organizace', 'Hodinové úkoly, Kanban, závislosti', 'Vestavěný asistent (shrnutí dne, zpoždění)', 'Stránky, tabule, plánování a milníky', 'Mapy', 'Členové', 'UEFN', 'UEFN Link: synchronizované projekty', 'Propojený editor Verse (kompilace, chyby na řádku)', 'Organizér aktérů a hromadné úpravy', 'Připojené AI (Claude, Cursor, Codex…)', 'POP Forge: asistované stavění v UEFN', 'Růst', 'Analýza trhu a mapy, které fungují', 'Video trendy TikTok a YouTube Shorts', 'Výměna playtestů a den vydání', 'Dělení výdělků a výpisy', 'Discord, GitHub, Lore'],
   },
   faq: {
     eyebrow: 'Otázky', h2: 'Na co se nás ptáte.',
     items: [
       ['Potřebuji PC s Windows?', 'Pro propojení s UEFN ano: UEFN běží jen na Windows a UEFN Link se spouští na tomto PC. Zbytek POP funguje v jakémkoli prohlížeči, i na Macu.'],
       ['Publikuje POP moji mapu?', 'Ne. POP vše připraví (kontrola před publikací, playtesty, plán dne vydání), ale publikace vždy probíhá na portálu tvůrců Epicu.'],
-      ['Jak funguje asistent Boussole?', 'Boussole je součástí POP: čte vaše úkoly, jejich termíny, závislosti a milníky, aby shrnul den, odpověděl na otázky („co je ve zpoždění?“, „na čem pracuje Hugo?“) a vysvětlil, jak POP používat. Běží celý uvnitř POP: vaše data nejdou do žádné externí služby.'],
+      ['Funguje POP, i když tvořím sám?', 'Ano. POP je pro samostatné tvůrce i pro týmy: tarif Tvůrce je pro jednu mapu zdarma a členy můžete pozvat později, aniž byste cokoli měnili.'],
       ['A když chci použít vlastní AI?', 'Připojte Claude, Cursor, Codex nebo jinou AI kompatibilní s MCP v „Připojené AI“. Může číst a upravovat úkoly, Verse i aktéry v UEFN a každá akce je zaznamenaná a vratná.'],
       ['Odkud jsou čísla v analýze?', 'Z oficiálního Fortnite API od Epicu: hráči, špička současných hráčů, herní čas a retence každé veřejné mapy za 7 dní.'],
       ['Jak získám přístup?', 'POP je v uzavřené betě. Zapište se na čekací listinu: žádosti procházíme jednu po druhé a pak vám pošleme uživatelské jméno a dočasné heslo, které při prvním přihlášení změníte.'],
@@ -74,7 +62,7 @@ const cs: Dict = {
     earnings: 'Výdělky za říjen', roles: ['Kód · 40 %', 'Mapa · 35 %', 'Hudba · pevně', 'Zbytek'], noTransfer: 'POP počítá, nikdy nepřevádí peníze.',
   },
   wl: {
-    eyebrow: 'Uzavřená beta', title: 'Zapsat se na čekací listinu', intro: 'POP otevíráme postupně, abychom se mohli věnovat každému studiu. Řekněte nám, kdo jste, a přístup vám pošleme co nejdřív.',
+    eyebrow: 'Uzavřená beta', title: 'Zapsat se na čekací listinu', intro: 'POP otevíráme postupně, abychom se mohli věnovat každému tvůrci. Řekněte nám, kdo jste, a přístup vám pošleme co nejdřív.',
     pageIntro: 'Během bety zakládá účty POP náš tým. Řekněte nám, kdo jste: po schválení dostanete uživatelské jméno a dočasné heslo.',
     invalid: 'Tento přístupový odkaz je neplatný, už použitý nebo vypršel. Požádejte znovu, nebo napište týmu POP.',
     name: 'Jméno nebo přezdívka', email: 'E-mail', studio: 'Studio', optional: '(nepovinné)', studioPh: 'Název studia', team: 'Velikost týmu',

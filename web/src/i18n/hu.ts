@@ -1,22 +1,22 @@
 import type { Dict } from './fr'
 const hu: Dict = {
-  meta: { title: 'POP · A Fortnite-alkotók stúdiója' },
-  nav: { features: 'Funkciók', boussole: 'Boussole', pricing: 'Árak', faq: 'GYIK', login: 'Belépés', join: 'Csatlakozás a bétához', home: 'POP, kezdőlap', lang: 'Nyelv', search: 'Ország keresése' },
+  meta: { title: 'POP · SaaS UEFN-alkotóknak' },
+  nav: { features: 'Funkciók', pricing: 'Árak', faq: 'GYIK', login: 'Belépés', join: 'Csatlakozás a bétához', home: 'POP, kezdőlap', lang: 'Nyelv', search: 'Ország keresése' },
   hero: {
-    announce: 'Újdonság: Boussole, a beépített asszisztens', h1a: 'A Fortnite-pályáid.', h1b: 'Együtt. Káosz nélkül.',
-    subA: 'A POP egy helyre hozza az egész UEFN-stúdiódat: ', subB: 'egyórás feladatok', subC: ', UEFN-hez kötött Verse, tábla, piacelemzés és bevételmegosztás.',
+    announce: 'Zárt béta UEFN-alkotóknak', h1a: 'Alkoss az UEFN-ben.', h1b: 'Egyedül vagy csapatban, káosz nélkül.',
+    subA: 'A POP az a SaaS, amely az ötlettől a megjelenésig segíti az UEFN-alkotókat: ', subB: 'egyórás feladatok', subC: ', UEFN-hez kötött Verse, tábla, piacelemzés és bevételmegosztás.',
     cta: 'Feliratkozás a várólistára', see: 'Funkciók megtekintése', micro1: 'Zárt béta', micro2: 'Hozzáférés várólistán', micro3: 'UEFN-hez kötve',
   },
   marquee: { label: 'Működik az eszközeiddel', epic: 'Az Epic Fortnite API-ja' },
   pain: {
-    eyebrow: 'A probléma', h2a: 'Discord, három Google Docs,', h2b: 'és senki sem tudja, ki mit csinál.', without: 'POP nélkül', with: 'POP-pal',
+    eyebrow: 'A probléma', h2a: 'Discord, Google Docs, Verse .txt-ben…', h2b: 'és a pálya nem halad.', without: 'POP nélkül', with: 'POP-pal',
     bad: ['„Ki nyúlt a spawnerhez?”', 'A Verse .txt-ben kering Discordon', 'Feladatlista egy Google Docban', 'A bevételi táblázat, 7. verzió', '„Mikor is adjuk ki?”', 'Építünk, de nem tudjuk, működik-e a műfaj'],
-    good: ['Minden művelet naplózva és visszavonható', 'A Ctrl+S elküldi a Verse-t az UEFN-be', 'Egyórás feladatok, függőségekkel', 'Átlátható kimutatás mindenkinek', 'Boussole követi a mérföldköveket és a csúszást', 'Műfajonkénti ítélet, valós számokkal'],
+    good: ['Minden művelet naplózva és visszavonható', 'A Ctrl+S elküldi a Verse-t az UEFN-be', 'Egyórás feladatok, függőségekkel', 'Átlátható kimutatás mindenkinek', 'Mérföldkövek és csúszások automatikus követése', 'Műfajonkénti ítélet, valós számokkal'],
   },
   feat: {
-    eyebrow: 'Funkciók', h2: 'Az egész stúdió, az ötlettől a megjelenés napjáig.', p: 'Amit itt látsz, azok a POP valódi képernyői, egyszerűsítve.',
+    eyebrow: 'Funkciók', h2: 'Minden, ami az UEFN-alkotáshoz kell, az ötlettől a megjelenés napjáig.', p: 'Amit itt látsz, azok a POP valódi képernyői, egyszerűsítve.',
     items: [
-      { tag: 'Feladatok és Boussole', h: 'Egyórás feladatok. Asszisztens minden reggel.', p: 'A generátor egyórás feladatokra bontja a pályát, a függőségekkel együtt. Boussole összefoglalja a napot, jelzi a csúszásokat, és javasolja, mivel kezdj.', pts: ['Kanban és függőségek', 'Csúszások és mérföldkövek követése', '„Elvállalom” egy kattintással'] },
+      { tag: 'Feladatok és tervezés', h: 'Egyórás feladatok. Egy terv, ami tartható.', p: 'A generátor egyórás feladatokra bontja a pályát, a függőségekkel együtt. A terv követi a mérföldköveket és jelzi a csúszást, egy beépített asszisztens pedig összefoglalja a napot.', pts: ['Kanban és függőségek', 'Mérföldkövek és csúszások', 'A nap összefoglalója'] },
       { tag: 'Verse-szerkesztő', h: 'Ctrl+S, és már az UEFN-ben van.', p: 'A Verse-t a POP-ban írod, és egyenesen a projektedbe kerül: fordítás, hibák a megfelelő sorban, tesztmenet. Az asszisztens külső szolgáltatás nélkül magyaráz és javít.', pts: ['Fordítás az UEFN-ben', 'Hibák soronként', 'Javasolt javítások'] },
       { tag: 'Rendező', h: 'Minden eszközöd. Három másodperc alatt rendben.', p: 'Keress tag, típus vagy mappa szerint, jelölj ki húszat, és nevezd át, helyezd át vagy duplikáld egyszerre. A Ctrl+Z visszavon. Ha az UEFN zárva van, a módosítások várnak.', pts: ['Keresés tag:, type:, mappa:', 'Tömeges szerkesztés', 'Minden visszavonható'] },
       { tag: 'Tábla', h: 'Rajzoljátok meg együtt a pályát.', p: 'Cetlik, alakzatok, nyilak, színek, félkövér, aláhúzás: minden az ötletekhez. Szavazzatok, majd a legjobb cetliket alakítsátok feladattá.', pts: ['Teljes formázás', 'Valós idejű közös munka', 'Cetlik → feladatok'] },
@@ -24,18 +24,6 @@ const hu: Dict = {
       { tag: 'Kifizetések', h: 'Mindenki tudja, mennyit kap.', p: 'Megosztási szabályok százalékban, fix összegben vagy feladatonként, bevételimport, személyenkénti kimutatás. Vége a Discordon elveszett táblázatoknak.', pts: ['Százalék, fix, feladatonként', 'CSV-import', 'Mindenki kimutatása'] },
     ],
     aiB: 'Már használsz MI-t?', aiText: 'Kösd be a Claude-ot, Cursort, Codexet vagy más MCP-kompatibilis MI-t: elvállal egy feladatot, megírja a Verse-t, lefordítja, majd egy megjegyzéssel lezárja a feladatot. Minden művelet naplózva és visszavonható.',
-  },
-  bou: {
-    eyebrow: 'Beépített asszisztens', h2a: 'Tedd fel a kérdést.', h2b: 'Boussole válaszol.',
-    p: 'Boussole ismeri a feladataidat, mérföldköveidet és a csapatodat. Megmondja, mi késik, ki min dolgozik és mivel kezdj, az újakat pedig lépésről lépésre végigvezeti a POP-on. Az adataid közben nem hagyják el a POP-ot.',
-    sub: 'beépített asszisztens', ask: 'Hogyan…?',
-    demo: [
-      { q: 'Mit csináljak most?', a: ['**Szia Léa, behozzuk a lemaradást?**', '[r] 2 feladat késésben van.', '[g] Tegnap 3 feladatot fejeztél be.', 'Most: **#42 Pontrendszer**, ez 3 másik feladatot old fel.'] },
-      { q: 'Hogyan kötöm be az UEFN-t?', a: ['**Hogyan köthető az UEFN a POP-hoz?**', '1. Rendező → UEFN Link letöltése.', '2. Kattints duplán a pop-link.exe-re a PC-n.', '3. Az UEFN-ben: Model Context Protocol → Start Server.'] },
-      { q: 'Késésben vagyunk a bétához?', a: ['[o] „Béta” mérföldkő 5 nap múlva: 9 feladat van hátra.', 'A jelenlegi tempóval (napi 1,5) 6 nap kellene. **Várható csúszás: 1 nap.**'] },
-      { q: 'Min dolgozik Hugo?', a: ['**Hugónak** 1 folyamatban lévő és 2 teendő feladata van:', '• **#38** A 2. zóna díszlete · tegnap óta folyamatban', '• **#44** Záróképernyő · a #42-re vár', '[g] Ezen a héten 4 feladat készült el.'] },
-      { q: 'Lezárhatja az MI-m a feladatokat?', a: ['Igen: a „Bekötött MI-k” között bekötve a **next_task**, **set_task_status** és **comment_task** eszközöket használja. Minden művelet „MI” jelölést kap az előzményekben.'] },
-    ],
   },
   stats: [['1 óra', 'feladatonként, hogy minden nap haladj'], ['0', 'kötelező külső MI-szolgáltatás'], ['7 nap', 'statisztika pályánként, az Epic API-jából'], ['100%', 'az UEFN-műveletek visszavonhatók']],
   pricing: {
@@ -46,14 +34,14 @@ const hu: Dict = {
       { name: 'Studio', tag: 'A legteljesebb', desc: 'Csapatban pályákat kiadó stúdióknak.', cta: 'Feliratkozom' },
       { name: 'Studio+', tag: 'Hamarosan', desc: 'Minden a Studióból, plusz POP Forge: az asztali alkalmazás, amely az UEFN-ben épít.', cta: 'Feliratkozom' },
     ],
-    rows: ['Szervezés', 'Egyórás feladatok, Kanban, függőségek', 'Boussole, a beépített asszisztens', 'Oldalak, tábla, tervezés és mérföldkövek', 'Pályák', 'Tagok', 'UEFN', 'UEFN Link: szinkronizált projektek', 'Bekötött Verse-szerkesztő (fordítás, soronkénti hibák)', 'Aktorrendező és tömeges szerkesztés', 'Bekötött MI-k (Claude, Cursor, Codex…)', 'POP Forge: segített építés az UEFN-ben', 'Növekedés', 'Piacelemzés és működő pályák', 'TikTok- és YouTube Shorts-videótrendek', 'Playtest-csere és megjelenési nap', 'Bevételmegosztás és kimutatások', 'Discord, GitHub, Lore'],
+    rows: ['Szervezés', 'Egyórás feladatok, Kanban, függőségek', 'Beépített asszisztens (napi összefoglaló, csúszások)', 'Oldalak, tábla, tervezés és mérföldkövek', 'Pályák', 'Tagok', 'UEFN', 'UEFN Link: szinkronizált projektek', 'Bekötött Verse-szerkesztő (fordítás, soronkénti hibák)', 'Aktorrendező és tömeges szerkesztés', 'Bekötött MI-k (Claude, Cursor, Codex…)', 'POP Forge: segített építés az UEFN-ben', 'Növekedés', 'Piacelemzés és működő pályák', 'TikTok- és YouTube Shorts-videótrendek', 'Playtest-csere és megjelenési nap', 'Bevételmegosztás és kimutatások', 'Discord, GitHub, Lore'],
   },
   faq: {
     eyebrow: 'GYIK', h2: 'Amit kérdezni szoktak.',
     items: [
       ['Kell Windowsos PC?', 'Az UEFN bekötéséhez igen: az UEFN csak Windowson fut, és az UEFN Link azon a PC-n indul. A POP többi része bármilyen böngészőben működik, Macen is.'],
       ['Közzéteszi a POP a pályámat?', 'Nem. A POP mindent előkészít (közzététel előtti ellenőrzés, playtestek, a megjelenési nap terve), de a közzététel mindig az Epic alkotói portálján történik.'],
-      ['Hogyan működik a Boussole asszisztens?', 'Boussole a POP része: beolvassa a feladataidat, azok határidejét, függőségeit és a mérföldköveidet, hogy összefoglalja a napot, válaszoljon a kérdéseidre („mi késik?”, „min dolgozik Hugo?”), és elmagyarázza, hogyan használd a POP-ot. Teljes egészében a POP-on belül fut: az adataid semmilyen külső szolgáltatáshoz nem kerülnek.'],
+      ['Működik a POP, ha egyedül alkotok?', 'Igen. A POP egyéni alkotóknak és csapatoknak egyaránt szól: az Alkotó csomag egy pályára ingyenes, tagokat pedig később is meghívhatsz, semmin sem kell változtatni.'],
       ['És ha a saját MI-met akarom használni?', 'Kösd be a Claude-ot, Cursort, Codexet vagy más MCP-kompatibilis MI-t a „Bekötött MI-k” között. Olvashatja és szerkesztheti a feladataidat, a Verse-t és az UEFN-aktorokat, és minden művelet naplózva és visszavonható.'],
       ['Honnan származnak az elemzés számai?', 'Az Epic hivatalos Fortnite API-jából: játékosszám, egyidejű játékoscsúcs, játékidő és megtartás minden nyilvános pályára, 7 napra.'],
       ['Hogyan kapok hozzáférést?', 'A POP zárt bétában van. Iratkozz fel a várólistára: a kéréseket egyenként bíráljuk el, majd elküldjük a felhasználóneved és egy ideiglenes jelszót, amelyet az első belépéskor megváltoztatsz.'],
@@ -74,7 +62,7 @@ const hu: Dict = {
     earnings: 'Októberi bevétel', roles: ['Kód · 40%', 'Pálya · 35%', 'Zene · fix', 'Maradék'], noTransfer: 'A POP számol, pénzt sosem utal.',
   },
   wl: {
-    eyebrow: 'Zárt béta', title: 'Feliratkozás a várólistára', intro: 'Fokozatosan nyitjuk meg a POP-ot, hogy minden stúdiót segíthessünk. Mondd el, ki vagy, és amint lehet, küldjük a hozzáférést.',
+    eyebrow: 'Zárt béta', title: 'Feliratkozás a várólistára', intro: 'Fokozatosan nyitjuk meg a POP-ot, hogy minden alkotót segíthessünk. Mondd el, ki vagy, és amint lehet, küldjük a hozzáférést.',
     pageIntro: 'A béta alatt a POP-fiókokat a csapat hozza létre. Mondd el, ki vagy: a jóváhagyás után megkapod a felhasználóneved és egy ideiglenes jelszót.',
     invalid: 'Ez a hozzáférési link érvénytelen, már felhasználták vagy lejárt. Kérd újra, vagy írj a POP csapatának.',
     name: 'Név vagy becenév', email: 'E-mail', studio: 'Stúdió', optional: '(nem kötelező)', studioPh: 'A stúdió neve', team: 'Csapatméret',

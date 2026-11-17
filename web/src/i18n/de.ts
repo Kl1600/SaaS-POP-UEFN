@@ -1,22 +1,22 @@
 import type { Dict } from './fr'
 const de: Dict = {
-  meta: { title: 'POP · Das Studio für Fortnite-Creator' },
-  nav: { features: 'Funktionen', boussole: 'Boussole', pricing: 'Preise', faq: 'FAQ', login: 'Anmelden', join: 'Zur Beta', home: 'POP, Startseite', lang: 'Sprache', search: 'Land suchen' },
+  meta: { title: 'POP · Das SaaS für UEFN-Creator' },
+  nav: { features: 'Funktionen', pricing: 'Preise', faq: 'FAQ', login: 'Anmelden', join: 'Zur Beta', home: 'POP, Startseite', lang: 'Sprache', search: 'Land suchen' },
   hero: {
-    announce: 'Neu: Boussole, der integrierte Assistent', h1a: 'Deine Fortnite-Maps.', h1b: 'Im Team. Ohne Chaos.',
-    subA: 'POP bringt dein ganzes UEFN-Studio an einen Ort: ', subB: 'einstündige Aufgaben', subC: ', mit UEFN verbundenes Verse, Whiteboard, Marktanalyse und Umsatzaufteilung.',
+    announce: 'Private Beta für UEFN-Creator geöffnet', h1a: 'Erschaffe in UEFN.', h1b: 'Allein oder im Team, ohne Chaos.',
+    subA: 'POP ist das SaaS, das UEFN-Creatorn von der Idee bis zum Release hilft: ', subB: 'einstündige Aufgaben', subC: ', mit UEFN verbundenes Verse, Whiteboard, Marktanalyse und Umsatzaufteilung.',
     cta: 'Auf die Warteliste', see: 'Funktionen ansehen', micro1: 'Private Beta', micro2: 'Zugang über Warteliste', micro3: 'Mit UEFN verbunden',
   },
   marquee: { label: 'Funktioniert mit deinen Tools', epic: 'Fortnite-API von Epic' },
   pain: {
-    eyebrow: 'Das Problem', h2a: 'Discord, drei Google Docs,', h2b: 'und niemand weiß, wer was macht.', without: 'Ohne POP', with: 'Mit POP',
+    eyebrow: 'Das Problem', h2a: 'Discord, Google Docs, Verse als .txt…', h2b: 'und die Map kommt nicht voran.', without: 'Ohne POP', with: 'Mit POP',
     bad: ['„Wer hat den Spawner angefasst?“', 'Verse wird als .txt über Discord verschickt', 'Eine Aufgabenliste in einem Google Doc', 'Die Umsatztabelle, Version 7', '„Wann releasen wir nochmal?“', 'Bauen, ohne zu wissen, ob das Genre läuft'],
-    good: ['Jede Aktion wird protokolliert und ist rückgängig machbar', 'Strg+S schickt das Verse nach UEFN', 'Einstündige Aufgaben mit Abhängigkeiten', 'Eine klare Abrechnung für alle', 'Boussole verfolgt Meilenstein und Verzug', 'Ein Urteil pro Genre, mit echten Zahlen'],
+    good: ['Jede Aktion wird protokolliert und ist rückgängig machbar', 'Strg+S schickt das Verse nach UEFN', 'Einstündige Aufgaben mit Abhängigkeiten', 'Eine klare Abrechnung für alle', 'Meilensteine und Verzug werden automatisch verfolgt', 'Ein Urteil pro Genre, mit echten Zahlen'],
   },
   feat: {
-    eyebrow: 'Funktionen', h2: 'Das ganze Studio, von der Idee bis zum Release.', p: 'Was du hier siehst, sind die echten Bildschirme von POP, vereinfacht.',
+    eyebrow: 'Funktionen', h2: 'Alles, um in UEFN zu erschaffen – von der Idee bis zum Release.', p: 'Was du hier siehst, sind die echten Bildschirme von POP, vereinfacht.',
     items: [
-      { tag: 'Aufgaben und Boussole', h: 'Einstündige Aufgaben. Ein Assistent jeden Morgen.', p: 'Der Generator teilt die Map in einstündige Aufgaben mit Abhängigkeiten. Boussole fasst den Tag zusammen, meldet Verzug und schlägt vor, was zuerst dran ist.', pts: ['Kanban und Abhängigkeiten', 'Verzug und Meilensteine im Blick', '„Übernehmen“ mit einem Klick'] },
+      { tag: 'Aufgaben und Planung', h: 'Einstündige Aufgaben. Eine Planung, die hält.', p: 'Der Generator teilt deine Map in einstündige Aufgaben mit Abhängigkeiten. Die Planung verfolgt Meilensteine und meldet Verzug, und ein integrierter Assistent fasst den Tag zusammen.', pts: ['Kanban und Abhängigkeiten', 'Meilensteine und Verzug im Blick', 'Tageszusammenfassung'] },
       { tag: 'Verse-Editor', h: 'Strg+S, und es ist in UEFN.', p: 'Verse wird in POP geschrieben und landet direkt in deinem Projekt: Kompilierung, Fehler in der richtigen Zeile, Testsitzung. Der Assistent erklärt und korrigiert, ohne externen Dienst.', pts: ['Kompilierung in UEFN', 'Fehler in der Zeile', 'Vorgeschlagene Korrekturen'] },
       { tag: 'Organizer', h: 'Alle deine Geräte. In drei Sekunden sortiert.', p: 'Suche nach Tag, Typ oder Ordner, wähle zwanzig aus und benenne sie um, verschiebe oder dupliziere sie auf einmal. Strg+Z macht rückgängig. Ist UEFN geschlossen, warten die Änderungen.', pts: ['Suche tag:, type:, ordner:', 'Massenbearbeitung', 'Alles rückgängig machbar'] },
       { tag: 'Whiteboard', h: 'Zeichnet die Map gemeinsam.', p: 'Haftnotizen, Formen, Pfeile, Farben, fett, unterstrichen: alles, um Ideen festzuhalten. Stimmt ab und macht aus den besten Notizen Aufgaben.', pts: ['Volle Formatierung', 'Echtzeit im Team', 'Notizen → Aufgaben'] },
@@ -24,18 +24,6 @@ const de: Dict = {
       { tag: 'Auszahlungen', h: 'Jeder weiß, was er bekommt.', p: 'Aufteilungsregeln nach Prozent, Fixbetrag oder pro Aufgabe, Umsatzimport, Abrechnung pro Person. Schluss mit der Tabelle, die in Discord verloren geht.', pts: ['Prozent, fix, pro Aufgabe', 'CSV-Import', 'Abrechnung für jeden'] },
     ],
     aiB: 'Du nutzt schon eine KI?', aiText: 'Verbinde Claude, Cursor, Codex oder eine andere MCP-kompatible KI: Sie übernimmt eine Aufgabe, schreibt das Verse, kompiliert und schließt die Aufgabe mit einer Notiz. Jede Aktion wird protokolliert und ist rückgängig machbar.',
-  },
-  bou: {
-    eyebrow: 'Integrierter Assistent', h2a: 'Stell die Frage.', h2b: 'Boussole antwortet.',
-    p: 'Boussole kennt deine Aufgaben, Meilensteine und dein Team. Er sagt dir, was im Verzug ist, wer woran arbeitet und womit du anfängst, und führt Neulinge Schritt für Schritt durch POP. Ohne dass deine Daten POP verlassen.',
-    sub: 'integrierter Assistent', ask: 'Wie mache ich…?',
-    demo: [
-      { q: 'Was mache ich jetzt?', a: ['**Hallo Léa, holen wir den Rückstand auf?**', '[r] 2 Aufgaben im Verzug.', '[g] Gestern hast du 3 Aufgaben erledigt.', 'Jetzt: **#42 Punktesystem**, das 3 andere Aufgaben freischaltet.'] },
-      { q: 'Wie verbinde ich UEFN?', a: ['**Wie verbinde ich UEFN mit POP?**', '1. Organizer → UEFN Link herunterladen.', '2. Doppelklick auf pop-link.exe auf dem PC.', '3. In UEFN: Model Context Protocol → Start Server.'] },
-      { q: 'Sind wir für die Beta im Verzug?', a: ['[o] Meilenstein „Beta“ in 5 Tagen: noch 9 Aufgaben.', 'Beim aktuellen Tempo (1,5 pro Tag) bräuchte es 6 Tage. **Erwarteter Verzug: 1 Tag.**'] },
-      { q: 'Woran arbeitet Hugo?', a: ['**Hugo** hat 1 Aufgabe in Arbeit und 2 offen:', '• **#38** Kulisse Zone 2 · in Arbeit seit gestern', '• **#44** Endbildschirm · wartet auf #42', '[g] 4 Aufgaben diese Woche erledigt.'] },
-      { q: 'Kann meine KI Aufgaben schließen?', a: ['Ja: Verbunden unter „Verbundene KIs“ nutzt sie **next_task**, **set_task_status** und **comment_task**. Jede Aktion ist im Verlauf als „KI“ markiert.'] },
-    ],
   },
   stats: [['1 Std.', 'pro Aufgabe, um jeden Tag voranzukommen'], ['0', 'externe KI-Dienste nötig'], ['7 Tage', 'Statistiken pro Map, aus der API von Epic'], ['100 %', 'der UEFN-Aktionen rückgängig machbar']],
   pricing: {
@@ -46,14 +34,14 @@ const de: Dict = {
       { name: 'Studio', tag: 'Am umfassendsten', desc: 'Für Studios, die Maps im Team veröffentlichen.', cta: 'Auf die Liste' },
       { name: 'Studio+', tag: 'Bald', desc: 'Alles aus Studio, plus POP Forge: die Desktop-App, die in UEFN baut.', cta: 'Auf die Liste' },
     ],
-    rows: ['Organisation', 'Einstündige Aufgaben, Kanban, Abhängigkeiten', 'Boussole, der integrierte Assistent', 'Seiten, Whiteboard, Planung und Meilensteine', 'Maps', 'Mitglieder', 'UEFN', 'UEFN Link: synchronisierte Projekte', 'Verbundener Verse-Editor (Kompilierung, Fehler pro Zeile)', 'Actor-Organizer und Massenbearbeitung', 'Verbundene KIs (Claude, Cursor, Codex…)', 'POP Forge: unterstütztes Bauen in UEFN', 'Wachstum', 'Marktanalyse und Maps, die laufen', 'Videotrends TikTok und YouTube Shorts', 'Playtest-Austausch und Release-Tag', 'Umsatzaufteilung und Abrechnungen', 'Discord, GitHub, Lore'],
+    rows: ['Organisation', 'Einstündige Aufgaben, Kanban, Abhängigkeiten', 'Integrierter Assistent (Tageszusammenfassung, Verzug)', 'Seiten, Whiteboard, Planung und Meilensteine', 'Maps', 'Mitglieder', 'UEFN', 'UEFN Link: synchronisierte Projekte', 'Verbundener Verse-Editor (Kompilierung, Fehler pro Zeile)', 'Actor-Organizer und Massenbearbeitung', 'Verbundene KIs (Claude, Cursor, Codex…)', 'POP Forge: unterstütztes Bauen in UEFN', 'Wachstum', 'Marktanalyse und Maps, die laufen', 'Videotrends TikTok und YouTube Shorts', 'Playtest-Austausch und Release-Tag', 'Umsatzaufteilung und Abrechnungen', 'Discord, GitHub, Lore'],
   },
   faq: {
     eyebrow: 'FAQ', h2: 'Fragen, die uns gestellt werden.',
     items: [
       ['Brauche ich einen Windows-PC?', 'Um UEFN zu verbinden, ja: UEFN läuft nur unter Windows, und UEFN Link läuft auf diesem PC. Der Rest von POP funktioniert in jedem Browser, auch auf dem Mac.'],
       ['Veröffentlicht POP meine Map?', 'Nein. POP bereitet alles vor (Prüfung vor der Veröffentlichung, Playtests, Plan für den Release-Tag), veröffentlicht wird aber immer im Creator-Portal von Epic.'],
-      ['Wie funktioniert der Assistent Boussole?', 'Boussole ist in POP integriert: Er liest deine Aufgaben, Termine, Abhängigkeiten und Meilensteine, um den Tag zusammenzufassen, deine Fragen zu beantworten („Was ist im Verzug?“, „Woran arbeitet Hugo?“) und POP zu erklären. Er läuft komplett in POP: Deine Daten gehen an keinen externen Dienst.'],
+      ['Funktioniert POP auch, wenn ich allein erstelle?', 'Ja. POP ist für Solo-Creator genauso wie für Teams: Der Creator-Plan ist für eine Map kostenlos, und du kannst später Mitglieder einladen, ohne etwas zu ändern.'],
       ['Und wenn ich meine eigene KI nutzen will?', 'Verbinde Claude, Cursor, Codex oder eine andere MCP-kompatible KI unter „Verbundene KIs“. Sie kann deine Aufgaben, dein Verse und deine UEFN-Actors lesen und ändern, und jede Aktion wird protokolliert und ist rückgängig machbar.'],
       ['Woher kommen die Zahlen der Analyse?', 'Aus der offiziellen Fortnite-API von Epic: Spieler, Spitzenwert gleichzeitiger Spieler, Spielzeit und Bindung jeder öffentlichen Map über 7 Tage.'],
       ['Wie bekomme ich Zugang?', 'POP ist in einer geschlossenen Beta. Trag dich in die Warteliste ein: Wir prüfen die Anfragen einzeln und schicken dir dann deinen Benutzernamen und ein vorläufiges Passwort, das du beim ersten Login änderst.'],
@@ -74,7 +62,7 @@ const de: Dict = {
     earnings: 'Einnahmen Oktober', roles: ['Code · 40 %', 'Map · 35 %', 'Musik · fix', 'Rest'], noTransfer: 'POP rechnet, überweist aber nichts.',
   },
   wl: {
-    eyebrow: 'Private Beta', title: 'Auf die Warteliste', intro: 'Wir öffnen POP schrittweise, um jedes Studio zu begleiten. Sag uns, wer du bist, und wir schicken dir so bald wie möglich den Zugang.',
+    eyebrow: 'Private Beta', title: 'Auf die Warteliste', intro: 'Wir öffnen POP schrittweise, um jeden Creator gut zu begleiten. Sag uns, wer du bist, und wir schicken dir so bald wie möglich deinen Zugang.',
     pageIntro: 'Während der Beta legt das Team die POP-Konten an. Sag uns, wer du bist: Sobald dein Zugang freigegeben ist, bekommst du deinen Benutzernamen und ein vorläufiges Passwort.',
     invalid: 'Dieser Zugangslink ist ungültig, schon benutzt oder abgelaufen. Frag erneut an oder schreib dem POP-Team.',
     name: 'Name oder Nickname', email: 'E-Mail', studio: 'Studio', optional: '(optional)', studioPh: 'Name des Studios', team: 'Teamgröße',

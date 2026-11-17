@@ -10,18 +10,19 @@ import { useApp, useLoad } from '../state'
 import { PageHead } from '../components/ui'
 import { useMembers } from './Tasks'
 import { FormatBar, PenBar, Rich, RichEdit, ShapeSvg, textStyle, vAlign, strokeColor, FONTS } from './BoardFormat'
+import { tr } from '../i18n/t'
 
 type Obj = { id: string; kind: string; x: number; y: number; w?: number; h?: number; text?: string; shade?: number; votes?: Record<string, number>; author?: string; author_id?: number; task_id?: number; task_number?: number; from?: string; to?: string; style?: string; dashed?: boolean; arrow?: boolean; points?: number[][]; color?: string; width?: number; shape?: string; url?: string; locked?: boolean; reactions?: number } & Record<string, any>
 
 const uid = () => Math.random().toString(36).slice(2, 12)
 const SHADES = [['#FFFFFF', '#0A0A0A'], ['#E5E5E5', '#0A0A0A'], ['#A3A3A3', '#0A0A0A'], ['#404040', '#FFFFFF'], ['#FDF0A6', '#0A0A0A'], ['#C9EDD0', '#0A0A0A'], ['#CBE0FA', '#0A0A0A'], ['#F8D0E1', '#0A0A0A'], ['#FCD9B8', '#0A0A0A']]
-const SHADE_NAMES = ['Blanc', 'Gris clair', 'Gris moyen', 'Gris foncé', 'Jaune', 'Vert', 'Bleu', 'Rose', 'Orange']
+const SHADE_NAMES = [tr("Blanc"), tr("Gris clair"), tr("Gris moyen"), tr("Gris foncé"), tr("Jaune"), tr("Vert"), tr("Bleu"), tr("Rose"), tr("Orange")]
 const KEYS: Record<string, string> = { v: 'select', l: 'lasso', n: 'sticky', t: 'text', r: 'rect', o: 'ellipse', c: 'connector', p: 'pen', h: 'hl', e: 'erase', f: 'frame', m: 'comment' }
 const GRID = 24
 const snap = (v: number, on: boolean) => (on ? Math.round(v / GRID) * GRID : v)
 const UEFN: [string, string, string][] = [
-  ['zone', 'Zone', 'Z'], ['spawn', 'Apparition', 'A'], ['button', 'Bouton', 'B'], ['trigger', 'Déclencheur', 'D'], ['dispenser', 'Distributeur', 'R'], ['npc', 'PNJ', 'P'],
-  ['objective', 'Objectif', 'O'], ['vehicle', 'Véhicule', 'V'], ['road', 'Route', '═'], ['wall', 'Mur', '▮'], ['camera', 'Caméra', 'C'], ['door', 'Porte', '⌂'], ['loot', 'Butin', '€'], ['path', 'Parcours joueur', '→'],
+  ['zone', tr("Zone"), 'Z'], ['spawn', tr("Apparition"), 'A'], ['button', tr("Bouton"), 'B'], ['trigger', tr("Déclencheur"), 'D'], ['dispenser', tr("Distributeur"), 'R'], ['npc', 'PNJ', 'P'],
+  ['objective', tr("Objectif"), 'O'], ['vehicle', tr("Véhicule"), 'V'], ['road', tr("Route"), '═'], ['wall', tr("Mur"), '▮'], ['camera', tr("Caméra"), 'C'], ['door', tr("Porte"), '⌂'], ['loot', tr("Butin"), '€'], ['path', tr("Parcours joueur"), '→'],
 ]
 
 export default function Board() {
@@ -34,22 +35,22 @@ export default function Board() {
   const create = async (template?: string) => {
     try { const r = await api.post(`/api/maps/${map!.id}/boards`, { template }); setTplOpen(false); await reload(); nav(`/tableau/${r.id}`) } catch (e: any) { toast(e.message, true) }
   }
-  const TPL = [['brainstorm', 'Brainstorm d’idées'], ['plan', 'Plan de map et parcours'], ['loop', 'Boucle de gameplay'], ['journey', 'Parcours du joueur'], ['mockups', 'Maquettes 16:9 et mobile'], ['retro', 'Rétrospective'], ['roadmap', 'Feuille de route par saison'], ['matrix', 'Matrice impact / effort']]
+  const TPL = [['brainstorm', tr("Brainstorm d’idées")], ['plan', tr("Plan de map et parcours")], ['loop', tr("Boucle de gameplay")], ['journey', tr("Parcours du joueur")], ['mockups', tr("Maquettes 16:9 et mobile")], ['retro', tr("Rétrospective")], ['roadmap', tr("Feuille de route par saison")], ['matrix', tr("Matrice impact / effort")]]
   return (
     <main className="content">
-      <PageHead title={`Tableau blanc${list?.find(b => b.id === id) ? ' · ' + list.find(b => b.id === id).title : ''}`} help="Dessinez la map à plusieurs, votez les idées, puis transformez les post-it en tâches ou en pages.">
-        <select className="field" value={id ?? ''} onChange={e => nav(`/tableau/${e.target.value}`)} aria-label="Tableau">{list?.map(b => <option key={b.id} value={b.id}>{b.title}</option>)}</select>
+      <PageHead title={tr("Tableau blanc{0}", [list?.find(b => b.id === id) ? ' · ' + list.find(b => b.id === id).title : ''])} help={tr("Dessinez la map à plusieurs, votez les idées, puis transformez les post-it en tâches ou en pages.")}>
+        <select className="field" value={id ?? ''} onChange={e => nav(`/tableau/${e.target.value}`)} aria-label={tr("Tableau")}>{list?.map(b => <option key={b.id} value={b.id}>{b.title}</option>)}</select>
         {canEdit && <div style={{ position: 'relative' }}>
-          <button className="btn" onClick={() => setTplOpen(o => !o)}>Nouveau tableau</button>
-          {tplOpen && <div className="menu" style={{ right: 0, top: 48 }}><button onClick={() => create()}>Tableau vide</button>{TPL.map(([k, l]) => <button key={k} onClick={() => create(k)}>{l}</button>)}</div>}
+          <button className="btn" onClick={() => setTplOpen(o => !o)}>{tr("Nouveau tableau")}</button>
+          {tplOpen && <div className="menu" style={{ right: 0, top: 48 }}><button onClick={() => create()}>{tr("Tableau vide")}</button>{TPL.map(([k, l]) => <button key={k} onClick={() => create(k)}>{l}</button>)}</div>}
         </div>}
         {canEdit && id && <>
-          <button className="iconbtn" title="Renommer le tableau" aria-label="Renommer le tableau" onClick={async () => { const t = prompt('Nom du tableau', list?.find(b => b.id === id)?.title); if (t) { try { await api.patch(`/api/boards/${id}`, { title: t }); reload() } catch (e: any) { toast(e.message, true) } } }}><Pencil size={18} /></button>
-          <button className="iconbtn" title="Dupliquer le tableau" aria-label="Dupliquer le tableau" onClick={async () => { try { const r = await api.post(`/api/boards/${id}/duplicate`); await reload(); nav(`/tableau/${r.id}`) } catch (e: any) { toast(e.message, true) } }}><Copy size={18} /></button>
-          {['owner', 'admin', 'member'].includes(role) && <button className="iconbtn" title="Supprimer le tableau" aria-label="Supprimer le tableau" onClick={async () => { if (!confirm(`Mettre « ${list?.find(b => b.id === id)?.title} » à la corbeille ? (restaurable depuis la corbeille des Pages)`)) return; try { await api.del(`/api/boards/${id}`); await reload(); nav('/tableau') } catch (e: any) { toast(e.message, true) } }}><Trash2 size={18} /></button>}
+          <button className="iconbtn" title={tr("Renommer le tableau")} aria-label={tr("Renommer le tableau")} onClick={async () => { const t = prompt(tr("Nom du tableau"), list?.find(b => b.id === id)?.title); if (t) { try { await api.patch(`/api/boards/${id}`, { title: t }); reload() } catch (e: any) { toast(e.message, true) } } }}><Pencil size={18} /></button>
+          <button className="iconbtn" title={tr("Dupliquer le tableau")} aria-label={tr("Dupliquer le tableau")} onClick={async () => { try { const r = await api.post(`/api/boards/${id}/duplicate`); await reload(); nav(`/tableau/${r.id}`) } catch (e: any) { toast(e.message, true) } }}><Copy size={18} /></button>
+          {['owner', 'admin', 'member'].includes(role) && <button className="iconbtn" title={tr("Supprimer le tableau")} aria-label={tr("Supprimer le tableau")} onClick={async () => { if (!confirm(tr("Mettre « {0} » à la corbeille ? (restaurable depuis la corbeille des Pages)", [list?.find(b => b.id === id)?.title]))) return; try { await api.del(`/api/boards/${id}`); await reload(); nav('/tableau') } catch (e: any) { toast(e.message, true) } }}><Trash2 size={18} /></button>}
         </>}
       </PageHead>
-      {id ? <Canvas key={id} id={id} /> : list && <div className="card"><p className="muted">Aucun tableau. Créez-en un avec « Nouveau tableau ».</p></div>}
+      {id ? <Canvas key={id} id={id} /> : list && <div className="card"><p className="muted">{tr("Aucun tableau. Créez-en un avec « Nouveau tableau ».")}</p></div>}
     </main>
   )
 }
@@ -162,7 +163,7 @@ function Canvas({ id }: { id: number }) {
     push(out)
   }
   const importImage = (file: File, at?: { x: number; y: number }) => {
-    if (!file.type.startsWith('image/')) return app.toast('Seules les images sont acceptées.', true)
+    if (!file.type.startsWith('image/')) return app.toast(tr("Seules les images sont acceptées."), true)
     const r = new FileReader()
     r.onload = () => {
       const img = new window.Image()
@@ -170,7 +171,7 @@ function Canvas({ id }: { id: number }) {
         const k = Math.min(1, 1600 / Math.max(img.width, img.height)); const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k)
         c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height)
         const url = c.toDataURL('image/jpeg', 0.82)
-        if (url.length > 1_300_000) return app.toast('Image trop lourde, même compressée.', true)
+        if (url.length > 1_300_000) return app.toast(tr("Image trop lourde, même compressée."), true)
         const w = Math.min(600, c.width), h = Math.round(w * c.height / c.width), p = at ?? center()
         push([{ id: uid(), kind: 'image', url, x: p.x - w / 2, y: p.y - h / 2, w, h, z: zBottom() }])
       }
@@ -231,8 +232,8 @@ function Canvas({ id }: { id: number }) {
       e.preventDefault()
       const base = { x: snap(p.x, gridOn), y: snap(p.y, gridOn) }
       const o: Obj = tool === 'sticky' ? { id: uid(), kind: 'sticky', ...base, w: 160, h: 120, text: '', shade, votes: {} }
-        : tool === 'text' ? { id: uid(), kind: 'text', ...base, w: 220, h: 40, text: 'Texte' }
-        : tool === 'frame' ? { id: uid(), kind: 'frame', ...base, w: 480, h: 320, text: 'Cadre' }
+        : tool === 'text' ? { id: uid(), kind: 'text', ...base, w: 220, h: 40, text: tr("Texte") }
+        : tool === 'frame' ? { id: uid(), kind: 'frame', ...base, w: 480, h: 320, text: tr("Cadre") }
         : tool === 'comment' ? { id: uid(), kind: 'comment', ...base, w: 220, h: 80, text: '' }
         : { id: uid(), kind: 'shape', shape: tool, ...base, w: 140, h: 90, text: '' }
       push([o]); setSel([o.id]); setEditing(o.kind === 'frame' ? null : o.id); setTool('select'); return
@@ -339,7 +340,7 @@ function Canvas({ id }: { id: number }) {
         e.preventDefault(); const k = e.key.toLowerCase(); const t = sel.map(i => objs[i]).filter(o => o && ['sticky', 'text', 'shape', 'comment', 'frame'].includes(o.kind))
         if (t.length) push(t.map(o => ({ ...o, [k]: !t.every(x => x[k]) }))); return
       }
-      if (mod && e.key.toLowerCase() === 'c' && sel.length) { clip.current = withLinks(sel).map(o => ({ ...o })); app.toast(`${sel.length} objet(s) copié(s)`); return }
+      if (mod && e.key.toLowerCase() === 'c' && sel.length) { clip.current = withLinks(sel).map(o => ({ ...o })); app.toast(tr("{0} objet(s) copié(s)", [sel.length])); return }
       if (!canEdit) return
       if (mod && e.key.toLowerCase() === 'z') { e.preventDefault(); travel(e.shiftKey ? 'redo' : 'undo'); return }
       if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); travel('redo'); return }
@@ -347,7 +348,7 @@ function Canvas({ id }: { id: number }) {
       if (mod && e.key.toLowerCase() === 'd') { e.preventDefault(); paste(withLinks(sel)); return }
       if (mod && e.key.toLowerCase() === 'x' && sel.length) { clip.current = withLinks(sel).map(o => ({ ...o })); del(sel); return }
       if (!mod && !e.altKey && KEYS[e.key.toLowerCase()] && !(e.key === 'Tab')) { setTool(KEYS[e.key.toLowerCase()]); setConnFrom(null); return }
-      if (e.key.startsWith('Arrow') && sel.length) {
+      if (e.key.startsWith(tr("Arrow")) && sel.length) {
         e.preventDefault(); const k = e.shiftKey ? GRID : 2
         const dx = e.key === 'ArrowLeft' ? -k : e.key === 'ArrowRight' ? k : 0, dy = e.key === 'ArrowUp' ? -k : e.key === 'ArrowDown' ? k : 0
         push(sel.map(i => objs[i]).filter(o => o && o.kind !== 'connector').map(o => ({ ...o, x: o.x + dx, y: o.y + dy, points: o.points?.map(p => [p[0] + dx, p[1] + dy]) })))
@@ -376,7 +377,7 @@ function Canvas({ id }: { id: number }) {
   const doConvert = async () => {
     try {
       const r = await api.post(`/api/boards/${id}/convert`, { ids: sel, tag: convert.tag, assignee_id: convert.assignee ? Number(convert.assignee) : null })
-      app.toast(`${r.created.length} tâche(s) créée(s)`); setSel([])
+      app.toast(tr("{0} tâche(s) créée(s)", [r.created.length])); setSel([])
     } catch (e: any) { app.toast(e.message, true) }
   }
   const frameToPage = async (fid: string) => { try { const r = await api.post(`/api/boards/${id}/frame-to-page`, { frame_id: fid }); nav(`/pages/${r.page_id}`) } catch (e: any) { app.toast(e.message, true) } }
@@ -391,33 +392,33 @@ function Canvas({ id }: { id: number }) {
       const tx = ta === 'center' ? x + w / 2 : ta === 'right' ? x + w - 10 : x + 10
       const total = lines.length * lh, ty = (va === 'middle' ? y + (h - total) / 2 : va === 'bottom' ? y + h - total - 8 : y + 8) + size
       const deco = [o.u && 'underline', o.s && 'line-through'].filter(Boolean).join(' ')
-      return `<text x="${tx}" y="${ty}" font-size="${size}" fill="${o.tc ?? def.color}" font-family="${fam(o)}" text-anchor="${ta === 'center' ? 'middle' : ta === 'right' ? 'end' : 'start'}"${o.b ? ' font-weight="700"' : ''}${o.i ? ' font-style="italic"' : ''}${deco ? ` text-decoration="${deco}"` : ''}>${lines.map((l, i) => `<tspan x="${tx}" dy="${i ? lh : 0}">${esc(l)}</tspan>`).join('')}</text>`
+      return tr("<text x=\"{0}\" y=\"{1}\" font-size=\"{2}\" fill=\"{3}\" font-family=\"{4}\" text-anchor=\"{5}\"{6}{7}{8}>{9}</text>", [tx, ty, size, o.tc ?? def.color, fam(o), ta === 'center' ? 'middle' : ta === 'right' ? 'end' : 'start', o.b ? ' font-weight="700"' : '', o.i ? ' font-style="italic"' : '', deco ? ` text-decoration="${deco}"` : '', lines.map((l, i) => `<tspan x="${tx}" dy="${i ? lh : 0}">${esc(l)}</tspan>`).join('')])
     }
     const shp = (o: Obj) => {
       const { x, y } = o, w = o.w ?? 140, h = o.h ?? 90, X = (v: number) => x + (v / 100) * w, Y = (v: number) => y + (v / 100) * h
       const pts = (a: number[][]) => a.map(([u, v]) => `${X(u)},${Y(v)}`).join(' ')
       const fill = o.bg && o.bg !== 'none' ? o.bg : o.fill !== undefined ? SHADES[o.fill]?.[0] : 'none'
-      const sw = o.bw ?? 1.5, st = `fill="${fill}" stroke="${sw ? o.bc ?? '#1a1a1a' : 'none'}" stroke-width="${sw}"${(o.bs ?? (o.dashed ? 'dashed' : '')) === 'dashed' ? ' stroke-dasharray="8 6"' : o.bs === 'dotted' ? ' stroke-dasharray="2 4"' : ''}`
+      const sw = o.bw ?? 1.5, st = tr("fill=\"{0}\" stroke=\"{1}\" stroke-width=\"{2}\"{3}", [fill, sw ? o.bc ?? '#1a1a1a' : 'none', sw, (o.bs ?? (o.dashed ? 'dashed' : '')) === 'dashed' ? ' stroke-dasharray="8 6"' : o.bs === 'dotted' ? ' stroke-dasharray="2 4"' : ''])
       const k = o.shape
       if (k === 'ellipse') return `<ellipse cx="${x + w / 2}" cy="${y + h / 2}" rx="${w / 2}" ry="${h / 2}" ${st}/>`
       const poly: Record<string, number[][]> = { diamond: [[50, 0], [100, 50], [50, 100], [0, 50]], triangle: [[50, 0], [100, 100], [0, 100]], hexagon: [[25, 0], [75, 0], [100, 50], [75, 100], [25, 100], [0, 50]], para: [[20, 0], [100, 0], [80, 100], [0, 100]], star: [[50, 2], [61, 37], [98, 37], [68, 59], [79, 96], [50, 74], [21, 96], [32, 59], [2, 37], [39, 37]], arrow: [[0, 30], [65, 30], [65, 4], [100, 50], [65, 96], [65, 70], [0, 70]], bubble: [[0, 0], [100, 0], [100, 75], [40, 75], [20, 98], [24, 75], [0, 75]] }
-      if (poly[k!]) return `<polygon points="${pts(poly[k!])}" ${st}/>`
-      return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${k === 'round' ? 16 : 4}" ${st}/>`
+      if (poly[k!]) return tr("<polygon points=\"{0}\" {1}/>", [pts(poly[k!]), st])
+      return tr("<rect x=\"{0}\" y=\"{1}\" width=\"{2}\" height=\"{3}\" rx=\"{4}\" {5}/>", [x, y, w, h, k === 'round' ? 16 : 4, st])
     }
     const parts = ordered.map(o => {
       const op = o.op !== undefined ? ` opacity="${o.op}"` : ''
       const g = (inner: string) => `<g${op}>${inner}</g>`
-      if (o.kind === 'sticky') { const [bg, fg] = SHADES[o.shade ?? 0]; return g(`<rect x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" rx="6" fill="${o.bg && o.bg !== 'none' ? o.bg : bg}" stroke="#d4d4d4"/>${txt(o, o.x, o.y, o.w ?? 160, o.h ?? 120, { size: 14, color: fg })}`) }
-      if (o.kind === 'frame') return g(`<rect x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" rx="10" fill="${o.bg && o.bg !== 'none' ? o.bg : 'none'}" stroke="${o.bc ?? '#a3a3a3'}" stroke-width="${o.bw ?? 1.5}"/><text x="${o.x}" y="${o.y - 8}" font-size="13" font-family="sans-serif">${esc(o.text ?? '')}</text>`)
-      if (o.kind === 'stroke') return g(`<polyline points="${o.points?.map(p => p.join(',')).join(' ')}" fill="none" stroke="${o.color?.startsWith('#') ? o.color : '#1a1a1a'}" stroke-opacity="${o.color === 'hl' ? 0.25 : 1}" stroke-width="${o.width}" stroke-linecap="round" stroke-linejoin="round"${o.dashed || o.color === 'path' ? ' stroke-dasharray="10 8"' : ''}/>`)
-      if (o.kind === 'connector') { const col = o.color?.startsWith('#') ? o.color : '#555', w = o.width ?? 1.6; return g(`<defs><marker id="m${o.id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="${Math.max(7, w * 3.5)}" markerHeight="${Math.max(7, w * 3.5)}" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="${col}"/></marker></defs><path d="${path(o)}" fill="none" stroke="${col}" stroke-width="${w}"${o.dashed ? ` stroke-dasharray="${w * 4} ${w * 3}"` : ''}${o.arrow ? ` marker-end="url(#m${o.id})"` : ''}${o.arrowStart ? ` marker-start="url(#m${o.id})"` : ''}/>`) }
+      if (o.kind === 'sticky') { const [bg, fg] = SHADES[o.shade ?? 0]; return g(tr("<rect x=\"{0}\" y=\"{1}\" width=\"{2}\" height=\"{3}\" rx=\"6\" fill=\"{4}\" stroke=\"#d4d4d4\"/>{5}", [o.x, o.y, o.w, o.h, o.bg && o.bg !== 'none' ? o.bg : bg, txt(o, o.x, o.y, o.w ?? 160, o.h ?? 120, { size: 14, color: fg })])) }
+      if (o.kind === 'frame') return g(tr("<rect x=\"{0}\" y=\"{1}\" width=\"{2}\" height=\"{3}\" rx=\"10\" fill=\"{4}\" stroke=\"{5}\" stroke-width=\"{6}\"/><text x=\"{7}\" y=\"{8}\" font-size=\"13\" font-family=\"sans-serif\">{9}</text>", [o.x, o.y, o.w, o.h, o.bg && o.bg !== 'none' ? o.bg : 'none', o.bc ?? '#a3a3a3', o.bw ?? 1.5, o.x, o.y - 8, esc(o.text ?? '')]))
+      if (o.kind === 'stroke') return g(tr("<polyline points=\"{0}\" fill=\"none\" stroke=\"{1}\" stroke-opacity=\"{2}\" stroke-width=\"{3}\" stroke-linecap=\"round\" stroke-linejoin=\"round\"{4}/>", [o.points?.map(p => p.join(',')).join(' '), o.color?.startsWith('#') ? o.color : '#1a1a1a', o.color === 'hl' ? 0.25 : 1, o.width, o.dashed || o.color === 'path' ? ' stroke-dasharray="10 8"' : '']))
+      if (o.kind === 'connector') { const col = o.color?.startsWith('#') ? o.color : '#555', w = o.width ?? 1.6; return g(tr("<defs><marker id=\"m{0}\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"{1}\" markerHeight=\"{2}\" markerUnits=\"userSpaceOnUse\" orient=\"auto-start-reverse\"><path d=\"M0 0L10 5L0 10z\" fill=\"{3}\"/></marker></defs><path d=\"{4}\" fill=\"none\" stroke=\"{5}\" stroke-width=\"{6}\"{7}{8}{9}/>", [o.id, Math.max(7, w * 3.5), Math.max(7, w * 3.5), col, path(o), col, w, o.dashed ? ` stroke-dasharray="${w * 4} ${w * 3}"` : '', o.arrow ? ` marker-end="url(#m${o.id})"` : '', o.arrowStart ? ` marker-start="url(#m${o.id})"` : ''])) }
       if (o.kind === 'shape') return g(shp(o) + txt(o, o.x, o.y, o.w ?? 140, o.h ?? 90, { size: 13, color: o.fill !== undefined ? SHADES[o.fill]?.[1] ?? '#1a1a1a' : '#1a1a1a', anchor: 'center', va: 'middle' }))
-      if (o.kind === 'text' || o.kind === 'comment') return g(`${o.bg && o.bg !== 'none' ? `<rect x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" fill="${o.bg}"/>` : ''}${o.bw ? `<rect x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" fill="none" stroke="${o.bc ?? '#1a1a1a'}" stroke-width="${o.bw}"/>` : ''}${txt(o, o.x - 10, o.y - 8, (o.w ?? 220) + 10, o.h ?? 40, { size: o.kind === 'text' ? 18 : 14, color: '#1a1a1a' })}`)
-      if (o.kind === 'uefn') return `<circle cx="${o.x + 19}" cy="${o.y + 19}" r="19" fill="#fff" stroke="#1a1a1a" stroke-width="1.5"/><text x="${o.x + 19}" y="${o.y + 60}" font-size="11" text-anchor="middle" font-family="sans-serif">${esc(o.text ?? '')}</text>`
-      if (o.kind === 'image' && o.url) return g(`<image href="${esc(o.url)}" x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" preserveAspectRatio="xMidYMid meet"/>`)
+      if (o.kind === 'text' || o.kind === 'comment') return g(`${o.bg && o.bg !== 'none' ? tr("<rect x=\"{0}\" y=\"{1}\" width=\"{2}\" height=\"{3}\" fill=\"{4}\"/>", [o.x, o.y, o.w, o.h, o.bg]) : ''}${o.bw ? tr("<rect x=\"{0}\" y=\"{1}\" width=\"{2}\" height=\"{3}\" fill=\"none\" stroke=\"{4}\" stroke-width=\"{5}\"/>", [o.x, o.y, o.w, o.h, o.bc ?? '#1a1a1a', o.bw]) : ''}${txt(o, o.x - 10, o.y - 8, (o.w ?? 220) + 10, o.h ?? 40, { size: o.kind === 'text' ? 18 : 14, color: '#1a1a1a' })}`)
+      if (o.kind === 'uefn') return tr("<circle cx=\"{0}\" cy=\"{1}\" r=\"19\" fill=\"#fff\" stroke=\"#1a1a1a\" stroke-width=\"1.5\"/><text x=\"{2}\" y=\"{3}\" font-size=\"11\" text-anchor=\"middle\" font-family=\"sans-serif\">{4}</text>", [o.x + 19, o.y + 19, o.x + 19, o.y + 60, esc(o.text ?? '')])
+      if (o.kind === 'image' && o.url) return g(tr("<image href=\"{0}\" x=\"{1}\" y=\"{2}\" width=\"{3}\" height=\"{4}\" preserveAspectRatio=\"xMidYMid meet\"/>", [esc(o.url), o.x, o.y, o.w, o.h]))
       return ''
     })
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${x0} ${y0} ${w} ${h}" width="${w}" height="${h}"><rect x="${x0}" y="${y0}" width="${w}" height="${h}" fill="#fff"/>${parts.join('')}</svg>`
+    return tr("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"{0} {1} {2} {3}\" width=\"{4}\" height=\"{5}\"><rect x=\"{6}\" y=\"{7}\" width=\"{8}\" height=\"{9}\" fill=\"#fff\"/>{10}</svg>", [x0, y0, w, h, w, h, x0, y0, w, h, parts.join('')])
   }
   const download = (blob: Blob, name: string) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click() }
   const exportSvg = () => { if (list.length) download(new Blob([buildSvg()], { type: 'image/svg+xml' }), 'tableau.svg') }
@@ -433,9 +434,9 @@ function Canvas({ id }: { id: number }) {
     const a = objs[c.from!], b = objs[c.to!]; if (!a || !b) return ''
     const edge = (o: Obj, t: { x: number; y: number }) => { const c = anchor(o), hw = (o.w ?? 38) / 2 + 4, hh = (o.h ?? 38) / 2 + 4, dx = t.x - c.x, dy = t.y - c.y; if (!dx && !dy) return c; const k = Math.min(dx ? hw / Math.abs(dx) : 1e9, dy ? hh / Math.abs(dy) : 1e9); return { x: c.x + dx * k, y: c.y + dy * k } }
     const p = edge(a, anchor(b)), q = edge(b, anchor(a))
-    if (c.style === 'straight') return `M${p.x},${p.y} L${q.x},${q.y}`
-    if (c.style === 'elbow') return `M${p.x},${p.y} L${(p.x + q.x) / 2},${p.y} L${(p.x + q.x) / 2},${q.y} L${q.x},${q.y}`
-    return `M${p.x},${p.y} C${(p.x + q.x) / 2},${p.y} ${(p.x + q.x) / 2},${q.y} ${q.x},${q.y}`
+    if (c.style === 'straight') return tr("M{0},{1} L{2},{3}", [p.x, p.y, q.x, q.y])
+    if (c.style === 'elbow') return tr("M{0},{1} L{2},{3} L{4},{5} L{6},{7}", [p.x, p.y, (p.x + q.x) / 2, p.y, (p.x + q.x) / 2, q.y, q.x, q.y])
+    return tr("M{0},{1} C{2},{3} {4},{5} {6},{7}", [p.x, p.y, (p.x + q.x) / 2, p.y, (p.x + q.x) / 2, q.y, q.x, q.y])
   }
   const selSticky = sel.filter(s => objs[s]?.kind === 'sticky')
   // Barre de mise en forme au-dessus de la sélection (comme Miro), sinon en dessous si pas la place.
@@ -447,71 +448,71 @@ function Canvas({ id }: { id: number }) {
   }
   const selFrame = sel.length === 1 && objs[sel[0]]?.kind === 'frame' ? sel[0] : null
   const ranking = list.filter(o => o.kind === 'sticky').map(o => ({ o, v: votesOf(o) })).filter(x => x.v > 0).sort((a, b) => b.v - a.v)
-  const TOOLS: [string, string, any][] = [['select', 'Sélectionner (V)', MousePointer2], ['sticky', 'Post-it (N)', StickyNote], ['text', 'Texte (T)', Type], ['rect', 'Rectangle (R)', Square], ['ellipse', 'Cercle (O)', Circle], ['connector', 'Flèche entre deux objets (C)', Spline], ['pen', 'Stylo (P)', Pen], ['erase', 'Gomme (E)', Eraser]]
-  const MORE: [string, string, any][] = [['lasso', 'Lasso (L)', Lasso], ['hl', 'Surligneur (H)', Highlighter], ['frame', 'Cadre / diapo (F)', Frame], ['comment', 'Commentaire épinglé (M)', MessageSquarePlus]]
+  const TOOLS: [string, string, any][] = [['select', tr("Sélectionner (V)"), MousePointer2], ['sticky', tr("Post-it (N)"), StickyNote], ['text', tr("Texte (T)"), Type], ['rect', tr("Rectangle (R)"), Square], ['ellipse', tr("Cercle (O)"), Circle], ['connector', tr("Flèche entre deux objets (C)"), Spline], ['pen', tr("Stylo (P)"), Pen], ['erase', tr("Gomme (E)"), Eraser]]
+  const MORE: [string, string, any][] = [['lasso', tr("Lasso (L)"), Lasso], ['hl', tr("Surligneur (H)"), Highlighter], ['frame', tr("Cadre / diapo (F)"), Frame], ['comment', tr("Commentaire épinglé (M)"), MessageSquarePlus]]
 
   return (
     <>
-      <section ref={wbRef} className={'wb' + (fs ? ' fs' : '')} aria-label="Canevas">
+      <section ref={wbRef} className={'wb' + (fs ? ' fs' : '')} aria-label={tr("Canevas")}>
         <div className="wbtop">
-          <div className="toolbar" role="toolbar" aria-label="Outils">
+          <div className="toolbar" role="toolbar" aria-label={tr("Outils")}>
             {TOOLS.map(([k, l, I]) => <button key={k} className={'tool' + (tool === k ? ' on' : '')} title={l} aria-label={l} aria-pressed={tool === k} onClick={() => { setTool(k); setConnFrom(null) }} disabled={!canEdit && k !== 'select'}><I size={18} strokeWidth={1.5} /></button>)}
-            <label className={'tool' + (canEdit ? '' : ' off')} title="Image (ou glissez-la sur le tableau)" aria-label="Importer une image"><ImagePlus size={18} strokeWidth={1.5} /><input type="file" accept="image/*" hidden disabled={!canEdit} onChange={e => { const f = e.target.files?.[0]; if (f) importImage(f); e.target.value = '' }} /></label>
+            <label className={'tool' + (canEdit ? '' : ' off')} title={tr("Image (ou glissez-la sur le tableau)")} aria-label={tr("Importer une image")}><ImagePlus size={18} strokeWidth={1.5} /><input type="file" accept="image/*" hidden disabled={!canEdit} onChange={e => { const f = e.target.files?.[0]; if (f) importImage(f); e.target.value = '' }} /></label>
             <div style={{ position: 'relative' }}>
-              <button className={'tool' + (MORE.some(m => m[0] === tool) ? ' on' : '')} title="Plus d’outils" aria-label="Plus d’outils" aria-expanded={menu === 'tools'} onClick={() => setMenu(menu === 'tools' ? null : 'tools')}><MoreHorizontal size={18} strokeWidth={1.5} /></button>
+              <button className={'tool' + (MORE.some(m => m[0] === tool) ? ' on' : '')} title={tr("Plus d’outils")} aria-label={tr("Plus d’outils")} aria-expanded={menu === 'tools'} onClick={() => setMenu(menu === 'tools' ? null : 'tools')}><MoreHorizontal size={18} strokeWidth={1.5} /></button>
               {menu === 'tools' && <div className="menu" style={{ left: 0, top: 44 }} onMouseLeave={() => setMenu(null)}>
                 {MORE.map(([k, l, I]) => <button key={k} disabled={!canEdit} onClick={() => { setTool(k); setConnFrom(null); setMenu(null) }}><I size={16} />{l}</button>)}
-                <button disabled={!canEdit} onClick={() => { setMenu(null); const u = prompt('Lien https de l’image (plan de map vu du dessus, capture…)'); if (u && /^https:\/\//.test(u)) add({ kind: 'image', url: u, w: 600, h: 400, locked: confirm('Utiliser comme fond « plan de map » (verrouillé derrière) ?') }) }}><Upload size={16} />Image par lien</button>
-                <button onClick={() => { setLib(l => !l); setMenu(null) }}><LayoutGrid size={16} />{lib ? 'Masquer' : 'Afficher'} les formes UEFN</button>
+                <button disabled={!canEdit} onClick={() => { setMenu(null); const u = prompt(tr("Lien https de l’image (plan de map vu du dessus, capture…)")); if (u && /^https:\/\//.test(u)) add({ kind: 'image', url: u, w: 600, h: 400, locked: confirm(tr("Utiliser comme fond « plan de map » (verrouillé derrière) ?")) }) }}><Upload size={16} />{tr("Image par lien")}</button>
+                <button onClick={() => { setLib(l => !l); setMenu(null) }}><LayoutGrid size={16} />{tr("{0} les formes UEFN", [lib ? tr("Masquer") : tr("Afficher")])}</button>
               </div>}
             </div>
             <span className="tsep" />
-            <button className="tool" title="Annuler (Ctrl+Z)" aria-label="Annuler" disabled={!canEdit} onClick={() => travel('undo')}><Undo2 size={18} strokeWidth={1.5} /></button>
-            <button className="tool" title="Rétablir (Ctrl+Maj+Z)" aria-label="Rétablir" disabled={!canEdit} onClick={() => travel('redo')}><Redo2 size={18} strokeWidth={1.5} /></button>
-            {tool === 'sticky' && SHADES.map(([bg], i) => <button key={i} className="tool" title={SHADE_NAMES[i]} aria-label={SHADE_NAMES[i]} onClick={() => setShade(i)}><span style={{ width: 18, height: 18, borderRadius: 4, background: bg, border: shade === i ? '2px solid var(--text)' : '1px solid var(--border)' }} /></button>)}
+            <button className="tool" title={tr("Annuler (Ctrl+Z)")} aria-label={tr("Annuler")} disabled={!canEdit} onClick={() => travel('undo')}><Undo2 size={18} strokeWidth={1.5} /></button>
+            <button className="tool" title={tr("Rétablir (Ctrl+Maj+Z)")} aria-label={tr("Rétablir")} disabled={!canEdit} onClick={() => travel('redo')}><Redo2 size={18} strokeWidth={1.5} /></button>
+            {tool === 'sticky' && SHADES.map(([bg], i) => <button key={i} className="tool" title={SHADE_NAMES[i]} aria-label={SHADE_NAMES[i]} onClick={() => setShade(i)}><span style={{ width: 18, height: 18, borderRadius: 4, background: bg, border: shade === i ? tr("2px solid var(--text)") : tr("1px solid var(--border)") }} /></button>)}
             {(tool === 'pen') && <PenBar color={pen.color} width={pen.width} onColor={c => setPen(p => ({ ...p, color: c }))} onWidth={w => setPen(p => ({ ...p, width: w }))} />}
-            {tool === 'connector' && <select className="field" style={{ height: 34 }} value={connStyle} onChange={e => setConnStyle(e.target.value)} aria-label="Style"><option value="straight">Droit</option><option value="elbow">Coudé</option><option value="curve">Courbe</option></select>}
-            {tool === 'connector' && <span className="small muted">{connFrom ? 'Cliquez l’objet d’arrivée' : 'Cliquez l’objet de départ'}</span>}
+            {tool === 'connector' && <select className="field" style={{ height: 34 }} value={connStyle} onChange={e => setConnStyle(e.target.value)} aria-label={tr("Style")}><option value="straight">{tr("Droit")}</option><option value="elbow">{tr("Coudé")}</option><option value="curve">{tr("Courbe")}</option></select>}
+            {tool === 'connector' && <span className="small muted">{connFrom ? tr("Cliquez l’objet d’arrivée") : tr("Cliquez l’objet de départ")}</span>}
           </div>
-          <div className="toolbar" aria-label="Actions">
+          <div className="toolbar" aria-label={tr("Actions")}>
             {timerLeft ? <button className="pill on" onClick={() => setMetaOp({ timer_end: null })} disabled={!canEdit}><Timer size={16} />{`${String(Math.floor(timerLeft / 60)).padStart(2, '0')}:${String(timerLeft % 60).padStart(2, '0')}`}</button> : null}
-            {voting && <button className="pill on" onClick={() => setVoting(false)}><ThumbsUp size={16} />Vote · {Math.max(0, meta.points - myVotes)} pts · Terminer</button>}
+            {voting && <button className="pill on" onClick={() => setVoting(false)}><ThumbsUp size={16} />{tr("Vote · {0} pts · Terminer", [Math.max(0, meta.points - myVotes)])}</button>}
             <div style={{ position: 'relative' }}>
-              <button className="pill" onClick={() => setMenu(menu === 'atelier' ? null : 'atelier')} aria-expanded={menu === 'atelier'}><Users size={16} />Atelier</button>
+              <button className="pill" onClick={() => setMenu(menu === 'atelier' ? null : 'atelier')} aria-expanded={menu === 'atelier'}><Users size={16} />{tr("Atelier")}</button>
               {menu === 'atelier' && <div className="menu" style={{ right: 0, top: 44 }} onMouseLeave={() => setMenu(null)}>
-                <button disabled={!canEdit} onClick={() => { setMetaOp({ timer_end: timerLeft ? null : Date.now() + 5 * 60000 }); setMenu(null) }}><Timer size={16} />{timerLeft ? 'Arrêter le minuteur' : 'Minuteur 5 min'}</button>
-                <button onClick={() => { setVoting(v => !v); setMenu(null) }}><ThumbsUp size={16} />{voting ? 'Terminer le vote' : 'Voter pour les post-it'}</button>
-                <button disabled={!canEdit} onClick={() => { setMetaOp({ hidden: !meta.hidden }); setMenu(null) }}>{meta.hidden ? <><Eye size={16} />Révéler les idées</> : <><EyeOff size={16} />Cacher les idées des autres</>}</button>
-                <button disabled={!canEdit} onClick={() => { groupByShade(); setMenu(null) }}><LayoutGrid size={16} />Regrouper par couleur</button>
-                {Object.entries(cursors).map(([u, c]) => <button key={u} onClick={() => { setFollow(Number(u)); setMenu(null) }}><UserRound size={16} />Suivre {c.name}</button>)}
+                <button disabled={!canEdit} onClick={() => { setMetaOp({ timer_end: timerLeft ? null : Date.now() + 5 * 60000 }); setMenu(null) }}><Timer size={16} />{timerLeft ? tr("Arrêter le minuteur") : tr("Minuteur 5 min")}</button>
+                <button onClick={() => { setVoting(v => !v); setMenu(null) }}><ThumbsUp size={16} />{voting ? tr("Terminer le vote") : tr("Voter pour les post-it")}</button>
+                <button disabled={!canEdit} onClick={() => { setMetaOp({ hidden: !meta.hidden }); setMenu(null) }}>{meta.hidden ? <><Eye size={16} />{tr("Révéler les idées")}</> : <><EyeOff size={16} />{tr("Cacher les idées des autres")}</>}</button>
+                <button disabled={!canEdit} onClick={() => { groupByShade(); setMenu(null) }}><LayoutGrid size={16} />{tr("Regrouper par couleur")}</button>
+                {Object.entries(cursors).map(([u, c]) => <button key={u} onClick={() => { setFollow(Number(u)); setMenu(null) }}><UserRound size={16} />{tr("Suivre {0}", [c.name])}</button>)}
               </div>}
             </div>
-            <button className="pill" onClick={() => frames.length ? goFrame(0) : app.toast('Ajoutez des cadres (menu « … ») pour présenter.')}><Presentation size={16} />Présenter</button>
+            <button className="pill" onClick={() => frames.length ? goFrame(0) : app.toast(tr("Ajoutez des cadres (menu « … ») pour présenter."))}><Presentation size={16} />{tr("Présenter")}</button>
             <div style={{ position: 'relative' }}>
-              <button className="pill" onClick={() => setMenu(menu === 'export' ? null : 'export')} aria-expanded={menu === 'export'}><Download size={16} />Exporter</button>
+              <button className="pill" onClick={() => setMenu(menu === 'export' ? null : 'export')} aria-expanded={menu === 'export'}><Download size={16} />{tr("Exporter")}</button>
               {menu === 'export' && <div className="menu" style={{ right: 0, top: 44, minWidth: 160 }} onMouseLeave={() => setMenu(null)}>
-                <button onClick={() => { exportPng(); setMenu(null) }}>Image PNG</button>
-                <button onClick={() => { exportSvg(); setMenu(null) }}>Image SVG</button>
+                <button onClick={() => { exportPng(); setMenu(null) }}>{tr("Image PNG")}</button>
+                <button onClick={() => { exportSvg(); setMenu(null) }}>{tr("Image SVG")}</button>
                 <button onClick={() => { setMenu(null); window.print() }}>PDF (impression)</button>
               </div>}
             </div>
-            <button className={'pill' + (fs ? ' on' : '')} onClick={toggleFs} title="Plein écran (Échap pour sortir)">{fs ? <><Shrink size={16} />Quitter</> : <><Expand size={16} />Plein écran</>}</button>
+            <button className={'pill' + (fs ? ' on' : '')} onClick={toggleFs} title={tr("Plein écran (Échap pour sortir)")}>{fs ? <><Shrink size={16} />{tr("Quitter")}</> : <><Expand size={16} />{tr("Plein écran")}</>}</button>
           </div>
         </div>
         <div className="wbbody">
-          {lib && <aside className="lib" aria-label="Formes UEFN">
-            <div className="row" style={{ justifyContent: 'space-between' }}><b style={{ fontWeight: 500 }}>Formes UEFN</b><button className="iconbtn" style={{ width: 26, height: 26 }} aria-label="Masquer" onClick={() => setLib(false)}><X size={14} /></button></div>
-            {UEFN.map(([k, l, ic]) => <button key={k} className="libitem" disabled={!canEdit} onClick={() => add(k === 'zone' ? { kind: 'shape', shape: 'rect', w: 240, h: 160, text: 'Zone', dashed: true } : k === 'road' || k === 'wall' ? { kind: 'shape', shape: 'rect', w: k === 'road' ? 260 : 160, h: k === 'road' ? 28 : 14, text: '' } : k === 'path' ? { kind: 'stroke', x: 0, y: 0, points: [[center().x - 100, center().y], [center().x + 100, center().y]], width: 3, color: 'path' } : { kind: 'uefn', shape: k, w: 38, h: 38, text: l })}><span className="lico">{ic}</span>{l}</button>)}
+          {lib && <aside className="lib" aria-label={tr("Formes UEFN")}>
+            <div className="row" style={{ justifyContent: 'space-between' }}><b style={{ fontWeight: 500 }}>{tr("Formes UEFN")}</b><button className="iconbtn" style={{ width: 26, height: 26 }} aria-label={tr("Masquer")} onClick={() => setLib(false)}><X size={14} /></button></div>
+            {UEFN.map(([k, l, ic]) => <button key={k} className="libitem" disabled={!canEdit} onClick={() => add(k === 'zone' ? { kind: 'shape', shape: 'rect', w: 240, h: 160, text: tr("Zone"), dashed: true } : k === 'road' || k === 'wall' ? { kind: 'shape', shape: 'rect', w: k === 'road' ? 260 : 160, h: k === 'road' ? 28 : 14, text: '' } : k === 'path' ? { kind: 'stroke', x: 0, y: 0, points: [[center().x - 100, center().y], [center().x + 100, center().y]], width: 3, color: 'path' } : { kind: 'uefn', shape: k, w: 38, h: 38, text: l })}><span className="lico">{ic}</span>{l}</button>)}
             {ranking.length > 0 && <>
-              <div style={{ fontWeight: 500, margin: '16px 0 8px' }}>Classement</div>
-              {ranking.slice(0, 8).map(({ o, v }, i) => <div key={o.id} className="small" style={{ padding: '4px 0' }}><span className="mono muted">{i + 1}.</span> {meta.hidden && o.author_id !== me ? 'Idée cachée' : o.text} <b style={{ fontWeight: 500 }}>· {v}</b></div>)}
+              <div style={{ fontWeight: 500, margin: '16px 0 8px' }}>{tr("Classement")}</div>
+              {ranking.slice(0, 8).map(({ o, v }, i) => <div key={o.id} className="small" style={{ padding: '4px 0' }}><span className="mono muted">{i + 1}.</span> {meta.hidden && o.author_id !== me ? tr("Idée cachée") : o.text} <b style={{ fontWeight: 500 }}>· {v}</b></div>)}
             </>}
           </aside>}
           <div ref={box} className="canvas" style={{ backgroundSize: `${GRID * view.z}px ${GRID * view.z}px`, backgroundPosition: `${view.x}px ${view.y}px`, cursor: tool === 'select' ? 'default' : 'crosshair' }}
             onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp}
-            onDragOver={e => { if (canEdit && e.dataTransfer.types.includes('Files')) e.preventDefault() }}
+            onDragOver={e => { if (canEdit && e.dataTransfer.types.includes(tr("Files"))) e.preventDefault() }}
             onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f && canEdit) importImage(f, toWorld(e.clientX, e.clientY)) }} onDoubleClick={e => { const t = (e.target as HTMLElement).closest('[data-oid]') as HTMLElement | null; if (t && canEdit && !objs[t.dataset.oid!]?.lk && !['image', 'stroke', 'connector', 'uefn'].includes(objs[t.dataset.oid!]?.kind)) { setSel([t.dataset.oid!]); setEditing(t.dataset.oid!) } }}>
-            <div className="layer" style={{ transform: `translate(${view.x}px,${view.y}px) scale(${view.z})` }}>
+            <div className="layer" style={{ transform: tr("translate({0}px,{1}px) scale({2})", [view.x, view.y, view.z]) }}>
               <svg style={{ position: 'absolute', left: 0, top: 0, overflow: 'visible', pointerEvents: 'none' }} width="1" height="1">
                                 {list.filter(o => o.kind === 'connector').map(c => { const w = c.width ?? 1.6; const col = strokeColor(c, 'var(--text2)'); return <g key={c.id} opacity={c.op}>
                   <defs><marker id={'arr-' + c.id} viewBox="0 0 10 10" refX="9" refY="5" markerWidth={Math.max(7, w * 3.5)} markerHeight={Math.max(7, w * 3.5)} markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill={col} /></marker></defs>
@@ -538,9 +539,9 @@ function Canvas({ id }: { id: number }) {
                 if (o.kind === 'sticky') {
                   const [sbg, sfg] = SHADES[o.shade ?? 0]; const bg = o.bg && o.bg !== 'none' ? o.bg : sbg; const hide = meta.hidden && o.author_id !== me; const t = taskOf(o.task_number)
                   return <div key={o.id} data-oid={o.id} className={'obj sticky' + isSel + lk} style={{ ...bx(), background: bg, color: sfg }}>
-                    <div className="tbody" style={{ ...ts, justifyContent: vAlign(o) }}>{ed ? input : hide ? <div className="hiddenidea">Idée cachée<div className="small">de {o.author?.split(' ')[0]}</div></div> : <Rich o={o} placeholder="Double-clic pour écrire" />}</div>
+                    <div className="tbody" style={{ ...ts, justifyContent: vAlign(o) }}>{ed ? input : hide ? <div className="hiddenidea">{tr("Idée cachée")}<div className="small">de {o.author?.split(' ')[0]}</div></div> : <Rich o={o} placeholder={tr("Double-clic pour écrire")} />}</div>
                     <div className="row" style={{ justifyContent: 'space-between', gap: 6, flex: 'none' }}><span className="small" style={{ opacity: 0.7 }}>{o.author?.split(' ')[0]}</span>{votesOf(o) > 0 && <span className="votes">{votesOf(o)} vote{votesOf(o) > 1 ? 's' : ''}</span>}</div>
-                    {o.task_number && <span className="tasklink badge" style={{ background: 'var(--surface)' }}>#{o.task_number} · {t ? ({ todo: 'À faire', doing: 'En cours', blocked: 'Bloqué', done: 'Fait' } as any)[t.status] : '…'}</span>}
+                    {o.task_number && <span className="tasklink badge" style={{ background: 'var(--surface)' }}>#{o.task_number} · {t ? ({ todo: tr("À faire"), doing: tr("En cours"), blocked: tr("Bloqué"), done: tr("Fait") } as any)[t.status] : '…'}</span>}
                   </div>
                 }
                 if (o.kind === 'uefn') return <div key={o.id} data-oid={o.id} className={'obj uefn' + isSel + lk} style={{ left: o.x, top: o.y, opacity: o.op }} title={o.text}>{UEFN.find(u => u[0] === o.shape)?.[2] ?? '•'}<span className="ulab">{o.text}</span></div>
@@ -551,11 +552,11 @@ function Canvas({ id }: { id: number }) {
                     <div className="tbody" style={{ ...ts, textAlign: o.ta ?? 'center', justifyContent: vAlign(o, 'center') }}>{ed ? input : <Rich o={o} />}</div>
                   </div>
                 }
-                if (o.kind === 'comment') return <div key={o.id} data-oid={o.id} className={'obj sticky' + isSel + lk} style={{ ...bx(), background: o.bg && o.bg !== 'none' ? o.bg : 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)', ...border }}><span className="small muted">Commentaire · {o.author?.split(' ')[0]}</span><div className="tbody" style={ts}>{ed ? input : <Rich o={o} />}</div></div>
+                if (o.kind === 'comment') return <div key={o.id} data-oid={o.id} className={'obj sticky' + isSel + lk} style={{ ...bx(), background: o.bg && o.bg !== 'none' ? o.bg : 'var(--surface)', color: 'var(--text)', border: tr("1px solid var(--border)"), ...border }}><span className="small muted">{tr("Commentaire · {0}", [o.author?.split(' ')[0]])}</span><div className="tbody" style={ts}>{ed ? input : <Rich o={o} />}</div></div>
                 return <div key={o.id} data-oid={o.id} className={'obj wtext' + isSel + lk} style={{ ...bx(), background: o.bg && o.bg !== 'none' ? o.bg : undefined, ...border, padding: o.bg || o.bw ? 8 : undefined }}><div className="tbody" style={ts}>{ed ? input : <Rich o={o} />}</div></div>
               })}
-              {canEdit && sel.length === 1 && objs[sel[0]] && !['connector', 'stroke', 'uefn'].includes(objs[sel[0]].kind) && !objs[sel[0]].lk && editing !== sel[0] && (() => { const o = objs[sel[0]]; return <div data-handle={o.id} className="rhandle" title="Redimensionner (Maj : garder les proportions)" style={{ left: o.x + (o.w ?? 40) - 6, top: o.y + (o.h ?? 40) - 6, transform: `scale(${1 / view.z})` }} /> })()}
-              {lasso && <div style={{ position: 'absolute', left: Math.min(lasso.x0, lasso.x1), top: Math.min(lasso.y0, lasso.y1), width: Math.abs(lasso.x1 - lasso.x0), height: Math.abs(lasso.y1 - lasso.y0), border: '1px dashed var(--text)', background: 'rgba(127,127,127,.08)' }} />}
+              {canEdit && sel.length === 1 && objs[sel[0]] && !['connector', 'stroke', 'uefn'].includes(objs[sel[0]].kind) && !objs[sel[0]].lk && editing !== sel[0] && (() => { const o = objs[sel[0]]; return <div data-handle={o.id} className="rhandle" title={tr("Redimensionner (Maj : garder les proportions)")} style={{ left: o.x + (o.w ?? 40) - 6, top: o.y + (o.h ?? 40) - 6, transform: `scale(${1 / view.z})` }} /> })()}
+              {lasso && <div style={{ position: 'absolute', left: Math.min(lasso.x0, lasso.x1), top: Math.min(lasso.y0, lasso.y1), width: Math.abs(lasso.x1 - lasso.x0), height: Math.abs(lasso.y1 - lasso.y0), border: tr("1px dashed var(--text)"), background: 'rgba(127,127,127,.08)' }} />}
               {Object.entries(cursors).filter(([, c]) => Date.now() - c.t < 15000).map(([u, c]) => (
                 <div key={u} className="wcursor" style={{ left: c.x, top: c.y, transform: `scale(${1 / view.z})`, transformOrigin: '0 0' }}><svg width="16" height="16" viewBox="0 0 24 24"><path d="M3 2l7 19 2.5-8.5L21 10z" fill="var(--text)" /></svg><span>{c.name.split(' ')[0]}</span></div>
               ))}
@@ -567,44 +568,44 @@ function Canvas({ id }: { id: number }) {
               const ed = editing && sel.includes(editing)
               return <FormatBar sel={so} editing={!!ed} push={l => push(l as Obj[])} pos={barPos(so)} extra={<>
                 {selSticky.length > 0 && selSticky.length === sel.length && <>
-                  <div className="fpop"><button className={'fbtn' + (menu === 'shade' ? ' on' : '')} title="Couleur du post-it" aria-label="Couleur du post-it" onClick={() => setMenu(menu === 'shade' ? null : 'shade')}><span className="sw" style={{ width: 16, height: 16, background: objs[selSticky[0]]?.bg ?? SHADES[objs[selSticky[0]]?.shade ?? 0][0] }} /></button>
+                  <div className="fpop"><button className={'fbtn' + (menu === 'shade' ? ' on' : '')} title={tr("Couleur du post-it")} aria-label={tr("Couleur du post-it")} onClick={() => setMenu(menu === 'shade' ? null : 'shade')}><span className="sw" style={{ width: 16, height: 16, background: objs[selSticky[0]]?.bg ?? SHADES[objs[selSticky[0]]?.shade ?? 0][0] }} /></button>
                     {menu === 'shade' && <div className="fmenu"><div className="row" style={{ gap: 6 }}>{SHADES.map(([bg], i) => <button key={i} className="sw" style={{ background: bg, width: 22, height: 22 }} title={SHADE_NAMES[i]} aria-label={SHADE_NAMES[i]} onClick={() => { push(selSticky.map(s => ({ ...objs[s], shade: i, bg: undefined }))); setMenu(null) }} />)}</div></div>}</div>
-                  <div className="fpop"><button className={'fbtn' + (menu === 'conv' ? ' on' : '')} title="Convertir en tâches" onClick={() => setMenu(menu === 'conv' ? null : 'conv')} style={{ width: 'auto', padding: '0 8px' }}>Tâches</button>
+                  <div className="fpop"><button className={'fbtn' + (menu === 'conv' ? ' on' : '')} title={tr("Convertir en tâches")} onClick={() => setMenu(menu === 'conv' ? null : 'conv')} style={{ width: 'auto', padding: '0 8px' }}>{tr("Tâches")}</button>
                     {menu === 'conv' && <div className="fmenu" style={{ display: 'grid', gap: 8, width: 220 }}>
-                      <select className="field" style={{ height: 34 }} value={convert.assignee} onChange={e => setConvert({ ...convert, assignee: e.target.value })} aria-label="Assigné"><option value="">Assigné…</option>{mem?.members.map((m: any) => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
-                      <select className="field" style={{ height: 34 }} value={convert.tag} onChange={e => setConvert({ ...convert, tag: e.target.value })} aria-label="Étiquette">{['code', 'carte', 'conception', 'test'].map(t => <option key={t}>{t}</option>)}</select>
-                      <button className="btn pri" style={{ height: 34 }} onClick={() => { doConvert(); setMenu(null) }}>Convertir {selSticky.length} post-it</button>
+                      <select className="field" style={{ height: 34 }} value={convert.assignee} onChange={e => setConvert({ ...convert, assignee: e.target.value })} aria-label={tr("Assigné")}><option value="">{tr("Assigné…")}</option>{mem?.members.map((m: any) => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
+                      <select className="field" style={{ height: 34 }} value={convert.tag} onChange={e => setConvert({ ...convert, tag: e.target.value })} aria-label={tr("Étiquette")}>{['code', 'carte', 'conception', 'test'].map(t => <option key={t} value={t}>{tr(t)}</option>)}</select>
+                      <button className="btn pri" style={{ height: 34 }} onClick={() => { doConvert(); setMenu(null) }}>{tr("Convertir {0} post-it", [selSticky.length])}</button>
                     </div>}</div>
                 </>}
-                {selFrame && <button className="fbtn" style={{ width: 'auto', padding: '0 8px' }} onClick={() => frameToPage(selFrame)}>Cadre → page</button>}
+                {selFrame && <button className="fbtn" style={{ width: 'auto', padding: '0 8px' }} onClick={() => frameToPage(selFrame)}>{tr("Cadre → page")}</button>}
                 {sel.length > 1 && <>
-                  <button className="fbtn" title="Aligner à gauche" aria-label="Aligner à gauche" onClick={() => align('left')}><AlignStartVertical size={16} /></button>
-                  <button className="fbtn" title="Centrer horizontalement" aria-label="Centrer horizontalement" onClick={() => align('hcenter')}><AlignCenterVertical size={16} /></button>
-                  <button className="fbtn" title="Aligner en haut" aria-label="Aligner en haut" onClick={() => align('top')}><AlignStartHorizontal size={16} /></button>
-                  <button className="fbtn" title="Centrer verticalement" aria-label="Centrer verticalement" onClick={() => align('vcenter')}><AlignCenterHorizontal size={16} /></button>
-                  {sel.length > 2 && <button className="fbtn" style={{ width: 'auto', padding: '0 8px' }} onClick={() => align('hdist')}>Répartir</button>}
+                  <button className="fbtn" title={tr("Aligner à gauche")} aria-label={tr("Aligner à gauche")} onClick={() => align('left')}><AlignStartVertical size={16} /></button>
+                  <button className="fbtn" title={tr("Centrer horizontalement")} aria-label={tr("Centrer horizontalement")} onClick={() => align('hcenter')}><AlignCenterVertical size={16} /></button>
+                  <button className="fbtn" title={tr("Aligner en haut")} aria-label={tr("Aligner en haut")} onClick={() => align('top')}><AlignStartHorizontal size={16} /></button>
+                  <button className="fbtn" title={tr("Centrer verticalement")} aria-label={tr("Centrer verticalement")} onClick={() => align('vcenter')}><AlignCenterHorizontal size={16} /></button>
+                  {sel.length > 2 && <button className="fbtn" style={{ width: 'auto', padding: '0 8px' }} onClick={() => align('hdist')}>{tr("Répartir")}</button>}
                 </>}
-                <button className="fbtn" title="Premier plan" aria-label="Premier plan" onClick={() => push(sel.map(i => ({ ...objs[i], z: zTop() })))}><BringToFront size={16} /></button>
-                <button className="fbtn" title="Arrière-plan" aria-label="Arrière-plan" onClick={() => push(sel.map(i => ({ ...objs[i], z: zBottom() })))}><SendToBack size={16} /></button>
-                <button className="fbtn" title="Dupliquer (Ctrl+D)" aria-label="Dupliquer" onClick={() => paste(withLinks(sel))}><Copy size={16} /></button>
-                <button className="fbtn" title="Supprimer (Suppr)" aria-label="Supprimer" onClick={() => del(sel)}><Trash2 size={16} /></button>
+                <button className="fbtn" title={tr("Premier plan")} aria-label={tr("Premier plan")} onClick={() => push(sel.map(i => ({ ...objs[i], z: zTop() })))}><BringToFront size={16} /></button>
+                <button className="fbtn" title={tr("Arrière-plan")} aria-label={tr("Arrière-plan")} onClick={() => push(sel.map(i => ({ ...objs[i], z: zBottom() })))}><SendToBack size={16} /></button>
+                <button className="fbtn" title={tr("Dupliquer (Ctrl+D)")} aria-label={tr("Dupliquer")} onClick={() => paste(withLinks(sel))}><Copy size={16} /></button>
+                <button className="fbtn" title={tr("Supprimer (Suppr)")} aria-label={tr("Supprimer")} onClick={() => del(sel)}><Trash2 size={16} /></button>
               </>} />
             })()}
-            {present !== null && <div className="selbar" onPointerDown={e => e.stopPropagation()}><button className="iconbtn" aria-label="Cadre précédent" onClick={() => goFrame(Math.max(0, present - 1))}><ChevronLeft size={18} /></button><span>{frames[present]?.text} · {present + 1}/{frames.length}</span><button className="iconbtn" aria-label="Cadre suivant" onClick={() => goFrame(Math.min(frames.length - 1, present + 1))}><ChevronRight size={18} /></button><button className="iconbtn" aria-label="Quitter" onClick={() => setPresent(null)}><X size={18} /></button></div>}
+            {present !== null && <div className="selbar" onPointerDown={e => e.stopPropagation()}><button className="iconbtn" aria-label={tr("Cadre précédent")} onClick={() => goFrame(Math.max(0, present - 1))}><ChevronLeft size={18} /></button><span>{frames[present]?.text} · {present + 1}/{frames.length}</span><button className="iconbtn" aria-label={tr("Cadre suivant")} onClick={() => goFrame(Math.min(frames.length - 1, present + 1))}><ChevronRight size={18} /></button><button className="iconbtn" aria-label={tr("Quitter")} onClick={() => setPresent(null)}><X size={18} /></button></div>}
             <div className="zoombox" onPointerDown={e => e.stopPropagation()}>
-              <button className="iconbtn" aria-label="Dézoomer" onClick={() => zoom(0.85)}><Minus size={16} /></button>
+              <button className="iconbtn" aria-label={tr("Dézoomer")} onClick={() => zoom(0.85)}><Minus size={16} /></button>
               <span className="small mono" style={{ minWidth: 46, textAlign: 'center' }}>{Math.round(view.z * 100)} %</span>
-              <button className="iconbtn" aria-label="Zoomer" onClick={() => zoom(1.15)}><Plus size={16} /></button>
-              <button className="pill" title="Recadrer pour voir tout le tableau (Ctrl+0)" onClick={fit}><Maximize size={14} />Tout voir</button>
-              <button className={'pill' + (gridOn ? ' on' : '')} title="Aligner les objets sur la grille en les déplaçant" onClick={() => setGridOn(g => !g)}>Grille</button>
-              {follow && <button className="pill on" onClick={() => setFollow(null)}><UserRound size={14} />Ne plus suivre</button>}
+              <button className="iconbtn" aria-label={tr("Zoomer")} onClick={() => zoom(1.15)}><Plus size={16} /></button>
+              <button className="pill" title={tr("Recadrer pour voir tout le tableau (Ctrl+0)")} onClick={fit}><Maximize size={14} />{tr("Tout voir")}</button>
+              <button className={'pill' + (gridOn ? ' on' : '')} title={tr("Aligner les objets sur la grille en les déplaçant")} onClick={() => setGridOn(g => !g)}>{tr("Grille")}</button>
+              {follow && <button className="pill on" onClick={() => setFollow(null)}><UserRound size={14} />{tr("Ne plus suivre")}</button>}
             </div>
             <MiniMap objs={list} view={view} box={box} />
-            {fs && <button className="btn fsexit" onPointerDown={e => e.stopPropagation()} onClick={toggleFs}><Shrink size={16} />Quitter le plein écran</button>}
+            {fs && <button className="btn fsexit" onPointerDown={e => e.stopPropagation()} onClick={toggleFs}><Shrink size={16} />{tr("Quitter le plein écran")}</button>}
           </div>
         </div>
       </section>
-      <p className="small muted">Astuces : molette de la souris ou pincer sur le trackpad pour zoomer, deux doigts ou Espace + glisser pour se déplacer, raccourcis V L N T R O C P H E F M pour les outils, Ctrl+Z / Ctrl+Maj+Z, Ctrl+C / V / D / X, flèches pour déplacer, poignée en bas à droite pour redimensionner, glisser une image pour l’importer, double-clic pour écrire, Maj+clic pour sélectionner plusieurs objets, Tab / Entrée sur un post-it pour la carte mentale, Suppr pour effacer. En mode vote, cliquez un post-it pour voter (Maj+clic pour retirer).</p>
+      <p className="small muted">{tr("Astuces : molette de la souris ou pincer sur le trackpad pour zoomer, deux doigts ou Espace + glisser pour se déplacer, raccourcis V L N T R O C P H E F M pour les outils, Ctrl+Z / Ctrl+Maj+Z, Ctrl+C / V / D / X, flèches pour déplacer, poignée en bas à droite pour redimensionner, glisser une image pour l’importer, double-clic pour écrire, Maj+clic pour sélectionner plusieurs objets, Tab / Entrée sur un post-it pour la carte mentale, Suppr pour effacer. En mode vote, cliquez un post-it pour voter (Maj+clic pour retirer).")}</p>
     </>
   )
 }
@@ -618,8 +619,8 @@ function MiniMap({ objs, view, box }: { objs: Obj[]; view: { x: number; y: numbe
   const r = box.current.getBoundingClientRect()
   return (
     <div className="minimap" aria-hidden="true">
-      {items.map(o => <div key={o.id} style={{ position: 'absolute', left: (o.x - x0) * k, top: (o.y - y0) * k, width: Math.max(2, (o.w ?? 30) * k), height: Math.max(2, (o.h ?? 30) * k), background: o.kind === 'frame' ? 'transparent' : 'var(--text3)', border: o.kind === 'frame' ? '1px solid var(--text3)' : 0 }} />)}
-      <div style={{ position: 'absolute', left: (-view.x / view.z - x0) * k, top: (-view.y / view.z - y0) * k, width: (r.width / view.z) * k, height: (r.height / view.z) * k, border: '1.5px solid var(--text)', borderRadius: 3 }} />
+      {items.map(o => <div key={o.id} style={{ position: 'absolute', left: (o.x - x0) * k, top: (o.y - y0) * k, width: Math.max(2, (o.w ?? 30) * k), height: Math.max(2, (o.h ?? 30) * k), background: o.kind === 'frame' ? 'transparent' : 'var(--text3)', border: o.kind === 'frame' ? tr("1px solid var(--text3)") : 0 }} />)}
+      <div style={{ position: 'absolute', left: (-view.x / view.z - x0) * k, top: (-view.y / view.z - y0) * k, width: (r.width / view.z) * k, height: (r.height / view.z) * k, border: tr("1.5px solid var(--text)"), borderRadius: 3 }} />
     </div>
   )
 }

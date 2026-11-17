@@ -7,6 +7,7 @@ import {
 import { ago, api, frDate } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { Avatar, CardHead, Empty, PageHead, Tabs } from '../components/ui'
+import { tr } from '../i18n/t'
 
 type Block = { id: string; type: string; text?: string; checked?: boolean; open?: boolean; body?: string; lang?: string; rows?: string[][]; url?: string; cols?: string[]; page?: number; board?: number; title?: string; view?: string; columns?: { key: string; label: string; type: string }[]; dbrows?: any[] } & Record<string, any>
 
@@ -14,13 +15,13 @@ const uid = () => Math.random().toString(36).slice(2, 12)
 const TEXT_TYPES = ['p', 'h1', 'h2', 'h3', 'bullet', 'number', 'todo', 'toggle', 'callout', 'quote', 'code']
 
 const INSERT: [string, string, string, any][] = [
-  ['p', 'Texte', 'Paragraphe', Type], ['h1', 'Titre 1', 'Grande section', Heading1], ['h2', 'Titre 2', 'Section', Heading2], ['h3', 'Titre 3', 'Sous-section', Heading3],
-  ['bullet', 'Liste à puces', 'Liste simple', List], ['number', 'Liste numérotée', '1, 2, 3', ListOrdered], ['todo', 'Case à cocher', 'Liste de tâches', CheckSquare],
-  ['toggle', 'Bloc repliable', 'Contenu masqué', ChevronRight], ['callout', 'Encadré', 'Mettre en avant', AlertCircle], ['quote', 'Citation', 'Citer un passage', Quote],
-  ['code', 'Code (Verse)', 'Bloc de code', Code], ['table', 'Tableau', 'Lignes et colonnes', Table], ['image', 'Image', 'Par lien', Image], ['video', 'Vidéo', 'YouTube ou lien', Video],
-  ['file', 'Fichier', 'Lien vers un fichier', Paperclip], ['columns', 'Colonnes', '2 colonnes de texte', Columns2], ['toc', 'Sommaire', 'Titres de la page', ListTree],
-  ['pagelink', 'Lien vers une page', 'Une autre page', Link2], ['board', 'Tableau blanc', 'Intégrer un tableau', PenTool], ['database', 'Base de données', 'Tableau, Kanban, Calendrier…', Database],
-  ['divider', 'Séparateur', 'Ligne horizontale', Minus],
+  ['p', tr("Texte"), tr("Paragraphe"), Type], ['h1', tr("Titre 1"), tr("Grande section"), Heading1], ['h2', tr("Titre 2"), tr("Section"), Heading2], ['h3', tr("Titre 3"), tr("Sous-section"), Heading3],
+  ['bullet', tr("Liste à puces"), tr("Liste simple"), List], ['number', tr("Liste numérotée"), '1, 2, 3', ListOrdered], ['todo', tr("Case à cocher"), tr("Liste de tâches"), CheckSquare],
+  ['toggle', tr("Bloc repliable"), tr("Contenu masqué"), ChevronRight], ['callout', tr("Encadré"), tr("Mettre en avant"), AlertCircle], ['quote', tr("Citation"), tr("Citer un passage"), Quote],
+  ['code', tr("Code (Verse)"), tr("Bloc de code"), Code], ['table', tr("Tableau"), tr("Lignes et colonnes"), Table], ['image', tr("Image"), tr("Par lien"), Image], ['video', tr("Vidéo"), tr("YouTube ou lien"), Video],
+  ['file', tr("Fichier"), tr("Lien vers un fichier"), Paperclip], ['columns', tr("Colonnes"), tr("2 colonnes de texte"), Columns2], ['toc', tr("Sommaire"), tr("Titres de la page"), ListTree],
+  ['pagelink', tr("Lien vers une page"), tr("Une autre page"), Link2], ['board', tr("Tableau blanc"), tr("Intégrer un tableau"), PenTool], ['database', tr("Base de données"), tr("Tableau, Kanban, Calendrier…"), Database],
+  ['divider', tr("Séparateur"), tr("Ligne horizontale"), Minus],
 ]
 
 function newBlock(type: string): Block {
@@ -28,7 +29,7 @@ function newBlock(type: string): Block {
   if (type === 'table') b.rows = [['', '', ''], ['', '', '']]
   if (type === 'code') b.lang = 'verse'
   if (type === 'columns') b.cols = ['', '']
-  if (type === 'database') Object.assign(b, { title: 'Nouvelle base', view: 'table', columns: [{ key: 'name', label: 'Nom', type: 'text' }, { key: 'status', label: 'Statut', type: 'select' }, { key: 'date', label: 'Date', type: 'date' }, { key: 'owner', label: 'Personne', type: 'person' }], rows: [] })
+  if (type === 'database') Object.assign(b, { title: tr("Nouvelle base"), view: 'table', columns: [{ key: 'name', label: tr("Nom"), type: 'text' }, { key: 'status', label: tr("Statut"), type: 'select' }, { key: 'date', label: tr("Date"), type: 'date' }, { key: 'owner', label: tr("Personne"), type: 'person' }], rows: [] })
   return b
 }
 
@@ -84,11 +85,11 @@ export default function Pages() {
   }
   const removePage = async (p: any) => {
     const n = (tree ?? []).filter(x => x.parent_id === p.id).length
-    if (!confirm(`Supprimer « ${p.title || 'Sans titre'} »${n ? ` et ses ${n} sous-page(s)` : ''} ? Elle ira dans la corbeille (restaurable).`)) return
-    try { await api.del(`/api/pages/${p.id}`); setMenu(null); await reloadTree(); if (p.id === id) nav('/pages'); toast('Page mise à la corbeille') } catch (e: any) { toast(e.message, true) }
+    if (!confirm(tr("Supprimer « {0} »{1} ? Elle ira dans la corbeille (restaurable).", [p.title || tr("Sans titre"), n ? tr(" et ses {0} sous-page(s)", [n]) : '']))) return
+    try { await api.del(`/api/pages/${p.id}`); setMenu(null); await reloadTree(); if (p.id === id) nav('/pages'); toast(tr("Page mise à la corbeille")) } catch (e: any) { toast(e.message, true) }
   }
   const renamePage = async (p: any) => {
-    const t = prompt('Nouveau titre', p.title); if (!t) return
+    const t = prompt(tr("Nouveau titre"), p.title); if (!t) return
     try { await api.patch(`/api/pages/${p.id}`, { title: t }); setMenu(null); reloadTree() } catch (e: any) { toast(e.message, true) }
   }
   const children = (p: number | null) => (tree ?? []).filter(x => (x.parent_id ?? null) === p)
@@ -97,18 +98,18 @@ export default function Pages() {
     const kids = children(p.id)
     return <>
       <div className="row tnode" style={{ gap: 0, position: 'relative' }}>
-        <button className="titem" style={{ width: 24, padding: 0, justifyContent: 'center', marginLeft: depth * 14 }} aria-label={open ? 'Replier' : 'Déplier'} onClick={() => setOpen(!open)}>{kids.length ? (open ? <ChevronDown size={14} /> : <ChevronRight size={14} />) : null}</button>
-        <button className={'titem' + (p.id === id ? ' on' : '')} onClick={() => nav(`/pages/${p.id}`)} onContextMenu={e => { e.preventDefault(); setMenu(p.id) }}><span className="pico">{p.icon || <FileText size={12} />}</span><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title || 'Sans titre'}</span></button>
+        <button className="titem" style={{ width: 24, padding: 0, justifyContent: 'center', marginLeft: depth * 14 }} aria-label={open ? tr("Replier") : tr("Déplier")} onClick={() => setOpen(!open)}>{kids.length ? (open ? <ChevronDown size={14} /> : <ChevronRight size={14} />) : null}</button>
+        <button className={'titem' + (p.id === id ? ' on' : '')} onClick={() => nav(`/pages/${p.id}`)} onContextMenu={e => { e.preventDefault(); setMenu(p.id) }}><span className="pico">{p.icon || <FileText size={12} />}</span><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title || tr("Sans titre")}</span></button>
         {canEdit && <span className="tacts">
-          <button className="iconbtn" style={{ width: 26, height: 26 }} aria-label="Ajouter une sous-page" title="Sous-page" onClick={() => create(undefined, p.id)}><Plus size={14} /></button>
-          <button className="iconbtn" style={{ width: 26, height: 26 }} aria-label="Actions de la page" title="Actions" onClick={() => setMenu(menu === p.id ? null : p.id)}><MoreHorizontal size={14} /></button>
+          <button className="iconbtn" style={{ width: 26, height: 26 }} aria-label={tr("Ajouter une sous-page")} title={tr("Sous-page")} onClick={() => create(undefined, p.id)}><Plus size={14} /></button>
+          <button className="iconbtn" style={{ width: 26, height: 26 }} aria-label={tr("Actions de la page")} title={tr("Actions")} onClick={() => setMenu(menu === p.id ? null : p.id)}><MoreHorizontal size={14} /></button>
         </span>}
         {menu === p.id && <div className="menu" style={{ right: 0, top: 30, minWidth: 190 }} onMouseLeave={() => setMenu(null)}>
-          <button onClick={() => { setMenu(null); nav(`/pages/${p.id}`) }}><FileText size={16} />Ouvrir</button>
-          <button onClick={() => renamePage(p)}><Type size={16} />Renommer</button>
-          <button onClick={() => { setMenu(null); create(undefined, p.id) }}><Plus size={16} />Ajouter une sous-page</button>
-          <button onClick={async () => { setMenu(null); try { const r = await api.post(`/api/pages/${p.id}/duplicate`); await reloadTree(); nav(`/pages/${r.id}`) } catch (e: any) { toast(e.message, true) } }}><Copy size={16} />Dupliquer</button>
-          {canDelete && <button style={{ color: 'var(--tr)' }} onClick={() => removePage(p)}><Trash2 size={16} />Supprimer</button>}
+          <button onClick={() => { setMenu(null); nav(`/pages/${p.id}`) }}><FileText size={16} />{tr("Ouvrir")}</button>
+          <button onClick={() => renamePage(p)}><Type size={16} />{tr("Renommer")}</button>
+          <button onClick={() => { setMenu(null); create(undefined, p.id) }}><Plus size={16} />{tr("Ajouter une sous-page")}</button>
+          <button onClick={async () => { setMenu(null); try { const r = await api.post(`/api/pages/${p.id}/duplicate`); await reloadTree(); nav(`/pages/${r.id}`) } catch (e: any) { toast(e.message, true) } }}><Copy size={16} />{tr("Dupliquer")}</button>
+          {canDelete && <button style={{ color: 'var(--tr)' }} onClick={() => removePage(p)}><Trash2 size={16} />{tr("Supprimer")}</button>}
         </div>}
       </div>
       {open && kids.map(k => <Node key={k.id} p={k} depth={depth + 1} />)}
@@ -117,23 +118,23 @@ export default function Pages() {
 
   return (
     <main className="content">
-      <PageHead title="Pages" help="Docs, règles et bases de données de la map, modifiés à plusieurs en temps réel.">
+      <PageHead title={tr("Pages")} help={tr("Docs, règles et bases de données de la map, modifiés à plusieurs en temps réel.")}>
         {canEdit && <div style={{ position: 'relative' }}>
-          <button className="btn" onClick={() => setTplOpen(o => !o)}>Modèles UEFN</button>
+          <button className="btn" onClick={() => setTplOpen(o => !o)}>{tr("Modèles UEFN")}</button>
           {tplOpen && <div className="menu" style={{ right: 0, top: 48 }}>{templates?.map(t => <button key={t.key} onClick={() => create(t.key)}><span className="sico">{t.icon}</span>{t.title}</button>)}</div>}
         </div>}
-        {canEdit && <button className="btn pri" onClick={() => create()}><Plus size={18} />Nouvelle page</button>}
+        {canEdit && <button className="btn pri" onClick={() => create()}><Plus size={18} />{tr("Nouvelle page")}</button>}
       </PageHead>
       <div className="doc">
-        <nav className="card tree" aria-label="Arborescence">
-          <div className="tsec">Favoris</div>
+        <nav className="card tree" aria-label={tr("Arborescence")}>
+          <div className="tsec">{tr("Favoris")}</div>
           {tree?.filter(p => p.favorite).map(p => <button key={p.id} className={'titem' + (p.id === id ? ' on' : '')} onClick={() => nav(`/pages/${p.id}`)}><Star size={14} />{p.title}</button>)}
-          <div className="tsec">Pages de la map</div>
+          <div className="tsec">{tr("Pages de la map")}</div>
           {children(null).map(p => <Node key={p.id} p={p} depth={0} />)}
-          {tree?.length === 0 && <Empty text="Aucune page pour l'instant." />}
+          {tree?.length === 0 && <Empty text={tr("Aucune page pour l'instant.")} />}
           <Trash />
         </nav>
-        {id ? <Editor key={id} id={id} tree={tree ?? []} onNewChild={() => create(undefined, id)} /> : <div className="card"><Empty text="Créez votre première page." /></div>}
+        {id ? <Editor key={id} id={id} tree={tree ?? []} onNewChild={() => create(undefined, id)} /> : <div className="card"><Empty text={tr("Créez votre première page.")} /></div>}
       </div>
     </main>
   )
@@ -165,7 +166,7 @@ function Editor({ id, tree, onNewChild }: { id: number; tree: any[]; onNewChild:
     setPage(p); setTitle(p.title); setBlocks(p.blocks.length ? p.blocks : [newBlock('p')])
   }, [id])
   useEffect(() => { load().catch(e => app.toast(e.message, true)) }, [load])
-  useEffect(() => { if (page) app.send({ t: 'place', place: `Page · ${page.title}` }) }, [page?.id])
+  useEffect(() => { if (page) app.send({ t: 'place', place: tr("Page · {0}", [page.title]) }) }, [page?.id])
   useEffect(() => app.subscribe(m => {
     if (m.t === 'page' && m.id === id && m.client !== clientId) {
       setEditors(e => Array.from(new Set([...e, m.name])))
@@ -225,30 +226,30 @@ function Editor({ id, tree, onNewChild }: { id: number; tree: any[]; onNewChild:
   const { data: tasks } = useLoad<any[]>(app.map ? `/api/maps/${app.map.id}/tasks` : null, [app.map?.id])
   const { data: boards } = useLoad<any[]>(app.map ? `/api/maps/${app.map.id}/boards` : null, [app.map?.id])
 
-  if (!page) return <div className="card editor"><p className="muted">Chargement…</p></div>
+  if (!page) return <div className="card editor"><p className="muted">{tr("Chargement…")}</p></div>
   let num = 0
   const headings = blocks.filter(b => ['h1', 'h2', 'h3'].includes(b.type))
 
   return <>
-    <article className="card editor" aria-label={`Page ${title}`}>
+    <article className="card editor" aria-label={tr("Page {0}", [title])}>
       <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'wrap', marginBottom: 18 }}>
-        <div className="small muted">{tree.find(t => t.id === page.parent_id)?.title ? `${tree.find(t => t.id === page.parent_id)?.title} / ` : ''}{title || 'Sans titre'}</div>
+        <div className="small muted">{tree.find(t => t.id === page.parent_id)?.title ? `${tree.find(t => t.id === page.parent_id)?.title} / ` : ''}{title || tr("Sans titre")}</div>
         <div className="row" style={{ gap: 8 }}>
           {editors.length > 0 && <span className="small muted">{editors.join(', ')} modifie…</span>}
-          <span className="small muted">{saving === 'saving' ? 'Enregistrement…' : saving === 'saved' ? 'Enregistré' : `Modifié par ${page.updated_by ?? '—'} ${ago(page.updated_at)}`}</span>
-          <button className="iconbtn" aria-label={page.favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'} onClick={async () => { await api.patch(`/api/pages/${id}`, { favorite: !page.favorite }); setPage({ ...page, favorite: !page.favorite }) }}><Star size={18} fill={page.favorite ? 'currentColor' : 'none'} /></button>
-          {!disabled && <button className="btn" onClick={onNewChild}>Sous-page</button>}
-          {!disabled && <button className="iconbtn" aria-label="Dupliquer la page" title="Dupliquer" onClick={async () => { try { const r = await api.post(`/api/pages/${id}/duplicate`); nav(`/pages/${r.id}`) } catch (e: any) { app.toast(e.message, true) } }}><Copy size={18} /></button>}
-          {['owner', 'admin', 'member'].includes(app.role) && <button className="iconbtn" aria-label="Mettre la page à la corbeille" title="Supprimer (corbeille)" onClick={async () => {
+          <span className="small muted">{saving === 'saving' ? tr("Enregistrement…") : saving === 'saved' ? tr("Enregistré") : tr("Modifié par {0} {1}", [page.updated_by ?? '—', ago(page.updated_at)])}</span>
+          <button className="iconbtn" aria-label={page.favorite ? tr("Retirer des favoris") : tr("Ajouter aux favoris")} onClick={async () => { await api.patch(`/api/pages/${id}`, { favorite: !page.favorite }); setPage({ ...page, favorite: !page.favorite }) }}><Star size={18} fill={page.favorite ? 'currentColor' : 'none'} /></button>
+          {!disabled && <button className="btn" onClick={onNewChild}>{tr("Sous-page")}</button>}
+          {!disabled && <button className="iconbtn" aria-label={tr("Dupliquer la page")} title={tr("Dupliquer")} onClick={async () => { try { const r = await api.post(`/api/pages/${id}/duplicate`); nav(`/pages/${r.id}`) } catch (e: any) { app.toast(e.message, true) } }}><Copy size={18} /></button>}
+          {['owner', 'admin', 'member'].includes(app.role) && <button className="iconbtn" aria-label={tr("Mettre la page à la corbeille")} title={tr("Supprimer (corbeille)")} onClick={async () => {
             const kids = tree.filter(x => x.parent_id === id).length
-            if (!confirm(`Mettre « ${page.title || 'Sans titre'} »${kids ? ` et ses ${kids} sous-page(s)` : ''} à la corbeille ? Vous pourrez la restaurer.`)) return
-            try { await api.del(`/api/pages/${id}`); app.toast('Page mise à la corbeille'); nav('/pages') } catch (e: any) { app.toast(e.message, true) }
+            if (!confirm(tr("Mettre « {0} »{1} à la corbeille ? Vous pourrez la restaurer.", [page.title || tr("Sans titre"), kids ? tr(" et ses {0} sous-page(s)", [kids]) : '']))) return
+            try { await api.del(`/api/pages/${id}`); app.toast(tr("Page mise à la corbeille")); nav('/pages') } catch (e: any) { app.toast(e.message, true) }
           }}><Trash2 size={18} /></button>}
         </div>
       </div>
-      <input className="field" style={{ width: 60, textAlign: 'center', fontSize: 20, height: 48, marginBottom: 8 }} defaultValue={page.icon} maxLength={2} aria-label="Icône" disabled={disabled}
+      <input className="field" style={{ width: 60, textAlign: 'center', fontSize: 20, height: 48, marginBottom: 8 }} defaultValue={page.icon} maxLength={2} aria-label={tr("Icône")} disabled={disabled}
         onBlur={e => api.patch(`/api/pages/${id}`, { icon: e.target.value })} />
-      <input className="ptitle" value={title} placeholder="Sans titre" disabled={disabled} aria-label="Titre de la page" onChange={e => { setTitle(e.target.value); save(blocks, e.target.value) }} />
+      <input className="ptitle" value={title} placeholder={tr("Sans titre")} disabled={disabled} aria-label={tr("Titre de la page")} onChange={e => { setTitle(e.target.value); save(blocks, e.target.value) }} />
       <div className="stack" style={{ gap: 2, marginTop: 16 }}>
         {blocks.map(b => {
           if (b.type === 'number') num += 1; else num = 0
@@ -259,27 +260,27 @@ function Editor({ id, tree, onNewChild }: { id: number; tree: any[]; onNewChild:
               onDragOver={e => { if (dragId) { e.preventDefault(); setOverId(b.id) } }}
               onDrop={e => { e.preventDefault(); if (dragId && dragId !== b.id) update(bs => { const from = bs.find(x => x.id === dragId)!; const rest = bs.filter(x => x.id !== dragId); const i = rest.findIndex(x => x.id === b.id); rest.splice(i, 0, from); return rest }); setDragId(null); setOverId(null) }}
               onClick={() => setSelBlock(b.id)}>
-              {!disabled && <button className="handle" draggable aria-label="Déplacer ou modifier le bloc" onDragStart={() => setDragId(b.id)} onDragEnd={() => { setDragId(null); setOverId(null) }} onClick={e => { e.stopPropagation(); setMenuFor(menuFor === b.id ? null : b.id) }}><GripVertical size={16} /></button>}
+              {!disabled && <button className="handle" draggable aria-label={tr("Déplacer ou modifier le bloc")} onDragStart={() => setDragId(b.id)} onDragEnd={() => { setDragId(null); setOverId(null) }} onClick={e => { e.stopPropagation(); setMenuFor(menuFor === b.id ? null : b.id) }}><GripVertical size={16} /></button>}
               {menuFor === b.id && (
                 <div className="menu" style={{ left: 24, top: 28 }} onMouseLeave={() => setMenuFor(null)}>
-                  <button onClick={() => { insertAfter(b.id, { ...b, id: uid() }); setMenuFor(null) }}><Copy size={16} />Dupliquer</button>
-                  <button onClick={() => { remove(b.id); setMenuFor(null) }}><Trash2 size={16} />Supprimer</button>
-                  <button onClick={() => { setSelBlock(b.id); setPanel('comments'); setMenuFor(null) }}><MessageSquare size={16} />Commenter</button>
-                  <div className="small muted" style={{ padding: '6px 10px' }}>Transformer en</div>
+                  <button onClick={() => { insertAfter(b.id, { ...b, id: uid() }); setMenuFor(null) }}><Copy size={16} />{tr("Dupliquer")}</button>
+                  <button onClick={() => { remove(b.id); setMenuFor(null) }}><Trash2 size={16} />{tr("Supprimer")}</button>
+                  <button onClick={() => { setSelBlock(b.id); setPanel('comments'); setMenuFor(null) }}><MessageSquare size={16} />{tr("Commenter")}</button>
+                  <div className="small muted" style={{ padding: '6px 10px' }}>{tr("Transformer en")}</div>
                   {INSERT.filter(i => TEXT_TYPES.includes(i[0])).map(([t, l, , I]) => <button key={t} className={b.type === t ? 'on' : ''} onClick={() => { setB(b.id, { type: t }); setMenuFor(null) }}><I size={16} />{l}</button>)}
                 </div>
               )}
               {b.type === 'bullet' && <span className="bullet" />}
               {b.type === 'number' && <span className="numbered">{num}.</span>}
-              {b.type === 'todo' && <input type="checkbox" style={{ marginTop: 7 }} checked={!!b.checked} disabled={disabled} onChange={e => setB(b.id, { checked: e.target.checked })} aria-label="Fait" />}
-              {b.type === 'toggle' && <button className="handle" style={{ opacity: 1 }} aria-label={b.open ? 'Replier' : 'Déplier'} onClick={() => setB(b.id, { open: !b.open })}>{b.open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}</button>}
+              {b.type === 'todo' && <input type="checkbox" style={{ marginTop: 7 }} checked={!!b.checked} disabled={disabled} onChange={e => setB(b.id, { checked: e.target.checked })} aria-label={tr("Fait")} />}
+              {b.type === 'toggle' && <button className="handle" style={{ opacity: 1 }} aria-label={b.open ? tr("Replier") : tr("Déplier")} onClick={() => setB(b.id, { open: !b.open })}>{b.open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}</button>}
               {isText && (
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <Editable value={b.text ?? ''} focusKey={fk} disabled={disabled} onFocus={() => setSelBlock(b.id)}
                     className={({ h1: 'b-h1', h2: 'b-h2', h3: 'b-h3', quote: 'b-quote', callout: 'b-callout', code: 'b-code' } as any)[b.type] + (b.type === 'todo' && b.checked ? ' done' : '')}
-                    ph={b.type === 'p' ? 'Tapez « / » pour insérer un bloc, « @ » pour mentionner' : 'Texte'}
+                    ph={b.type === 'p' ? tr("Tapez « / » pour insérer un bloc, « @ » pour mentionner") : tr("Texte")}
                     onChange={v => onText(b, v)} onKeyDown={e => onKey(b, e)} />
-                  {b.type === 'toggle' && b.open && <Editable value={b.body ?? ''} disabled={disabled} className="muted" ph="Contenu masqué" onChange={v => setB(b.id, { body: v })} />}
+                  {b.type === 'toggle' && b.open && <Editable value={b.body ?? ''} disabled={disabled} className="muted" ph={tr("Contenu masqué")} onChange={v => setB(b.id, { body: v })} />}
                   {slash?.id === b.id && (
                     <div className="menu slash" role="menu">
                       {INSERT.filter(i => (i[1] + i[2]).toLowerCase().includes(slash.q)).map(([t, l, h, I]) => (
@@ -289,34 +290,34 @@ function Editor({ id, tree, onNewChild }: { id: number; tree: any[]; onNewChild:
                   )}
                   {mention?.id === b.id && (
                     <div className="menu slash">
-                      <div className="small muted" style={{ padding: '4px 10px' }}>Personnes</div>
+                      <div className="small muted" style={{ padding: '4px 10px' }}>{tr("Personnes")}</div>
                       {mem?.members.map((m: any) => <button key={'u' + m.id} onMouseDown={e => { e.preventDefault(); insertMention(b, m.name.split(' ')[0]) }}>@{m.name}</button>)}
-                      <div className="small muted" style={{ padding: '4px 10px' }}>Pages</div>
+                      <div className="small muted" style={{ padding: '4px 10px' }}>{tr("Pages")}</div>
                       {tree.slice(0, 6).map(p => <button key={'p' + p.id} onMouseDown={e => { e.preventDefault(); insertMention(b, p.title) }}>@{p.title}</button>)}
-                      <div className="small muted" style={{ padding: '4px 10px' }}>Tâches</div>
+                      <div className="small muted" style={{ padding: '4px 10px' }}>{tr("Tâches")}</div>
                       {tasks?.filter(t => t.status !== 'done').slice(0, 6).map(t => <button key={'t' + t.id} onMouseDown={e => { e.preventDefault(); insertMention(b, `#${t.number}`) }}>#{t.number} {t.title}</button>)}
-                      <div className="small muted" style={{ padding: '4px 10px' }}>Date</div>
+                      <div className="small muted" style={{ padding: '4px 10px' }}>{tr("Date")}</div>
                       <button onMouseDown={e => { e.preventDefault(); insertMention(b, frDate(new Date().toISOString().slice(0, 10), { weekday: 'short', day: 'numeric', month: 'short' })) }}>@aujourd'hui</button>
                     </div>
                   )}
                 </div>
               )}
-              {b.type === 'divider' && <hr style={{ flex: 1, border: 0, borderTop: '1px solid var(--border)', margin: '14px 0' }} />}
+              {b.type === 'divider' && <hr style={{ flex: 1, border: 0, borderTop: tr("1px solid var(--border)"), margin: '14px 0' }} />}
               {b.type === 'table' && <TableBlock b={b} disabled={disabled} onChange={rows => setB(b.id, { rows })} />}
               {['image', 'video', 'file'].includes(b.type) && <MediaBlock b={b} disabled={disabled} onChange={p => setB(b.id, p)} />}
-              {b.type === 'columns' && <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>{(b.cols ?? ['', '']).map((c, i) => <Editable key={i} value={c} disabled={disabled} ph={`Colonne ${i + 1}`} onChange={v => setB(b.id, { cols: (b.cols ?? ['', '']).map((x, j) => (j === i ? v : x)) })} />)}</div>}
-              {b.type === 'toc' && <div style={{ flex: 1 }} className="b-callout"><div className="small muted">Sommaire</div>{headings.map(h => <div key={h.id} style={{ paddingLeft: h.type === 'h3' ? 28 : h.type === 'h2' ? 14 : 0 }}>{h.text}</div>)}</div>}
-              {b.type === 'pagelink' && <div style={{ flex: 1 }}>{b.page ? <button className="btn" onClick={() => nav(`/pages/${b.page}`)}><FileText size={16} />{tree.find(t => t.id === b.page)?.title ?? 'Page'}</button> : <select className="field" disabled={disabled} onChange={e => setB(b.id, { page: Number(e.target.value) })} defaultValue=""><option value="" disabled>Choisir une page…</option>{tree.filter(t => t.id !== id).map(t => <option key={t.id} value={t.id}>{t.title}</option>)}</select>}</div>}
-              {b.type === 'board' && <div style={{ flex: 1 }}>{b.board ? <button className="btn" style={{ width: '100%', justifyContent: 'flex-start', height: 56 }} onClick={() => nav(`/tableau/${b.board}`)}><span className="ico" style={{ width: 34, height: 34 }}><PenTool size={16} /></span>Tableau blanc · {boards?.find(x => x.id === b.board)?.title ?? ''}</button> : <select className="field" disabled={disabled} onChange={e => setB(b.id, { board: Number(e.target.value) })} defaultValue=""><option value="" disabled>Choisir un tableau…</option>{boards?.map(x => <option key={x.id} value={x.id}>{x.title}</option>)}</select>}</div>}
+              {b.type === 'columns' && <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>{(b.cols ?? ['', '']).map((c, i) => <Editable key={i} value={c} disabled={disabled} ph={tr("Colonne {0}", [i + 1])} onChange={v => setB(b.id, { cols: (b.cols ?? ['', '']).map((x, j) => (j === i ? v : x)) })} />)}</div>}
+              {b.type === 'toc' && <div style={{ flex: 1 }} className="b-callout"><div className="small muted">{tr("Sommaire")}</div>{headings.map(h => <div key={h.id} style={{ paddingLeft: h.type === 'h3' ? 28 : h.type === 'h2' ? 14 : 0 }}>{h.text}</div>)}</div>}
+              {b.type === 'pagelink' && <div style={{ flex: 1 }}>{b.page ? <button className="btn" onClick={() => nav(`/pages/${b.page}`)}><FileText size={16} />{tree.find(t => t.id === b.page)?.title ?? tr("Page")}</button> : <select className="field" disabled={disabled} onChange={e => setB(b.id, { page: Number(e.target.value) })} defaultValue=""><option value="" disabled>{tr("Choisir une page…")}</option>{tree.filter(t => t.id !== id).map(t => <option key={t.id} value={t.id}>{t.title}</option>)}</select>}</div>}
+              {b.type === 'board' && <div style={{ flex: 1 }}>{b.board ? <button className="btn" style={{ width: '100%', justifyContent: 'flex-start', height: 56 }} onClick={() => nav(`/tableau/${b.board}`)}><span className="ico" style={{ width: 34, height: 34 }}><PenTool size={16} /></span>{tr("Tableau blanc · {0}", [boards?.find(x => x.id === b.board)?.title ?? ''])}</button> : <select className="field" disabled={disabled} onChange={e => setB(b.id, { board: Number(e.target.value) })} defaultValue=""><option value="" disabled>{tr("Choisir un tableau…")}</option>{boards?.map(x => <option key={x.id} value={x.id}>{x.title}</option>)}</select>}</div>}
               {b.type === 'database' && <DatabaseBlock b={b} disabled={disabled} members={mem?.members ?? []} onChange={p => setB(b.id, p)} />}
             </div>
           )
         })}
-        {!disabled && <button className="btn ghost" style={{ alignSelf: 'flex-start', marginTop: 8 }} onClick={() => insertAfter(blocks[blocks.length - 1].id, newBlock('p'))}><Plus size={16} />Ajouter un bloc</button>}
+        {!disabled && <button className="btn ghost" style={{ alignSelf: 'flex-start', marginTop: 8 }} onClick={() => insertAfter(blocks[blocks.length - 1].id, newBlock('p'))}><Plus size={16} />{tr("Ajouter un bloc")}</button>}
       </div>
     </article>
-    <aside className="card side2" aria-label="Panneau latéral">
-      <Tabs value={panel} onChange={setPanel} items={[['comments', 'Commentaires'], ['versions', 'Versions'], ['share', 'Partage']]} />
+    <aside className="card side2" aria-label={tr("Panneau latéral")}>
+      <Tabs value={panel} onChange={setPanel} items={[['comments', tr("Commentaires")], ['versions', tr("Versions")], ['share', tr("Partage")]]} />
       <div style={{ marginTop: 16 }}>
         {panel === 'comments' && <Comments pageId={id} blocks={blocks} sel={selBlock} comments={comments ?? []} reload={reloadComments} />}
         {panel === 'versions' && <Versions pageId={id} onRestored={load} />}
@@ -332,11 +333,11 @@ function TableBlock({ b, disabled, onChange }: { b: Block; disabled: boolean; on
   return (
     <div style={{ flex: 1, overflowX: 'auto' }}>
       <table className="tbl dbtable"><tbody>{rows.map((r, i) => (
-        <tr key={i}>{r.map((c, j) => <td key={j} style={i === 0 ? { fontWeight: 500 } : {}}><input value={c} disabled={disabled} onChange={e => set(i, j, e.target.value)} aria-label={`Cellule ${i + 1}, ${j + 1}`} /></td>)}</tr>
+        <tr key={i}>{r.map((c, j) => <td key={j} style={i === 0 ? { fontWeight: 500 } : {}}><input value={c} disabled={disabled} onChange={e => set(i, j, e.target.value)} aria-label={tr("Cellule {0}, {1}", [i + 1, j + 1])} /></td>)}</tr>
       ))}</tbody></table>
       {!disabled && <div className="row" style={{ gap: 6, marginTop: 6 }}>
-        <button className="btn ghost" onClick={() => onChange([...rows, rows[0].map(() => '')])}>+ ligne</button>
-        <button className="btn ghost" onClick={() => onChange(rows.map(r => [...r, '']))}>+ colonne</button>
+        <button className="btn ghost" onClick={() => onChange([...rows, rows[0].map(() => '')])}>{tr("+ ligne")}</button>
+        <button className="btn ghost" onClick={() => onChange(rows.map(r => [...r, '']))}>{tr("+ colonne")}</button>
       </div>}
     </div>
   )
@@ -347,11 +348,11 @@ function MediaBlock({ b, disabled, onChange }: { b: Block; disabled: boolean; on
   const yt = safe?.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]{6,})/)
   return (
     <div style={{ flex: 1 }}>
-      {!safe && <input className="field" style={{ width: '100%' }} placeholder={b.type === 'image' ? "Lien https de l'image" : b.type === 'video' ? 'Lien YouTube ou vidéo (https)' : 'Lien https du fichier'} disabled={disabled} onBlur={e => onChange({ url: e.target.value.trim() })} />}
+      {!safe && <input className="field" style={{ width: '100%' }} placeholder={b.type === 'image' ? tr("Lien https de l'image") : b.type === 'video' ? tr("Lien YouTube ou vidéo (https)") : tr("Lien https du fichier")} disabled={disabled} onBlur={e => onChange({ url: e.target.value.trim() })} />}
       {safe && b.type === 'image' && <img src={safe} alt={b.text ?? ''} style={{ maxWidth: '100%', borderRadius: 12 }} />}
-      {safe && b.type === 'video' && (yt ? <iframe title="Vidéo" src={`https://www.youtube-nocookie.com/embed/${yt[1]}`} style={{ width: '100%', aspectRatio: '16/9', border: 0, borderRadius: 12 }} allowFullScreen sandbox="allow-scripts allow-same-origin allow-presentation" /> : <video src={safe} controls style={{ width: '100%', borderRadius: 12 }} />)}
+      {safe && b.type === 'video' && (yt ? <iframe title={tr("Vidéo")} src={`https://www.youtube-nocookie.com/embed/${yt[1]}`} style={{ width: '100%', aspectRatio: '16/9', border: 0, borderRadius: 12 }} allowFullScreen sandbox={tr("allow-scripts allow-same-origin allow-presentation")} /> : <video src={safe} controls style={{ width: '100%', borderRadius: 12 }} />)}
       {safe && b.type === 'file' && <a className="btn" href={safe} target="_blank" rel="noopener noreferrer"><Paperclip size={16} />{safe.split('/').pop()}</a>}
-      {safe && !disabled && <button className="link small" style={{ marginLeft: 8 }} onClick={() => onChange({ url: '' })}>Changer</button>}
+      {safe && !disabled && <button className="link small" style={{ marginLeft: 8 }} onClick={() => onChange({ url: '' })}>{tr("Changer")}</button>}
     </div>
   )
 }
@@ -369,27 +370,27 @@ function DatabaseBlock({ b, disabled, members, onChange }: { b: Block; disabled:
   const setRows = (r: any[]) => onChange({ rows: r } as any)
   const setCell = (rid: string, k: string, v: any) => setRows(rows.map(r => (r.id === rid ? { ...r, [k]: v } : r)))
   const addRow = (extra: any = {}) => setRows([...rows, { id: uid(), ...extra }])
-  const groups = statusCol ? Array.from(new Set(rows.map(r => r[statusCol.key] || 'Sans statut'))) : []
+  const groups = statusCol ? Array.from(new Set(rows.map(r => r[statusCol.key] || tr("Sans statut")))) : []
   const cell = (r: any, c: any) => {
     if (c.type === 'checkbox') return <input type="checkbox" checked={!!r[c.key]} disabled={disabled} onChange={e => setCell(r.id, c.key, e.target.checked)} />
     if (c.type === 'person') return <select className="field" style={{ height: 32 }} value={r[c.key] ?? ''} disabled={disabled} onChange={e => setCell(r.id, c.key, e.target.value)}><option value="" />{members.map(m => <option key={m.id} value={m.name.split(' ')[0]}>{m.name}</option>)}</select>
     return <input type={c.type === 'number' ? 'number' : c.type === 'date' ? 'date' : 'text'} value={r[c.key] ?? ''} disabled={disabled} onChange={e => setCell(r.id, c.key, c.type === 'number' ? Number(e.target.value) : e.target.value)} aria-label={c.label} />
   }
   return (
-    <div style={{ flex: 1, border: '1px solid var(--border)', borderRadius: 14, padding: 14, minWidth: 0 }}>
+    <div style={{ flex: 1, border: tr("1px solid var(--border)"), borderRadius: 14, padding: 14, minWidth: 0 }}>
       <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
-        <input className="field" style={{ fontWeight: 500, border: 0, padding: 0, height: 30 }} value={b.title ?? ''} disabled={disabled} onChange={e => onChange({ title: e.target.value })} aria-label="Nom de la base" />
+        <input className="field" style={{ fontWeight: 500, border: 0, padding: 0, height: 30 }} value={b.title ?? ''} disabled={disabled} onChange={e => onChange({ title: e.target.value })} aria-label={tr("Nom de la base")} />
         <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
-          <input className="field" style={{ height: 32, width: 140 }} placeholder="Filtrer" value={filter} onChange={e => setFilter(e.target.value)} />
-          <select className="field" style={{ height: 32 }} value={sort ?? ''} onChange={e => setSort(e.target.value || null)} aria-label="Trier"><option value="">Tri</option>{cols.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}</select>
+          <input className="field" style={{ height: 32, width: 140 }} placeholder={tr("Filtrer")} value={filter} onChange={e => setFilter(e.target.value)} />
+          <select className="field" style={{ height: 32 }} value={sort ?? ''} onChange={e => setSort(e.target.value || null)} aria-label={tr("Trier")}><option value="">{tr("Tri")}</option>{cols.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}</select>
         </div>
       </div>
       <div className="tabs" style={{ marginBottom: 10 }}>
-        {[['table', 'Tableau'], ['kanban', 'Kanban'], ['calendar', 'Calendrier'], ['timeline', 'Chronologie'], ['gallery', 'Galerie'], ['list', 'Liste']].map(([k, l]) => <button key={k} className={view === k ? 'on' : ''} onClick={() => onChange({ view: k })}>{l}</button>)}
+        {[['table', tr("Tableau")], ['kanban', tr("Kanban")], ['calendar', tr("Calendrier")], ['timeline', tr("Chronologie")], ['gallery', tr("Galerie")], ['list', tr("Liste")]].map(([k, l]) => <button key={k} className={view === k ? 'on' : ''} onClick={() => onChange({ view: k })}>{l}</button>)}
       </div>
       {view === 'table' && <div style={{ overflowX: 'auto' }}><table className="tbl dbtable"><thead><tr>{cols.map(c => <th key={c.key}>{c.label}</th>)}</tr></thead><tbody>{vis.map(r => <tr key={r.id}>{cols.map(c => <td key={c.key}>{cell(r, c)}</td>)}</tr>)}</tbody></table></div>}
       {view === 'kanban' && statusCol && <div className="dbk">{groups.map(g => <div key={g} className="dbcol" onDragOver={e => e.preventDefault()} onDrop={e => setCell(e.dataTransfer.getData('text/plain'), statusCol.key, g)}><span className="badge">{g}</span>{vis.filter(r => (r[statusCol.key] || 'Sans statut') === g).map(r => <div key={r.id} className="dbcard" draggable onDragStart={e => e.dataTransfer.setData('text/plain', r.id)}><b style={{ fontWeight: 500 }}>{r[cols[0].key]}</b></div>)}</div>)}</div>}
-      {view === 'calendar' && <div className="dbk">{dateCol ? [...vis].sort((a, c) => String(a[dateCol.key]).localeCompare(String(c[dateCol.key]))).map(r => <div key={r.id} className="dbcard row"><div style={{ width: 52, textAlign: 'center' }}><b style={{ fontSize: 18, fontWeight: 500 }}>{r[dateCol.key] ? new Date(r[dateCol.key] + 'T12:00').getDate() : '—'}</b><div className="small muted">{frDate(r[dateCol.key], { month: 'short' })}</div></div><span>{r[cols[0].key]}</span></div>) : <p className="muted">Ajoutez une propriété date.</p>}</div>}
+      {view === 'calendar' && <div className="dbk">{dateCol ? [...vis].sort((a, c) => String(a[dateCol.key]).localeCompare(String(c[dateCol.key]))).map(r => <div key={r.id} className="dbcard row"><div style={{ width: 52, textAlign: 'center' }}><b style={{ fontSize: 18, fontWeight: 500 }}>{r[dateCol.key] ? new Date(r[dateCol.key] + 'T12:00').getDate() : '—'}</b><div className="small muted">{frDate(r[dateCol.key], { month: 'short' })}</div></div><span>{r[cols[0].key]}</span></div>) : <p className="muted">{tr("Ajoutez une propriété date.")}</p>}</div>}
       {view === 'timeline' && dateCol && (() => {
         const ds = vis.map(r => r[dateCol.key]).filter(Boolean).sort(); const min = new Date((ds[0] ?? '2026-01-01') + 'T12:00').getTime(); const max = new Date((ds[ds.length - 1] ?? '2026-01-02') + 'T12:00').getTime() + 864e5 * 7
         return <div className="stack" style={{ gap: 6 }}>{vis.map(r => { const x = r[dateCol.key] ? (new Date(r[dateCol.key] + 'T12:00').getTime() - min) / (max - min) : 0; return <div key={r.id} className="row"><span className="small" style={{ width: 160 }}>{r[cols[0].key]}</span><div style={{ flex: 1, position: 'relative', height: 22, background: 'var(--hover)', borderRadius: 6 }}><div style={{ position: 'absolute', left: `${x * 100}%`, width: '12%', top: 0, bottom: 0, background: 'var(--text)', borderRadius: 6 }} /></div></div> })}</div>
@@ -397,9 +398,9 @@ function DatabaseBlock({ b, disabled, members, onChange }: { b: Block; disabled:
       {view === 'gallery' && <div className="dbk">{vis.map(r => <div key={r.id} className="dbcard"><div style={{ height: 60, background: 'var(--hover)', borderRadius: 8, marginBottom: 8 }} /><b style={{ fontWeight: 500 }}>{r[cols[0].key]}</b>{cols.slice(1, 3).map(c => <div key={c.key} className="small muted">{String(r[c.key] ?? '')}</div>)}</div>)}</div>}
       {view === 'list' && <div className="list">{vis.map(r => <div key={r.id} className="li"><span style={{ flex: 1 }}>{r[cols[0].key]}</span>{statusCol && <span className="badge">{r[statusCol.key]}</span>}</div>)}</div>}
       {!disabled && <div className="row" style={{ gap: 6, marginTop: 8 }}>
-        <button className="btn ghost" onClick={() => addRow()}>+ élément</button>
-        <select className="field" style={{ height: 32 }} value="" onChange={e => { const t = e.target.value; if (t) onChange({ columns: [...cols, { key: uid(), label: 'Propriété', type: t }] }) }} aria-label="Ajouter une propriété">
-          <option value="">+ propriété</option>{['text', 'number', 'select', 'status', 'date', 'person', 'checkbox', 'url', 'file', 'relation', 'rollup', 'formula'].map(t => <option key={t} value={t}>{t}</option>)}
+        <button className="btn ghost" onClick={() => addRow()}>{tr("+ élément")}</button>
+        <select className="field" style={{ height: 32 }} value="" onChange={e => { const t = e.target.value; if (t) onChange({ columns: [...cols, { key: uid(), label: tr("Propriété"), type: t }] }) }} aria-label={tr("Ajouter une propriété")}>
+          <option value="">{tr("+ propriété")}</option>{['text', 'number', 'select', 'status', 'date', 'person', 'checkbox', 'url', 'file', 'relation', 'rollup', 'formula'].map(t => <option key={t} value={t}>{t}</option>)}
         </select>
       </div>}
     </div>
@@ -417,17 +418,17 @@ function Comments({ pageId, blocks, sel, comments, reload }: { pageId: number; b
       const res = list.every(c => c.resolved)
       return (
         <div key={bid} className="thread" style={{ opacity: res ? 0.55 : 1 }}>
-          <div className="small muted" style={{ marginBottom: 6 }}>Sur « {(blocks.find(b => b.id === bid)?.text ?? 'bloc supprimé').slice(0, 50)}… »</div>
+          <div className="small muted" style={{ marginBottom: 6 }}>{tr("Sur « {0}… »", [(blocks.find(b => b.id === bid)?.text ?? tr("bloc supprimé")).slice(0, 50)])}</div>
           {list.map(c => <div key={c.id} className="row" style={{ alignItems: 'flex-start', padding: '6px 0' }}><Avatar name={c.who} small /><div><b style={{ fontWeight: 500 }}>{c.who?.split(' ')[0]}</b> <span className="small muted">{ago(c.at)}</span><div>{c.body}</div></div></div>)}
-          <button className="btn ghost" onClick={async () => { await api.post(`/api/comments/${list[list.length - 1].id}/resolve`); reload() }}>{res ? 'Rouvrir' : 'Résoudre'}</button>
+          <button className="btn ghost" onClick={async () => { await api.post(`/api/comments/${list[list.length - 1].id}/resolve`); reload() }}>{res ? tr("Rouvrir") : tr("Résoudre")}</button>
         </div>
       )
     })}
     {sel ? <form className="stack" onSubmit={async e => { e.preventDefault(); if (!body.trim()) return; try { await api.post(`/api/pages/${pageId}/comments`, { block: sel, body }); setBody(''); reload() } catch (er: any) { toast(er.message, true) } }}>
-      <div className="small muted">Commenter « {(selText ?? '').slice(0, 40)} »</div>
-      <textarea className="field" style={{ minHeight: 70, padding: 10 }} value={body} onChange={e => setBody(e.target.value)} placeholder="Votre commentaire, @ pour mentionner" />
-      <button className="btn pri">Commenter</button>
-    </form> : <p className="small muted">Cliquez un bloc pour le commenter.</p>}
+      <div className="small muted">{tr("Commenter « {0} »", [(selText ?? '').slice(0, 40)])}</div>
+      <textarea className="field" style={{ minHeight: 70, padding: 10 }} value={body} onChange={e => setBody(e.target.value)} placeholder={tr("Votre commentaire, @ pour mentionner")} />
+      <button className="btn pri">{tr("Commenter")}</button>
+    </form> : <p className="small muted">{tr("Cliquez un bloc pour le commenter.")}</p>}
   </>
 }
 
@@ -437,12 +438,12 @@ function Versions({ pageId, onRestored }: { pageId: number; onRestored: () => vo
   return <>
     <div className="list">
       {data?.map(v => (
-        <div key={v.id} className="li"><Avatar name={v.who} small /><div style={{ flex: 1, minWidth: 0 }}><div>Version {v.version}</div><div className="small muted">{frDate(v.at, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · <span className="mono">{v.sha256.slice(0, 10)}</span></div></div>
-          {canEdit && <button className="btn" onClick={async () => { try { await api.post(`/api/pages/${pageId}/versions/${v.id}/restore`); toast('Version restaurée'); onRestored(); reload() } catch (e: any) { toast(e.message, true) } }}><History size={16} />Restaurer</button>}</div>
+        <div key={v.id} className="li"><Avatar name={v.who} small /><div style={{ flex: 1, minWidth: 0 }}><div>{tr("Version {0}", [v.version])}</div><div className="small muted">{frDate(v.at, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · <span className="mono">{v.sha256.slice(0, 10)}</span></div></div>
+          {canEdit && <button className="btn" onClick={async () => { try { await api.post(`/api/pages/${pageId}/versions/${v.id}/restore`); toast(tr("Version restaurée")); onRestored(); reload() } catch (e: any) { toast(e.message, true) } }}><History size={16} />{tr("Restaurer")}</button>}</div>
       ))}
     </div>
-    <p className="small muted">Chaque version est horodatée par le serveur avec une empreinte SHA-256 : c'est une preuve d'antériorité contre les copies de map.</p>
-    <a className="btn" style={{ width: '100%' }} href={`/api/pages/${pageId}/proof`}><Download size={16} />Exporter l'historique daté</a>
+    <p className="small muted">{tr("Chaque version est horodatée par le serveur avec une empreinte SHA-256 : c'est une preuve d'antériorité contre les copies de map.")}</p>
+    <a className="btn" style={{ width: '100%' }} href={`/api/pages/${pageId}/proof`}><Download size={16} />{tr("Exporter l'historique daté")}</a>
   </>
 }
 
@@ -453,14 +454,14 @@ function Share({ page, setPage }: { page: any; setPage: (p: any) => void }) {
     try { const r = await api.patch(`/api/pages/${page.id}`, { share }); setPage({ ...page, share }); if (r.link) setLink(location.origin + r.link) } catch (e: any) { toast(e.message, true) }
   }
   return <div className="stack">
-    {[['private', 'Privé', 'Vous seul'], ['team', 'Équipe', 'Tous les membres du studio'], ['link', 'Lien en lecture', 'Toute personne qui a le lien']].map(([k, l, d]) => (
-      <label key={k} className="row" style={{ border: '1px solid var(--border)', borderRadius: 12, padding: '10px 12px', alignItems: 'flex-start', cursor: 'pointer' }}>
+    {[['private', tr("Privé"), tr("Vous seul")], ['team', tr("Équipe"), tr("Tous les membres du studio")], ['link', tr("Lien en lecture"), tr("Toute personne qui a le lien")]].map(([k, l, d]) => (
+      <label key={k} className="row" style={{ border: tr("1px solid var(--border)"), borderRadius: 12, padding: '10px 12px', alignItems: 'flex-start', cursor: 'pointer' }}>
         <input type="radio" name="share" checked={page.share === k} disabled={!canEdit} onChange={() => set(k)} /><span><span style={{ display: 'block' }}>{l}</span><span className="small muted">{d}</span></span>
       </label>
     ))}
-    {link && <div className="stack" style={{ gap: 6 }}><span className="small muted">Lien de lecture (copiez-le maintenant, il ne sera plus affiché) :</span><input className="field mono" readOnly value={link} onFocus={e => e.target.select()} /></div>}
-    {page.share === 'link' && !link && <p className="small muted">Un lien est actif. Repassez en « Équipe » pour le désactiver, puis en « Lien » pour en créer un nouveau.</p>}
-    <div className="row"><a className="btn" style={{ flex: 1 }} href={`/api/pages/${page.id}/export.md`}><Download size={16} />Markdown</a><button className="btn" style={{ flex: 1 }} onClick={() => window.print()}><Share2 size={16} />PDF</button></div>
+    {link && <div className="stack" style={{ gap: 6 }}><span className="small muted">{tr("Lien de lecture (copiez-le maintenant, il ne sera plus affiché) :")}</span><input className="field mono" readOnly value={link} onFocus={e => e.target.select()} /></div>}
+    {page.share === 'link' && !link && <p className="small muted">{tr("Un lien est actif. Repassez en « Équipe » pour le désactiver, puis en « Lien » pour en créer un nouveau.")}</p>}
+    <div className="row"><a className="btn" style={{ flex: 1 }} href={`/api/pages/${page.id}/export.md`}><Download size={16} />{tr("Markdown")}</a><button className="btn" style={{ flex: 1 }} onClick={() => window.print()}><Share2 size={16} />PDF</button></div>
   </div>
 }
 
@@ -472,13 +473,13 @@ function Trash() {
   useLive(['pages', 'boards'], () => open && reload())
   const can = ['owner', 'admin', 'member'].includes(role)
   return <>
-    <button className="titem" style={{ marginTop: 10 }} onClick={() => setOpen(o => !o)}><Trash2 size={14} />Corbeille{data ? ` (${data.pages.length})` : ''}</button>
+    <button className="titem" style={{ marginTop: 10 }} onClick={() => setOpen(o => !o)}><Trash2 size={14} />{tr("Corbeille{0}", [data ? ` (${data.pages.length})` : ''])}</button>
     {open && <div className="stack" style={{ gap: 2, paddingLeft: 8 }}>
-      {data?.pages.length === 0 && <span className="small muted" style={{ padding: '4px 8px' }}>Vide</span>}
+      {data?.pages.length === 0 && <span className="small muted" style={{ padding: '4px 8px' }}>{tr("Vide")}</span>}
       {data?.pages.map((p: any) => <div key={p.id} className="row small" style={{ gap: 4 }}>
-        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`Supprimée ${ago(p.deleted_at)}`}>{p.title || 'Sans titre'}</span>
-        {can && <button className="iconbtn" style={{ width: 28, height: 28 }} aria-label="Restaurer" title="Restaurer" onClick={async () => { await api.post(`/api/pages/${p.id}/restore`); reload(); nav(`/pages/${p.id}`) }}><RotateCcw size={14} /></button>}
-        {can && <button className="iconbtn" style={{ width: 28, height: 28 }} aria-label="Supprimer définitivement" title="Supprimer définitivement" onClick={async () => { if (confirm(`Supprimer définitivement « ${p.title} » ? Impossible à annuler.`)) { try { await api.del(`/api/pages/${p.id}?purge=true`); reload() } catch (e: any) { toast(e.message, true) } } }}><X size={14} /></button>}
+        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={tr("Supprimée {0}", [ago(p.deleted_at)])}>{p.title || tr("Sans titre")}</span>
+        {can && <button className="iconbtn" style={{ width: 28, height: 28 }} aria-label={tr("Restaurer")} title={tr("Restaurer")} onClick={async () => { await api.post(`/api/pages/${p.id}/restore`); reload(); nav(`/pages/${p.id}`) }}><RotateCcw size={14} /></button>}
+        {can && <button className="iconbtn" style={{ width: 28, height: 28 }} aria-label={tr("Supprimer définitivement")} title={tr("Supprimer définitivement")} onClick={async () => { if (confirm(tr("Supprimer définitivement « {0} » ? Impossible à annuler.", [p.title]))) { try { await api.del(`/api/pages/${p.id}?purge=true`); reload() } catch (e: any) { toast(e.message, true) } } }}><X size={14} /></button>}
       </div>)}
     </div>}
   </>
