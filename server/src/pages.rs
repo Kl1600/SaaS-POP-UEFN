@@ -17,6 +17,41 @@ fn b(t: &str, text: &str) -> Value {
     json!({ "id": random_token()[..10].to_string(), "type": t, "text": text })
 }
 
+/// Fiche d'une idée de map (onglet Idées → « Je me lance »), écrite à partir des chiffres de la niche.
+pub fn idea_blocks(d: &Value) -> Value {
+    let n = |k: &str| d[k].as_f64();
+    let pct = |v: Option<f64>| v.map(|x| format!("{} %", (x * 100.0).round())).unwrap_or("—".into());
+    let num = |v: Option<f64>| v.map(|x| format!("{}", x.round() as i64)).unwrap_or("—".into());
+    let mut v = vec![
+        b("callout", &format!("Idée tirée de l’analyse du marché POP, le {}. Note d’opportunité : {}/100.", d["generated_day"].as_str().unwrap_or(""), num(n("score")))),
+        b("h1", "Pourquoi cette niche"),
+        b("bullet", &format!("{} maps jouées hier, {} joueurs au total ; une map typique en a {}.", num(n("islands")), num(n("players")), num(n("typical")))),
+        b("bullet", &format!("Temps de jeu moyen : {} min (une map typique de Fortnite : {} min). Retour à J+1 : {}.", num(n("minutes")), num(d["eco"]["minutes"].as_f64()), pct(n("d1")))),
+        b("bullet", &format!("Maps sorties depuis 30 jours : {}, dont {} au-dessus de 100 joueurs et {} au-dessus de 1 000.", num(n("newcomers")), num(n("success100")), num(n("success1000")))),
+        b("bullet", &format!("Les 3 premières maps prennent {} % des joueurs.", num(n("top3_share")))),
+        b("h2", "Chiffres à battre"),
+        b("todo", &format!("Temps de jeu moyen d’au moins {} min", num(d["targets"]["minutes"].as_f64()))),
+        b("todo", &format!("Retour à J+1 d’au moins {}", pct(d["targets"]["d1"].as_f64()))),
+        b("h2", "Maps à étudier"),
+    ];
+    for m in d["study"].as_array().cloned().unwrap_or_default() {
+        v.push(b("bullet", &format!("{} ({}) : {} joueurs hier", m["title"].as_str().unwrap_or(""), m["code"].as_str().unwrap_or(""), m["players"].as_i64().unwrap_or(0))));
+    }
+    if let Some(m) = d["best_new"].as_object() {
+        v.push(b("bullet", &format!("Meilleure nouvelle venue : {} ({}), jusqu’à {} joueurs", m["title"].as_str().unwrap_or(""), m["code"].as_str().unwrap_or(""), m["players"].as_i64().unwrap_or(0))));
+    }
+    let tw: Vec<String> = d["twists"].as_array().cloned().unwrap_or_default().iter().map(|t| format!("{} ({} maps le font déjà)", t["fr"].as_str().unwrap_or(""), t["maps_together"].as_i64().unwrap_or(0))).collect();
+    if !tw.is_empty() { v.push(b("h2", "Idées de twist")); for t in tw { v.push(b("bullet", &format!("Croiser avec : {t}"))) } }
+    v.push(b("h2", "Pièges à éviter"));
+    let words: Vec<String> = d["title_words"].as_array().cloned().unwrap_or_default().iter().filter_map(|w| w.as_str().map(String::from)).collect();
+    if !words.is_empty() { v.push(b("bullet", &format!("Titres déjà très repris : {}. Un titre trop proche d’une map existante est moins montré dans Discover.", words.join(", ")))) }
+    v.push(b("bullet", "Vignette originale qui montre le vrai jeu : pas de fond uni ou en dégradé, pas d’armes collées, pas de badges d’Epic."));
+    v.push(b("bullet", &format!("Genre à choisir dans le Creator Portal : {}.", d["genre"].as_str().unwrap_or(""))));
+    v.push(b("h2", "Pitch"));
+    v.push(b("p", "En une phrase : qui joue, pour faire quoi, et ce qui change par rapport aux maps à étudier."));
+    json!(v)
+}
+
 /// Modèles UEFN prêts à remplir.
 pub fn template(key: &str) -> Option<(&'static str, &'static str, Vec<Value>)> {
     Some(match key {
@@ -128,7 +163,7 @@ pub async fn create(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64
     Ok(Json(json!({ "id": id })))
 }
 
-async fn snapshot(st: &AppState, pid: i64, version: i64, title: &str, blocks: &str, uid: i64) -> Result<(), AppError> {
+pub async fn snapshot(st: &AppState, pid: i64, version: i64, title: &str, blocks: &str, uid: i64) -> Result<(), AppError> {
     // L'empreinte SHA-256 horodatée sert de preuve d'antériorité.
     let digest = sha256_hex(&format!("{pid}|{version}|{title}|{blocks}"));
     sqlx::query("INSERT INTO page_versions (page_id, version, title, blocks, user_id, sha256) VALUES (?, ?, ?, ?, ?, ?)")

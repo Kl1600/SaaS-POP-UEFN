@@ -19,6 +19,7 @@ import { PageHead } from './components/ui'
 import Help from './pages/Help'
 import AI from './pages/AI'
 import { Market, Trending, Launches } from './pages/Analysis'
+import Ideas from './pages/Ideas'
 import { AnalyseGate, AnalyseVideos, StudioMarket } from './components/Access'
 import { tr } from './i18n/t'
 const Landing = lazy(() => import('./pages/Landing'))
@@ -66,6 +67,7 @@ function Gate() {
         <Route path="aide" element={<Help />} />
         <Route path="admin" element={L(Admin)} />
         <Route path="parametres" element={<main className="content"><PageHead title={tr("Paramètres")} help={tr("Votre compte : nom, mot de passe, données personnelles.")} /><Account /></main>} />
+        <Route path="analyse/idees" element={<AnalyseGate title={tr("Idées de maps")}><Ideas /></AnalyseGate>} />
         <Route path="analyse/marche" element={<AnalyseGate title={tr("Analyse du marché")}><Market /></AnalyseGate>} />
         <Route path="analyse/tendances" element={<AnalyseGate title={tr("Maps qui marchent")}><Trending /></AnalyseGate>} />
         <Route path="analyse/lancements" element={<AnalyseGate title={tr("Meilleurs démarrages")}><Launches /></AnalyseGate>} />

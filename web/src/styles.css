@@ -640,3 +640,56 @@ body.wb-fs .side,body.wb-fs .top{visibility:hidden}
   .locked p { max-width: 520px; margin: 0; line-height: 1.55; }
   .locked-ic { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: var(--soft, rgba(0,0,0,.05)); }
 }
+
+/* ---------- Idées de maps ---------- */
+@layer app {
+  .igrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+  .icard { display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }
+  .icard:hover, .icard:focus-visible { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,.08); outline: none; }
+  .icard.fresh { animation: ipopin .45s ease both; }
+  @keyframes ipopin { from { opacity: 0; transform: translateY(10px) scale(.98) } to { opacity: 1; transform: none } }
+  .icard-top, .idrawer-head { position: relative; padding: 14px 16px; min-height: 104px; color: #fff;
+    background: linear-gradient(135deg, hsl(var(--h) 70% 42%), hsl(calc(var(--h) + 35) 75% 55%)); }
+  .icard-top .iring { position: absolute; right: 12px; bottom: 8px; }
+  .icard-top .ispark { position: absolute; left: 16px; right: 70px; bottom: 10px; height: 30px; width: auto; opacity: .85; }
+  .icard-genre { display: inline-block; font-size: 12px; font-weight: 500; padding: 3px 9px; border-radius: 999px; background: rgba(255,255,255,.2); }
+  .icard-new { margin-left: 6px; display: inline-block; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: #fff; color: hsl(var(--h) 70% 35%); }
+  .icard-body { padding: 14px 16px 6px; display: grid; gap: 8px; flex: 1; }
+  .icard-body h3 { margin: 0; font-size: 17px; font-weight: 600; line-height: 1.3; }
+  .icard-hook { margin: 0; font-size: 14px; color: var(--text2); line-height: 1.45; }
+  .icard-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+  .icard-stats { display: flex; flex-wrap: wrap; gap: 12px; font-size: 13px; color: var(--text2); margin-top: 2px; }
+  .icard-stats span { display: inline-flex; align-items: center; gap: 4px; }
+  .icard-foot { display: flex; justify-content: space-between; padding: 10px 16px 14px; }
+  .icard-save.on { color: #e5484d; }
+  .icard-save.on svg { fill: currentColor; }
+  .idrawer { width: min(640px, 100%); padding: 0; }
+  .idrawer > :not(.idrawer-head) { margin-left: 24px; margin-right: 24px; }
+  .idrawer-head { padding: 18px 24px 20px; }
+  .idrawer-head h2 { margin: 0; font-size: 22px; font-weight: 600; }
+  .idrawer-head .iconbtn { color: #fff; }
+  .ihook { font-size: 16px; line-height: 1.5; margin-top: 16px; margin-bottom: 10px; }
+  .iaxis { display: grid; grid-template-columns: 120px 1fr 34px; align-items: center; gap: 10px; margin: 8px 0; font-size: 14px; }
+  .iaxis-bar { height: 8px; border-radius: 99px; background: var(--hover); overflow: hidden; }
+  .iaxis-bar i { display: block; height: 100%; border-radius: 99px; background: var(--text); }
+  .iaxis-v { text-align: right; font-variant-numeric: tabular-nums; color: var(--text2); }
+  .ifacts { margin: 10px 0 0; padding-left: 18px; display: grid; gap: 6px; line-height: 1.5; font-size: 14px; }
+  .itargets { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .itargets > div { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; display: grid; gap: 2px; }
+  .itargets b { font-size: 22px; font-weight: 600; }
+  .itargets span { font-size: 13px; color: var(--text2); }
+  .ilink { display: grid; gap: 2px; text-align: left; width: 100%; border: 1px solid var(--border); background: var(--surface); border-radius: 12px; padding: 10px 12px; cursor: pointer; font: inherit; color: var(--text); }
+  .ilink:hover { background: var(--hover); }
+  .itwist { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; line-height: 1.5; margin: 6px 0; }
+  .itwist svg { flex: none; margin-top: 2px; }
+  .iprofile .label { display: grid; gap: 6px; }
+  .iprofile .field { width: 160px; }
+  .chip.on.off { background: #e5484d; border-color: #e5484d; color: #fff; }
+  .iprofile-line { margin-top: -6px; margin-bottom: -6px; }
+  .ipop { position: fixed; right: 20px; bottom: 20px; z-index: 60; display: flex; align-items: center; gap: 12px; max-width: 420px; padding: 12px 12px 12px 14px;
+    background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 16px 40px rgba(0,0,0,.18); animation: ipopup .35s cubic-bezier(.2,.9,.3,1.2) both; }
+  @keyframes ipopup { from { opacity: 0; transform: translateY(24px) scale(.96) } to { opacity: 1; transform: none } }
+  .ipop-ic { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: #ffb224; color: #fff; flex: none; }
+  .ipop-txt { display: grid; gap: 2px; font-size: 14px; flex: 1; min-width: 0; }
+  .ipop-txt span { color: var(--text2); }
+}

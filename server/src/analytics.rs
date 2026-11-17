@@ -242,7 +242,7 @@ pub async fn crawler(st: AppState) {
     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
     loop {
         match crawl(&st).await {
-            Ok(m) => tracing::info!("analyse Fortnite : {m}"),
+            Ok(m) => { tracing::info!("analyse Fortnite : {m}"); crate::ideas::refresh_all(&st).await }
             Err(e) => {
                 tracing::warn!("analyse Fortnite : {e}");
                 let _ = sqlx::query("UPDATE fn_status SET last_error = ? WHERE id = 1").bind(&e).execute(&st.db).await;

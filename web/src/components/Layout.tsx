@@ -2,7 +2,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import {
   Home, FileText, PenTool, CalendarDays, KanbanSquare, Rocket, Coins, Users, Settings, LifeBuoy, PanelLeft,
-  Search, Moon, Sun, Bell, Plus, ChevronDown, Hexagon, LogOut, ListTree, Bot, ChartNoAxesCombined, Hash, Flame, Sparkle, Layers, LayoutGrid, Lock,
+  Search, Moon, Sun, Bell, Plus, ChevronDown, Hexagon, LogOut, ListTree, Bot, ChartNoAxesCombined, Hash, Flame, Sparkle, Layers, LayoutGrid, Lock, Lightbulb,
 } from 'lucide-react'
 import { useApp, studioName } from '../state'
 import { ago, api } from '../api'
@@ -15,6 +15,7 @@ import { tr, tx } from '../i18n/t'
 import LangPicker from './LangPicker'
 import { MapSwitcher, CreateHost, openCreate } from './MapSwitcher'
 import { useNav } from '../routes'
+import { IdeaPop } from '../pages/Ideas'
 
 type Item = [string, string, any]
 /** Onglets de la map (changent quand on change de map). Le premier groupe n'a pas de titre. */
@@ -26,6 +27,7 @@ const mapGroups = (mid: number): [string, Item[]][] => [
 ]
 /** Catégorie Analyse (plan du compte). */
 const analyseItems = (): Item[] => [
+  ['/analyse/idees', tr("Idées de maps"), Lightbulb],
   ['/analyse/marche', tr("Marché"), ChartNoAxesCombined], ['/analyse/tendances', tr("Maps qui marchent"), Flame],
   ['/analyse/lancements', tr("Meilleurs démarrages"), Sparkle], ['/analyse/videos', tr("Tendances vidéo"), Hash],
 ]
@@ -142,6 +144,7 @@ export default function Layout() {
       {guide && <GuideDrawer key={guide.ask ?? 'day'} ask={guide.ask} onClose={() => setGuide(false)} />}
       {newTask && <NewTaskModal onClose={() => setNewTask(false)} />}
       <CreateHost />
+      <IdeaPop />
     </div>
   )
 }

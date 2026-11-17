@@ -4,6 +4,7 @@ mod security;
 mod admin;
 mod analytics;
 mod billing;
+mod ideas;
 mod ai;
 mod mail;
 mod manage;
@@ -130,6 +131,11 @@ fn api() -> Router<AppState> {
         .route("/api/notifications/read", post(account::read_notifications))
         .route("/api/studios/{sid}/members/{uid}/reset-link", post(account::admin_reset_link))
         .route("/api/maps/{mid}/search", get(account::search))
+        .route("/api/ideas", get(ideas::list))
+        .route("/api/ideas/niches", get(ideas::all_niches))
+        .route("/api/ideas/profile", axum::routing::put(ideas::save_profile))
+        .route("/api/ideas/{id}/state", post(ideas::set_state))
+        .route("/api/ideas/{id}/start", post(ideas::start))
         .route("/api/analytics/status", get(analytics::status))
         .route("/api/analytics/refresh", post(analytics::refresh))
         .route("/api/analytics/trending", get(analytics::trending))
