@@ -82,14 +82,16 @@ fn totp_at(secret: &[u8], counter: u64) -> u32 {
     let bin = ((h[o] as u32 & 0x7f) << 24) | ((h[o + 1] as u32) << 16) | ((h[o + 2] as u32) << 8) | h[o + 3] as u32;
     bin % 1_000_000
 }
-/// Vérifie un code à 6 chiffres, avec une tolérance de ±30 s pour les horloges décalées.
-pub fn totp_ok(secret_b32: &str, code: &str) -> bool {
+/// Pas de temps TOTP (30 s) qui correspond au code, avec une tolérance de ±30 s pour les horloges décalées.
+pub fn totp_match(secret_b32: &str, code: &str, now_step: u64) -> Option<u64> {
     let code: String = code.chars().filter(|c| c.is_ascii_digit()).collect();
-    if code.len() != 6 { return false }
-    let Ok(secret) = data_encoding::BASE32_NOPAD.decode(secret_b32.as_bytes()) else { return false };
-    let Ok(want) = code.parse::<u32>() else { return false };
-    let now = chrono::Utc::now().timestamp() as u64 / 30;
-    (now.saturating_sub(1)..=now + 1).any(|c| totp_at(&secret, c) == want)
+    if code.len() != 6 { return None }
+    let secret = data_encoding::BASE32_NOPAD.decode(secret_b32.as_bytes()).ok()?;
+    let want = code.parse::<u32>().ok()?;
+    (now_step.saturating_sub(1)..=now_step + 1).find(|c| totp_at(&secret, *c) == want)
+}
+fn now_step() -> u64 {
+    chrono::Utc::now().timestamp() as u64 / 30
 }
 fn new_secret() -> String {
     use rand::RngCore;
@@ -99,9 +101,18 @@ fn new_secret() -> String {
 }
 
 /// Vérifie un code de double authentification ou un code de secours (consommé s'il est utilisé).
+/// Un code TOTP ne sert qu'une fois (#15) : son pas de temps doit être plus récent que le dernier accepté,
+/// sinon la réponse est une erreur « Code déjà utilisé ».
 pub async fn check_second_factor(st: &AppState, uid: i64, code: &str) -> Result<bool, AppError> {
     let (secret, recovery): (Option<String>, String) = sqlx::query_as("SELECT totp_secret, recovery FROM users WHERE id = ? AND totp_enabled = 1").bind(uid).fetch_optional(&st.db).await?.unwrap_or((None, "[]".into()));
-    if let Some(s) = &secret { if totp_ok(s, code) { return Ok(true) } }
+    if let Some(step) = secret.as_deref().and_then(|s| totp_match(s, code, now_step())) {
+        // Mise à jour conditionnelle : deux requêtes simultanées avec le même code ne passent pas toutes les deux.
+        let fresh = sqlx::query("UPDATE users SET totp_last_step = ? WHERE id = ? AND totp_last_step < ?").bind(step as i64).bind(uid).bind(step as i64).execute(&st.db).await?.rows_affected();
+        if fresh == 0 {
+            return Err(bad("Code déjà utilisé : attendez le code suivant de votre application (30 secondes)."));
+        }
+        return Ok(true);
+    }
     let norm: String = code.chars().filter(|c| c.is_ascii_alphanumeric()).collect::<String>().to_lowercase();
     if norm.len() >= 10 {
         let mut list: Vec<String> = serde_json::from_str(&recovery).unwrap_or_default();
@@ -140,7 +151,7 @@ pub async fn setup_2fa(State(st): State<AppState>, u: AuthUser) -> ApiResult<Val
     let enabled: i64 = sqlx::query_scalar("SELECT totp_enabled FROM users WHERE id = ?").bind(u.id).fetch_one(&st.db).await?;
     if enabled == 1 { return Err(bad("La double authentification est déjà activée.")) }
     let secret = new_secret();
-    sqlx::query("UPDATE users SET totp_secret = ? WHERE id = ?").bind(&secret).bind(u.id).execute(&st.db).await?;
+    sqlx::query("UPDATE users SET totp_secret = ?, totp_last_step = 0 WHERE id = ?").bind(&secret).bind(u.id).execute(&st.db).await?;
     let label = format!("POP:{}", u.email).replace(' ', "%20");
     Ok(Json(json!({ "secret": secret, "uri": format!("otpauth://totp/{label}?secret={secret}&issuer=POP&algorithm=SHA1&digits=6&period=30") })))
 }
@@ -151,11 +162,11 @@ pub struct CodeIn { code: String, password: Option<String> }
 pub async fn enable_2fa(State(st): State<AppState>, u: AuthUser, ClientIp(ip): ClientIp, Json(b): Json<CodeIn>) -> ApiResult<Value> {
     let secret: Option<String> = sqlx::query_scalar("SELECT totp_secret FROM users WHERE id = ? AND totp_enabled = 0").bind(u.id).fetch_one(&st.db).await?;
     let secret = secret.ok_or_else(|| bad("Recommencez l’activation."))?;
-    if !totp_ok(&secret, &b.code) { return Err(bad("Code incorrect : vérifiez l’heure de votre téléphone et réessayez.")) }
+    let Some(step) = totp_match(&secret, &b.code, now_step()) else { return Err(bad("Code incorrect : vérifiez l’heure de votre téléphone et réessayez.")) };
     // 10 codes de secours, montrés une seule fois.
     let codes: Vec<String> = (0..10).map(|_| { let t = random_token(); format!("{}-{}", &t[..5], &t[5..10]) }).collect();
     let hashes: Vec<String> = codes.iter().map(|c| sha256_hex(&c.replace('-', ""))).collect();
-    sqlx::query("UPDATE users SET totp_enabled = 1, recovery = ? WHERE id = ?").bind(json!(hashes).to_string()).bind(u.id).execute(&st.db).await?;
+    sqlx::query("UPDATE users SET totp_enabled = 1, recovery = ?, totp_last_step = ? WHERE id = ?").bind(json!(hashes).to_string()).bind(step as i64).bind(u.id).execute(&st.db).await?;
     sqlx::query("UPDATE sessions SET mfa = 1 WHERE token_hash = ?").bind(&u.sid).execute(&st.db).await?;
     // Les autres appareils devront se reconnecter avec le code.
     sqlx::query("DELETE FROM sessions WHERE user_id = ? AND token_hash != ?").bind(u.id).bind(&u.sid).execute(&st.db).await?;
@@ -269,6 +280,16 @@ mod tests {
         assert_eq!(client_ip(&h(&[("x-forwarded-for", "pas-une-ip")]), peer(), ProxyMode::Forwarded), PEER);
         // x-real-ip et cf-connecting-ip ne comptent pas en mode proxy générique.
         assert_eq!(client_ip(&h(&[("x-real-ip", "127.0.0.1"), ("cf-connecting-ip", "127.0.0.1")]), peer(), ProxyMode::Forwarded), PEER);
+    }
+
+    #[test]
+    fn totp_vecteur_rfc6238_et_fenetre() {
+        // RFC 6238, annexe B : secret ASCII « 12345678901234567890 », T = 59 s (pas 1) -> 94287082, 6 derniers chiffres.
+        let secret = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
+        assert_eq!(super::totp_match(secret, "287082", 1), Some(1));
+        assert_eq!(super::totp_match(secret, "287 082", 2), Some(1), "tolérance de -30 s");
+        assert_eq!(super::totp_match(secret, "287082", 3), None, "trop ancien");
+        assert_eq!(super::totp_match(secret, "000000", 1), None);
     }
 
     #[test]
