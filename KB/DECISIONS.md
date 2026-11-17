@@ -19,3 +19,4 @@ fixes ; si une demande ou une issue semble en contredire une, arrêtez-vous et d
 | 17/11 | Tâches sur les Issues GitHub avec des étiquettes de statut (pas de GitHub Project) ; branche et PR par issue ; validation humaine avant fusion | benybens |
 | 17/11 | Jalons : M1 UEFN réel validé, M2 Mise en ligne, M3 Abonnements et paiement, M4 Logiciel de bureau ; chaque issue en a un | benybens |
 | 17/11 | Le CI vérifie compilation et tests (serveur, relais), build du web et `web/dist` à jour, migrations jamais modifiées ; rustfmt et clippy pas encore bloquants (dette à traiter dans une tâche) | benybens |
+| 17/11 | Aucun compte ne devient administrateur selon son adresse IP : administrateurs par `POP_ADMIN_EMAILS` ou `pop-server admin ajouter <e-mail>` sur la machine du serveur ; `POP_TRUST_PROXY` vaut vide, `1` (dernier élément de X-Forwarded-For) ou `cloudflare` (#12) | benybens |

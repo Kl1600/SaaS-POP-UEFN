@@ -1,5 +1,6 @@
 //! Administration de la plateforme POP : liste d'attente de la bêta, utilisateurs, vue générale.
-//! Réservé aux comptes `is_admin` (le premier compte créé, le compte de test « kl », ou POP_ADMIN_EMAILS).
+//! Réservé aux comptes `is_admin` (nommés par `pop-server admin ajouter <e-mail>`, le compte de test « kl »),
+//! ou dont l'adresse est dans POP_ADMIN_EMAILS.
 use crate::{
     auth::{random_token, rate_limit, sha256_hex, AuthUser},
     error::{bad, ApiResult, AppError},
@@ -82,8 +83,8 @@ pub async fn check_access(State(st): State<AppState>, Query(q): Query<TokQ>) -> 
 pub async fn signup_allowed(st: &AppState, email: &str, ip: &str, invite: Option<&str>, access: Option<&str>) -> Result<Option<i64>, AppError> {
     let users: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users").fetch_one(&st.db).await?;
     if std::env::var("POP_OPEN_SIGNUP").map(|v| v == "1").unwrap_or(false) { return Ok(None) }
-    // Une installation vide n'accepte son premier compte que depuis l'ordinateur du serveur,
-    // ou pour une adresse listée dans POP_ADMIN_EMAILS (sinon n'importe qui deviendrait administrateur).
+    // Une installation vide accepte son premier compte depuis l'ordinateur du serveur (sans droit d'administration :
+    // voir `pop-server admin`), ou pour une adresse listée dans POP_ADMIN_EMAILS.
     let env_admin = std::env::var("POP_ADMIN_EMAILS").unwrap_or_default().split(',').any(|e| !e.trim().is_empty() && e.trim().eq_ignore_ascii_case(email));
     if env_admin { return Ok(None) }
     if users == 0 && crate::security::is_loopback(ip) { return Ok(None) }
