@@ -1,0 +1,9 @@
+# Exceptions de `cargo audit` pour le serveur. Chaque ligne dit pourquoi et jusqu'à quand.
+[advisories]
+ignore = [
+    # SQLite < 3.54 (libsqlite3-sys 0.30, tiré par sqlx 0.8) : fuite de mémoire si le processus ouvre
+    # une base et un fichier -wal écrits par un tiers. POP n'ouvre que sa propre base, dans son dossier
+    # de données : pas exploitable aujourd'hui. Le correctif demande sqlx 0.9 (version majeure) :
+    # à retirer dès que le serveur passe à sqlx 0.9.
+    "RUSTSEC-2026-0459",
+]
