@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { RefreshCw, Star, X, ExternalLink, TrendingUp, TrendingDown, Search } from 'lucide-react'
 import { ago, api } from '../api'
 import { useApp, useLoad } from '../state'
 import { CardHead, Empty, PageHead } from '../components/ui'
 import { tr, LOCALE } from '../i18n/t'
+import { useNav } from '../routes'
 
 const n = (v?: number | null) => v === null || v === undefined ? '—' : v >= 1e6 ? (v / 1e6).toFixed(1).replace('.', ',') + ' M' : v >= 1e4 ? Math.round(v / 1e3) + ' k' : v.toLocaleString(LOCALE)
 const pct = (v?: number | null) => v === null || v === undefined ? '—' : `${Math.round(v * 100)} %`
@@ -274,7 +274,7 @@ export function TikTok() {
   const [setup, setSetup] = useState<string | null>(null)
   const [platform, setPlatform] = useState('')
   const isl = useIsland()
-  const nav = useNavigate()
+  const nav = useNav()
   const tcfg = integ?.apify?.config ?? {}
   const ycfg = integ?.youtube?.config ?? {}
   const save = async (kind: string, c: any) => { try { await api.put(`/api/studios/${studio!.id}/integrations/${kind}`, { enabled: true, config: c }); reloadI(); reload(); setSetup(null); toast(tr("Enregistré")) } catch (e: any) { toast(e.message, true) } }

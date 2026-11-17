@@ -1,6 +1,5 @@
 import { GuidePanel } from '../components/Guide'
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import {
   Clock, Ban, CheckSquare, Flag, Coins, Users, Zap, Activity, ArrowRight, Upload, FileText, PenTool, AlertTriangle, MessageSquare, CheckCircle2, Rocket,
 } from 'lucide-react'
@@ -8,6 +7,7 @@ import { ago, api, euros, frDate } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { CardHead, Empty, PageHead, tagLabel } from '../components/ui'
 import { tr, LOCALE, LANG, tx } from '../i18n/t'
+import { useNav } from '../routes'
 
 const ICON: Record<string, [any, string]> = {
   checkin: [Upload, 'i-g'], board: [PenTool, 'i-n'], page: [FileText, 'i-n'], blocked: [Ban, 'i-r'], done: [CheckCircle2, 'i-g'],
@@ -16,7 +16,7 @@ const ICON: Record<string, [any, string]> = {
 
 export default function Overview() {
   const { map, toast } = useApp()
-  const nav = useNavigate()
+  const nav = useNav()
   const { data, reload } = useLoad<any>(map ? `/api/maps/${map.id}/overview` : null, [map?.id])
   // Tâches cochées ici : restent affichées (barrées) pour pouvoir annuler.
   const [checked, setChecked] = useState<Record<number, { item: any; prev: string }>>({})

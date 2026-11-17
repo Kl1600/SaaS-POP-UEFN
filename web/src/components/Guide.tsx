@@ -1,19 +1,23 @@
 // Boussole : assistant intégré (calculs côté serveur sur les données de la map + guide de POP, rien ne sort de POP).
 import { useEffect, useRef, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import { Compass, AlertCircle, AlertTriangle, CheckCircle2, Info, Play, ArrowRight, X, Send } from 'lucide-react'
 import { ask, suggested, type Fiche } from '../guideKB'
 import { api } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { tr, LANG } from '../i18n/t'
+import { useNav } from '../routes'
 
 const TONE: Record<string, [any, string]> = {
   bad: [AlertCircle, 'var(--tr)'], warn: [AlertTriangle, 'var(--to)'], good: [CheckCircle2, 'var(--tg)'], info: [Info, 'var(--text3)'],
 }
 
+/** /map/12/taches → /taches ; /studio/3/equipe → /equipe (pages des fiches d’aide). */
+const shortPath = (p: string) => p.replace(/^\/map\/\d+/, '').replace(/^\/studio\/\d+\/(integrations|maps)/, '/equipe').replace(/^\/studio\/\d+\/tendances/, '/analyse/tiktok').replace(/^\/studio\/\d+/, '') || '/'
+
 export function GuidePanel({ compact, onNavigate }: { compact?: boolean; onNavigate?: () => void }) {
   const { map, me, toast } = useApp()
-  const nav = useNavigate()
+  const nav = useNav()
   const { data, reload } = useLoad<any>(map ? `/api/maps/${map.id}/guide?lang=${LANG}` : null, [map?.id])
   useLive(['tasks', 'plan'], reload)
   if (!data) return null
@@ -58,7 +62,7 @@ type Msg = { who: 'me' | 'bot'; text?: string; f?: Fiche; others?: Fiche[]; toda
 
 /** Questions-réponses : Boussole guide l'utilisateur dans POP (base de fiches locale, pas d'IA). */
 function GuideChat({ initial, onNavigate, onToday }: { initial?: string; onNavigate?: () => void; onToday: () => void }) {
-  const nav = useNavigate()
+  const nav = useNav()
   const loc = useLocation()
   const [msgs, setMsgs] = useState<Msg[]>([{ who: 'bot', text: tr("Posez-moi une question : sur votre map (« qu’est-ce qui est en retard ? », « sur quoi travaille Hugo ? », « où en est la tâche #12 ? ») ou sur POP (« comment relier UEFN ? »).") }])
   const [q, setQ] = useState('')
@@ -67,7 +71,7 @@ function GuideChat({ initial, onNavigate, onToday }: { initial?: string; onNavig
   const send = async (text: string) => {
     const t = text.trim(); if (!t) return
     setQ(''); setMsgs(m => [...m, { who: 'me', text: t }, { who: 'bot', typing: true }])
-    const res = ask(t, loc.pathname)
+    const res = ask(t, shortPath(loc.pathname))
     let bot: Msg
     // 1. Question sur les données de la map (retards, une personne, une tâche, le jalon, les chiffres…).
     const data = map ? await api.get(`/api/maps/${map.id}/guide/ask?lang=${LANG}&q=${encodeURIComponent(t)}`).catch(() => null) : null
@@ -79,7 +83,7 @@ function GuideChat({ initial, onNavigate, onToday }: { initial?: string; onNavig
       const found: any[] = map && t.length >= 2 ? await api.get(`/api/maps/${map.id}/search?q=${encodeURIComponent(t)}`).catch(() => []) : []
       bot = found.length
         ? { who: 'bot', text: tr("Je n’ai pas de fiche sur ce sujet, mais voici ce que j’ai trouvé dans votre map :"), items: found.slice(0, 6).map(r => ({ label: r.title + (r.detail ? ` · ${r.detail}` : ''), link: r.link, kind: r.kind })) }
-        : { who: 'bot', text: tr("Je n’ai pas trouvé de réponse. Reformulez avec d’autres mots, ou choisissez un sujet ci-dessous."), others: suggested(loc.pathname) }
+        : { who: 'bot', text: tr("Je n’ai pas trouvé de réponse. Reformulez avec d’autres mots, ou choisissez un sujet ci-dessous."), others: suggested(shortPath(loc.pathname)) }
     }
     setMsgs(m => [...m.filter(x => !x.typing), bot])
   }
@@ -105,7 +109,7 @@ function GuideChat({ initial, onNavigate, onToday }: { initial?: string; onNavig
       </div>)}
       <div ref={end} />
     </div>
-    {msgs.length <= 1 && <div className="gothers" style={{ padding: '0 0 8px' }}>{suggested(loc.pathname).map(f => <button key={f.id} className="chip" onClick={() => pick(f)}>{f.q}</button>)}</div>}
+    {msgs.length <= 1 && <div className="gothers" style={{ padding: '0 0 8px' }}>{suggested(shortPath(loc.pathname)).map(f => <button key={f.id} className="chip" onClick={() => pick(f)}>{f.q}</button>)}</div>}
     <form className="gask" onSubmit={e => { e.preventDefault(); send(q) }}>
       <input className="field" autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder={tr("Comment je… ?")} aria-label={tr("Votre question")} />
       <button className="btn pri" aria-label={tr("Envoyer")}><Send size={16} /></button>

@@ -610,4 +610,23 @@ body.wb-fs .side,body.wb-fs .top{visibility:hidden}
 .mapsw-opt.off{opacity:.6;cursor:default}
 .mapsw-opt:focus-within{box-shadow:0 0 0 3px rgba(237,117,62,.2)}
 @media (max-width:560px){.mapsw-choice{grid-template-columns:1fr}}
+
+/* Barre latérale : blocs Studio et Compte */
+.navblock{margin-top:6px;padding-top:10px;border-top:1px solid rgb(30,30,30)}
+.navblock .navsec{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Accueil */
+.home-block{margin-bottom:28px}
+.home-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.home-head h2{margin:0;font-size:20px;font-weight:500}
+.home-ic{display:grid;place-items:center;width:38px;height:38px;border-radius:10px;border:1px solid var(--border);color:var(--text2);flex:none}
+.home-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+.home-map{display:flex;flex-direction:column;align-items:stretch;text-align:left;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px;font:inherit;color:var(--text);cursor:pointer;transition:border-color .15s,transform .15s,box-shadow .15s}
+.home-map:hover{border-color:var(--accent);box-shadow:0 6px 20px rgba(0,0,0,.06);transform:translateY(-1px)}
+.home-map-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px}
+.home-map-top b{font-weight:500;font-size:16.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.home-map-top svg{color:var(--text3);flex:none}
+.home-map:hover .home-map-top svg{color:var(--accent)}
+.home-map .bar{display:block}
+.home-map.add{align-items:center;justify-content:center;gap:8px;border-style:dashed;color:var(--text2);min-height:120px}
+.home-map.add b{font-weight:500}
 }

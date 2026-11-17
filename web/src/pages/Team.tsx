@@ -1,6 +1,6 @@
 import { SecuritySettings } from '../components/Security'
 import { useState } from 'react'
-import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { Copy, KeyRound, Plus, Trash2 } from 'lucide-react'
 import { api, euros } from '../api'
 import { useApp, useLoad, studioName } from '../state'
@@ -9,57 +9,53 @@ import { tr } from '../i18n/t'
 import LangPicker from '../components/LangPicker'
 import { openCreate } from '../components/MapSwitcher'
 
-export default function Team() {
-  const [params, setParams] = useSearchParams()
+/** Pages du studio (ou de l'espace perso) : /studio/:sid/equipe | integrations | maps. */
+export default function Team({ tab }: { tab: 'members' | 'integ' | 'maps' }) {
   const { studio } = useApp()
-  const tab = (params.get('tab') as any) || 'members'
+  const nav = useNavigate()
+  if (!studio) return null
+  if (studio.personal && tab === 'members') return <Navigate to={`/studio/${studio.id}/maps`} replace />
+  const items: [string, string][] = studio.personal
+    ? [['maps', tr("Mes maps")], ['integ', tr("Intégrations")]]
+    : [['members', tr("Membres et rôles")], ['maps', tr("Maps du studio")], ['integ', tr("Intégrations")]]
+  const sub = { members: 'equipe', integ: 'integrations', maps: 'maps' } as const
   return (
     <main className="content">
-      <PageHead title={tr("Équipe et intégrations")} help={tr("Qui fait partie du studio, ce que chacun peut faire, et les outils reliés.")} />
-      <Tabs value={tab} onChange={t => setParams({ tab: t })} items={[['members', studio?.personal ? tr("Seul ou en équipe") : tr("Membres et rôles")], ['integ', tr("Intégrations")], ['maps', studio?.personal ? tr("Mes maps") : tr("Maps du studio")]]} />
-      {tab === 'members' && (studio?.personal ? <SoloTeam /> : <Members />)}
+      <PageHead title={studio.personal ? tr("Mes outils") : tr("Studio {0}", [studio.name])} help={studio.personal ? tr("Vos maps perso et les outils reliés à votre compte (Discord, GitHub, Lore).") : tr("Qui fait partie du studio, ce que chacun peut faire, ses maps et les outils reliés.")} />
+      <Tabs value={tab} onChange={t => nav(`/studio/${studio.id}/${sub[t as keyof typeof sub]}`)} items={items} />
+      {tab === 'members' && <Members />}
       {tab === 'integ' && <Integrations />}
       {tab === 'maps' && <Maps />}
-      {tab === 'compte' && <Navigate to="/parametres" replace />}
     </main>
   )
 }
 
-/** Map perso : on travaille seul ; pour inviter des gens, la map passe dans un studio. */
-function SoloTeam() {
-  const { me, map, reload, toast } = useApp()
+/** Map perso → map d'équipe : la map passe dans un studio (existant ou nouveau) avec tout son contenu. */
+function GoTeam({ m, onDone }: { m: { id: number; name: string }; onDone: () => void }) {
+  const { me, reload, toast } = useApp()
   const nav = useNavigate()
   const teams = (me?.studios ?? []).filter(s => !s.personal && (s.role === 'owner' || s.role === 'admin'))
   const [mode, setMode] = useState<'new' | 'existing'>(teams.length ? 'existing' : 'new')
   const [sid, setSid] = useState(teams[0]?.id ?? 0)
   const [name, setName] = useState('')
   const [busy, setBusy] = useState(false)
-  if (!map) return null
-  return <div className="grid2">
-    <section className="card">
-      <CardHead title={tr("Vous travaillez seul sur « {0} »", [map.name])} sub={tr("Cette map est dans vos maps perso : personne d’autre n’y a accès.")} />
-      <p style={{ margin: 0 }}>{tr("Tout marche pareil en solo : tâches, planning, pages, tableau blanc, Organiseur, IA connectées et analyse. Boussole vous propose quoi faire chaque jour.")}</p>
-    </section>
-    <section className="card">
-      <CardHead title={tr("Travailler en équipe sur cette map")} sub={tr("La map passe dans un studio avec tout son contenu (tâches, pages, tableaux, gains). Vous pourrez ensuite inviter des membres.")} />
-      <form className="stack" onSubmit={async e => {
-        e.preventDefault(); if (busy) return; setBusy(true)
-        try {
-          await api.post(`/api/maps/${map.id}/move`, mode === 'new' ? { new_studio: name } : { studio_id: sid })
-          await reload(); toast(tr("« {0} » est maintenant une map d’équipe", [map.name])); nav('/equipe?tab=members')
-        } catch (er: any) { toast(er.message, true) } finally { setBusy(false) }
-      }}>
-        {teams.length > 0 && <div className="row" style={{ gap: 16, flexWrap: 'wrap' }}>
-          <label className="row" style={{ gap: 6 }}><input type="radio" checked={mode === 'existing'} onChange={() => setMode('existing')} />{tr("Dans un studio existant")}</label>
-          <label className="row" style={{ gap: 6 }}><input type="radio" checked={mode === 'new'} onChange={() => setMode('new')} />{tr("Dans un nouveau studio")}</label>
-        </div>}
-        {mode === 'existing' && teams.length > 0
-          ? <label className="label">{tr("Studio")}<select className="field" value={sid} onChange={e => setSid(Number(e.target.value))}>{teams.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
-          : <label className="label">{tr("Nom du studio")}<input className="field" value={name} onChange={e => setName(e.target.value)} required maxLength={60} placeholder={tr("Ex. Studio Nova")} /></label>}
-        <button className="btn pri" style={{ alignSelf: 'flex-start' }} disabled={busy}>{tr("Passer en équipe")}</button>
-      </form>
-    </section>
-  </div>
+  return <form className="stack" style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border)' }} onSubmit={async e => {
+    e.preventDefault(); if (busy) return; setBusy(true)
+    try {
+      const r = await api.post(`/api/maps/${m.id}/move`, mode === 'new' ? { new_studio: name } : { studio_id: sid })
+      await reload(); toast(tr("« {0} » est maintenant une map d’équipe", [m.name])); nav(`/studio/${r.studio_id}/equipe`)
+    } catch (er: any) { toast(er.message, true); setBusy(false) }
+  }}>
+    <span className="small muted">{tr("La map passe dans un studio avec tout son contenu (tâches, pages, tableaux, gains). Vous pourrez ensuite inviter des membres.")}</span>
+    {teams.length > 0 && <div className="row" style={{ gap: 16, flexWrap: 'wrap' }}>
+      <label className="row" style={{ gap: 6 }}><input type="radio" checked={mode === 'existing'} onChange={() => setMode('existing')} />{tr("Dans un studio existant")}</label>
+      <label className="row" style={{ gap: 6 }}><input type="radio" checked={mode === 'new'} onChange={() => setMode('new')} />{tr("Dans un nouveau studio")}</label>
+    </div>}
+    {mode === 'existing' && teams.length > 0
+      ? <label className="label">{tr("Studio")}<select className="field" value={sid} onChange={e => setSid(Number(e.target.value))}>{teams.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+      : <label className="label">{tr("Nom du studio")}<input className="field" value={name} onChange={e => setName(e.target.value)} required maxLength={60} placeholder={tr("Ex. Studio Nova")} /></label>}
+    <div className="row"><button type="button" className="btn" onClick={onDone}>{tr("Annuler")}</button><button className="btn pri" disabled={busy}>{tr("Passer en équipe")}</button></div>
+  </form>
 }
 
 function Members() {
@@ -138,7 +134,9 @@ function Integrations() {
 }
 
 function Maps() {
-  const { studio, isAdmin, setMapId, reload: reloadMe, toast } = useApp()
+  const { studio, isAdmin, reload: reloadMe, toast } = useApp()
+  const nav = useNavigate()
+  const [going, setGoing] = useState<number | null>(null)
   const { data, reload } = useLoad<any[]>(studio ? `/api/studios/${studio.id}/maps` : null, [studio?.id])
   return <>
     <div className="two">
@@ -152,16 +150,18 @@ function Maps() {
           </div>
           <div className="bar" style={{ margin: '16px 0' }}><span style={{ width: `${m.progress}%` }} /></div>
           <div className="row">
-            <button className="btn" onClick={() => setMapId(m.id)}>{tr("Ouvrir")}</button>
+            <button className="btn" onClick={() => nav(`/map/${m.id}`)}>{tr("Ouvrir")}</button>
+            {studio?.personal && going !== m.id && <button className="btn" onClick={() => setGoing(m.id)}>{tr("Passer en équipe")}</button>}
             {isAdmin && (data?.length ?? 0) > 1 && <button className="btn" onClick={async () => { const c = prompt(tr("Supprimer définitivement « {0} » et tout son contenu (tâches, pages, Verse, gains) ?\nTapez le nom de la map pour confirmer :", [m.name])); if (c === null) return; try { await api.del(`/api/maps/${m.id}`, { confirm: c }); await reloadMe(); reload(); toast(tr("Map supprimée")) } catch (er: any) { toast(er.message, true) } }}>{tr("Supprimer")}</button>}
             {isAdmin && <input className="field" type="date" defaultValue={m.release_date ?? ''} aria-label={tr("Date de sortie")} onBlur={async e => { await api.patch(`/api/maps/${m.id}`, { release_date: e.target.value }); reloadMe(); reload() }} />}
           </div>
+          {going === m.id && <GoTeam m={m} onDone={() => setGoing(null)} />}
         </section>
       ))}
     </div>
     <div className="two">
       <section className="card">
-        <CardHead title={tr("Créer")} sub={tr("Une nouvelle map pour ce studio, ou un nouveau studio pour une autre équipe.")} />
+        <CardHead title={tr("Créer")} sub={studio?.personal ? tr("Une nouvelle map perso, ou un studio pour travailler en équipe.") : tr("Une nouvelle map pour ce studio, ou un nouveau studio pour une autre équipe.")} />
         <div className="row" style={{ flexWrap: 'wrap' }}>
           {isAdmin && <button className="btn pri" onClick={() => openCreate({ kind: 'map', studioId: studio?.id })}><Plus size={16} />{tr("Nouvelle map")}</button>}
           <button className="btn" onClick={() => openCreate({ kind: 'studio' })}><Plus size={16} />{tr("Nouveau studio")}</button>

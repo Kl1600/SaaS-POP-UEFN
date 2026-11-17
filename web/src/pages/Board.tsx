@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import {
   MousePointer2, Lasso, StickyNote, Type, Square, Circle, Spline, Pen, Highlighter, Eraser, Frame, ImagePlus, MessageSquarePlus, ThumbsUp,
   Timer, Eye, EyeOff, LayoutGrid, Presentation, Download, Plus, Minus, Maximize, UserRound, ChevronLeft, ChevronRight, X, Network,
@@ -11,6 +11,7 @@ import { PageHead } from '../components/ui'
 import { useMembers } from './Tasks'
 import { FormatBar, PenBar, Rich, RichEdit, ShapeSvg, textStyle, vAlign, strokeColor, FONTS } from './BoardFormat'
 import { tr } from '../i18n/t'
+import { useNav } from '../routes'
 
 type Obj = { id: string; kind: string; x: number; y: number; w?: number; h?: number; text?: string; shade?: number; votes?: Record<string, number>; author?: string; author_id?: number; task_id?: number; task_number?: number; from?: string; to?: string; style?: string; dashed?: boolean; arrow?: boolean; points?: number[][]; color?: string; width?: number; shape?: string; url?: string; locked?: boolean; reactions?: number } & Record<string, any>
 
@@ -27,7 +28,7 @@ const UEFN: [string, string, string][] = [
 
 export default function Board() {
   const { bid } = useParams()
-  const nav = useNavigate()
+  const nav = useNav()
   const { map, canEdit, toast, role } = useApp()
   const { data: list, reload } = useLoad<any[]>(map ? `/api/maps/${map.id}/boards` : null, [map?.id])
   const [tplOpen, setTplOpen] = useState(false)
@@ -57,7 +58,7 @@ export default function Board() {
 
 function Canvas({ id }: { id: number }) {
   const app = useApp()
-  const nav = useNavigate()
+  const nav = useNav()
   const { data: mem } = useMembers()
   const { data: tasks, reload: reloadTasks } = useLoad<any[]>(app.map ? `/api/maps/${app.map.id}/tasks` : null, [app.map?.id])
   const [objs, setObjs] = useState<Record<string, Obj>>({})

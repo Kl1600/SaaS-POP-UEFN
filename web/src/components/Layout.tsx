@@ -2,7 +2,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import {
   Home, FileText, PenTool, CalendarDays, KanbanSquare, Rocket, Coins, Users, Settings, LifeBuoy, PanelLeft,
-  Search, Moon, Sun, Bell, Plus, ChevronDown, Hexagon, LogOut, ListTree, Bot, ChartNoAxesCombined, Hash, Flame, Sparkle,
+  Search, Moon, Sun, Bell, Plus, ChevronDown, Hexagon, LogOut, ListTree, Bot, ChartNoAxesCombined, Hash, Flame, Sparkle, Layers, Plug, LayoutGrid,
 } from 'lucide-react'
 import { useApp, studioName } from '../state'
 import { ago, api } from '../api'
@@ -14,35 +14,50 @@ import { useUefnStatus, STATUS_LABEL } from '../uefnState'
 import { tr, tx } from '../i18n/t'
 import LangPicker from './LangPicker'
 import { MapSwitcher, CreateHost, openCreate } from './MapSwitcher'
+import { useNav } from '../routes'
 
-const GROUPS: [string, [string, string, any][]][] = [
-  [tr("Général"), [['/', tr("Vue d'ensemble"), Home]]],
-  [tr("Espace"), [['/pages', tr("Pages"), FileText], ['/tableau', tr("Tableau blanc"), PenTool]]],
-  [tr("Production"), [['/planifier', tr("Planifier"), CalendarDays], ['/taches', tr("Tâches"), KanbanSquare]]],
-  ['UEFN', [['/organiseur', tr("Organiseur"), ListTree], ['/ia', tr("IA connectées"), Bot]]],
-  [tr("Analyse"), [['/analyse/marche', tr("Marché"), ChartNoAxesCombined], ['/analyse/tiktok', tr("Tendances vidéo"), Hash], ['/analyse/tendances', tr("Maps qui marchent"), Flame], ['/analyse/lancements', tr("Meilleurs démarrages"), Sparkle]]],
-  [tr("Publication"), [['/lancer', tr("Lancer et suivre"), Rocket]]],
-  [tr("Studio"), [['/remunerer', tr("Rémunérer"), Coins], ['/equipe', tr("Équipe"), Users]]],
+type Item = [string, string, any]
+/** Onglets de la map (changent quand on change de map). */
+const mapGroups = (mid: number): [string, Item[]][] => [
+  [tr("Général"), [[`/map/${mid}`, tr("Vue d'ensemble"), Home]]],
+  [tr("Espace"), [[`/map/${mid}/pages`, tr("Pages"), FileText], [`/map/${mid}/tableau`, tr("Tableau blanc"), PenTool]]],
+  [tr("Production"), [[`/map/${mid}/planifier`, tr("Planifier"), CalendarDays], [`/map/${mid}/taches`, tr("Tâches"), KanbanSquare]]],
+  ['UEFN', [[`/map/${mid}/organiseur`, tr("Organiseur"), ListTree], [`/map/${mid}/ia`, tr("IA connectées"), Bot]]],
+  [tr("Publication"), [[`/map/${mid}/lancer`, tr("Lancer et suivre"), Rocket], [`/map/${mid}/remunerer`, tr("Rémunérer"), Coins]]],
 ]
-const TITLES: Record<string, [string, string]> = {}
-GROUPS.forEach(([g, items]) => items.forEach(([p, l]) => (TITLES[p] = [g, l])))
-TITLES['/parametres'] = [tr("Compte"), tr("Paramètres")]
-TITLES['/aide'] = [tr("Compte"), tr("Aide et support")]
-TITLES['/admin'] = ['POP', tr("Administration")]
-TITLES['/equipe'] = [tr("Studio"), tr("Équipe et intégrations")]
+/** Onglets du studio, ou de l'espace perso (« Mes outils »). */
+const studioItems = (sid: number, personal?: boolean): Item[] => personal
+  ? [[`/studio/${sid}/maps`, tr("Mes maps"), Layers], [`/studio/${sid}/integrations`, tr("Intégrations"), Plug], [`/studio/${sid}/tendances`, tr("Tendances vidéo"), Hash]]
+  : [[`/studio/${sid}/equipe`, tr("Équipe"), Users], [`/studio/${sid}/maps`, tr("Maps du studio"), Layers], [`/studio/${sid}/integrations`, tr("Intégrations"), Plug], [`/studio/${sid}/tendances`, tr("Tendances vidéo"), Hash]]
+/** Onglets du compte (les mêmes partout). */
+const accountItems = (): Item[] => [
+  ['/', tr("Accueil"), LayoutGrid], ['/analyse/marche', tr("Marché"), ChartNoAxesCombined], ['/analyse/tendances', tr("Maps qui marchent"), Flame], ['/analyse/lancements', tr("Meilleurs démarrages"), Sparkle],
+]
 
 export default function Layout() {
   const app = useApp()
   const loc = useLocation()
-  const nav = useNavigate()
+  const nav = useNav()
   const [collapsed, setCollapsed] = useState(false)
   const [acct, setAcct] = useState(false)
   const acctBox = useOutside(acct, () => setAcct(false))
   const [newTask, setNewTask] = useState(false)
   const [guide, setGuide] = useState<false | { ask?: string }>(false)
   useEffect(() => { const h = (e: Event) => setGuide({ ask: (e as CustomEvent).detail ?? '' }); window.addEventListener('boussole', h); return () => window.removeEventListener('boussole', h) }, [])
-  const key = '/' + (loc.pathname.split('/')[1] || '')
-  const [group, title] = TITLES[loc.pathname] ?? TITLES[key] ?? [tr("Général"), '']
+  // Pas d'onglets de map quand le studio ouvert n'a pas cette map (ex. espace perso encore vide).
+  const showMap = !!app.map && (!app.studio || app.studio.maps.some(m => m.id === app.map!.id))
+  const mGroups = showMap ? mapGroups(app.map!.id) : []
+  const sItems = app.studio ? studioItems(app.studio.id, app.studio.personal) : []
+  const aItems = accountItems()
+  const sLabel = app.studio ? (app.studio.personal ? tr("Mes outils") : tr("Studio · {0}", [app.studio.name])) : ''
+  const all: [string, string, string][] = [
+    ...mGroups.flatMap(([, items]) => items.map(([p, l]) => [p, app.map!.name, l] as [string, string, string])),
+    ...sItems.map(([p, l]) => [p, sLabel, l] as [string, string, string]),
+    ...aItems.map(([p, l]) => [p, tr("Compte"), l] as [string, string, string]),
+    ['/parametres', tr("Compte"), tr("Paramètres")], ['/aide', tr("Compte"), tr("Aide et support")], ['/admin', 'POP', tr("Administration")],
+  ]
+  const hit = all.filter(([p]) => p === '/' ? loc.pathname === '/' : loc.pathname === p || loc.pathname.startsWith(p + '/')).sort((x, y) => y[0].length - x[0].length)[0]
+  const [, group, title] = hit ?? ['', tr("Compte"), tr("Accueil")]
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -63,16 +78,20 @@ export default function Layout() {
         <div className="brand"><img src="/logo.png" alt="POP" /></div>
         <MapSwitcher />
         <nav className="nav" aria-label={tr("Sections")}>
-          {GROUPS.map(([g, items]) => (
+          {mGroups.map(([g, items]) => (
             <div key={g} className="nav">
               <span className="navsec lbl">{g}</span>
-              {items.map(([p, l, I]) => (
-                <NavLink key={p} to={p} end={p === '/'} className={({ isActive }) => (isActive ? 'on' : '')}>
-                  <I size={20} strokeWidth={1.5} /><span className="lbl">{l}</span>
-                </NavLink>
-              ))}
+              {items.map(([p, l, I]) => <NavLink key={p} to={p} end={p === `/map/${app.map!.id}`} className={({ isActive }) => (isActive ? 'on' : '')}><I size={20} strokeWidth={1.5} /><span className="lbl">{l}</span></NavLink>)}
             </div>
           ))}
+          {app.studio && <div className="nav navblock">
+            <span className="navsec lbl" title={sLabel}>{sLabel}</span>
+            {sItems.map(([p, l, I]) => <NavLink key={p} to={p} className={({ isActive }) => (isActive ? 'on' : '')}><I size={20} strokeWidth={1.5} /><span className="lbl">{l}</span></NavLink>)}
+          </div>}
+          <div className="nav navblock">
+            <span className="navsec lbl">{tr("Compte")}</span>
+            {aItems.map(([p, l, I]) => <NavLink key={p} to={p} end={p === '/'} className={({ isActive }) => (isActive ? 'on' : '')}><I size={20} strokeWidth={1.5} /><span className="lbl">{l}</span></NavLink>)}
+          </div>
         </nav>
         <nav className="nav" style={{ marginTop: 'auto' }} aria-label={tr("Compte")}>
           <NavLink to="/parametres" className={({ isActive }) => (isActive ? 'on' : '')}><Settings size={20} strokeWidth={1.5} /><span className="lbl">{tr("Paramètres")}</span></NavLink>
@@ -137,7 +156,7 @@ function useOutside(open: boolean, close: () => void) {
 
 function GlobalSearch() {
   const app = useApp()
-  const nav = useNavigate()
+  const nav = useNav()
   const [q, setQ] = useState('')
   const [res, setRes] = useState<any[]>([])
   const [open, setOpen] = useState(false)
@@ -168,7 +187,7 @@ function GlobalSearch() {
 
 function Notifications() {
   const app = useApp()
-  const nav = useNavigate()
+  const nav = useNav()
   const [open, setOpen] = useState(false)
   const [data, setData] = useState<{ unread: number; items: any[] }>({ unread: 0, items: [] })
   const load = () => api.get('/api/notifications').then(setData).catch(() => {})
@@ -182,7 +201,7 @@ function Notifications() {
     {open && <div className="menu notif" style={{ right: 0, top: 50 }}>
       <div className="small muted" style={{ padding: '6px 10px' }}>{tr("Notifications")}</div>
       {data.items.length === 0 ? <div className="small muted" style={{ padding: 10 }}>{tr("Rien pour l’instant. Vous serez prévenu quand on vous assigne une tâche, qu’on vous mentionne avec @, ou qu’une tâche se débloque.")}</div> :
-        data.items.map(n => <button key={n.id} onClick={() => { setOpen(false); if (n.map_id && n.map_id !== app.map?.id) app.setMapId(n.map_id); if (n.link) nav(n.link) }} style={{ alignItems: 'flex-start' }}>
+        data.items.map(n => <button key={n.id} onClick={() => { setOpen(false); if (n.link) nav(n.link, { map: n.map_id || undefined }); else if (n.map_id) nav(`/map/${n.map_id}`) }} style={{ alignItems: 'flex-start' }}>
           {!n.read && <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--red)', marginTop: 7, flex: 'none' }} />}
           <span style={{ flex: 1, textAlign: 'left' }}><span style={{ display: 'block' }}>{n.text}</span><span className="small muted">{ago(n.at)}</span></span>
         </button>)}

@@ -1,6 +1,6 @@
 // Sélecteur de map dans la barre latérale : changer de map, créer une map ou un studio sans quitter la page.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Check, ChevronsUpDown, Plus, Settings2, Building2, User, Users } from 'lucide-react'
 import { api } from '../api'
 import { useApp, studioName } from '../state'
@@ -15,6 +15,13 @@ export const openCreate = (c: Create) => window.dispatchEvent(new CustomEvent('p
 export function MapSwitcher() {
   const app = useApp()
   const nav = useNavigate()
+  const loc = useLocation()
+  // Changer de map garde l'onglet en cours (Tâches → Tâches de l'autre map).
+  const openMap = (id: number) => {
+    const m = loc.pathname.match(/^\/map\/\d+(\/[a-z]+)?/)
+    const sec = m?.[1] && !['/pages', '/tableau'].includes(m[1]) ? m[1] : m?.[1] ?? ''
+    nav(`/map/${id}${m ? sec : ''}`)
+  }
   const [open, setOpen] = useState(false)
   const btn = useRef<HTMLButtonElement>(null)
   const pop = useRef<HTMLDivElement>(null)
@@ -42,7 +49,7 @@ export function MapSwitcher() {
     {open && <div ref={pop} className="mapsw-pop" role="menu" style={{ top: pos.top, left: pos.left, width: pos.width }}>
       {studios.map(s => <div key={s.id} className="mapsw-group">
         <div className="mapsw-studio">{s.personal ? <User size={14} /> : <Building2 size={14} />}{studioName(s)}</div>
-        {s.maps.map(m => <button key={m.id} role="menuitem" className={'mapsw-item' + (m.id === app.map?.id ? ' on' : '')} onClick={() => go(() => app.setMapId(m.id))}>
+        {s.maps.map(m => <button key={m.id} role="menuitem" className={'mapsw-item' + (m.id === app.map?.id ? ' on' : '')} onClick={() => go(() => openMap(m.id))}>
           <span>{m.name}</span>{m.id === app.map?.id && <Check size={15} />}
         </button>)}
         {s.personal && s.maps.length === 0 && <div className="mapsw-empty">{tr('Les maps que vous faites seul.')}</div>}
@@ -50,7 +57,7 @@ export function MapSwitcher() {
       </div>)}
       <div className="mapsw-foot">
         <button role="menuitem" className="mapsw-item add" onClick={() => go(() => openCreate({ kind: 'studio' }))}><Users size={15} />{tr('Créer un studio (équipe)')}</button>
-        <button role="menuitem" className="mapsw-item" onClick={() => go(() => nav('/equipe?tab=maps'))}><Settings2 size={15} />{tr('Gérer les maps')}</button>
+        <button role="menuitem" className="mapsw-item" onClick={() => go(() => nav('/'))}><Settings2 size={15} />{tr('Toutes mes maps')}</button>
       </div>
     </div>}
   </div>
@@ -69,6 +76,7 @@ export function CreateHost() {
 
 function CreateModal({ c, onClose }: { c: Create; onClose: () => void }) {
   const { me, studio, reload, setMapId, toast } = useApp()
+  const nav = useNavigate()
   const all = me?.studios ?? []
   const personal = all.find(s => s.personal)
   const teams = all.filter(s => !s.personal && (s.role === 'owner' || s.role === 'admin'))
@@ -85,7 +93,7 @@ function CreateModal({ c, onClose }: { c: Create; onClose: () => void }) {
       const r = kind === 'map'
         ? await api.post(`/api/studios/${sid}/maps`, { name: f.name, genre: f.genre, release_date: f.release_date || null })
         : await api.post('/api/studios', { name: f.studio, map_name: f.name, genre: f.genre, release_date: f.release_date || null })
-      await reload(); setMapId(r.map_id)
+      await reload(); setMapId(r.map_id); nav(`/map/${r.map_id}`)
       toast(kind === 'map' ? tr('Map « {0} » créée', [f.name]) : tr('Studio « {0} » créé', [f.studio]))
       onClose()
     } catch (er: any) { setErr(er.message); setBusy(false) }

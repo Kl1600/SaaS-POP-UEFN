@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import {
   GripVertical, Plus, Star, FileText, Copy, Trash2, Type, Heading1, Heading2, Heading3, List, ListOrdered, CheckSquare, ChevronRight, ChevronDown, MoreHorizontal,
   AlertCircle, Quote, Code, Table, Image, Video, Paperclip, Columns2, ListTree, Link2, PenTool, Database, Minus, Download, History, Share2, MessageSquare, RotateCcw, X,
@@ -8,6 +8,7 @@ import { ago, api, frDate } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { Avatar, CardHead, Empty, PageHead, Tabs } from '../components/ui'
 import { tr } from '../i18n/t'
+import { useNav } from '../routes'
 
 type Block = { id: string; type: string; text?: string; checked?: boolean; open?: boolean; body?: string; lang?: string; rows?: string[][]; url?: string; cols?: string[]; page?: number; board?: number; title?: string; view?: string; columns?: { key: string; label: string; type: string }[]; dbrows?: any[] } & Record<string, any>
 
@@ -70,7 +71,7 @@ export function BlockView({ b }: { b: Block }) {
 
 export default function Pages() {
   const { pid } = useParams()
-  const nav = useNavigate()
+  const nav = useNav()
   const { map, canEdit, toast, role } = useApp()
   const canDelete = ['owner', 'admin', 'member'].includes(role)
   const [menu, setMenu] = useState<number | null>(null)
@@ -142,7 +143,7 @@ export default function Pages() {
 
 function Editor({ id, tree, onNewChild }: { id: number; tree: any[]; onNewChild: () => void }) {
   const app = useApp()
-  const nav = useNavigate()
+  const nav = useNav()
   const [page, setPage] = useState<any>(null)
   const [blocks, setBlocks] = useState<Block[]>([])
   const [title, setTitle] = useState('')
@@ -467,7 +468,7 @@ function Share({ page, setPage }: { page: any; setPage: (p: any) => void }) {
 
 function Trash() {
   const { map, role, toast } = useApp()
-  const nav = useNavigate()
+  const nav = useNav()
   const [open, setOpen] = useState(false)
   const { data, reload } = useLoad<any>(map && open ? `/api/maps/${map.id}/trash` : null, [map?.id, open])
   useLive(['pages', 'boards'], () => open && reload())

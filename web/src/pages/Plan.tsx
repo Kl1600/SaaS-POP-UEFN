@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, Trash2 } from 'lucide-react'
 import { addDays, api, frDate, ymd } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { Avatar, CardHead, PageHead, Tabs, TAGS, tagLabel } from '../components/ui'
 import { useMembers } from './Tasks'
 import { tr } from '../i18n/t'
+import { useNav } from '../routes'
 
 const GENRES: [string, string, string][] = [
   ['cr', tr("Gendarmes et voleurs"), tr("Équipes, braquages, boutique")], ['tycoon', tr("Tycoon"), tr("Production, améliorations")], ['boxfight', tr("Box fight / Zone wars"), tr("Manches courtes")],
@@ -128,7 +128,7 @@ function Wizard({ done }: { done: () => void }) {
 
 function Timeline() {
   const { map, canEdit, toast } = useApp()
-  const nav = useNavigate()
+  const nav = useNav()
   const { data, reload } = useLoad<any>(map ? `/api/maps/${map.id}/plan/timeline` : null, [map?.id])
   const [alerts, setAlerts] = useState<string[]>([])
   const [shifted, setShifted] = useState<number[]>([])

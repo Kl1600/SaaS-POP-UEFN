@@ -6,6 +6,8 @@ import { AppProvider, useApp } from './state'
 import Layout from './components/Layout'
 import { Login, Signup, Onboarding, InviteAccept, PublicPage, ResetPassword, Welcome, FirstPassword } from './pages/Auth'
 import Overview from './pages/Overview'
+import Home from './pages/Home'
+import { MapScope, StudioScope, Legacy } from './components/Scopes'
 import Pages from './pages/Pages'
 import Board from './pages/Board'
 import Plan from './pages/Plan'
@@ -37,26 +39,36 @@ function Gate() {
   return (
     <Routes>
       <Route element={<Layout />}>
-        <Route index element={<Overview />} />
-        <Route path="pages" element={<Pages />} />
-        <Route path="pages/:pid" element={<Pages />} />
-        <Route path="tableau" element={<Board />} />
-        <Route path="tableau/:bid" element={<Board />} />
-        <Route path="planifier" element={<Plan />} />
-        <Route path="taches" element={<Tasks />} />
-        <Route path="lancer" element={<Launch />} />
-        <Route path="remunerer" element={<Money />} />
-        <Route path="equipe" element={<Team />} />
-        <Route path="organiseur" element={L(Organizer)} />
+        <Route index element={<Home />} />
+        <Route path="map/:mid" element={<MapScope />}>
+          <Route index element={<Overview />} />
+          <Route path="pages" element={<Pages />} />
+          <Route path="pages/:pid" element={<Pages />} />
+          <Route path="tableau" element={<Board />} />
+          <Route path="tableau/:bid" element={<Board />} />
+          <Route path="planifier" element={<Plan />} />
+          <Route path="taches" element={<Tasks />} />
+          <Route path="organiseur" element={L(Organizer)} />
+          <Route path="ia" element={<AI />} />
+          <Route path="lancer" element={<Launch />} />
+          <Route path="remunerer" element={<Money />} />
+          <Route path="*" element={<Overview />} />
+        </Route>
+        <Route path="studio/:sid" element={<StudioScope />}>
+          <Route index element={<Team tab="members" />} />
+          <Route path="equipe" element={<Team tab="members" />} />
+          <Route path="integrations" element={<Team tab="integ" />} />
+          <Route path="maps" element={<Team tab="maps" />} />
+          <Route path="tendances" element={<TikTok />} />
+        </Route>
         <Route path="aide" element={<Help />} />
         <Route path="admin" element={L(Admin)} />
         <Route path="parametres" element={<main className="content"><PageHead title={tr("Paramètres")} help={tr("Votre compte : nom, mot de passe, données personnelles.")} /><Account /></main>} />
-        <Route path="ia" element={<AI />} />
         <Route path="analyse/marche" element={<Market />} />
-        <Route path="analyse/tiktok" element={<TikTok />} />
         <Route path="analyse/tendances" element={<Trending />} />
         <Route path="analyse/lancements" element={<Launches />} />
-        <Route path="*" element={<Overview />} />
+        {['pages', 'pages/:pid', 'tableau', 'tableau/:bid', 'planifier', 'taches', 'organiseur', 'ia', 'lancer', 'remunerer', 'equipe', 'analyse/tiktok'].map(p => <Route key={p} path={p} element={<Legacy />} />)}
+        <Route path="*" element={<Home />} />
       </Route>
     </Routes>
   )

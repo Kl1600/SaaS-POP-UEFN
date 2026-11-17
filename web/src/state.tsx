@@ -16,6 +16,8 @@ type Ctx = {
   studio: Studio | null
   map: MapInfo | null
   setMapId: (id: number) => void
+  /** Studio affiché par les pages /studio/:sid (sinon : celui de la map en cours). */
+  setStudioId: (id: number | null) => void
   role: string
   canEdit: boolean
   isAdmin: boolean
@@ -34,6 +36,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [me, setMe] = useState<Me | null>(null)
   const [loading, setLoading] = useState(true)
   const [mapId, setMapIdState] = useState<number | null>(() => Number(localStorage.getItem('pop.map')) || null)
+  const [studioId, setStudioId] = useState<number | null>(null)
   const [dark, setDark] = useState(() => localStorage.getItem('pop.dark') === '1')
   const [toastMsg, setToast] = useState<{ m: string; bad: boolean; action?: { label: string; run: () => void }; k: number } | null>(null)
   const [presence, setPresence] = useState<Presence[]>([])
@@ -47,7 +50,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const allMaps = me?.studios.flatMap(s => s.maps.map(m => ({ s, m }))) ?? []
   const cur = allMaps.find(x => x.m.id === mapId) ?? allMaps[0] ?? null
-  const studio = cur?.s ?? null
+  const studio = (studioId ? me?.studios.find(s => s.id === studioId) : null) ?? cur?.s ?? null
   const map = cur?.m ?? null
   const role = studio?.role ?? 'viewer'
 
@@ -83,7 +86,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const send = useCallback((m: any) => { if (sock.current?.readyState === 1) sock.current.send(JSON.stringify(m)) }, [])
 
   const value = useMemo<Ctx>(() => ({
-    me, loading, reload, studio, map, setMapId, role,
+    me, loading, reload, studio, map, setMapId, setStudioId, role,
     canEdit: role !== 'viewer', isAdmin: role === 'owner' || role === 'admin',
     dark, toggleDark, toast, presence, subscribe, send,
   }), [me, loading, studio, map, role, dark, presence])

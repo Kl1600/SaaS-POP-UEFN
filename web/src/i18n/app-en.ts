@@ -1,6 +1,20 @@
 // Traduction anglaise de l'application. Clé = texte français de l'interface (ou du serveur), valeur = anglais.
 // Généré à partir des textes enveloppés dans tr(...) ; à compléter quand on ajoute des textes.
 const EN: Record<string, string> = {
+ "Accueil": "Home",
+ "Studio · {0}": "Studio · {0}",
+ "Mes outils": "My tools",
+ "Toutes mes maps": "All my maps",
+ "Gérer le studio": "Manage the studio",
+ "{0} map(s) · gains du dernier mois : {1}": "{0} map(s) · last month’s earnings: {1}",
+ "sortie {0}": "release {0}",
+ "Sans genre": "No genre",
+ "{0} membre(s)": "{0} member(s)",
+ "Bonjour {0}": "Hi {0}",
+ "Choisissez une map pour ouvrir sa dashboard. Vos maps perso sont pour vous seul ; les studios regroupent les maps d’une équipe.": "Pick a map to open its dashboard. Your personal maps are just for you; studios group a team’s maps.",
+ "Vos maps perso et les outils reliés à votre compte (Discord, GitHub, Lore).": "Your personal maps and the tools linked to your account (Discord, GitHub, Lore).",
+ "Qui fait partie du studio, ce que chacun peut faire, ses maps et les outils reliés.": "Who’s in the studio, what everyone can do, its maps and the connected tools.",
+ "Une nouvelle map perso, ou un studio pour travailler en équipe.": "A new personal map, or a studio to work as a team.",
  "Cliquez sur le sélecteur « Map » en haut à gauche : vous y changez de map et créez une map seul (« Nouvelle map perso ») ou dans un studio, ou un nouveau studio pour une équipe. C’est aussi dans le menu du compte (en haut à droite).": "Click the “Map” selector at the top left: that’s where you switch maps and create a map on your own (“New personal map”) or in a studio, or a new studio for a team. It’s also in the account menu (top right).",
  "Est-ce que je peux travailler seul ?": "Can I work solo?",
  "seul solo perso personnel sans equipe sans studio tout seul independant": "solo alone personal own without team without studio independent",
