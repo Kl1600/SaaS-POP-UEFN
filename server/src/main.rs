@@ -346,6 +346,7 @@ async fn main() -> anyhow::Result<()> {
         println!("Compte de test : identifiant « kl », mot de passe « kl »");
     }
     tokio::spawn(integrations::scheduler(st.clone()));
+    tokio::spawn(admin::digest_loop(st.clone()));
     tokio::spawn(analytics::crawler(st.clone()));
     tokio::spawn(analytics::social_loop(st.clone()));
     tokio::spawn(manage::backup_loop(st.clone(), db_url.clone()));

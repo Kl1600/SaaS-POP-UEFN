@@ -37,9 +37,20 @@ pub struct WaitIn {
     experience: Option<String>,
     links: Option<String>,
     message: Option<String>,
+    /// Champ piège, caché aux humains : rempli, la demande vient d'un robot.
+    #[serde(default)]
+    pop_hp: String,
 }
 
-pub async fn join(State(st): State<AppState>, Json(b): Json<WaitIn>) -> ApiResult<Value> {
+/// Demandes d'accès acceptées par adresse IP et par heure.
+const WAIT_PER_IP_HOUR: u32 = 5;
+
+pub async fn join(State(st): State<AppState>, crate::security::ClientIp(ip): crate::security::ClientIp, Json(b): Json<WaitIn>) -> ApiResult<Value> {
+    if !crate::auth::hit(&st, &format!("wait:ip:{ip}"), WAIT_PER_IP_HOUR, std::time::Duration::from_secs(3600)) {
+        return Err(AppError::TooManyMsg("Trop de demandes d’accès depuis votre connexion : réessayez dans une heure.".into()));
+    }
+    // Un robot reçoit la même réponse qu'un humain, mais rien n'est enregistré.
+    if !b.pop_hp.trim().is_empty() { return Ok(Json(json!({ "ok": true }))) }
     rate_limit(&st, &format!("wait:{}", b.email))?;
     let email = b.email.trim().to_lowercase();
     if !email.contains('@') || !email.contains('.') || email.len() > 200 { return Err(bad("Adresse e-mail invalide.")) }
@@ -55,17 +66,56 @@ pub async fn join(State(st): State<AppState>, Json(b): Json<WaitIn>) -> ApiResul
     sqlx::query("INSERT INTO waitlist (email, name, studio, team, experience, links, message) VALUES (?, ?, ?, ?, ?, ?, ?)")
         .bind(&email).bind(name).bind(cut(&b.studio, 80)).bind(cut(&b.team, 40)).bind(cut(&b.experience, 40)).bind(cut(&b.links, 400)).bind(cut(&b.message, 1500))
         .execute(&st.db).await?;
-    // Prévenir les administrateurs (cloche dans POP, et e-mail si l'envoi est configuré).
+    // Les administrateurs sont prévenus par le résumé horaire (`digest_loop`).
+    Ok(Json(json!({ "ok": true })))
+}
+
+/// Demandes pas encore signalées, si la plus ancienne attend depuis une heure : au plus un résumé par heure.
+/// Les marque comme signalées et renvoie (nom, e-mail, studio) de chacune.
+pub async fn take_digest(db: &sqlx::SqlitePool) -> Result<Vec<(String, String, String)>, AppError> {
+    let due: Option<i64> = sqlx::query_scalar("SELECT MAX(id) FROM waitlist WHERE admin_notified_at IS NULL HAVING MIN(created_at) <= datetime('now', '-1 hour')")
+        .fetch_optional(db).await?.flatten();
+    let Some(last) = due else { return Ok(vec![]) };
+    let rows: Vec<(String, String, String)> = sqlx::query_as("SELECT name, email, studio FROM waitlist WHERE admin_notified_at IS NULL AND id <= ? ORDER BY id")
+        .bind(last).fetch_all(db).await?;
+    sqlx::query("UPDATE waitlist SET admin_notified_at = datetime('now') WHERE admin_notified_at IS NULL AND id <= ?").bind(last).execute(db).await?;
+    Ok(rows)
+}
+
+/// Envoie le résumé des nouvelles demandes d'accès : une notification et un e-mail par admin.
+pub async fn send_digest(st: &AppState) -> Result<usize, AppError> {
+    let rows = take_digest(&st.db).await?;
+    if rows.is_empty() { return Ok(0) }
+    let n = rows.len();
+    let title = if n == 1 { "1 nouvelle demande d’accès à la bêta".to_string() } else { format!("{n} nouvelles demandes d’accès à la bêta") };
+    let mut body = format!("{title} de POP :
+
+");
+    for (name, email, studio) in rows.iter().take(50) {
+        body += &format!("- {name} ({email}){}
+", if studio.is_empty() { String::new() } else { format!(", studio {studio}") });
+    }
+    if n > 50 { body += &format!("… et {} autres.
+", n - 50) }
+    body += &format!("
+Répondre : {}/admin", crate::mail::public_url());
     let admins: Vec<(i64, String)> = sqlx::query_as("SELECT id, email FROM users WHERE is_admin = 1 AND disabled = 0").fetch_all(&st.db).await?;
     for (id, mail) in &admins {
-        let _ = sqlx::query("INSERT INTO notifications (user_id, map_id, text, link) VALUES (?, NULL, ?, '/admin')").bind(id).bind(format!("Nouvelle demande d’accès à la bêta : {name}")).execute(&st.db).await;
+        let _ = sqlx::query("INSERT INTO notifications (user_id, map_id, text, link) VALUES (?, NULL, ?, '/admin')").bind(id).bind(&title).execute(&st.db).await;
         if crate::mail::configured() && mail.contains('@') {
-            let body = format!("{name} ({email}) demande l’accès à la bêta de POP.\n\nStudio : {}\nMessage : {}\n\nRépondre : {}/admin", cut(&b.studio, 80), cut(&b.message, 400), crate::mail::public_url());
-            let m = mail.clone();
-            tokio::spawn(async move { let _ = crate::mail::send(&m, "POP : nouvelle demande d’accès à la bêta", &body).await; });
+            if let Err(e) = crate::mail::send(mail, &format!("POP : {title}"), &body).await { tracing::warn!("résumé de la liste d’attente non envoyé à un admin : {e}") }
         }
     }
-    Ok(Json(json!({ "ok": true })))
+    tracing::info!("résumé de la liste d’attente : {n} demande(s), {} admin(s)", admins.len());
+    Ok(n)
+}
+
+/// Toutes les minutes : envoie le résumé des demandes d'accès quand il est dû.
+pub async fn digest_loop(st: AppState) {
+    loop {
+        tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+        if let Err(e) = send_digest(&st).await { tracing::warn!("résumé de la liste d’attente : {e:?}") }
+    }
 }
 
 #[derive(Deserialize)]
@@ -235,4 +285,30 @@ pub async fn update_user(State(st): State<AppState>, u: AuthUser, Path(id): Path
         if d { sqlx::query("DELETE FROM sessions WHERE user_id = ?").bind(id).execute(&st.db).await?; }
     }
     Ok(Json(json!({ "ok": true })))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::take_digest;
+
+    async fn db() -> sqlx::SqlitePool {
+        let db = sqlx::sqlite::SqlitePoolOptions::new().max_connections(1).connect("sqlite::memory:").await.unwrap();
+        sqlx::migrate!("./migrations").run(&db).await.unwrap();
+        db
+    }
+    async fn ask(db: &sqlx::SqlitePool, i: usize, age: &str) {
+        sqlx::query("INSERT INTO waitlist (email, name, created_at) VALUES (?, ?, datetime('now', ?))").bind(format!("p{i}@exemple.com")).bind(format!("P{i}")).bind(age).execute(db).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn vingt_demandes_un_seul_resume() {
+        let db = db().await;
+        for i in 0..20 { ask(&db, i, &format!("-{} minutes", 59 - i)).await }
+        assert!(take_digest(&db).await.unwrap().is_empty(), "la plus ancienne n'attend pas encore depuis une heure");
+        sqlx::query("UPDATE waitlist SET created_at = datetime(created_at, '-2 minutes')").execute(&db).await.unwrap();
+        assert_eq!(take_digest(&db).await.unwrap().len(), 20, "un résumé couvre les 20 demandes");
+        assert!(take_digest(&db).await.unwrap().is_empty(), "rien n'est signalé deux fois");
+        ask(&db, 99, "-1 minutes").await;
+        assert!(take_digest(&db).await.unwrap().is_empty(), "la demande suivante attend le prochain résumé");
+    }
 }
