@@ -14,11 +14,16 @@ pub enum AppError {
     NotFound,
     Conflict(String),
     TooMany,
+    /// Refus avec un code que l'interface sait traiter (ex. double authentification requise).
+    Guard(&'static str, String),
     Internal(anyhow::Error),
 }
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
+        if let AppError::Guard(c, m) = &self {
+            return (StatusCode::FORBIDDEN, Json(json!({ "error": m, "code": c }))).into_response();
+        }
         let (code, msg) = match self {
             AppError::BadRequest(m) => (StatusCode::BAD_REQUEST, m),
             AppError::Unauthorized => (StatusCode::UNAUTHORIZED, "Connexion requise.".into()),
@@ -26,6 +31,7 @@ impl IntoResponse for AppError {
             AppError::NotFound => (StatusCode::NOT_FOUND, "Introuvable.".into()),
             AppError::Conflict(m) => (StatusCode::CONFLICT, m),
             AppError::TooMany => (StatusCode::TOO_MANY_REQUESTS, "Trop de tentatives, réessayez dans une minute.".into()),
+            AppError::Guard(_, m) => (StatusCode::FORBIDDEN, m),
             AppError::Internal(e) => {
                 tracing::error!("erreur interne : {e:?}");
                 (StatusCode::INTERNAL_SERVER_ERROR, "Erreur interne.".into())

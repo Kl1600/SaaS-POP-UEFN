@@ -1,9 +1,11 @@
 // Client HTTP : cookies de session + en-tête anti-CSRF sur chaque requête.
 export class ApiError extends Error {
   status: number
-  constructor(status: number, message: string) {
+  code?: string
+  constructor(status: number, message: string, code?: string) {
     super(message)
     this.status = status
+    this.code = code
   }
 }
 
@@ -21,7 +23,7 @@ async function req<T>(method: string, url: string, body?: unknown): Promise<T> {
   const text = await res.text()
   let data: any = null
   try { data = text ? JSON.parse(text) : null } catch { data = text }
-  if (!res.ok) throw new ApiError(res.status, (data && data.error) || `Erreur ${res.status}`)
+  if (!res.ok) throw new ApiError(res.status, (data && data.error) || `Erreur ${res.status}`, data?.code)
   return data as T
 }
 

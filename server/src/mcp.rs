@@ -125,7 +125,7 @@ pub async fn mcp(State(st): State<AppState>, headers: HeaderMap, axum::extract::
     };
     let _ = sqlx::query("UPDATE api_tokens SET last_used = datetime('now'), calls = calls + 1 WHERE token_hash = ?").bind(sha256_hex(token)).execute(&st.db).await;
     crate::access::notify(&st, mid, json!({ "t": "refresh", "what": "ai" }));
-    let user = AuthUser { id: uid, email, name };
+    let user = AuthUser { id: uid, email, name, sid: String::new() };
     let method = req["method"].as_str().unwrap_or("");
     match method {
         "initialize" => rpc_ok(id, json!({

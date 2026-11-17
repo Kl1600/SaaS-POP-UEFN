@@ -212,15 +212,25 @@ pub async fn crawl(st: &AppState) -> Result<String, String> {
          ) ORDER BY prio, metrics_at IS NOT NULL, metrics_at LIMIT 900",
     ).fetch_all(&st.db).await.map_err(|e| e.to_string())?;
     let mut measured = 0;
+    let (mut failed, mut in_a_row) = (0, 0);
     for c in &codes {
-        match fetch_metrics(st, c).await {
-            Ok(true) => measured += 1,
-            Ok(false) => { let _ = sqlx::query("UPDATE fn_islands SET metrics_at = datetime('now') WHERE code = ?").bind(c).execute(&st.db).await; }
+        // Une requête qui échoue (coupure réseau, délai dépassé) ne doit pas arrêter toute la collecte :
+        // on réessaie une fois, puis on passe à l'île suivante. On ne s'arrête que si le réseau semble coupé.
+        let mut r = fetch_metrics(st, c).await;
+        if matches!(&r, Err(e) if !e.contains("limite")) { tokio::time::sleep(std::time::Duration::from_secs(2)).await; r = fetch_metrics(st, c).await; }
+        match r {
+            Ok(true) => { measured += 1; in_a_row = 0 }
+            Ok(false) => { in_a_row = 0; let _ = sqlx::query("UPDATE fn_islands SET metrics_at = datetime('now') WHERE code = ?").bind(c).execute(&st.db).await; }
             Err(e) if e.contains("limite") => { tokio::time::sleep(std::time::Duration::from_secs(30)).await; break }
-            Err(e) => return Err(e),
+            Err(e) => {
+                failed += 1; in_a_row += 1;
+                tracing::debug!("analyse : {c} ignorée ({e})");
+                if in_a_row >= 10 { return Err(format!("API Fortnite injoignable (10 échecs de suite) : {e}")) }
+            }
         }
         tokio::time::sleep(std::time::Duration::from_millis(150)).await;
     }
+    if failed > 0 { tracing::info!("analyse : {failed} île(s) non mesurée(s) cette fois (réseau), elles seront retentées") }
     let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM fn_islands").fetch_one(&st.db).await.map_err(|e| e.to_string())?;
     sqlx::query("UPDATE fn_status SET last_ok = datetime('now'), last_error = NULL, islands = ? WHERE id = 1").bind(total).execute(&st.db).await.map_err(|e| e.to_string())?;
     Ok(format!("{listed} îles listées, {measured} mesurées"))

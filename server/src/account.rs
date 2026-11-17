@@ -64,9 +64,9 @@ pub async fn change_password(State(st): State<AppState>, u: AuthUser, Json(b): J
 }
 
 async fn set_password(st: &AppState, uid: i64, pw: &str) -> Result<(), AppError> {
-    if pw.chars().count() < 10 {
-        return Err(bad("Le mot de passe doit faire au moins 10 caractères."));
-    }
+    let email: String = sqlx::query_scalar("SELECT email FROM users WHERE id = ?").bind(uid).fetch_one(&st.db).await?;
+    crate::security::password_policy(pw, &email)?;
+    crate::security::audit(st, Some(uid), "mot_de_passe_changé", "", "").await;
     sqlx::query("UPDATE users SET password_hash = ? WHERE id = ?").bind(hash_password(pw)?).bind(uid).execute(&st.db).await?;
     // Déconnecte les autres appareils.
     sqlx::query("DELETE FROM sessions WHERE user_id = ?").bind(uid).execute(&st.db).await?;

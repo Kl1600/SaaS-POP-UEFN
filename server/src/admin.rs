@@ -19,7 +19,10 @@ pub async fn is_admin(st: &AppState, uid: i64) -> Result<bool, AppError> {
     Ok(flag == 1 || env.split(',').map(|e| e.trim().to_lowercase()).any(|e| !e.is_empty() && e == email.to_lowercase()))
 }
 async fn require(st: &AppState, u: &AuthUser) -> Result<(), AppError> {
-    if is_admin(st, u.id).await? { Ok(()) } else { Err(AppError::Forbidden) }
+    crate::security::require_admin(st, u).await
+}
+async fn log(st: &AppState, u: &AuthUser, action: &str, detail: &str) {
+    crate::security::audit(st, Some(u.id), action, detail, "").await;
 }
 
 // ---------- Public : demande d'accès ----------
@@ -76,9 +79,14 @@ pub async fn check_access(State(st): State<AppState>, Query(q): Query<TokQ>) -> 
 }
 
 /// Autorise une inscription : premier compte, invitation d'un studio, lien d'accès validé, ou inscriptions ouvertes.
-pub async fn signup_allowed(st: &AppState, email: &str, invite: Option<&str>, access: Option<&str>) -> Result<Option<i64>, AppError> {
+pub async fn signup_allowed(st: &AppState, email: &str, ip: &str, invite: Option<&str>, access: Option<&str>) -> Result<Option<i64>, AppError> {
     let users: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users").fetch_one(&st.db).await?;
-    if users == 0 || std::env::var("POP_OPEN_SIGNUP").map(|v| v == "1").unwrap_or(false) { return Ok(None) }
+    if std::env::var("POP_OPEN_SIGNUP").map(|v| v == "1").unwrap_or(false) { return Ok(None) }
+    // Une installation vide n'accepte son premier compte que depuis l'ordinateur du serveur,
+    // ou pour une adresse listée dans POP_ADMIN_EMAILS (sinon n'importe qui deviendrait administrateur).
+    let env_admin = std::env::var("POP_ADMIN_EMAILS").unwrap_or_default().split(',').any(|e| !e.trim().is_empty() && e.trim().eq_ignore_ascii_case(email));
+    if env_admin { return Ok(None) }
+    if users == 0 && crate::security::is_loopback(ip) { return Ok(None) }
     if let Some(t) = invite.filter(|t| !t.is_empty()) {
         let ok: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM invitations WHERE token_hash = ? AND accepted_at IS NULL AND created_at > datetime('now', '-7 days')").bind(sha256_hex(t)).fetch_one(&st.db).await?;
         if ok > 0 { return Ok(None) }
@@ -142,6 +150,7 @@ pub async fn waitlist(State(st): State<AppState>, u: AuthUser, Query(q): Query<L
 
 async fn grant(st: &AppState, admin: &AuthUser, wid: i64) -> Result<Value, AppError> {
     let (email, name): (String, String) = sqlx::query_as("SELECT email, name FROM waitlist WHERE id = ?").bind(wid).fetch_optional(&st.db).await?.ok_or(AppError::NotFound)?;
+    log(st, admin, "admin_accès_accordé", &email).await;
     let token = random_token();
     sqlx::query("UPDATE waitlist SET status = 'approved', token_hash = ?, decided_at = datetime('now'), decided_by = ? WHERE id = ?").bind(sha256_hex(&token)).bind(admin.id).bind(wid).execute(&st.db).await?;
     let link = format!("{}/inscription?acces={token}", crate::mail::public_url());
@@ -161,6 +170,7 @@ pub async fn approve(State(st): State<AppState>, u: AuthUser, Path(id): Path<i64
 
 pub async fn refuse(State(st): State<AppState>, u: AuthUser, Path(id): Path<i64>) -> ApiResult<Value> {
     require(&st, &u).await?;
+    log(&st, &u, "admin_demande_refusée", &id.to_string()).await;
     sqlx::query("UPDATE waitlist SET status = 'refused', token_hash = NULL, decided_at = datetime('now'), decided_by = ? WHERE id = ? AND status != 'registered'").bind(u.id).bind(id).execute(&st.db).await?;
     Ok(Json(json!({ "ok": true })))
 }
@@ -173,6 +183,7 @@ pub async fn reopen(State(st): State<AppState>, u: AuthUser, Path(id): Path<i64>
 
 pub async fn remove(State(st): State<AppState>, u: AuthUser, Path(id): Path<i64>) -> ApiResult<Value> {
     require(&st, &u).await?;
+    log(&st, &u, "admin_demande_supprimée", &id.to_string()).await;
     sqlx::query("DELETE FROM waitlist WHERE id = ?").bind(id).execute(&st.db).await?;
     Ok(Json(json!({ "ok": true })))
 }
@@ -216,6 +227,7 @@ pub struct UserPatch { is_admin: Option<bool>, disabled: Option<bool> }
 pub async fn update_user(State(st): State<AppState>, u: AuthUser, Path(id): Path<i64>, Json(b): Json<UserPatch>) -> ApiResult<Value> {
     require(&st, &u).await?;
     if id == u.id { return Err(bad("Vous ne pouvez pas modifier votre propre compte ici.")) }
+    log(&st, &u, "admin_compte_modifié", &format!("utilisateur {id} : admin={:?} désactivé={:?}", b.is_admin, b.disabled)).await;
     if let Some(a) = b.is_admin { sqlx::query("UPDATE users SET is_admin = ? WHERE id = ?").bind(a as i64).bind(id).execute(&st.db).await?; }
     if let Some(d) = b.disabled {
         sqlx::query("UPDATE users SET disabled = ? WHERE id = ?").bind(d as i64).bind(id).execute(&st.db).await?;

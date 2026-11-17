@@ -85,8 +85,21 @@ Chaque action est journalisée et annulable ; droits par rôle (invité en lectu
 | `POP_PUBLIC_URL` | `http://127.0.0.1:8080` | Adresse publique utilisée dans les e-mails |
 | `POP_ADMIN_EMAILS` | — | E-mails des administrateurs de la plateforme (séparés par des virgules). Le premier compte créé est aussi administrateur. |
 | `POP_OPEN_SIGNUP` | `0` | `1` = inscriptions ouvertes à tous (sinon : liste d’attente + lien d’accès validé dans Administration) |
+| `POP_TRUST_PROXY` | `0` | `1` derrière un proxy de confiance (Cloudflare, Caddy…) pour lire la vraie adresse IP des visiteurs |
 | `POP_SMTP_HOST`, `POP_SMTP_PORT`, `POP_SMTP_USER`, `POP_SMTP_PASS`, `POP_SMTP_FROM` | — | Envoi d'e-mails (invitations, mot de passe oublié). Sans eux, les liens s'affichent à copier |
 | `POP_BIND` | `127.0.0.1` | `0.0.0.0` pour le réseau local ou l'hébergement |
 | `PORT` | `8080` | Port (écoute sur 127.0.0.1) |
 | `POP_WEB_DIR` | `../web/dist` | Interface construite |
 | `POP_SECURE_COOKIES` | `0` | `1` derrière HTTPS |
+
+
+## Sécurité
+
+- **Mots de passe** : 10 caractères minimum, mots trop courants refusés, hachage Argon2.
+- **Connexion** : limite par adresse IP et par compte ; 5 mots de passe faux bloquent le compte 15 minutes.
+- **Double authentification** (application TOTP + 10 codes de secours) : Paramètres → Sécurité. **Obligatoire pour l’administration.**
+- **Administration** : double authentification exigée dans la session, puis confirmation par mot de passe + code, valable 30 minutes (bouton « Verrouiller » pour la refermer).
+- **Sessions** : cookie HttpOnly, SameSite, Secure en production ; expiration après 14 jours sans activité ; liste des appareils et déconnexion à distance.
+- **Journal de sécurité** : connexions, échecs, blocages, changements de sécurité, actions d’administration (Administration → Sécurité).
+- **En-têtes** : CSP stricte, interdiction d’intégrer POP dans un autre site, HSTS en production, pas de cache sur l’API.
+- **Compte de test « kl »** : utilisable seulement depuis l’ordinateur qui fait tourner POP. Une installation vide n’accepte son premier compte que depuis cet ordinateur, ou pour une adresse de `POP_ADMIN_EMAILS`.

@@ -1,6 +1,7 @@
 // Panel administrateur de la plateforme POP : liste d'attente, invitations, utilisateurs, vue générale.
-import { useState } from 'react'
-import { Check, X, RotateCcw, Trash2, Copy, Mail, ShieldCheck, Ban, UserPlus } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Check, X, RotateCcw, Trash2, Copy, Mail, ShieldCheck, Ban, UserPlus, Lock } from 'lucide-react'
+import { actionLabel } from '../components/Security'
 import { ago, api, frDate } from '../api'
 import { useApp, useLoad } from '../state'
 import { CardHead, Empty, PageHead } from '../components/ui'
@@ -116,18 +117,52 @@ function Users() {
   </section>
 }
 
+function Audit() {
+  const { data } = useLoad<any[]>('/api/admin/audit')
+  return <section className="card"><CardHead title="Journal de sécurité" sub="Connexions, échecs, blocages, double authentification et actions d’administration (300 derniers événements)." />
+    {!data ? null : data.length === 0 ? <Empty text="Rien pour l’instant." /> :
+      <div style={{ overflowX: 'auto' }}><table className="tbl"><thead><tr><th>Quand</th><th>Qui</th><th>Événement</th><th>Détail</th><th>Adresse IP</th></tr></thead>
+        <tbody>{data.map((e, i) => <tr key={i}><td className="small muted">{ago(e.at)}</td><td>{e.who ?? '—'}</td><td className={/échou|faux|bloqué|refus/.test(e.action) ? 'err' : ''}>{actionLabel(e.action)}</td><td className="small">{e.detail}</td><td className="small mono">{e.ip || '—'}</td></tr>)}</tbody></table></div>}
+  </section>
+}
+
+/** Accès à l'administration : double authentification obligatoire + confirmation récente (mot de passe et code). */
+function Gate({ code, msg, onOk }: { code: string; msg: string; onOk: () => void }) {
+  const { toast } = useApp()
+  const [f, setF] = useState({ password: '', code: '' })
+  return <section className="card" style={{ maxWidth: 520 }}>
+    <div className="row" style={{ gap: 10, marginBottom: 8 }}><Lock size={22} style={{ color: 'var(--to)' }} /><b style={{ fontWeight: 500, fontSize: 17 }}>Accès protégé</b></div>
+    <p style={{ marginTop: 0 }}>{msg}</p>
+    {code === 'mfa_setup' && <a className="btn pri" href="/parametres#securite">Activer la double authentification</a>}
+    {code === 'mfa_session' && <button className="btn pri" onClick={async () => { await api.post('/api/auth/logout'); location.href = '/connexion' }}>Me reconnecter</button>}
+    {code === 'sudo' && <form className="stack" onSubmit={async e => { e.preventDefault(); try { await api.post('/api/admin/unlock', f); onOk() } catch (er: any) { toast(er.message, true) } }}>
+      <label className="label">Mot de passe<input className="field" type="password" required autoFocus autoComplete="current-password" value={f.password} onChange={e => setF({ ...f, password: e.target.value })} /></label>
+      <label className="label">Code à 6 chiffres<input className="field mono" required inputMode="numeric" autoComplete="one-time-code" value={f.code} onChange={e => setF({ ...f, code: e.target.value })} style={{ letterSpacing: 3 }} /></label>
+      <button className="btn pri"><Lock size={15} />Déverrouiller pour 30 minutes</button>
+    </form>}
+  </section>
+}
+
 export default function Admin() {
   const { me } = useApp()
-  const [tab, setTab] = useState<'overview' | 'waitlist' | 'invite' | 'users'>(me?.admin_pending ? 'waitlist' : 'overview')
+  const [tab, setTab] = useState<'overview' | 'waitlist' | 'invite' | 'users' | 'audit'>(me?.admin_pending ? 'waitlist' : 'overview')
+  const [gate, setGate] = useState<{ code: string; msg: string } | null | 'ok'>(null)
+  const check = () => api.get('/api/admin/overview').then(() => setGate('ok')).catch((e: any) => setGate({ code: e.code ?? 'forbidden', msg: e.message }))
+  useEffect(() => { if (me?.admin) check() }, [me?.admin])
   if (!me?.admin) return <main className="content"><PageHead title="Administration" help="Réservé aux administrateurs de POP." /><section className="card"><Empty text="Vous n’avez pas accès à cette page." /></section></main>
   return <main className="content">
-    <PageHead title="Administration" help="Gérer la plateforme POP : demandes d’accès à la bêta, invitations et comptes." />
-    <div className="tabs" role="tablist" style={{ alignSelf: 'flex-start' }}>
-      {([['overview', 'Vue générale'], ['waitlist', `Liste d’attente${me.admin_pending ? ` (${me.admin_pending})` : ''}`], ['invite', 'Inviter'], ['users', 'Utilisateurs']] as const).map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}
-    </div>
-    {tab === 'overview' && <Overview />}
-    {tab === 'waitlist' && <Waitlist />}
-    {tab === 'invite' && <Invite />}
-    {tab === 'users' && <Users />}
+    <PageHead title="Administration" help="Gérer la plateforme POP : demandes d’accès à la bêta, invitations et comptes.">
+      {gate === 'ok' && <button className="btn" onClick={async () => { await api.post('/api/admin/lock'); setGate(null); check() }}><Lock size={15} />Verrouiller</button>}
+    </PageHead>
+    {gate === null ? null : gate !== 'ok' ? <Gate code={gate.code} msg={gate.msg} onOk={() => { setGate(null); check() }} /> : <>
+      <div className="tabs" role="tablist" style={{ alignSelf: 'flex-start' }}>
+        {([['overview', 'Vue générale'], ['waitlist', `Liste d’attente${me.admin_pending ? ` (${me.admin_pending})` : ''}`], ['invite', 'Inviter'], ['users', 'Utilisateurs'], ['audit', 'Sécurité']] as const).map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}
+      </div>
+      {tab === 'overview' && <Overview />}
+      {tab === 'waitlist' && <Waitlist />}
+      {tab === 'invite' && <Invite />}
+      {tab === 'users' && <Users />}
+      {tab === 'audit' && <Audit />}
+    </>}
   </main>
 }
