@@ -58,7 +58,7 @@ const fr = {
       ['Comment marche l’assistant Boussole ?', 'Boussole est intégré à POP : il lit vos tâches, leurs dates, leurs dépendances et vos jalons pour résumer la journée, répondre à vos questions (« qu’est-ce qui est en retard ? », « sur quoi travaille Hugo ? ») et expliquer comment utiliser POP. Il tourne entièrement dans POP : vos données ne partent vers aucun service externe.'],
       ['Et si je veux utiliser mon IA ?', 'Connectez Claude, Cursor, Codex ou une autre IA compatible MCP dans « IA connectées ». Elle peut lire et modifier vos tâches, votre Verse et vos acteurs UEFN, et chaque action est notée et annulable.'],
       ['D’où viennent les chiffres de l’analyse ?', 'De l’API officielle Fortnite d’Epic : joueurs, pic de joueurs simultanés, temps de jeu et rétention de chaque map publique, sur 7 jours.'],
-      ['Comment avoir accès ?', 'POP est en bêta privée. Rejoignez la liste d’attente : on valide les demandes une par une et vous recevez par e-mail un lien pour créer votre compte.'],
+      ['Comment avoir accès ?', 'POP est en bêta privée. Rejoignez la liste d’attente : on valide les demandes une par une, puis on vous envoie votre identifiant et un mot de passe provisoire, que vous changez à la première connexion.'],
       ['Combien ça coûte ?', 'Les tarifs sont affichés plus haut. Ils s’appliquent à l’ouverture de POP ; les membres de la bêta sont prévenus avant tout paiement.'],
     ] as [string, string][],
   },
@@ -77,14 +77,14 @@ const fr = {
   },
   wl: {
     eyebrow: 'Bêta privée', title: 'Rejoindre la liste d’attente', intro: 'On ouvre POP petit à petit pour accompagner chaque studio. Dites-nous qui vous êtes, on vous envoie votre accès dès que possible.',
-    pageIntro: 'Les comptes POP s’ouvrent sur invitation. Dites-nous qui vous êtes : vous recevrez un lien pour créer votre compte dès que votre accès est validé.',
+    pageIntro: 'Les comptes POP sont créés par l’équipe pendant la bêta. Dites-nous qui vous êtes : dès que votre accès est validé, vous recevez votre identifiant et un mot de passe provisoire.',
     invalid: 'Ce lien d’accès est invalide, déjà utilisé ou expiré. Refaites une demande, ou écrivez à l’équipe POP.',
     name: 'Nom ou pseudo', email: 'E-mail', studio: 'Studio', optional: '(facultatif)', studioPh: 'Nom du studio', team: 'Taille de l’équipe',
     teams: ['Seul', '2 à 3', '4 à 10', 'Plus de 10'], exp: 'Expérience', exps: ['Débutant UEFN', 'Quelques maps publiées', 'Créateur confirmé', 'Studio professionnel'],
     links: 'Vos maps ou réseaux', linksPh: 'Codes d’îles, TikTok, YouTube…', msg: 'Ce que vous voulez faire avec POP', msgPh: 'Ex. : on est 4 sur une map tycoon et on se perd entre Discord et les Google Docs.',
     send: 'Demander mon accès', sending: 'Envoi…', nospam: 'Pas de spam : on vous écrit seulement pour vous donner votre accès.',
-    okTitle: 'C’est noté, merci !', okText: 'Votre demande est arrivée chez l’équipe POP. Vous recevrez un lien pour créer votre compte dès qu’une place se libère.',
-    alreadyTitle: 'Vous êtes déjà sur la liste.', approvedTitle: 'Votre accès est déjà validé.', approvedText: 'Vérifiez vos e-mails : le lien pour créer votre compte vous a été envoyé. Sinon, écrivez-nous.', close: 'Fermer',
+    okTitle: 'C’est noté, merci !', okText: 'Votre demande est arrivée chez l’équipe POP. Dès qu’une place se libère, on vous envoie votre identifiant et un mot de passe provisoire.',
+    alreadyTitle: 'Vous êtes déjà sur la liste.', approvedTitle: 'Votre accès est déjà validé.', approvedText: 'Votre compte est prêt : l’équipe POP vous envoie votre identifiant et votre mot de passe provisoire. Sinon, écrivez-nous.', close: 'Fermer',
   },
 }
 export type Dict = typeof fr

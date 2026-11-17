@@ -56,7 +56,7 @@ const ro: Dict = {
       ['Cum funcționează asistentul Boussole?', 'Boussole e integrat în POP: îți citește sarcinile, datele, dependențele și etapele ca să rezume ziua, să răspundă la întrebări („ce e întârziat?”, „la ce lucrează Hugo?”) și să explice cum se folosește POP. Rulează în întregime în POP: datele tale nu pleacă spre niciun serviciu extern.'],
       ['Și dacă vreau să folosesc IA mea?', 'Conectează Claude, Cursor, Codex sau altă IA compatibilă MCP în „IA conectate”. Poate citi și modifica sarcinile, Verse-ul și actorii UEFN, iar fiecare acțiune e înregistrată și reversibilă.'],
       ['De unde vin cifrele din analiză?', 'Din API-ul oficial Fortnite de la Epic: jucători, vârf de jucători simultani, timp de joc și retenție pentru fiecare hartă publică, pe 7 zile.'],
-      ['Cum obțin acces?', 'POP e în beta privată. Intră pe lista de așteptare: verificăm cererile una câte una și primești pe e-mail un link pentru a-ți crea contul.'],
+      ['Cum obțin acces?', 'POP e în beta privată. Intră pe lista de așteptare: verificăm cererile una câte una, apoi îți trimitem numele de utilizator și o parolă provizorie, pe care o schimbi la prima conectare.'],
       ['Cât costă?', 'Prețurile sunt afișate mai sus. Se aplică la deschiderea POP; membrii beta sunt anunțați înainte de orice plată.'],
     ],
   },
@@ -75,14 +75,14 @@ const ro: Dict = {
   },
   wl: {
     eyebrow: 'Beta privată', title: 'Intră pe lista de așteptare', intro: 'Deschidem POP treptat, ca să fim alături de fiecare studio. Spune-ne cine ești și îți trimitem accesul cât mai repede.',
-    pageIntro: 'Conturile POP se deschid pe bază de invitație. Spune-ne cine ești: vei primi un link pentru a-ți crea contul după ce accesul e aprobat.',
+    pageIntro: 'În timpul beta, conturile POP sunt create de echipă. Spune-ne cine ești: după ce accesul e aprobat, primești numele de utilizator și o parolă provizorie.',
     invalid: 'Acest link de acces e invalid, deja folosit sau expirat. Trimite o nouă cerere sau scrie echipei POP.',
     name: 'Nume sau pseudonim', email: 'E-mail', studio: 'Studio', optional: '(opțional)', studioPh: 'Numele studioului', team: 'Mărimea echipei',
     teams: ['Singur', '2–3', '4–10', 'Peste 10'], exp: 'Experiență', exps: ['Începător în UEFN', 'Câteva hărți publicate', 'Creator experimentat', 'Studio profesionist'],
     links: 'Hărțile sau rețelele tale', linksPh: 'Coduri de insulă, TikTok, YouTube…', msg: 'Ce vrei să faci cu POP', msgPh: 'Ex.: suntem 4 pe o hartă tycoon și ne pierdem între Discord și Google Docs.',
     send: 'Cere acces', sending: 'Se trimite…', nospam: 'Fără spam: îți scriem doar ca să-ți dăm accesul.',
-    okTitle: 'Am notat, mulțumim!', okText: 'Cererea ta a ajuns la echipa POP. Vei primi un link pentru a-ți crea contul imediat ce se eliberează un loc.',
-    alreadyTitle: 'Ești deja pe listă.', approvedTitle: 'Accesul tău e deja aprobat.', approvedText: 'Verifică-ți e-mailul: linkul pentru crearea contului a fost trimis. Dacă nu, scrie-ne.', close: 'Închide',
+    okTitle: 'Am notat, mulțumim!', okText: 'Cererea ta a ajuns la echipa POP. Imediat ce se eliberează un loc, îți trimitem numele de utilizator și o parolă provizorie.',
+    alreadyTitle: 'Ești deja pe listă.', approvedTitle: 'Accesul tău e deja aprobat.', approvedText: 'Contul tău e gata: echipa POP îți trimite numele de utilizator și parola provizorie. Dacă nu, scrie-ne.', close: 'Închide',
   },
 }
 export default ro

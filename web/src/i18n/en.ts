@@ -56,7 +56,7 @@ const en: Dict = {
       ['How does the Boussole assistant work?', 'Boussole is built into POP: it reads your tasks, their dates, dependencies and milestones to sum up the day, answer your questions (“what’s late?”, “what is Hugo working on?”) and explain how to use POP. It runs entirely inside POP: your data goes to no external service.'],
       ['What if I want to use my own AI?', 'Connect Claude, Cursor, Codex or another MCP-compatible AI in “Connected AIs”. It can read and edit your tasks, Verse and UEFN actors, and every action is logged and undoable.'],
       ['Where do the analytics numbers come from?', 'From Epic’s official Fortnite API: players, peak concurrent players, playtime and retention for every public map, over 7 days.'],
-      ['How do I get access?', 'POP is in private beta. Join the waitlist: we review requests one by one and you get an email link to create your account.'],
+      ['How do I get access?', 'POP is in private beta. Join the waitlist: we review requests one by one, then send you your username and a temporary password, which you change at your first login.'],
       ['How much does it cost?', 'Prices are shown above. They apply when POP opens; beta members are notified before any payment.'],
     ],
   },
@@ -75,14 +75,14 @@ const en: Dict = {
   },
   wl: {
     eyebrow: 'Private beta', title: 'Join the waitlist', intro: 'We’re opening POP gradually to support every studio. Tell us who you are and we’ll send you access as soon as possible.',
-    pageIntro: 'POP accounts are invite-only. Tell us who you are: you’ll get a link to create your account once your access is approved.',
+    pageIntro: 'POP accounts are created by the team during the beta. Tell us who you are: once your access is approved, you’ll get your username and a temporary password.',
     invalid: 'This access link is invalid, already used or expired. Request again, or write to the POP team.',
     name: 'Name or nickname', email: 'Email', studio: 'Studio', optional: '(optional)', studioPh: 'Studio name', team: 'Team size',
     teams: ['Solo', '2 to 3', '4 to 10', 'More than 10'], exp: 'Experience', exps: ['New to UEFN', 'A few published maps', 'Experienced creator', 'Professional studio'],
     links: 'Your maps or socials', linksPh: 'Island codes, TikTok, YouTube…', msg: 'What you want to do with POP', msgPh: 'E.g. we’re 4 on a tycoon map and we get lost between Discord and Google Docs.',
     send: 'Request access', sending: 'Sending…', nospam: 'No spam: we only write to give you access.',
-    okTitle: 'Got it, thanks!', okText: 'Your request has reached the POP team. You’ll get a link to create your account as soon as a spot opens.',
-    alreadyTitle: 'You’re already on the list.', approvedTitle: 'Your access is already approved.', approvedText: 'Check your email: the link to create your account has been sent. Otherwise, write to us.', close: 'Close',
+    okTitle: 'Got it, thanks!', okText: 'Your request has reached the POP team. As soon as a spot opens, we’ll send you your username and a temporary password.',
+    alreadyTitle: 'You’re already on the list.', approvedTitle: 'Your access is already approved.', approvedText: 'Your account is ready: the POP team is sending you your username and temporary password. Otherwise, write to us.', close: 'Close',
   },
 }
 export default en

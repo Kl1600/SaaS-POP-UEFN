@@ -53,8 +53,6 @@ pub struct AppState {
     pub db: sqlx::SqlitePool,
     pub hub: Arc<ws::Hub>,
     pub limiter: Arc<Mutex<HashMap<String, (u32, Instant)>>>,
-    /// Connexions en attente du code de double authentification : empreinte du ticket → (utilisateur, création, essais).
-    pub mfa_tickets: Arc<Mutex<HashMap<String, (i64, Instant, u32)>>>,
     pub board_lock: Arc<tokio::sync::Mutex<()>>,
     pub secure_cookies: bool,
     pub dummy_hash: String,
@@ -171,11 +169,8 @@ fn api() -> Router<AppState> {
         .route("/api/maps/{mid}/overview", get(plan::overview))
         .route("/api/waitlist", post(admin::join))
         .route("/api/waitlist/access", get(admin::check_access))
-        .route("/api/auth/mfa", post(auth::login_mfa))
         .route("/api/me/security", get(security::overview))
-        .route("/api/me/2fa/setup", post(security::setup_2fa))
-        .route("/api/me/2fa/enable", post(security::enable_2fa))
-        .route("/api/me/2fa/disable", post(security::disable_2fa))
+        .route("/api/me/first-password", post(account::first_password))
         .route("/api/me/sessions/{id}", delete(security::revoke_session))
         .route("/api/me/sessions/close-others", post(security::revoke_others))
         .route("/api/admin/unlock", post(security::unlock_admin))
@@ -191,6 +186,8 @@ fn api() -> Router<AppState> {
         .route("/api/admin/invite", post(admin::invite))
         .route("/api/admin/users", get(admin::users))
         .route("/api/admin/users/{id}", post(admin::update_user))
+        .route("/api/admin/accounts", post(admin::create_account))
+        .route("/api/admin/users/{id}/password", post(admin::reset_password))
         .route("/api/maps/{mid}/guide", get(guide::guide))
         .route("/api/maps/{mid}/guide/ask", get(guide::ask))
         .route("/api/maps/{mid}/report", get(report))
@@ -288,7 +285,6 @@ async fn main() -> anyhow::Result<()> {
         db,
         hub: Arc::new(ws::Hub::default()),
         limiter: Arc::new(Mutex::new(HashMap::new())),
-        mfa_tickets: Arc::new(Mutex::new(HashMap::new())),
         board_lock: Arc::new(tokio::sync::Mutex::new(())),
         secure_cookies: std::env::var("POP_SECURE_COOKIES").map(|v| v == "1").unwrap_or(false),
         dummy_hash: auth::hash_password("mot-de-passe-factice").map_err(|e| anyhow::anyhow!("{e:?}"))?,

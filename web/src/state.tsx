@@ -3,7 +3,7 @@ import { api } from './api'
 
 export type MapInfo = { id: number; name: string; genre: string; release_date: string | null; status: string }
 export type Studio = { id: number; name: string; role: string; maps: MapInfo[] }
-export type Me = { user: { id: number; name: string; email: string }; credits: number; studios: Studio[]; admin?: boolean; admin_pending?: number }
+export type Me = { user: { id: number; name: string; email: string }; credits: number; studios: Studio[]; admin?: boolean; admin_pending?: number; username?: string | null; must_change_password?: boolean }
 export type Presence = { uid: number; name: string; place: string }
 
 type Ctx = {

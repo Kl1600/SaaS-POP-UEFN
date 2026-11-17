@@ -56,7 +56,7 @@ const tr: Dict = {
       ['Boussole asistanı nasıl çalışır?', 'Boussole POP’a yerleşiktir: günü özetlemek, sorularınızı cevaplamak (“ne gecikti?”, “Hugo ne üzerinde çalışıyor?”) ve POP’un nasıl kullanılacağını anlatmak için görevlerinizi, tarihlerini, bağımlılıklarını ve kilometre taşlarınızı okur. Tamamen POP içinde çalışır: verileriniz hiçbir harici hizmete gitmez.'],
       ['Kendi yapay zekâmı kullanmak istersem?', 'Claude, Cursor, Codex veya MCP uyumlu başka bir yapay zekâyı “Bağlı yapay zekâlar”da bağlayın. Görevlerinizi, Verse’ünüzü ve UEFN aktörlerinizi okuyup düzenleyebilir; her işlem kaydedilir ve geri alınabilir.'],
       ['Analizdeki rakamlar nereden geliyor?', 'Epic’in resmî Fortnite API’sinden: her herkese açık harita için 7 günlük oyuncu sayısı, eşzamanlı oyuncu zirvesi, oynama süresi ve elde tutma.'],
-      ['Nasıl erişim alırım?', 'POP kapalı betada. Bekleme listesine katılın: talepleri tek tek inceliyoruz ve hesabınızı oluşturmanız için e-postayla bir bağlantı alıyorsunuz.'],
+      ['Nasıl erişim alırım?', 'POP kapalı betada. Bekleme listesine katılın: talepleri tek tek inceliyor, ardından kullanıcı adınızı ve ilk girişte değiştireceğiniz geçici bir şifre gönderiyoruz.'],
       ['Ne kadar tutuyor?', 'Fiyatlar yukarıda. POP açıldığında geçerli olur; beta üyelerine herhangi bir ödemeden önce haber verilir.'],
     ],
   },
@@ -75,14 +75,14 @@ const tr: Dict = {
   },
   wl: {
     eyebrow: 'Kapalı beta', title: 'Bekleme listesine katıl', intro: 'Her stüdyoya destek olabilmek için POP’u adım adım açıyoruz. Kim olduğunuzu anlatın, erişiminizi en kısa sürede gönderelim.',
-    pageIntro: 'POP hesapları davetle açılır. Kim olduğunuzu anlatın: erişiminiz onaylanınca hesabınızı oluşturmanız için bir bağlantı alacaksınız.',
+    pageIntro: 'Beta süresince POP hesaplarını ekip oluşturur. Kim olduğunuzu anlatın: erişiminiz onaylanınca kullanıcı adınızı ve geçici bir şifre alacaksınız.',
     invalid: 'Bu erişim bağlantısı geçersiz, zaten kullanılmış veya süresi dolmuş. Yeniden başvurun ya da POP ekibine yazın.',
     name: 'Ad veya takma ad', email: 'E-posta', studio: 'Stüdyo', optional: '(isteğe bağlı)', studioPh: 'Stüdyo adı', team: 'Ekip büyüklüğü',
     teams: ['Tek başıma', '2–3', '4–10', '10’dan fazla'], exp: 'Deneyim', exps: ['UEFN’de yeni', 'Birkaç yayımlanmış harita', 'Deneyimli üretici', 'Profesyonel stüdyo'],
     links: 'Haritalarınız veya sosyal medyanız', linksPh: 'Ada kodları, TikTok, YouTube…', msg: 'POP ile ne yapmak istiyorsunuz', msgPh: 'Örn. bir tycoon haritasında 4 kişiyiz ve Discord ile Google Docs arasında kayboluyoruz.',
     send: 'Erişim iste', sending: 'Gönderiliyor…', nospam: 'Spam yok: yalnızca erişim vermek için yazarız.',
-    okTitle: 'Kaydedildi, teşekkürler!', okText: 'Talebiniz POP ekibine ulaştı. Bir yer açılır açılmaz hesabınızı oluşturmanız için bir bağlantı alacaksınız.',
-    alreadyTitle: 'Zaten listedesiniz.', approvedTitle: 'Erişiminiz zaten onaylandı.', approvedText: 'E-postanızı kontrol edin: hesap oluşturma bağlantısı gönderildi. Gelmediyse bize yazın.', close: 'Kapat',
+    okTitle: 'Kaydedildi, teşekkürler!', okText: 'Talebiniz POP ekibine ulaştı. Bir yer açılır açılmaz kullanıcı adınızı ve geçici bir şifre göndereceğiz.',
+    alreadyTitle: 'Zaten listedesiniz.', approvedTitle: 'Erişiminiz zaten onaylandı.', approvedText: 'Hesabınız hazır: POP ekibi kullanıcı adınızı ve geçici şifrenizi gönderiyor. Gelmediyse bize yazın.', close: 'Kapat',
   },
 }
 export default tr

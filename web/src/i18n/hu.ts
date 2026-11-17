@@ -56,7 +56,7 @@ const hu: Dict = {
       ['Hogyan működik a Boussole asszisztens?', 'Boussole a POP része: beolvassa a feladataidat, azok határidejét, függőségeit és a mérföldköveidet, hogy összefoglalja a napot, válaszoljon a kérdéseidre („mi késik?”, „min dolgozik Hugo?”), és elmagyarázza, hogyan használd a POP-ot. Teljes egészében a POP-on belül fut: az adataid semmilyen külső szolgáltatáshoz nem kerülnek.'],
       ['És ha a saját MI-met akarom használni?', 'Kösd be a Claude-ot, Cursort, Codexet vagy más MCP-kompatibilis MI-t a „Bekötött MI-k” között. Olvashatja és szerkesztheti a feladataidat, a Verse-t és az UEFN-aktorokat, és minden művelet naplózva és visszavonható.'],
       ['Honnan származnak az elemzés számai?', 'Az Epic hivatalos Fortnite API-jából: játékosszám, egyidejű játékoscsúcs, játékidő és megtartás minden nyilvános pályára, 7 napra.'],
-      ['Hogyan kapok hozzáférést?', 'A POP zárt bétában van. Iratkozz fel a várólistára: a kéréseket egyenként bíráljuk el, és e-mailben kapsz egy linket a fiókod létrehozásához.'],
+      ['Hogyan kapok hozzáférést?', 'A POP zárt bétában van. Iratkozz fel a várólistára: a kéréseket egyenként bíráljuk el, majd elküldjük a felhasználóneved és egy ideiglenes jelszót, amelyet az első belépéskor megváltoztatsz.'],
       ['Mennyibe kerül?', 'Az árak fentebb láthatók. A POP indulásakor lépnek életbe; a béta tagjait bármilyen fizetés előtt értesítjük.'],
     ],
   },
@@ -75,14 +75,14 @@ const hu: Dict = {
   },
   wl: {
     eyebrow: 'Zárt béta', title: 'Feliratkozás a várólistára', intro: 'Fokozatosan nyitjuk meg a POP-ot, hogy minden stúdiót segíthessünk. Mondd el, ki vagy, és amint lehet, küldjük a hozzáférést.',
-    pageIntro: 'POP-fiók csak meghívóval nyitható. Mondd el, ki vagy: a jóváhagyás után kapsz egy linket a fiókod létrehozásához.',
+    pageIntro: 'A béta alatt a POP-fiókokat a csapat hozza létre. Mondd el, ki vagy: a jóváhagyás után megkapod a felhasználóneved és egy ideiglenes jelszót.',
     invalid: 'Ez a hozzáférési link érvénytelen, már felhasználták vagy lejárt. Kérd újra, vagy írj a POP csapatának.',
     name: 'Név vagy becenév', email: 'E-mail', studio: 'Stúdió', optional: '(nem kötelező)', studioPh: 'A stúdió neve', team: 'Csapatméret',
     teams: ['Egyedül', '2–3', '4–10', 'Több mint 10'], exp: 'Tapasztalat', exps: ['Új az UEFN-ben', 'Néhány kiadott pálya', 'Tapasztalt alkotó', 'Profi stúdió'],
     links: 'A pályáid vagy közösségi oldalaid', linksPh: 'Szigetkódok, TikTok, YouTube…', msg: 'Mit szeretnél csinálni a POP-pal', msgPh: 'Pl. négyen dolgozunk egy tycoon pályán, és elveszünk a Discord és a Google Docs között.',
     send: 'Hozzáférés kérése', sending: 'Küldés…', nospam: 'Nincs spam: csak a hozzáférés miatt írunk.',
-    okTitle: 'Megkaptuk, köszönjük!', okText: 'A kérésed megérkezett a POP csapatához. Amint felszabadul egy hely, kapsz egy linket a fiókod létrehozásához.',
-    alreadyTitle: 'Már rajta vagy a listán.', approvedTitle: 'A hozzáférésed már jóvá van hagyva.', approvedText: 'Nézd meg az e-mailjeidet: a fiók létrehozásához szükséges linket elküldtük. Ha nem érkezett meg, írj nekünk.', close: 'Bezárás',
+    okTitle: 'Megkaptuk, köszönjük!', okText: 'A kérésed megérkezett a POP csapatához. Amint felszabadul egy hely, elküldjük a felhasználóneved és egy ideiglenes jelszót.',
+    alreadyTitle: 'Már rajta vagy a listán.', approvedTitle: 'A hozzáférésed már jóvá van hagyva.', approvedText: 'A fiókod kész: a POP csapata elküldi a felhasználóneved és az ideiglenes jelszavad. Ha nem érkezett meg, írj nekünk.', close: 'Bezárás',
   },
 }
 export default hu

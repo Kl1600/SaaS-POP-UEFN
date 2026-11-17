@@ -97,8 +97,8 @@ Chaque action est journalisée et annulable ; droits par rôle (invité en lectu
 
 - **Mots de passe** : 10 caractères minimum, mots trop courants refusés, hachage Argon2.
 - **Connexion** : limite par adresse IP et par compte ; 5 mots de passe faux bloquent le compte 15 minutes.
-- **Double authentification** (application TOTP + 10 codes de secours) : Paramètres → Sécurité. **Obligatoire pour l’administration.**
-- **Administration** : double authentification exigée dans la session, puis confirmation par mot de passe + code, valable 30 minutes (bouton « Verrouiller » pour la refermer).
+- **Comptes de la bêta** : créés par un administrateur (Administration → Créer un compte, ou « Accepter et créer le compte » sur une demande) avec un identifiant et un mot de passe provisoire, que la personne remplace à sa première connexion. Connexion par identifiant ou e-mail. (Plus tard : connexion par code reçu par e-mail.)
+- **Administration** : confirmation par mot de passe, valable 30 minutes (bouton « Verrouiller » pour la refermer). La double authentification a été retirée pour la bêta.
 - **Sessions** : cookie HttpOnly, SameSite, Secure en production ; expiration après 14 jours sans activité ; liste des appareils et déconnexion à distance.
 - **Journal de sécurité** : connexions, échecs, blocages, changements de sécurité, actions d’administration (Administration → Sécurité).
 - **En-têtes** : CSP stricte, interdiction d’intégrer POP dans un autre site, HSTS en production, pas de cache sur l’API.

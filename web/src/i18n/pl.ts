@@ -56,7 +56,7 @@ const pl: Dict = {
       ['Jak działa asystent Boussole?', 'Boussole jest wbudowany w POP: czyta twoje zadania, ich terminy, zależności i kamienie milowe, aby podsumować dzień, odpowiadać na pytania („co jest opóźnione?”, „nad czym pracuje Hugo?”) i wyjaśniać, jak korzystać z POP. Działa w całości w POP: twoje dane nie trafiają do żadnej zewnętrznej usługi.'],
       ['A jeśli chcę używać własnego AI?', 'Połącz Claude, Cursor, Codex lub inne AI zgodne z MCP w „Połączone AI”. Może czytać i edytować zadania, Verse i aktorów UEFN, a każda akcja jest zapisana i odwracalna.'],
       ['Skąd pochodzą dane w analizie?', 'Z oficjalnego API Fortnite od Epic: gracze, szczyt jednoczesnych graczy, czas gry i retencja każdej publicznej mapy, z 7 dni.'],
-      ['Jak uzyskać dostęp?', 'POP jest w zamkniętej becie. Dołącz do listy oczekujących: sprawdzamy zgłoszenia pojedynczo, a link do założenia konta dostaniesz e-mailem.'],
+      ['Jak uzyskać dostęp?', 'POP jest w zamkniętej becie. Dołącz do listy oczekujących: sprawdzamy zgłoszenia pojedynczo, a potem wysyłamy ci login i tymczasowe hasło, które zmienisz przy pierwszym logowaniu.'],
       ['Ile to kosztuje?', 'Ceny są podane wyżej. Obowiązują od otwarcia POP; uczestnicy bety zostaną powiadomieni przed każdą płatnością.'],
     ],
   },
@@ -75,14 +75,14 @@ const pl: Dict = {
   },
   wl: {
     eyebrow: 'Zamknięta beta', title: 'Dołącz do listy oczekujących', intro: 'Otwieramy POP stopniowo, by zadbać o każde studio. Powiedz nam, kim jesteś, a wyślemy ci dostęp jak najszybciej.',
-    pageIntro: 'Konta POP są tylko na zaproszenie. Powiedz nam, kim jesteś: po zatwierdzeniu dostaniesz link do założenia konta.',
+    pageIntro: 'W czasie bety konta POP zakłada zespół. Powiedz nam, kim jesteś: po zatwierdzeniu dostępu otrzymasz login i tymczasowe hasło.',
     invalid: 'Ten link dostępu jest nieprawidłowy, już użyty lub wygasł. Złóż prośbę ponownie albo napisz do zespołu POP.',
     name: 'Imię lub pseudonim', email: 'E-mail', studio: 'Studio', optional: '(opcjonalnie)', studioPh: 'Nazwa studia', team: 'Wielkość zespołu',
     teams: ['Sam', '2–3', '4–10', 'Ponad 10'], exp: 'Doświadczenie', exps: ['Nowy w UEFN', 'Kilka opublikowanych map', 'Doświadczony twórca', 'Profesjonalne studio'],
     links: 'Twoje mapy lub social media', linksPh: 'Kody wysp, TikTok, YouTube…', msg: 'Co chcesz robić z POP', msgPh: 'Np. jesteśmy w 4 osoby przy mapie tycoon i gubimy się między Discordem a Google Docs.',
     send: 'Poproś o dostęp', sending: 'Wysyłanie…', nospam: 'Bez spamu: piszemy tylko po to, by dać ci dostęp.',
-    okTitle: 'Zapisane, dziękujemy!', okText: 'Twoja prośba dotarła do zespołu POP. Link do założenia konta dostaniesz, gdy tylko zwolni się miejsce.',
-    alreadyTitle: 'Jesteś już na liście.', approvedTitle: 'Twój dostęp jest już zatwierdzony.', approvedText: 'Sprawdź e-mail: link do założenia konta został wysłany. Jeśli nie dotarł, napisz do nas.', close: 'Zamknij',
+    okTitle: 'Zapisane, dziękujemy!', okText: 'Twoja prośba dotarła do zespołu POP. Gdy tylko zwolni się miejsce, wyślemy ci login i tymczasowe hasło.',
+    alreadyTitle: 'Jesteś już na liście.', approvedTitle: 'Twój dostęp jest już zatwierdzony.', approvedText: 'Twoje konto jest gotowe: zespół POP wyśle ci login i tymczasowe hasło. Jeśli nie dotarły, napisz do nas.', close: 'Zamknij',
   },
 }
 export default pl

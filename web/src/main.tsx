@@ -4,7 +4,7 @@ import { BrowserRouter, Route, Routes, useParams } from 'react-router-dom'
 import './styles.css'
 import { AppProvider, useApp } from './state'
 import Layout from './components/Layout'
-import { Login, Signup, Onboarding, InviteAccept, PublicPage, ResetPassword, Welcome } from './pages/Auth'
+import { Login, Signup, Onboarding, InviteAccept, PublicPage, ResetPassword, Welcome, FirstPassword } from './pages/Auth'
 import Overview from './pages/Overview'
 import Pages from './pages/Pages'
 import Board from './pages/Board'
@@ -31,6 +31,7 @@ function Gate() {
     <Route path="/inscription" element={<Signup />} />
     <Route path="*" element={<Login />} />
   </Routes>
+  if (me.must_change_password) return <FirstPassword />
   if (me.studios.length === 0) return <Onboarding />
   if (me.studios.every(s => s.maps.length === 0)) return <Welcome />
   return (

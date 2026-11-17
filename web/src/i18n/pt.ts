@@ -57,7 +57,7 @@ const ptBR: Dict = {
       ['Como funciona o assistente Boussole?', 'O Boussole é integrado ao POP: ele lê suas tarefas, datas, dependências e marcos para resumir o dia, responder às suas perguntas (“o que está atrasado?”, “no que o Hugo está trabalhando?”) e explicar como usar o POP. Funciona totalmente dentro do POP: seus dados não vão para nenhum serviço externo.'],
       ['E se eu quiser usar minha própria IA?', 'Conecte Claude, Cursor, Codex ou outra IA compatível com MCP em “IAs conectadas”. Ela pode ler e editar suas tarefas, seu Verse e seus atores no UEFN, e toda ação é registrada e pode ser desfeita.'],
       ['De onde vêm os números da análise?', 'Da API oficial do Fortnite da Epic: jogadores, pico de jogadores simultâneos, tempo de jogo e retenção de cada mapa público, por 7 dias.'],
-      ['Como consigo acesso?', 'O POP está em beta fechado. Entre na lista de espera: analisamos os pedidos um a um e você recebe por e-mail um link para criar sua conta.'],
+      ['Como consigo acesso?', 'O POP está em beta fechado. Entre na lista de espera: analisamos os pedidos um a um e depois enviamos seu usuário e uma senha provisória, que você troca no primeiro acesso.'],
       ['Quanto custa?', 'Os preços estão mais acima. Eles valem no lançamento do POP; os membros do beta são avisados antes de qualquer pagamento.'],
     ],
   },
@@ -76,14 +76,14 @@ const ptBR: Dict = {
   },
   wl: {
     eyebrow: 'Beta fechado', title: 'Entrar na lista de espera', intro: 'Estamos abrindo o POP aos poucos para acompanhar cada estúdio. Conte quem você é e enviamos seu acesso o quanto antes.',
-    pageIntro: 'As contas do POP são por convite. Conte quem você é: você vai receber um link para criar sua conta quando seu acesso for aprovado.',
+    pageIntro: 'Durante o beta, as contas do POP são criadas pela equipe. Conte quem você é: quando seu acesso for aprovado, você recebe seu usuário e uma senha provisória.',
     invalid: 'Este link de acesso é inválido, já foi usado ou expirou. Peça de novo ou escreva para a equipe do POP.',
     name: 'Nome ou apelido', email: 'E-mail', studio: 'Estúdio', optional: '(opcional)', studioPh: 'Nome do estúdio', team: 'Tamanho da equipe',
     teams: ['Sozinho', '2 a 3', '4 a 10', 'Mais de 10'], exp: 'Experiência', exps: ['Iniciante no UEFN', 'Alguns mapas publicados', 'Criador experiente', 'Estúdio profissional'],
     links: 'Seus mapas ou redes', linksPh: 'Códigos de ilha, TikTok, YouTube…', msg: 'O que você quer fazer com o POP', msgPh: 'Ex.: somos 4 num mapa tycoon e nos perdemos entre o Discord e os Google Docs.',
     send: 'Pedir acesso', sending: 'Enviando…', nospam: 'Sem spam: só escrevemos para liberar seu acesso.',
-    okTitle: 'Anotado, obrigado!', okText: 'Seu pedido chegou à equipe do POP. Você vai receber um link para criar sua conta assim que abrir uma vaga.',
-    alreadyTitle: 'Você já está na lista.', approvedTitle: 'Seu acesso já foi aprovado.', approvedText: 'Veja seu e-mail: o link para criar sua conta foi enviado. Se não chegou, escreva para nós.', close: 'Fechar',
+    okTitle: 'Anotado, obrigado!', okText: 'Seu pedido chegou à equipe do POP. Assim que abrir uma vaga, enviamos seu usuário e uma senha provisória.',
+    alreadyTitle: 'Você já está na lista.', approvedTitle: 'Seu acesso já foi aprovado.', approvedText: 'Sua conta está pronta: a equipe do POP vai enviar seu usuário e sua senha provisória. Se não chegar, escreva para nós.', close: 'Fechar',
   },
 }
 export default ptBR

@@ -14,7 +14,7 @@ pub enum AppError {
     NotFound,
     Conflict(String),
     TooMany,
-    /// Refus avec un code que l'interface sait traiter (ex. double authentification requise).
+    /// Refus avec un code que l'interface sait traiter (ex. confirmation du mot de passe pour l'administration).
     Guard(&'static str, String),
     Internal(anyhow::Error),
 }

@@ -56,7 +56,7 @@ const nl: Dict = {
       ['Hoe werkt de assistent Boussole?', 'Boussole is ingebouwd in POP: hij leest je taken, data, afhankelijkheden en mijlpalen om de dag samen te vatten, je vragen te beantwoorden (“wat loopt achter?”, “waar werkt Hugo aan?”) en uit te leggen hoe POP werkt. Hij draait volledig in POP: je gegevens gaan naar geen enkele externe dienst.'],
       ['En als ik mijn eigen AI wil gebruiken?', 'Koppel Claude, Cursor, Codex of een andere MCP-compatibele AI in “Gekoppelde AI’s”. Die kan je taken, Verse en UEFN-actors lezen en wijzigen, en elke actie wordt vastgelegd en kan ongedaan.'],
       ['Waar komen de cijfers van de analyse vandaan?', 'Uit de officiële Fortnite-API van Epic: spelers, piek gelijktijdige spelers, speeltijd en retentie van elke openbare map, over 7 dagen.'],
-      ['Hoe krijg ik toegang?', 'POP zit in privébèta. Zet je op de wachtlijst: we bekijken aanvragen één voor één en je krijgt per e-mail een link om je account aan te maken.'],
+      ['Hoe krijg ik toegang?', 'POP is in besloten bèta. Meld je aan voor de wachtlijst: we bekijken de aanvragen één voor één en sturen je daarna je gebruikersnaam en een tijdelijk wachtwoord, dat je bij de eerste keer inloggen wijzigt.'],
       ['Wat kost het?', 'De prijzen staan hierboven. Ze gelden vanaf de lancering van POP; bètaleden worden vóór elke betaling geïnformeerd.'],
     ],
   },
@@ -75,14 +75,14 @@ const nl: Dict = {
   },
   wl: {
     eyebrow: 'Privébèta', title: 'Op de wachtlijst', intro: 'We openen POP stap voor stap om elke studio goed te begeleiden. Vertel wie je bent en we sturen je zo snel mogelijk toegang.',
-    pageIntro: 'POP-accounts zijn alleen op uitnodiging. Vertel wie je bent: je krijgt een link om je account aan te maken zodra je toegang is goedgekeurd.',
+    pageIntro: 'Tijdens de bèta maakt het team de POP-accounts aan. Vertel ons wie je bent: zodra je toegang is goedgekeurd, krijg je je gebruikersnaam en een tijdelijk wachtwoord.',
     invalid: 'Deze toegangslink is ongeldig, al gebruikt of verlopen. Vraag opnieuw aan of schrijf het POP-team.',
     name: 'Naam of bijnaam', email: 'E-mail', studio: 'Studio', optional: '(optioneel)', studioPh: 'Naam van de studio', team: 'Teamgrootte',
     teams: ['Alleen', '2 tot 3', '4 tot 10', 'Meer dan 10'], exp: 'Ervaring', exps: ['Nieuw in UEFN', 'Een paar maps gepubliceerd', 'Ervaren creator', 'Professionele studio'],
     links: 'Je maps of socials', linksPh: 'Eilandcodes, TikTok, YouTube…', msg: 'Wat je met POP wilt doen', msgPh: 'Bijv.: we zijn met z’n vieren aan een tycoon-map en raken verdwaald tussen Discord en Google Docs.',
     send: 'Toegang aanvragen', sending: 'Verzenden…', nospam: 'Geen spam: we schrijven je alleen om je toegang te geven.',
-    okTitle: 'Genoteerd, bedankt!', okText: 'Je aanvraag is bij het POP-team aangekomen. Je krijgt een link om je account aan te maken zodra er een plek vrijkomt.',
-    alreadyTitle: 'Je staat al op de lijst.', approvedTitle: 'Je toegang is al goedgekeurd.', approvedText: 'Kijk in je e-mail: de link om je account aan te maken is verstuurd. Anders, schrijf ons.', close: 'Sluiten',
+    okTitle: 'Genoteerd, bedankt!', okText: 'Je aanvraag is bij het POP-team aangekomen. Zodra er een plek vrijkomt, sturen we je je gebruikersnaam en een tijdelijk wachtwoord.',
+    alreadyTitle: 'Je staat al op de lijst.', approvedTitle: 'Je toegang is al goedgekeurd.', approvedText: 'Je account is klaar: het POP-team stuurt je je gebruikersnaam en tijdelijke wachtwoord. Anders kun je ons mailen.', close: 'Sluiten',
   },
 }
 export default nl

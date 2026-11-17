@@ -164,28 +164,30 @@ pub async fn register(State(st): State<AppState>, crate::security::ClientIp(ip):
 
 #[derive(Deserialize)]
 pub struct LoginIn {
+    /// Identifiant ou adresse e-mail.
+    #[serde(alias = "login")]
     email: String,
     password: String,
 }
 
-/// Connexion. Verrouillage 15 minutes après 5 échecs, limite par adresse IP, compte de test réservé à cet ordinateur,
-/// et second facteur (code à 6 chiffres) si la double authentification est activée.
+/// Connexion par identifiant (ou e-mail) et mot de passe. Verrouillage 15 minutes après 5 échecs,
+/// limite par adresse IP, compte de test réservé à cet ordinateur.
 pub async fn login(State(st): State<AppState>, crate::security::ClientIp(ip): crate::security::ClientIp, headers: axum::http::HeaderMap, jar: CookieJar, Json(b): Json<LoginIn>) -> Result<(CookieJar, Json<Value>), AppError> {
     rate_limit(&st, &b.email)?;
     rate_limit(&st, &format!("ip:{ip}"))?;
     let email = b.email.trim().to_lowercase();
     if email == "kl" && !crate::security::is_loopback(&ip) {
-        return Err(bad("E-mail ou mot de passe incorrect."));
+        return Err(bad("Identifiant ou mot de passe incorrect."));
     }
-    let row: Option<(i64, String, String, i64, i64)> = sqlx::query_as(
-        "SELECT id, name, password_hash, totp_enabled, COALESCE(locked_until > datetime('now'), 0) FROM users WHERE email = ? AND disabled = 0",
+    let row: Option<(i64, String, String, i64)> = sqlx::query_as(
+        "SELECT id, name, password_hash, COALESCE(locked_until > datetime('now'), 0) FROM users WHERE (email = ?1 OR username = ?1) AND disabled = 0",
     ).bind(&email).fetch_optional(&st.db).await?;
     // Même message et même coût que l'adresse existe ou non.
-    let (id, name, hash, totp, locked) = match row {
+    let (id, name, hash, locked) = match row {
         Some(r) => r,
         None => {
             let _ = verify_password(&b.password, &st.dummy_hash);
-            return Err(bad("E-mail ou mot de passe incorrect."));
+            return Err(bad("Identifiant ou mot de passe incorrect."));
         }
     };
     if locked == 1 {
@@ -200,48 +202,13 @@ pub async fn login(State(st): State<AppState>, crate::security::ClientIp(ip): cr
         } else {
             crate::security::audit(&st, Some(id), "connexion_échouée", "", &ip).await;
         }
-        return Err(bad("E-mail ou mot de passe incorrect."));
+        return Err(bad("Identifiant ou mot de passe incorrect."));
     }
     sqlx::query("UPDATE users SET failed_logins = 0, locked_until = NULL WHERE id = ?").bind(id).execute(&st.db).await?;
     let ua = headers.get("user-agent").and_then(|v| v.to_str().ok()).unwrap_or("").to_string();
-    if totp == 1 {
-        let ticket = random_token();
-        st.mfa_tickets.lock().unwrap().insert(sha256_hex(&ticket), (id, Instant::now(), 0));
-        return Ok((jar, Json(json!({ "mfa": true, "ticket": ticket }))));
-    }
     crate::security::audit(&st, Some(id), "connexion", "", &ip).await;
     let jar = open_session(&st, jar, id, &ip, &ua, false).await?;
     Ok((jar, Json(json!({ "id": id, "name": name }))))
-}
-
-#[derive(Deserialize)]
-pub struct MfaIn {
-    ticket: String,
-    code: String,
-}
-
-/// Deuxième étape de connexion : code de l'application d'authentification ou code de secours.
-pub async fn login_mfa(State(st): State<AppState>, crate::security::ClientIp(ip): crate::security::ClientIp, headers: axum::http::HeaderMap, jar: CookieJar, Json(b): Json<MfaIn>) -> Result<(CookieJar, Json<Value>), AppError> {
-    rate_limit(&st, &format!("ip:{ip}"))?;
-    let key = sha256_hex(&b.ticket);
-    let uid = {
-        let mut m = st.mfa_tickets.lock().unwrap();
-        m.retain(|_, v| v.1.elapsed() < Duration::from_secs(300));
-        match m.get_mut(&key) {
-            Some(v) if v.2 < 5 => { v.2 += 1; v.0 }
-            Some(_) => { m.remove(&key); return Err(bad("Trop d’essais : reconnectez-vous.")) }
-            None => return Err(bad("Session de connexion expirée : reconnectez-vous.")),
-        }
-    };
-    if !crate::security::check_second_factor(&st, uid, &b.code).await? {
-        crate::security::audit(&st, Some(uid), "code_2fa_faux", "", &ip).await;
-        return Err(bad("Code incorrect."));
-    }
-    st.mfa_tickets.lock().unwrap().remove(&key);
-    let ua = headers.get("user-agent").and_then(|v| v.to_str().ok()).unwrap_or("");
-    crate::security::audit(&st, Some(uid), "connexion", "avec double authentification", &ip).await;
-    let jar = open_session(&st, jar, uid, &ip, ua, true).await?;
-    Ok((jar, Json(json!({ "id": uid }))))
 }
 
 pub async fn logout(State(st): State<AppState>, jar: CookieJar) -> Result<(CookieJar, Json<Value>), AppError> {
@@ -258,7 +225,7 @@ pub async fn me(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
         let sid: i64 = sqlx::query_scalar("INSERT INTO studios (name) VALUES (?) RETURNING id").bind(format!("Studio de {}", u.name.split_whitespace().next().unwrap_or(&u.name))).fetch_one(&st.db).await?;
         sqlx::query("INSERT INTO memberships (studio_id, user_id, role) VALUES (?, ?, 'owner')").bind(sid).bind(u.id).execute(&st.db).await?;
     }
-    let credits: i64 = sqlx::query_scalar("SELECT credits FROM users WHERE id = ?").bind(u.id).fetch_one(&st.db).await?;
+    let (credits, username, must_change): (i64, Option<String>, i64) = sqlx::query_as("SELECT credits, username, must_change_password FROM users WHERE id = ?").bind(u.id).fetch_one(&st.db).await?;
     let _ = sqlx::query("UPDATE users SET last_seen = datetime('now') WHERE id = ?").bind(u.id).execute(&st.db).await;
     let admin = crate::admin::is_admin(&st, u.id).await?;
     let pending: i64 = if admin { sqlx::query_scalar("SELECT COUNT(*) FROM waitlist WHERE status = 'pending'").fetch_one(&st.db).await? } else { 0 };
@@ -280,5 +247,5 @@ pub async fn me(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
             "maps": maps.into_iter().map(|(id, name, genre, rd, status)| json!({"id": id, "name": name, "genre": genre, "release_date": rd, "status": status})).collect::<Vec<_>>()
         }));
     }
-    Ok(Json(json!({ "user": u, "credits": credits, "studios": out, "admin": admin, "admin_pending": pending })))
+    Ok(Json(json!({ "user": u, "credits": credits, "studios": out, "admin": admin, "admin_pending": pending, "username": username, "must_change_password": must_change == 1 })))
 }

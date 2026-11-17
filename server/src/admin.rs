@@ -213,13 +213,13 @@ pub async fn invite(State(st): State<AppState>, u: AuthUser, Json(b): Json<Invit
 
 pub async fn users(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
     require(&st, &u).await?;
-    let rows: Vec<(i64, String, String, String, Option<String>, i64, i64, i64, i64)> = sqlx::query_as(
+    let rows: Vec<(i64, String, String, String, Option<String>, i64, i64, i64, i64, Option<String>, i64)> = sqlx::query_as(
         "SELECT u.id, u.email, u.name, u.created_at, u.last_seen, u.is_admin, u.disabled,
                 (SELECT COUNT(*) FROM memberships m WHERE m.user_id = u.id),
-                (SELECT COUNT(*) FROM tasks t WHERE t.assignee_id = u.id AND t.status = 'done')
+                (SELECT COUNT(*) FROM tasks t WHERE t.assignee_id = u.id AND t.status = 'done'), u.username, u.must_change_password
          FROM users u ORDER BY u.created_at DESC LIMIT 2000",
     ).fetch_all(&st.db).await?;
-    Ok(Json(json!(rows.into_iter().map(|r| json!({ "id": r.0, "email": r.1, "name": r.2, "created_at": r.3, "last_seen": r.4, "is_admin": r.5 == 1, "disabled": r.6 == 1, "studios": r.7, "tasks_done": r.8, "me": r.0 == u.id })).collect::<Vec<_>>())))
+    Ok(Json(json!(rows.into_iter().map(|r| json!({ "id": r.0, "email": r.1, "name": r.2, "created_at": r.3, "last_seen": r.4, "is_admin": r.5 == 1, "disabled": r.6 == 1, "studios": r.7, "tasks_done": r.8, "username": r.9, "must_change": r.10 == 1, "me": r.0 == u.id })).collect::<Vec<_>>())))
 }
 
 #[derive(Deserialize)]
@@ -234,4 +234,77 @@ pub async fn update_user(State(st): State<AppState>, u: AuthUser, Path(id): Path
         if d { sqlx::query("DELETE FROM sessions WHERE user_id = ?").bind(id).execute(&st.db).await?; }
     }
     Ok(Json(json!({ "ok": true })))
+}
+
+// ---------- Comptes créés par l'administrateur (bêta) ----------
+
+/// Mot de passe provisoire lisible, sans caractères ambigus (ex. « k7mq-x2pa-9hrt »).
+fn temp_password() -> String {
+    use rand::Rng;
+    const A: &[u8] = b"abcdefghjkmnpqrstuvwxyz23456789";
+    let mut r = rand::rngs::OsRng;
+    (0..3).map(|_| (0..4).map(|_| A[r.gen_range(0..A.len())] as char).collect::<String>()).collect::<Vec<_>>().join("-")
+}
+
+/// Identifiant : 3 à 32 caractères, lettres sans accent, chiffres, point, tiret, tiret bas.
+fn check_username(raw: &str) -> Result<String, AppError> {
+    let u = raw.trim().to_lowercase();
+    let n = u.chars().count();
+    if !(3..=32).contains(&n) { return Err(bad("L’identifiant doit faire entre 3 et 32 caractères.")) }
+    if !u.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '.' | '-' | '_')) {
+        return Err(bad("L’identifiant ne peut contenir que des lettres sans accent, des chiffres, des points et des tirets."))
+    }
+    Ok(u)
+}
+
+#[derive(Deserialize)]
+pub struct AccountIn {
+    username: String,
+    name: String,
+    email: String,
+    password: Option<String>,
+    waitlist_id: Option<i64>,
+}
+
+/// Crée le compte d'un bêta-testeur. Le mot de passe (provisoire) n'est montré qu'une fois ;
+/// la personne devra le changer à sa première connexion.
+pub async fn create_account(State(st): State<AppState>, u: AuthUser, Json(b): Json<AccountIn>) -> ApiResult<Value> {
+    require(&st, &u).await?;
+    let username = check_username(&b.username)?;
+    let email = b.email.trim().to_lowercase();
+    if !email.contains('@') || email.len() > 200 { return Err(bad("Adresse e-mail invalide.")) }
+    let name: String = if b.name.trim().is_empty() { username.clone() } else { b.name.trim().chars().take(80).collect() };
+    let taken: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users WHERE username = ?1 OR email = ?1").bind(&username).fetch_one(&st.db).await?;
+    if taken > 0 { return Err(AppError::Conflict("Cet identifiant est déjà pris.".into())) }
+    let has: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users WHERE email = ?").bind(&email).fetch_one(&st.db).await?;
+    if has > 0 { return Err(AppError::Conflict("Un compte existe déjà avec cette adresse e-mail.".into())) }
+    let password = match b.password.as_deref().map(str::trim).filter(|p| !p.is_empty()) {
+        Some(p) => { crate::security::password_policy(p, &email)?; p.to_string() }
+        None => temp_password(),
+    };
+    let id: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash, username, must_change_password) VALUES (?, ?, ?, ?, 1) RETURNING id")
+        .bind(&email).bind(&name).bind(crate::auth::hash_password(&password)?).bind(&username).fetch_one(&st.db).await?;
+    // Relie la demande de la liste d'attente (celle choisie, sinon celle de la même adresse).
+    let wid: Option<i64> = match b.waitlist_id {
+        Some(w) => Some(w),
+        None => sqlx::query_scalar("SELECT id FROM waitlist WHERE email = ?").bind(&email).fetch_optional(&st.db).await?,
+    };
+    if let Some(w) = wid {
+        sqlx::query("UPDATE waitlist SET decided_at = COALESCE(decided_at, datetime('now')), decided_by = COALESCE(decided_by, ?) WHERE id = ?").bind(u.id).bind(w).execute(&st.db).await?;
+        mark_registered(&st, w, id).await;
+    }
+    log(&st, &u, "admin_compte_créé", &format!("{username} ({email})")).await;
+    Ok(Json(json!({ "id": id, "username": username, "name": name, "email": email, "password": password, "url": crate::mail::public_url() + "/connexion" })))
+}
+
+/// Nouveau mot de passe provisoire pour un utilisateur (ses sessions sont fermées).
+pub async fn reset_password(State(st): State<AppState>, u: AuthUser, Path(id): Path<i64>) -> ApiResult<Value> {
+    require(&st, &u).await?;
+    if id == u.id { return Err(bad("Changez votre propre mot de passe dans Paramètres.")) }
+    let (email, username): (String, Option<String>) = sqlx::query_as("SELECT email, username FROM users WHERE id = ?").bind(id).fetch_optional(&st.db).await?.ok_or(AppError::NotFound)?;
+    let password = temp_password();
+    sqlx::query("UPDATE users SET password_hash = ?, must_change_password = 1, failed_logins = 0, locked_until = NULL WHERE id = ?").bind(crate::auth::hash_password(&password)?).bind(id).execute(&st.db).await?;
+    sqlx::query("DELETE FROM sessions WHERE user_id = ?").bind(id).execute(&st.db).await?;
+    log(&st, &u, "admin_mot_de_passe_réinitialisé", &username.clone().unwrap_or_else(|| email.clone())).await;
+    Ok(Json(json!({ "username": username.unwrap_or(email), "password": password, "url": crate::mail::public_url() + "/connexion" })))
 }

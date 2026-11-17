@@ -56,7 +56,7 @@ const de: Dict = {
       ['Wie funktioniert der Assistent Boussole?', 'Boussole ist in POP integriert: Er liest deine Aufgaben, Termine, Abhängigkeiten und Meilensteine, um den Tag zusammenzufassen, deine Fragen zu beantworten („Was ist im Verzug?“, „Woran arbeitet Hugo?“) und POP zu erklären. Er läuft komplett in POP: Deine Daten gehen an keinen externen Dienst.'],
       ['Und wenn ich meine eigene KI nutzen will?', 'Verbinde Claude, Cursor, Codex oder eine andere MCP-kompatible KI unter „Verbundene KIs“. Sie kann deine Aufgaben, dein Verse und deine UEFN-Actors lesen und ändern, und jede Aktion wird protokolliert und ist rückgängig machbar.'],
       ['Woher kommen die Zahlen der Analyse?', 'Aus der offiziellen Fortnite-API von Epic: Spieler, Spitzenwert gleichzeitiger Spieler, Spielzeit und Bindung jeder öffentlichen Map über 7 Tage.'],
-      ['Wie bekomme ich Zugang?', 'POP ist in der privaten Beta. Trag dich in die Warteliste ein: Wir prüfen die Anfragen einzeln, und du bekommst per E-Mail einen Link, um dein Konto zu erstellen.'],
+      ['Wie bekomme ich Zugang?', 'POP ist in einer geschlossenen Beta. Trag dich in die Warteliste ein: Wir prüfen die Anfragen einzeln und schicken dir dann deinen Benutzernamen und ein vorläufiges Passwort, das du beim ersten Login änderst.'],
       ['Was kostet es?', 'Die Preise stehen weiter oben. Sie gelten ab dem Start von POP; Beta-Mitglieder werden vor jeder Zahlung informiert.'],
     ],
   },
@@ -75,14 +75,14 @@ const de: Dict = {
   },
   wl: {
     eyebrow: 'Private Beta', title: 'Auf die Warteliste', intro: 'Wir öffnen POP schrittweise, um jedes Studio zu begleiten. Sag uns, wer du bist, und wir schicken dir so bald wie möglich den Zugang.',
-    pageIntro: 'POP-Konten gibt es nur auf Einladung. Sag uns, wer du bist: Du bekommst einen Link zur Kontoerstellung, sobald dein Zugang freigegeben ist.',
+    pageIntro: 'Während der Beta legt das Team die POP-Konten an. Sag uns, wer du bist: Sobald dein Zugang freigegeben ist, bekommst du deinen Benutzernamen und ein vorläufiges Passwort.',
     invalid: 'Dieser Zugangslink ist ungültig, schon benutzt oder abgelaufen. Frag erneut an oder schreib dem POP-Team.',
     name: 'Name oder Nickname', email: 'E-Mail', studio: 'Studio', optional: '(optional)', studioPh: 'Name des Studios', team: 'Teamgröße',
     teams: ['Allein', '2 bis 3', '4 bis 10', 'Mehr als 10'], exp: 'Erfahrung', exps: ['UEFN-Einsteiger', 'Einige veröffentlichte Maps', 'Erfahrener Creator', 'Professionelles Studio'],
     links: 'Deine Maps oder Kanäle', linksPh: 'Insel-Codes, TikTok, YouTube…', msg: 'Was du mit POP vorhast', msgPh: 'Z. B.: Wir sind zu viert an einer Tycoon-Map und verlieren uns zwischen Discord und Google Docs.',
     send: 'Zugang anfragen', sending: 'Wird gesendet…', nospam: 'Kein Spam: Wir schreiben dir nur, um dir Zugang zu geben.',
-    okTitle: 'Notiert, danke!', okText: 'Deine Anfrage ist beim POP-Team angekommen. Du bekommst einen Link zur Kontoerstellung, sobald ein Platz frei wird.',
-    alreadyTitle: 'Du stehst schon auf der Liste.', approvedTitle: 'Dein Zugang ist schon freigegeben.', approvedText: 'Sieh in deinen E-Mails nach: Der Link zur Kontoerstellung wurde verschickt. Sonst schreib uns.', close: 'Schließen',
+    okTitle: 'Notiert, danke!', okText: 'Deine Anfrage ist beim POP-Team angekommen. Sobald ein Platz frei wird, schicken wir dir deinen Benutzernamen und ein vorläufiges Passwort.',
+    alreadyTitle: 'Du stehst schon auf der Liste.', approvedTitle: 'Dein Zugang ist schon freigegeben.', approvedText: 'Dein Konto ist bereit: Das POP-Team schickt dir deinen Benutzernamen und dein vorläufiges Passwort. Sonst schreib uns.', close: 'Schließen',
   },
 }
 export default de

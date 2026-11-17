@@ -56,7 +56,7 @@ const cs: Dict = {
       ['Jak funguje asistent Boussole?', 'Boussole je součástí POP: čte vaše úkoly, jejich termíny, závislosti a milníky, aby shrnul den, odpověděl na otázky („co je ve zpoždění?“, „na čem pracuje Hugo?“) a vysvětlil, jak POP používat. Běží celý uvnitř POP: vaše data nejdou do žádné externí služby.'],
       ['A když chci použít vlastní AI?', 'Připojte Claude, Cursor, Codex nebo jinou AI kompatibilní s MCP v „Připojené AI“. Může číst a upravovat úkoly, Verse i aktéry v UEFN a každá akce je zaznamenaná a vratná.'],
       ['Odkud jsou čísla v analýze?', 'Z oficiálního Fortnite API od Epicu: hráči, špička současných hráčů, herní čas a retence každé veřejné mapy za 7 dní.'],
-      ['Jak získám přístup?', 'POP je v uzavřené betě. Zapište se na čekací listinu: žádosti procházíme jednu po druhé a odkaz k vytvoření účtu dostanete e-mailem.'],
+      ['Jak získám přístup?', 'POP je v uzavřené betě. Zapište se na čekací listinu: žádosti procházíme jednu po druhé a pak vám pošleme uživatelské jméno a dočasné heslo, které při prvním přihlášení změníte.'],
       ['Kolik to stojí?', 'Ceny jsou uvedeny výše. Platí od otevření POP; členové bety budou upozorněni před jakoukoli platbou.'],
     ],
   },
@@ -75,14 +75,14 @@ const cs: Dict = {
   },
   wl: {
     eyebrow: 'Uzavřená beta', title: 'Zapsat se na čekací listinu', intro: 'POP otevíráme postupně, abychom se mohli věnovat každému studiu. Řekněte nám, kdo jste, a přístup vám pošleme co nejdřív.',
-    pageIntro: 'Účty POP jsou jen na pozvání. Řekněte nám, kdo jste: po schválení dostanete odkaz k vytvoření účtu.',
+    pageIntro: 'Během bety zakládá účty POP náš tým. Řekněte nám, kdo jste: po schválení dostanete uživatelské jméno a dočasné heslo.',
     invalid: 'Tento přístupový odkaz je neplatný, už použitý nebo vypršel. Požádejte znovu, nebo napište týmu POP.',
     name: 'Jméno nebo přezdívka', email: 'E-mail', studio: 'Studio', optional: '(nepovinné)', studioPh: 'Název studia', team: 'Velikost týmu',
     teams: ['Sám', '2–3', '4–10', 'Víc než 10'], exp: 'Zkušenosti', exps: ['Nováček v UEFN', 'Pár vydaných map', 'Zkušený tvůrce', 'Profesionální studio'],
     links: 'Vaše mapy nebo sítě', linksPh: 'Kódy ostrovů, TikTok, YouTube…', msg: 'Co chcete s POP dělat', msgPh: 'Např. jsme 4 na tycoon mapě a ztrácíme se mezi Discordem a Google Docs.',
     send: 'Požádat o přístup', sending: 'Odesílání…', nospam: 'Žádný spam: píšeme jen kvůli přístupu.',
-    okTitle: 'Zapsáno, díky!', okText: 'Vaše žádost dorazila týmu POP. Odkaz k vytvoření účtu dostanete, jakmile se uvolní místo.',
-    alreadyTitle: 'Už jste na seznamu.', approvedTitle: 'Váš přístup je už schválený.', approvedText: 'Zkontrolujte e-mail: odkaz k vytvoření účtu byl odeslán. Pokud nedorazil, napište nám.', close: 'Zavřít',
+    okTitle: 'Zapsáno, díky!', okText: 'Vaše žádost dorazila týmu POP. Jakmile se uvolní místo, pošleme vám uživatelské jméno a dočasné heslo.',
+    alreadyTitle: 'Už jste na seznamu.', approvedTitle: 'Váš přístup je už schválený.', approvedText: 'Váš účet je připraven: tým POP vám pošle uživatelské jméno a dočasné heslo. Pokud nedorazily, napište nám.', close: 'Zavřít',
   },
 }
 export default cs
