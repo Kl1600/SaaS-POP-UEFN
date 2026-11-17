@@ -276,6 +276,42 @@ fn api() -> Router<AppState> {
         .route("/mcp", post(mcp::mcp))
 }
 
+/// Nomme ou retire un administrateur de la plateforme. Seul quelqu'un qui a accès à la machine du serveur (et à sa
+/// base) peut le faire : c'est ce qui remplace l'ancien « premier compte créé depuis cet ordinateur ».
+async fn admin_cli(db: &sqlx::SqlitePool, args: &[String]) -> anyhow::Result<()> {
+    const USAGE: &str = "Usage : pop-server admin ajouter <e-mail> | retirer <e-mail> | liste";
+    match (args.first().map(String::as_str), args.get(1)) {
+        (Some(action @ ("ajouter" | "retirer")), Some(email)) => {
+            let email = email.trim().to_lowercase();
+            let flag = (action == "ajouter") as i64;
+            let n = sqlx::query("UPDATE users SET is_admin = ? WHERE email = ?").bind(flag).bind(&email).execute(db).await?.rows_affected();
+            if n == 0 {
+                anyhow::bail!("Aucun compte avec l'adresse « {email} » : créez d'abord le compte dans POP, puis relancez.");
+            }
+            sqlx::query("INSERT INTO audit_log (user_id, action, detail, ip) SELECT id, ?, 'commande pop-server admin', '' FROM users WHERE email = ?")
+                .bind(if flag == 1 { "admin_nommé" } else { "admin_retiré" })
+                .bind(&email)
+                .execute(db)
+                .await?;
+            println!("{email} {} administrateur de la plateforme.", if flag == 1 { "est maintenant" } else { "n'est plus" });
+            if flag == 1 {
+                println!("Pour ouvrir l'administration, ce compte doit activer la double authentification (Paramètres → Sécurité).");
+            }
+        }
+        (Some("liste"), _) => {
+            let rows: Vec<(String, String)> = sqlx::query_as("SELECT email, name FROM users WHERE is_admin = 1 ORDER BY email").fetch_all(db).await?;
+            if rows.is_empty() {
+                println!("Aucun administrateur nommé (hors POP_ADMIN_EMAILS).");
+            }
+            for (e, n) in rows {
+                println!("{e}  ({n})");
+            }
+        }
+        _ => anyhow::bail!(USAGE),
+    }
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt().with_env_filter(std::env::var("RUST_LOG").unwrap_or_else(|_| "pop_server=info".into())).init();
@@ -283,6 +319,11 @@ async fn main() -> anyhow::Result<()> {
     let opts = SqliteConnectOptions::from_str(&db_url)?.create_if_missing(true).journal_mode(SqliteJournalMode::Wal).foreign_keys(true);
     let db = SqlitePoolOptions::new().max_connections(8).connect_with(opts).await?;
     sqlx::migrate!("./migrations").run(&db).await?;
+    // `pop-server admin …` : gérer les administrateurs depuis la machine du serveur, puis s'arrêter.
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.first().map(String::as_str) == Some("admin") {
+        return admin_cli(&db, &args[1..]).await;
+    }
     let st = AppState {
         db,
         hub: Arc::new(ws::Hub::default()),

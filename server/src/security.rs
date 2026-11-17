@@ -17,7 +17,40 @@ use std::net::SocketAddr;
 
 // ---------- Adresse IP du client ----------
 
-/// IP du client. Derrière un proxy de confiance (Cloudflare, Caddy…), mettre POP_TRUST_PROXY=1 pour lire X-Forwarded-For.
+/// Où lire l'adresse IP du client (`POP_TRUST_PROXY`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ProxyMode {
+    /// Absent ou `0` : l'adresse de la connexion. Ne jamais lire d'en-tête, le client les choisit.
+    Direct,
+    /// `1` : derrière un proxy (Caddy, Nginx…) : le **dernier** élément de `X-Forwarded-For`, celui que pose le
+    /// proxy. Les éléments précédents viennent du client et peuvent être faux.
+    Forwarded,
+    /// `cloudflare` : l'en-tête `cf-connecting-ip`, posé par Cloudflare. Seulement si seul Cloudflare peut joindre le serveur.
+    Cloudflare,
+}
+
+pub fn proxy_mode() -> ProxyMode {
+    match std::env::var("POP_TRUST_PROXY").unwrap_or_default().trim().to_lowercase().as_str() {
+        "1" | "true" | "oui" => ProxyMode::Forwarded,
+        "cloudflare" => ProxyMode::Cloudflare,
+        _ => ProxyMode::Direct,
+    }
+}
+
+/// IP du client, d'après la connexion et le mode de proxy déclaré. Une valeur d'en-tête qui n'est pas une
+/// adresse IP est ignorée (on retombe sur l'adresse de la connexion).
+pub fn client_ip(headers: &axum::http::HeaderMap, peer: Option<std::net::IpAddr>, mode: ProxyMode) -> String {
+    let parse = |s: &str| s.trim().parse::<std::net::IpAddr>().ok();
+    let from_header = match mode {
+        ProxyMode::Direct => None,
+        // Plusieurs en-têtes X-Forwarded-For peuvent arriver : on les met bout à bout et on garde le dernier élément.
+        ProxyMode::Forwarded => headers.get_all("x-forwarded-for").iter().filter_map(|v| v.to_str().ok()).flat_map(|v| v.split(',')).last().and_then(parse),
+        ProxyMode::Cloudflare => headers.get("cf-connecting-ip").and_then(|v| v.to_str().ok()).and_then(parse),
+    };
+    from_header.or(peer).map(|a| a.to_string()).unwrap_or_default()
+}
+
+/// IP du client (voir `client_ip` et `POP_TRUST_PROXY` dans le README).
 pub struct ClientIp(pub String);
 impl FromRequestParts<AppState> for ClientIp {
     type Rejection = AppError;
@@ -26,12 +59,8 @@ impl FromRequestParts<AppState> for ClientIp {
     }
 }
 pub fn ip_of(parts: &Parts) -> String {
-    if std::env::var("POP_TRUST_PROXY").map(|v| v == "1").unwrap_or(false) {
-        let h = parts.headers.get("cf-connecting-ip").or(parts.headers.get("x-real-ip")).and_then(|v| v.to_str().ok()).map(String::from)
-            .or_else(|| parts.headers.get("x-forwarded-for").and_then(|v| v.to_str().ok()).and_then(|v| v.split(',').next()).map(|v| v.trim().to_string()));
-        if let Some(ip) = h.filter(|i| !i.is_empty() && i.len() < 64) { return ip }
-    }
-    parts.extensions.get::<ConnectInfo<SocketAddr>>().map(|c| c.0.ip().to_string()).unwrap_or_default()
+    let peer = parts.extensions.get::<ConnectInfo<SocketAddr>>().map(|c| c.0.ip());
+    client_ip(&parts.headers, peer, proxy_mode())
 }
 pub fn is_loopback(ip: &str) -> bool {
     ip.parse::<std::net::IpAddr>().map(|a| a.is_loopback()).unwrap_or(false)
@@ -198,6 +227,56 @@ pub async fn admin_audit(State(st): State<AppState>, u: AuthUser) -> ApiResult<V
         "SELECT a.action, a.detail, a.ip, a.at, u.name FROM audit_log a LEFT JOIN users u ON u.id = a.user_id ORDER BY a.id DESC LIMIT 300",
     ).fetch_all(&st.db).await?;
     Ok(Json(json!(rows.into_iter().map(|r| json!({ "action": r.0, "detail": r.1, "ip": r.2, "at": r.3, "who": r.4 })).collect::<Vec<_>>())))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{client_ip, ProxyMode};
+    use axum::http::HeaderMap;
+    use std::net::IpAddr;
+
+    fn h(pairs: &[(&'static str, &str)]) -> HeaderMap {
+        let mut m = HeaderMap::new();
+        for (k, v) in pairs {
+            m.append(*k, v.parse().unwrap());
+        }
+        m
+    }
+    const PEER: &str = "203.0.113.9";
+    fn peer() -> Option<IpAddr> {
+        Some(PEER.parse().unwrap())
+    }
+
+    #[test]
+    fn direct_ignore_les_en_tetes() {
+        let hd = h(&[("x-forwarded-for", "127.0.0.1"), ("cf-connecting-ip", "127.0.0.1"), ("x-real-ip", "127.0.0.1")]);
+        assert_eq!(client_ip(&hd, peer(), ProxyMode::Direct), PEER);
+    }
+
+    #[test]
+    fn proxy_garde_le_dernier_element() {
+        // Le client a mis 127.0.0.1 en tête ; le proxy a ajouté la vraie adresse à la fin.
+        let hd = h(&[("x-forwarded-for", "127.0.0.1, 198.51.100.7")]);
+        assert_eq!(client_ip(&hd, peer(), ProxyMode::Forwarded), "198.51.100.7");
+        // Deux en-têtes séparés : le dernier gagne aussi.
+        let hd = h(&[("x-forwarded-for", "127.0.0.1"), ("x-forwarded-for", "198.51.100.8")]);
+        assert_eq!(client_ip(&hd, peer(), ProxyMode::Forwarded), "198.51.100.8");
+    }
+
+    #[test]
+    fn proxy_sans_en_tete_ou_valeur_invalide() {
+        assert_eq!(client_ip(&h(&[]), peer(), ProxyMode::Forwarded), PEER);
+        assert_eq!(client_ip(&h(&[("x-forwarded-for", "pas-une-ip")]), peer(), ProxyMode::Forwarded), PEER);
+        // x-real-ip et cf-connecting-ip ne comptent pas en mode proxy générique.
+        assert_eq!(client_ip(&h(&[("x-real-ip", "127.0.0.1"), ("cf-connecting-ip", "127.0.0.1")]), peer(), ProxyMode::Forwarded), PEER);
+    }
+
+    #[test]
+    fn cloudflare() {
+        let hd = h(&[("cf-connecting-ip", "2001:db8::1"), ("x-forwarded-for", "127.0.0.1")]);
+        assert_eq!(client_ip(&hd, peer(), ProxyMode::Cloudflare), "2001:db8::1");
+        assert_eq!(client_ip(&h(&[("x-forwarded-for", "127.0.0.1")]), peer(), ProxyMode::Cloudflare), PEER);
+    }
 }
 
 /// Mots de passe refusés : trop courts, trop communs, ou contenant l'identifiant.

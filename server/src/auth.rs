@@ -139,17 +139,17 @@ pub async fn register(State(st): State<AppState>, crate::security::ClientIp(ip):
         return Err(AppError::Conflict("Un compte existe déjà avec cette adresse.".into()));
     }
     // Inscriptions sur liste d'attente : il faut une invitation de studio ou un lien d'accès validé.
-    let first: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users").fetch_one(&st.db).await?;
     let wid = crate::admin::signup_allowed(&st, &email, &ip, b.invite.as_deref(), b.access.as_deref()).await.map_err(|e| match e {
         AppError::Forbidden => AppError::Conflict("Les inscriptions se font sur liste d’attente : demandez l’accès à la bêta depuis la page d’accueil.".into()),
         other => other,
     })?;
     let hash = hash_password(&b.password)?;
-    let id: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash, is_admin) VALUES (?, ?, ?, ?) RETURNING id")
+    // Jamais administrateur selon l'adresse IP : un en-tête ou un proxy mal réglé suffirait à se faire passer pour
+    // l'ordinateur du serveur. Les administrateurs sont nommés par `pop-server admin ajouter <e-mail>` ou POP_ADMIN_EMAILS.
+    let id: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash) VALUES (?, ?, ?) RETURNING id")
         .bind(&email)
         .bind(b.name.trim())
         .bind(hash)
-        .bind((first == 0 && crate::security::is_loopback(&ip)) as i64)
         .fetch_one(&st.db)
         .await?;
     if let Some(w) = wid { crate::admin::mark_registered(&st, w, id).await; }

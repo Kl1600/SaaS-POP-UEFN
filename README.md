@@ -71,6 +71,14 @@ Le dépôt contient un `Dockerfile` (interface + serveur, base SQLite dans `/dat
 
 Sur un VPS : `docker build -t pop . && docker run -d -p 8080:8080 -v pop-data:/data pop`, derrière un proxy HTTPS (Caddy, Nginx). Le relais UEFN se connecte alors à `https://votre-domaine`.
 
+- **Derrière un proxy**, réglez `POP_TRUST_PROXY` pour que POP voie la vraie adresse des visiteurs (limites de connexion,
+  journal de sécurité) : `1` derrière Caddy ou Nginx (POP lit le **dernier** élément de `X-Forwarded-For`, celui que pose
+  le proxy ; avec Nginx, `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`), `cloudflare` si seul Cloudflare
+  peut joindre le serveur. Sans proxy, laissez la variable vide : un visiteur pourrait sinon choisir son adresse.
+- **Premier administrateur** : créez votre compte (adresse dans `POP_ADMIN_EMAILS`, ou par une invitation), puis sur la
+  machine du serveur : `docker exec <conteneur> /app/pop-server admin ajouter vous@exemple.com`
+  (`pop-server admin liste`, `pop-server admin retirer …`). Aucun compte ne devient administrateur selon son adresse IP.
+
 ## Ce qui fonctionne
 
 - **Comptes et studios** : inscription, connexion, plusieurs studios et plusieurs maps, rôles (propriétaire, admin, membre, freelance, invité en lecture), invitations par lien.
@@ -110,9 +118,9 @@ Chaque action est journalisée et annulable ; droits par rôle (invité en lectu
 | --- | --- | --- |
 | `DATABASE_URL` | `sqlite://pop-data.db` | Base SQLite |
 | `POP_PUBLIC_URL` | `http://127.0.0.1:8080` | Adresse publique utilisée dans les e-mails |
-| `POP_ADMIN_EMAILS` | — | E-mails des administrateurs de la plateforme (séparés par des virgules). Le premier compte créé est aussi administrateur. |
+| `POP_ADMIN_EMAILS` | — | E-mails des administrateurs de la plateforme (séparés par des virgules). Sinon : `pop-server admin ajouter <e-mail>` sur la machine du serveur. |
 | `POP_OPEN_SIGNUP` | `0` | `1` = inscriptions ouvertes à tous (sinon : liste d’attente + lien d’accès validé dans Administration) |
-| `POP_TRUST_PROXY` | `0` | `1` derrière un proxy de confiance (Cloudflare, Caddy…) pour lire la vraie adresse IP des visiteurs |
+| `POP_TRUST_PROXY` | vide | `1` derrière Caddy ou Nginx (dernier élément de `X-Forwarded-For`), `cloudflare` derrière Cloudflare seul (`cf-connecting-ip`). Vide sans proxy |
 | `POP_SMTP_HOST`, `POP_SMTP_PORT`, `POP_SMTP_USER`, `POP_SMTP_PASS`, `POP_SMTP_FROM` | — | Envoi d'e-mails (invitations, mot de passe oublié). Sans eux, les liens s'affichent à copier |
 | `POP_BIND` | `127.0.0.1` | `0.0.0.0` pour le réseau local ou l'hébergement |
 | `PORT` | `8080` | Port (écoute sur 127.0.0.1) |
@@ -130,3 +138,4 @@ Chaque action est journalisée et annulable ; droits par rôle (invité en lectu
 - **Journal de sécurité** : connexions, échecs, blocages, changements de sécurité, actions d’administration (Administration → Sécurité).
 - **En-têtes** : CSP stricte, interdiction d’intégrer POP dans un autre site, HSTS en production, pas de cache sur l’API.
 - **Compte de test « kl »** : utilisable seulement depuis l’ordinateur qui fait tourner POP. Une installation vide n’accepte son premier compte que depuis cet ordinateur, ou pour une adresse de `POP_ADMIN_EMAILS`.
+- **Administrateurs** : jamais accordés selon l'adresse IP ; nommés par `POP_ADMIN_EMAILS` ou par `pop-server admin ajouter <e-mail>` sur la machine du serveur.
