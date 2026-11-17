@@ -14,10 +14,17 @@ function Status() {
   const [busy, setBusy] = useState(false)
   useEffect(() => { if (!busy) return; const t = setInterval(reload, 4000); const s = setTimeout(() => setBusy(false), 120000); return () => { clearInterval(t); clearTimeout(s) } }, [busy])
   if (!data) return null
-  return <div className="row small muted" style={{ flexWrap: 'wrap' }}>
-    <span>Source : API publique Fortnite d’Epic · {data.islands} îles suivies, {data.measured} mesurées{data.latest_day ? ` · données jusqu’au ${day(data.latest_day)}` : ''}{data.last_ok ? ` · mise à jour ${ago(data.last_ok)}` : ''}</span>
-    {data.error && <span className="badge b-r" title={data.error}>Dernière collecte en erreur</span>}
-    <button className="btn" style={{ height: 32 }} disabled={busy} onClick={async () => { await api.post('/api/analytics/refresh'); setBusy(true) }}><RefreshCw size={14} className={busy ? 'spin' : ''} />{busy ? 'Collecte…' : 'Actualiser'}</button>
+  const partial = !data.catalog_done || data.popular_source?.error
+  return <div style={{ display: 'grid', gap: 8 }}>
+    <div className="row small muted" style={{ flexWrap: 'wrap' }}>
+      <span>Source : API officielle Fortnite d’Epic · {n(data.islands)} maps au catalogue, {n(data.active)} jouées hier{data.latest_day ? ` · données jusqu’au ${day(data.latest_day)}` : ''}{data.last_ok ? ` · mise à jour ${ago(data.last_ok)}` : ''}</span>
+      {data.error && <span className="badge b-r" title={data.error}>Dernière collecte en erreur</span>}
+      <button className="btn" style={{ height: 32 }} disabled={busy} onClick={async () => { await api.post('/api/analytics/refresh'); setBusy(true) }}><RefreshCw size={14} className={busy ? 'spin' : ''} />{busy ? 'Collecte…' : 'Actualiser'}</button>
+    </div>
+    {partial && <div className="b-callout small" style={{ lineHeight: 1.5 }}>
+      <b style={{ fontWeight: 500 }}>Chiffres encore partiels.</b> L’API d’Epic liste les maps de la plus récente à la plus ancienne, sans classement par joueurs. POP parcourt donc tout le catalogue petit à petit ({data.catalog_done ? 'parcours terminé' : 'parcours en cours'}, {n(data.unmeasured)} maps encore à mesurer){data.popular_source?.count ? ` et mesure en priorité ${data.popular_source.count} maps populaires repérées sur fortnite.gg et dans les vidéos` : ''}.
+      {data.popular_source?.error && <> Liste des maps populaires indisponible : {data.popular_source.error}.</>} Comptez quelques heures après le premier lancement pour des résultats fiables.
+    </div>}
   </div>
 }
 

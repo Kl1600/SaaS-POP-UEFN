@@ -143,7 +143,7 @@ function GlobalSearch() {
   const [sel, setSel] = useState(0)
   useEffect(() => {
     if (!app.map || q.trim().length < 2) { setRes([]); return }
-    const t = setTimeout(() => api.get(`/api/maps/${app.map!.id}/search?q=${encodeURIComponent(q)}`).then(r => { setRes(r); setSel(0) }).catch(() => {}), 160)
+    const t = setTimeout(() => api.get(`/api/maps/${app.map!.id}/search?q=${encodeURIComponent(q)}`).then((r: any[]) => { const order: string[] = []; r.forEach(x => { if (!order.includes(x.kind)) order.push(x.kind) }); setRes(order.flatMap(k => r.filter(x => x.kind === k))); setSel(0) }).catch(() => {}), 160)
     return () => clearTimeout(t)
   }, [q, app.map?.id])
   const go = (r: any) => { setOpen(false); setQ(''); nav(r.link) }
@@ -156,11 +156,11 @@ function GlobalSearch() {
       <span className="kbd">Ctrl K</span>
     </form>
     {open && q.trim().length >= 2 && <div className="menu gresults">
-      {res.length === 0 ? <div className="small muted" style={{ padding: 10 }}>Aucun résultat pour « {q} »</div> : res.map((r, i) => (
-        <button key={i} className={i === sel ? 'on' : ''} onMouseDown={e => { e.preventDefault(); go(r) }}>
-          <span className="badge" style={{ minWidth: 64, justifyContent: 'center' }}>{r.kind}</span>
+      {res.length === 0 ? <div className="small muted" style={{ padding: 10 }}>Aucun résultat pour « {q} »</div> : res.map((r, i) => (<div key={i}>
+        {(i === 0 || res[i - 1].kind !== r.kind) && <div className="gr-head">{({ Tâche: 'Tâches', Page: 'Pages', Tableau: 'Tableaux', Verse: 'Fichiers Verse', Acteur: 'Acteurs UEFN', Jalon: 'Jalons', Membre: 'Membres', Action: 'Actions récentes' } as any)[r.kind] ?? r.kind}</div>}
+        <button className={i === sel ? 'on' : ''} onMouseDown={e => { e.preventDefault(); go(r) }} onMouseEnter={() => setSel(i)}>
           <span style={{ minWidth: 0, flex: 1, textAlign: 'left' }}><span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>{r.detail && <span className="small muted" style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.detail}</span>}</span>
-        </button>))}
+        </button></div>))}
     </div>}
   </div>
 }

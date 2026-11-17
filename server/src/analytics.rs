@@ -100,45 +100,126 @@ async fn fetch_metrics(st: &AppState, code: &str) -> Result<bool, String> {
     Ok(true)
 }
 
-/// Une passe de collecte : dernières sorties, puis métriques des îles à suivre.
+/// Joueurs du dernier jour mesuré pour une île (None = jamais mesurée ou moins de 5 joueurs).
+async fn ensure_island(st: &AppState, code: &str) -> Result<bool, String> {
+    let known: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM fn_islands WHERE code = ?").bind(code).fetch_one(&st.db).await.map_err(|e| e.to_string())?;
+    if known > 0 { return Ok(true) }
+    let (status, v) = get_json(st, &format!("{}/islands/{code}", base())).await?;
+    if status != 200 { return Ok(false) }
+    upsert_island(st, &v, false).await.map_err(|e| e.to_string())?;
+    Ok(true)
+}
+
+/// Maps les plus jouées en ce moment, d'après fortnite.gg (l'API d'Epic ne sait pas trier par popularité).
+/// Sert seulement à savoir QUELLES îles mesurer : les chiffres viennent ensuite de l'API officielle.
+async fn seed_popular(st: &AppState) -> Result<usize, String> {
+    if std::env::var("POP_FORTNITE_GG").map(|v| v == "0").unwrap_or(false) { return Ok(0) }
+    let base = std::env::var("POP_FORTNITE_GG_URL").unwrap_or_else(|_| "https://fortnite.gg".into());
+    let re = regex::Regex::new(r"\b(\d{4}-\d{4}-\d{4})\b").unwrap();
+    let mut codes: Vec<String> = vec![];
+    for page in 1..=4 {
+        let url = if page == 1 { format!("{base}/creative") } else { format!("{base}/creative?page={page}") };
+        let r = st.http.get(&url)
+            .header("user-agent", "Mozilla/5.0 (compatible; POP-UEFN/1.0)")
+            .header("accept", "text/html,application/xhtml+xml")
+            .header("accept-language", "fr-FR,fr;q=0.9,en;q=0.8")
+            .timeout(std::time::Duration::from_secs(20)).send().await.map_err(|e| format!("fortnite.gg injoignable : {e}"))?;
+        let status = r.status().as_u16();
+        if status != 200 { if page == 1 { return Err(format!("fortnite.gg a refusé la lecture (HTTP {status})")) } else { break } }
+        let html = r.text().await.unwrap_or_default();
+        let before = codes.len();
+        for c in re.captures_iter(&html) { let c = c[1].to_string(); if !codes.contains(&c) { codes.push(c) } }
+        if codes.len() == before { break }
+        tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+    }
+    for (i, c) in codes.iter().enumerate() {
+        sqlx::query("INSERT INTO fn_seed (code, source, rank, seen_at) VALUES (?, 'fortnite.gg', ?, datetime('now')) ON CONFLICT(code) DO UPDATE SET rank = excluded.rank, seen_at = excluded.seen_at")
+            .bind(c).bind(i as i64 + 1).execute(&st.db).await.map_err(|e| e.to_string())?;
+    }
+    Ok(codes.len())
+}
+
+/// Une passe de collecte :
+/// 1. dernières sorties (début de la liste d'Epic, triée de la plus récente à la plus ancienne) ;
+/// 2. suite du parcours complet du catalogue, reprise là où la passe précédente s'était arrêtée ;
+/// 3. maps populaires repérées ailleurs (fortnite.gg, vidéos) ;
+/// 4. mesures, par priorité : maps populaires et suivies, puis jamais mesurées, puis rafraîchissements.
 pub async fn crawl(st: &AppState) -> Result<String, String> {
     sqlx::query("UPDATE fn_status SET last_run = datetime('now') WHERE id = 1").execute(&st.db).await.map_err(|e| e.to_string())?;
-    // 1. Les dernières îles sorties (l'API les classe de la plus récente à la plus ancienne).
-    let mut url = format!("{}/islands?size=100", base());
     let mut listed = 0;
-    for _ in 0..15 {
+    // 1. Nouveautés.
+    let mut url = format!("{}/islands?size=100", base());
+    for _ in 0..10 {
         let (status, v) = get_json(st, &url).await?;
         if status == 429 { break }
         if status != 200 { return Err(format!("API Fortnite (liste) : HTTP {status}")) }
         let data = v["data"].as_array().cloned().unwrap_or_default();
-        for it in &data {
-            upsert_island(st, it, true).await.map_err(|e| e.to_string())?;
-            listed += 1;
-        }
+        for it in &data { upsert_island(st, it, true).await.map_err(|e| e.to_string())?; listed += 1 }
+        match v["links"]["next"].as_str() { Some(n) if !n.is_empty() && !data.is_empty() => url = next_url(n), _ => break }
+        tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+    }
+    // 2. Parcours complet, par tranches.
+    let cursor: Option<String> = sqlx::query_scalar("SELECT cursor FROM fn_status WHERE id = 1").fetch_one(&st.db).await.map_err(|e| e.to_string())?;
+    let mut url = cursor.filter(|c| !c.is_empty()).unwrap_or_else(|| format!("{}/islands?size=100", base()));
+    let mut finished = false;
+    for _ in 0..60 {
+        let (status, v) = get_json(st, &url).await?;
+        if status == 429 { break }
+        if status != 200 { url = format!("{}/islands?size=100", base()); break }
+        let data = v["data"].as_array().cloned().unwrap_or_default();
+        for it in &data { upsert_island(st, it, false).await.map_err(|e| e.to_string())?; listed += 1 }
         match v["links"]["next"].as_str() {
             Some(n) if !n.is_empty() && !data.is_empty() => url = next_url(n),
-            _ => break,
+            _ => { finished = true; url = String::new(); break }
         }
-        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(250)).await;
     }
-    // 2. Métriques : îles jamais mesurées, sorties récentes, îles suivies, meilleures îles.
+    sqlx::query("UPDATE fn_status SET cursor = ?, sweeps = sweeps + ? WHERE id = 1").bind(&url).bind(finished as i64).execute(&st.db).await.map_err(|e| e.to_string())?;
+    // 3. Maps populaires (au plus toutes les 3 heures).
+    let due: bool = sqlx::query_scalar("SELECT seed_ok IS NULL OR seed_ok < datetime('now', '-3 hours') FROM fn_status WHERE id = 1").fetch_one(&st.db).await.map_err(|e| e.to_string())?;
+    if due {
+        match seed_popular(st).await {
+            Ok(n) => { let _ = sqlx::query("UPDATE fn_status SET seed_ok = datetime('now'), seed_error = NULL WHERE id = 1").execute(&st.db).await; tracing::info!("analyse : {n} maps populaires repérées") }
+            Err(e) => { let _ = sqlx::query("UPDATE fn_status SET seed_ok = datetime('now'), seed_error = ? WHERE id = 1").bind(&e).execute(&st.db).await; tracing::warn!("analyse : {e}") }
+        }
+    }
+    // Codes cités dans les vidéos récentes (TikTok, YouTube) : souvent des maps qui buzzent.
+    let texts: Vec<String> = sqlx::query_scalar("SELECT text FROM tt_videos WHERE fetched_at > datetime('now', '-3 days')").fetch_all(&st.db).await.map_err(|e| e.to_string())?;
+    let code_re = regex::Regex::new(r"\b\d{4}-\d{4}-\d{4}\b").unwrap();
+    for t in &texts { for m in code_re.find_iter(t) {
+        let _ = sqlx::query("INSERT INTO fn_seed (code, source, seen_at) VALUES (?, 'vidéos', datetime('now')) ON CONFLICT(code) DO UPDATE SET seen_at = excluded.seen_at").bind(m.as_str()).execute(&st.db).await;
+    } }
+    let seeds: Vec<String> = sqlx::query_scalar("SELECT code FROM fn_seed WHERE code NOT IN (SELECT code FROM fn_islands) AND seen_at > datetime('now', '-3 days') ORDER BY rank IS NULL, rank")
+        .fetch_all(&st.db).await.map_err(|e| e.to_string())?;
+    for c in seeds.iter().filter(|c| valid_code(c)).take(150) { let _ = ensure_island(st, c).await; tokio::time::sleep(std::time::Duration::from_millis(150)).await; }
+
+    // 4. Mesures par priorité. Les chiffres d'Epic sont journaliers : inutile de remesurer trop souvent.
     let codes: Vec<String> = sqlx::query_scalar(
-        "SELECT code FROM fn_islands i WHERE metrics_at IS NULL OR metrics_at < datetime('now', '-50 minutes') AND (
-            (seen_new = 1 AND first_seen > datetime('now', '-14 days'))
-            OR code IN (SELECT code FROM fn_watch)
-            OR code IN (SELECT island_code FROM maps WHERE island_code IS NOT NULL)
-            OR code IN (SELECT code FROM fn_metrics WHERE day = (SELECT MAX(day) FROM fn_metrics) ORDER BY unique_players DESC LIMIT 200))
-         ORDER BY metrics_at IS NOT NULL, metrics_at LIMIT 400",
+        "SELECT code FROM (
+           SELECT i.code, CASE
+             WHEN i.code IN (SELECT code FROM fn_seed WHERE seen_at > datetime('now', '-3 days')) OR i.code IN (SELECT code FROM fn_watch) OR i.code IN (SELECT island_code FROM maps WHERE island_code IS NOT NULL) THEN 0
+             WHEN i.metrics_at IS NULL AND i.seen_new = 1 THEN 1
+             WHEN i.code IN (SELECT code FROM fn_metrics WHERE day = (SELECT MAX(day) FROM fn_metrics) AND unique_players >= 100) THEN 2
+             WHEN i.metrics_at IS NULL THEN 3
+             WHEN i.code IN (SELECT code FROM fn_metrics WHERE unique_players IS NOT NULL) THEN 4
+             ELSE 5 END AS prio, i.metrics_at
+           FROM fn_islands i
+           WHERE i.metrics_at IS NULL
+              OR (i.metrics_at < datetime('now', '-3 hours') AND (i.code IN (SELECT code FROM fn_seed) OR i.code IN (SELECT code FROM fn_watch) OR i.code IN (SELECT island_code FROM maps WHERE island_code IS NOT NULL)
+                    OR i.code IN (SELECT code FROM fn_metrics WHERE day = (SELECT MAX(day) FROM fn_metrics) AND unique_players >= 100)))
+              OR (i.metrics_at < datetime('now', '-20 hours') AND i.code IN (SELECT code FROM fn_metrics WHERE unique_players IS NOT NULL))
+              OR i.metrics_at < datetime('now', '-7 days')
+         ) ORDER BY prio, metrics_at IS NOT NULL, metrics_at LIMIT 900",
     ).fetch_all(&st.db).await.map_err(|e| e.to_string())?;
     let mut measured = 0;
     for c in &codes {
         match fetch_metrics(st, c).await {
             Ok(true) => measured += 1,
-            Ok(false) => {}
+            Ok(false) => { let _ = sqlx::query("UPDATE fn_islands SET metrics_at = datetime('now') WHERE code = ?").bind(c).execute(&st.db).await; }
             Err(e) if e.contains("limite") => { tokio::time::sleep(std::time::Duration::from_secs(30)).await; break }
             Err(e) => return Err(e),
         }
-        tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(150)).await;
     }
     let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM fn_islands").fetch_one(&st.db).await.map_err(|e| e.to_string())?;
     sqlx::query("UPDATE fn_status SET last_ok = datetime('now'), last_error = NULL, islands = ? WHERE id = 1").bind(total).execute(&st.db).await.map_err(|e| e.to_string())?;
@@ -178,7 +259,13 @@ pub async fn status(State(st): State<AppState>, _u: AuthUser) -> ApiResult<Value
     let (last_run, last_ok, err, islands): (Option<String>, Option<String>, Option<String>, i64) = sqlx::query_as("SELECT last_run, last_ok, last_error, islands FROM fn_status WHERE id = 1").fetch_one(&st.db).await?;
     let latest: Option<String> = sqlx::query_scalar("SELECT MAX(day) FROM fn_metrics").fetch_one(&st.db).await?;
     let measured: i64 = sqlx::query_scalar("SELECT COUNT(DISTINCT code) FROM fn_metrics").fetch_one(&st.db).await?;
-    Ok(Json(json!({ "last_run": last_run, "last_ok": last_ok, "error": err, "islands": islands, "measured": measured, "latest_day": latest })))
+    let active: i64 = sqlx::query_scalar("SELECT COUNT(DISTINCT code) FROM fn_metrics WHERE unique_players > 0 AND day >= date((SELECT MAX(day) FROM fn_metrics), '-1 day')").fetch_one(&st.db).await?;
+    let (sweeps, cursor, seed_ok, seed_err): (i64, Option<String>, Option<String>, Option<String>) = sqlx::query_as("SELECT sweeps, cursor, seed_ok, seed_error FROM fn_status WHERE id = 1").fetch_one(&st.db).await?;
+    let seeds: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM fn_seed WHERE seen_at > datetime('now', '-3 days')").fetch_one(&st.db).await?;
+    let unmeasured: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM fn_islands WHERE metrics_at IS NULL").fetch_one(&st.db).await?;
+    Ok(Json(json!({ "last_run": last_run, "last_ok": last_ok, "error": err, "islands": islands, "measured": measured, "active": active, "latest_day": latest,
+        "catalog_done": sweeps > 0, "sweeping": cursor.map(|c| !c.is_empty()).unwrap_or(false), "unmeasured": unmeasured,
+        "popular_source": { "count": seeds, "last": seed_ok, "error": seed_err } })))
 }
 
 static REFRESHING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
@@ -277,7 +364,8 @@ pub async fn market(State(st): State<AppState>, _u: AuthUser) -> ApiResult<Value
     for (code, title, tags, new) in &islands {
         let Some(m) = per.get(code) else { continue };
         let up = *m.by_day.get(&last_day).unwrap_or(&0);
-        if up == 0 && m.by_day.is_empty() { continue }
+        // Seules les maps jouées le dernier jour comptent : une map morte ne dit rien du marché actuel.
+        if up == 0 { continue }
         measured += 1; total_players += up;
         for (d, v) in &m.by_day { *total_by_day.entry(d.clone()).or_default() += v }
         if let (Some(f), Some(l)) = (m.by_day.get(&first_day), m.by_day.get(&last_day)) { tot_first += f; tot_same += l }
@@ -325,7 +413,7 @@ pub async fn market(State(st): State<AppState>, _u: AuthUser) -> ApiResult<Value
             "d1": d1, "minutes": mins.map(|m| m.round()), "new_7d": a.new, "trend": trend.map(|t| t.round()), "top3_share": (top_share * 100.0).round(),
             "share": if total_players > 0 { a.players as f64 / total_players as f64 * 100.0 } else { 0.0 },
             "score": (score * 10.0).round() / 10.0, "verdict": verdict, "series": series,
-            "top": a.top.iter().take(5).map(|x| json!({ "code": x.1, "title": x.2, "players": x.0 })).collect::<Vec<_>>(),
+            "top": a.top.iter().filter(|x| x.0 > 0).take(5).map(|x| json!({ "code": x.1, "title": x.2, "players": x.0 })).collect::<Vec<_>>(),
         })
     }).collect();
     tags.sort_by(|a, b| b["players"].as_i64().cmp(&a["players"].as_i64()));
