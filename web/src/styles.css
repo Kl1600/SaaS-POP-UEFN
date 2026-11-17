@@ -518,3 +518,25 @@ body.wb-fs .side,body.wb-fs .top{visibility:hidden}
 .toast-act{all:unset;cursor:pointer;color:#EF8D46;font-weight:600;padding:2px 4px;border-radius:6px}
 .toast-act:hover{text-decoration:underline}
 }
+
+@layer app{
+.guide-head{display:flex;gap:12px;align-items:center}
+.guide-ico{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;flex:none;color:#fff;background:linear-gradient(135deg,#ED753E,#EF8D46);box-shadow:0 4px 14px rgba(237,117,62,.35)}
+.guide-name{font-weight:500;font-size:15px}
+.guide-hl{font-size:19px;line-height:1.35;margin-top:2px}
+.guide-pts{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:8px}
+.guide-pts li{display:flex;gap:10px;line-height:1.45;font-size:14.5px}
+.guide-pace{margin-top:12px;padding:10px 12px;border:1px solid var(--border);border-radius:12px}
+.guide-sugs{display:grid;gap:8px}
+.guide-sug{display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:12px;padding:8px 8px 8px 12px}
+.guide-sug.first{border-color:rgba(237,117,62,.55);background:rgba(237,117,62,.05)}
+.guide-sug-main{all:unset;flex:1;min-width:0;cursor:pointer;display:flex;flex-direction:column;gap:2px}
+.guide-sug-t{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.guide-sug .btn{flex:none;height:34px}
+}
+@layer app{
+.top .gsearch-wrap{flex:0 1 300px;min-width:120px}
+.top .gsearch-wrap .search{width:100%;flex:none;min-width:0;box-sizing:border-box}
+.top > *{flex-shrink:0}
+.top > .gsearch-wrap{flex-shrink:1}
+}

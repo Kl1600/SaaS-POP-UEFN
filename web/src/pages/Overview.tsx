@@ -1,3 +1,4 @@
+import { GuidePanel } from '../components/Guide'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -55,6 +56,8 @@ export default function Overview() {
       <PageHead title="Vue d'ensemble" help={`Où en est ${map?.name}, en un coup d'œil.`}>
         <button className="btn pri" onClick={() => nav('/taches')}>Ouvrir les tâches</button>
       </PageHead>
+
+      <section className="card"><GuidePanel compact /></section>
 
       <section className="tiles" aria-label="Indicateurs">
         <div className="card"><div className="lab"><Clock size={18} strokeWidth={1.5} />Tâches en cours</div><div className="num">{t.doing}</div><div className="muted">{t.done} / {t.total} finies au total</div></div>

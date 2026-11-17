@@ -5,6 +5,7 @@ mod ai;
 mod mail;
 mod manage;
 mod engine;
+mod guide;
 mod integrations;
 mod link;
 mod catalog;
@@ -155,6 +156,7 @@ fn api() -> Router<AppState> {
         .route("/api/maps/{mid}", patch(studio::update_map).delete(manage::delete_map))
         .route("/api/maps/{mid}/ws", get(ws::ws_handler))
         .route("/api/maps/{mid}/overview", get(plan::overview))
+        .route("/api/maps/{mid}/guide", get(guide::guide))
         .route("/api/maps/{mid}/report", get(report))
         // Tâches
         .route("/api/maps/{mid}/tasks", get(tasks::list).post(tasks::create))
