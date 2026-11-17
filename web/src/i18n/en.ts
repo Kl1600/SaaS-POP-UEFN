@@ -1,0 +1,88 @@
+import type { Dict } from './fr'
+const en: Dict = {
+  meta: { title: 'POP · The studio for Fortnite creators' },
+  nav: { features: 'Features', boussole: 'Boussole', pricing: 'Pricing', faq: 'FAQ', login: 'Log in', join: 'Join the beta', home: 'POP, home', lang: 'Language', search: 'Search a country' },
+  hero: {
+    announce: 'New: Boussole, the built-in assistant', h1a: 'Your Fortnite maps.', h1b: 'Built together. Without the chaos.',
+    subA: 'POP brings your whole UEFN studio into one place: ', subB: 'one-hour tasks', subC: ', Verse linked to UEFN, whiteboard, market analysis and revenue sharing.',
+    cta: 'Join the waitlist', see: 'See the features', micro1: 'Private beta', micro2: 'Waitlist access', micro3: 'Linked to UEFN',
+  },
+  marquee: { label: 'Works with your tools', epic: 'Epic’s Fortnite API' },
+  pain: {
+    eyebrow: 'The problem', h2a: 'Discord, three Google Docs,', h2b: 'and nobody knows who’s doing what.', without: 'Without POP', with: 'With POP',
+    bad: ['“Who touched the spawner?”', 'Verse gets passed around Discord as .txt', 'A task list in a Google Doc', 'The revenue spreadsheet, version 7', '“When are we shipping again?”', 'Building without knowing if the genre works'],
+    good: ['Every action is tracked and undoable', 'Ctrl+S sends the Verse into UEFN', 'One-hour tasks, with dependencies', 'A clear statement for everyone', 'Boussole tracks milestones and delays', 'A verdict per genre, with real numbers'],
+  },
+  feat: {
+    eyebrow: 'Features', h2: 'The whole studio, from idea to launch day.', p: 'What you see here are POP’s real screens, simplified.',
+    items: [
+      { tag: 'Tasks and Boussole', h: 'One-hour tasks. An assistant every morning.', p: 'The generator splits your map into one-hour tasks with their dependencies. Boussole sums up the day, flags delays and suggests what to pick up first.', pts: ['Kanban and dependencies', 'Delays and milestones tracked', '“Take” in one click'] },
+      { tag: 'Verse editor', h: 'Ctrl+S, and it’s in UEFN.', p: 'Write Verse in POP and it goes straight into your project: compilation, errors on the right line, test session. The assistant explains and fixes, with no external service.', pts: ['Compiles in UEFN', 'Errors on the line', 'Suggested fixes'] },
+      { tag: 'Organizer', h: 'All your devices. Sorted in three seconds.', p: 'Search by tag, type or folder, select twenty and rename, move or duplicate them at once. Ctrl+Z undoes. If UEFN is closed, changes wait.', pts: ['Search tag:, type:, folder:', 'Bulk edits', 'Everything is undoable'] },
+      { tag: 'Whiteboard', h: 'Sketch the map together.', p: 'Sticky notes, shapes, arrows, colors, bold, underline: everything you need to lay out ideas. Vote, then turn the best notes into tasks.', pts: ['Full formatting', 'Real-time collaboration', 'Notes → tasks'] },
+      { tag: 'Analytics', h: 'Know what to build before you build it.', p: 'Which genres attract players, where there’s room, which maps take off at launch, and what’s trending on video. Numbers from Epic’s official API.', pts: ['Verdict per genre', 'Maps that work', 'TikTok and Shorts trends'] },
+      { tag: 'Payouts', h: 'Everyone knows what they earn.', p: 'Sharing rules by percentage, fixed amount or per task, revenue import, statement per person. No more spreadsheet lost in Discord.', pts: ['Percentage, fixed, per task', 'CSV import', 'Personal statements'] },
+    ],
+    aiB: 'Already using an AI?', aiText: 'Connect Claude, Cursor, Codex or any MCP-compatible AI: it takes a task, writes the Verse, compiles, then closes the task with a note. Every action is logged and undoable.',
+  },
+  bou: {
+    eyebrow: 'Built-in assistant', h2a: 'Ask the question.', h2b: 'Boussole answers.',
+    p: 'Boussole knows your tasks, milestones and team. It tells you what’s late, who’s working on what and where to start, and walks newcomers through POP step by step. All without your data leaving POP.',
+    sub: 'built-in assistant', ask: 'How do I…?',
+    demo: [
+      { q: 'What should I do now?', a: ['**Hi Léa, shall we catch up?**', '[r] 2 tasks are late.', '[g] Yesterday you finished 3 tasks.', 'Do now: **#42 Score system**, which unblocks 3 other tasks.'] },
+      { q: 'How do I link UEFN?', a: ['**How to link UEFN to POP?**', '1. Organizer → Download UEFN Link.', '2. Double-click pop-link.exe on the PC.', '3. In UEFN: Model Context Protocol → Start Server.'] },
+      { q: 'Are we late for the beta?', a: ['[o] “Beta” milestone in 5 days: 9 tasks left.', 'At the current pace (1.5 per day), it would take 6 days. **Expected delay: 1 day.**'] },
+      { q: 'What is Hugo working on?', a: ['**Hugo** has 1 task in progress and 2 to do:', '• **#38** Zone 2 scenery · in progress since yesterday', '• **#44** End screen · waiting for #42', '[g] 4 tasks finished this week.'] },
+      { q: 'Can my AI close tasks?', a: ['Yes: once connected in “Connected AIs”, it uses **next_task**, **set_task_status** and **comment_task**. Every action is marked “AI” in the history.'] },
+    ],
+  },
+  stats: [['1 h', 'per task, to move forward every day'], ['0', 'external AI service required'], ['7 days', 'of stats per map, from Epic’s API'], ['100%', 'of UEFN actions undoable']],
+  pricing: {
+    eyebrow: 'Pricing', h2: 'Choose your plan.', p: 'POP is in private beta: access is by waitlist. Prices apply at launch, and you’ll be notified before any payment.',
+    perMonth: '/ month', compare: 'Compare plans', unlimited: 'Unlimited', soon: 'Soon',
+    plans: [
+      { name: 'Creator', tag: 'To get started', desc: 'One map, a small team, all the essentials.', cta: 'Join the list' },
+      { name: 'Studio', tag: 'Most complete', desc: 'For studios that ship maps as a team.', cta: 'Join the list' },
+      { name: 'Studio+', tag: 'Soon', desc: 'Everything in Studio, plus POP Forge: the desktop app that builds inside UEFN.', cta: 'Join the list' },
+    ],
+    rows: ['Organization', 'One-hour tasks, Kanban, dependencies', 'Boussole, the built-in assistant', 'Pages, whiteboard, planning and milestones', 'Maps', 'Members', 'UEFN', 'UEFN Link: synced projects', 'Linked Verse editor (compilation, line errors)', 'Actor organizer and bulk edits', 'Connected AIs (Claude, Cursor, Codex…)', 'POP Forge: assisted building in UEFN', 'Growth', 'Market analysis and maps that work', 'TikTok and YouTube Shorts video trends', 'Playtest exchange and launch day', 'Revenue sharing and statements', 'Discord, GitHub, Lore'],
+  },
+  faq: {
+    eyebrow: 'FAQ', h2: 'Questions we get asked.',
+    items: [
+      ['Do I need a Windows PC?', 'To link UEFN, yes: UEFN only runs on Windows, and UEFN Link runs on that PC. The rest of POP works in any browser, Mac included.'],
+      ['Does POP publish my map?', 'No. POP prepares everything (pre-publish check, playtests, launch-day plan), but publishing always happens in Epic’s creator portal.'],
+      ['How does the Boussole assistant work?', 'Boussole is built into POP: it reads your tasks, their dates, dependencies and milestones to sum up the day, answer your questions (“what’s late?”, “what is Hugo working on?”) and explain how to use POP. It runs entirely inside POP: your data goes to no external service.'],
+      ['What if I want to use my own AI?', 'Connect Claude, Cursor, Codex or another MCP-compatible AI in “Connected AIs”. It can read and edit your tasks, Verse and UEFN actors, and every action is logged and undoable.'],
+      ['Where do the analytics numbers come from?', 'From Epic’s official Fortnite API: players, peak concurrent players, playtime and retention for every public map, over 7 days.'],
+      ['How do I get access?', 'POP is in private beta. Join the waitlist: we review requests one by one and you get an email link to create your account.'],
+      ['How much does it cost?', 'Prices are shown above. They apply when POP opens; beta members are notified before any payment.'],
+    ],
+  },
+  final: { h2a: 'Your next map', h2b: 'starts here.', p: 'Join the waitlist: we’ll send you access as soon as a spot opens.' },
+  foot: { made: 'Made by Fortnite creators, for Fortnite creators.', legal: 'Fortnite and UEFN are trademarks of Epic Games. POP is not affiliated with or endorsed by Epic Games.', product: 'Product', help: 'Help', account: 'Account' },
+  mock: {
+    overview: 'Overview', nav: ['Overview', 'Pages', 'Whiteboard', 'Tasks', 'Verse editor', 'Organizer', 'Market'],
+    hello: 'Hi Léa, I suggest starting with #42.', late: '2 tasks late (the oldest was due on Nov 12).', mile: '“Beta” milestone in 5 days: 9 tasks left, expected delay of 1 day.',
+    take: 'Take', start: 'Start', unlocks: 'unblocks 3 other tasks', today: 'due today', waits: 'waiting for #42',
+    todo: 'To do', doing: 'In progress', done: 'Done', tasks: ['Score system', 'Zone 2 scenery', 'End screen', 'Internal playtest', 'Player spawn', 'Storm'],
+    sent: 'sent to UEFN', err: 'Line 12: int and float can’t be added.', fix: 'Fix: Points += 1',
+    red: 'Red team', selected: '2 selected', rename: 'Rename', move: 'Move', dup: 'Duplicate',
+    s1: '4v4 team mode', s2a: 'Final boss', s2b: 'in the center', s3: 'Economy: 1 coin / elimination',
+    verdicts: ['Good opportunity', 'Popular but crowded', 'Saturated', 'Niche'], typical: 'players / typical map',
+    earnings: 'October earnings', roles: ['Code · 40%', 'Map · 35%', 'Music · fixed', 'Remainder'], noTransfer: 'POP calculates, it never transfers money.',
+  },
+  wl: {
+    eyebrow: 'Private beta', title: 'Join the waitlist', intro: 'We’re opening POP gradually to support every studio. Tell us who you are and we’ll send you access as soon as possible.',
+    pageIntro: 'POP accounts are invite-only. Tell us who you are: you’ll get a link to create your account once your access is approved.',
+    invalid: 'This access link is invalid, already used or expired. Request again, or write to the POP team.',
+    name: 'Name or nickname', email: 'Email', studio: 'Studio', optional: '(optional)', studioPh: 'Studio name', team: 'Team size',
+    teams: ['Solo', '2 to 3', '4 to 10', 'More than 10'], exp: 'Experience', exps: ['New to UEFN', 'A few published maps', 'Experienced creator', 'Professional studio'],
+    links: 'Your maps or socials', linksPh: 'Island codes, TikTok, YouTube…', msg: 'What you want to do with POP', msgPh: 'E.g. we’re 4 on a tycoon map and we get lost between Discord and Google Docs.',
+    send: 'Request access', sending: 'Sending…', nospam: 'No spam: we only write to give you access.',
+    okTitle: 'Got it, thanks!', okText: 'Your request has reached the POP team. You’ll get a link to create your account as soon as a spot opens.',
+    alreadyTitle: 'You’re already on the list.', approvedTitle: 'Your access is already approved.', approvedText: 'Check your email: the link to create your account has been sent. Otherwise, write to us.', close: 'Close',
+  },
+}
+export default en
