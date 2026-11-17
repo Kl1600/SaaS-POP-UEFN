@@ -545,3 +545,22 @@ body.wb-fs .side,body.wb-fs .top{visibility:hidden}
 .gr-head{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);padding:10px 10px 4px}
 .gresults{max-height:480px}
 }
+
+@layer app{
+.gdrawer{display:flex;flex-direction:column}
+.seg{display:inline-flex;background:var(--hover);border-radius:10px;padding:3px;gap:2px}
+.seg button{all:unset;cursor:pointer;padding:6px 12px;border-radius:8px;font-size:14px;color:var(--text2)}
+.seg button.on{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.gchat{display:flex;flex-direction:column;flex:1;min-height:0}
+.gmsgs{flex:1;overflow:auto;display:flex;flex-direction:column;gap:10px;padding-bottom:10px}
+.gmsg{max-width:92%;padding:10px 13px;border-radius:14px;line-height:1.5;font-size:14.5px}
+.gmsg p{margin:0 0 6px}.gmsg p:last-child{margin-bottom:0}
+.gmsg ol{margin:4px 0 6px;padding-left:20px;display:grid;gap:4px}
+.gmsg.me{align-self:flex-end;background:linear-gradient(135deg,#ED753E,#EF8D46);color:#fff;border-bottom-right-radius:4px}
+.gmsg.bot{align-self:flex-start;background:var(--hover);border-bottom-left-radius:4px}
+.gothers{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center}
+.gothers .chip{height:auto;min-height:30px;padding:4px 12px;font-size:13px;text-align:left}
+.gask{display:flex;gap:8px}
+.gask .field{flex:1;min-width:0}
+.gask .btn{flex:none}
+}

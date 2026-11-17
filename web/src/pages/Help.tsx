@@ -14,7 +14,9 @@ const SECTIONS: [string, string[]][] = [
 
 export default function Help() {
   return <main className="content help">
-    <PageHead title="Aide et support" help="Comment utiliser chaque partie de POP." />
+    <PageHead title="Aide et support" help="Comment utiliser chaque partie de POP.">
+      <button className="btn pri" onClick={() => window.dispatchEvent(new CustomEvent('boussole', { detail: '' }))}>Demander à Boussole</button>
+    </PageHead>
     <div className="grid2">
       {SECTIONS.map(([t, ps]) => <section key={t} className="card"><h3>{t}</h3>{ps.map((p, i) => <p key={i} style={{ margin: '6px 0' }}>{p}</p>)}</section>)}
       <section className="card"><h3>Un problème ?</h3><p>Relais UEFN : lancez <span className="mono">pop-link.exe diagnostic</span> sur le PC et gardez le résultat. Mot de passe perdu : « Mot de passe oublié » sur la page de connexion, ou demandez un lien à un admin du studio.</p></section>

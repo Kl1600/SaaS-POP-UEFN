@@ -150,7 +150,7 @@ function Locks() {
 }
 
 function TaskDrawer({ id, onClose, members, tasks }: { id: number; onClose: () => void; members: any[]; tasks: Task[] }) {
-  const { canEdit, toast } = useApp()
+  const { canEdit, isAdmin, toast } = useApp()
   const { data, reload } = useLoad<any>(`/api/tasks/${id}`, [id])
   const [comment, setComment] = useState('')
   const [sub, setSub] = useState('')
@@ -213,6 +213,9 @@ function TaskDrawer({ id, onClose, members, tasks }: { id: number; onClose: () =
           <div key={i} className="li" style={{ padding: '8px 0' }}><span className="small muted mono" style={{ width: 110, flex: 'none' }}>{frDate(e.at, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span><span style={{ flex: 1 }}>{e.what}</span><span className="small muted">{e.via}{e.who ? ` · ${e.who.split(' ')[0]}` : ''}</span></div>
         ))}
       </div>
+      {isAdmin && <div style={{ marginTop: 20, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+        <button className="btn" style={{ color: 'var(--tr)' }} onClick={async () => { if (!confirm(`Supprimer définitivement la tâche #${t.number} « ${t.title} » ?`)) return; try { await api.del(`/api/tasks/${t.id}`); toast(`Tâche #${t.number} supprimée`); onClose() } catch (e: any) { toast(e.message, true) } }}>Supprimer la tâche</button>
+      </div>}
     </Drawer>
   )
 }

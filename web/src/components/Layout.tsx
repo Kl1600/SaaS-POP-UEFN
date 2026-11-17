@@ -35,7 +35,8 @@ export default function Layout() {
   const [acct, setAcct] = useState(false)
   const acctBox = useOutside(acct, () => setAcct(false))
   const [newTask, setNewTask] = useState(false)
-  const [guide, setGuide] = useState(false)
+  const [guide, setGuide] = useState<false | { ask?: string }>(false)
+  useEffect(() => { const h = (e: Event) => setGuide({ ask: (e as CustomEvent).detail ?? '' }); window.addEventListener('boussole', h); return () => window.removeEventListener('boussole', h) }, [])
   const key = '/' + (loc.pathname.split('/')[1] || '')
   const [group, title] = TITLES[loc.pathname] ?? TITLES[key] ?? ['Général', '']
 
@@ -94,7 +95,7 @@ export default function Layout() {
           <button className={'upill ' + uefn.status} onClick={() => nav('/organiseur')} title={uefn.project ? `Projet ${uefn.project}` : 'UEFN Link'}><span className="udot" />{STATUS_LABEL[uefn.status]}{uefn.pending ? ` · ${uefn.pending}` : ''}</button>
           <GlobalSearch />
           <button className="iconbtn" aria-label={app.dark ? 'Thème clair' : 'Thème sombre'} onClick={app.toggleDark}>{app.dark ? <Sun size={20} strokeWidth={1.5} /> : <Moon size={20} strokeWidth={1.5} />}</button>
-          {app.map && <button className="iconbtn" aria-label="Boussole, votre guide du jour" title="Boussole : votre guide du jour" onClick={() => setGuide(true)}><Compass size={20} strokeWidth={1.5} /></button>}
+          {app.map && <button className="iconbtn" aria-label="Boussole, votre guide du jour" title="Boussole : votre guide du jour" onClick={() => setGuide({})}><Compass size={20} strokeWidth={1.5} /></button>}
           <Notifications />
           {app.canEdit && <button className="btn pri" onClick={() => setNewTask(true)}><Plus size={18} strokeWidth={1.5} />Nouvelle tâche</button>}
           <div style={{ position: 'relative' }} ref={acctBox}>
@@ -115,7 +116,7 @@ export default function Layout() {
         </header>
         <div className="scroll"><Outlet /></div>
       </div>
-      {guide && <GuideDrawer onClose={() => setGuide(false)} />}
+      {guide && <GuideDrawer key={guide.ask ?? 'day'} ask={guide.ask} onClose={() => setGuide(false)} />}
       {newTask && <NewTaskModal onClose={() => setNewTask(false)} />}
     </div>
   )
