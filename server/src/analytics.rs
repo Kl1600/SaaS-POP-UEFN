@@ -16,11 +16,11 @@ use std::collections::HashMap;
 
 const DEFAULT_BASE: &str = "https://api.fortnite.com/ecosystem/v1";
 
-fn base() -> String {
+pub(crate) fn base() -> String {
     std::env::var("POP_FORTNITE_API").unwrap_or_else(|_| DEFAULT_BASE.into())
 }
 
-fn valid_code(c: &str) -> bool {
+pub(crate) fn valid_code(c: &str) -> bool {
     let b = c.as_bytes();
     (b.len() == 14 && b[4] == b'-' && b[9] == b'-' && c.chars().filter(|x| *x != '-').all(|x| x.is_ascii_digit()))
         || (c.starts_with("playlist_") && c.len() < 80 && c.chars().all(|x| x.is_ascii_alphanumeric() || x == '_'))
@@ -32,7 +32,7 @@ fn next_url(link: &str) -> String {
     else { format!("{}{}", base(), if link.starts_with('/') { link.to_string() } else { format!("/{link}") }) }
 }
 
-async fn get_json(st: &AppState, url: &str) -> Result<(u16, Value), String> {
+pub(crate) async fn get_json(st: &AppState, url: &str) -> Result<(u16, Value), String> {
     let r = st.http.get(url).header("accept", "application/json").header("user-agent", "POP-UEFN/1.0").timeout(std::time::Duration::from_secs(25)).send().await.map_err(|e| e.to_string())?;
     let code = r.status().as_u16();
     let v = r.json::<Value>().await.unwrap_or(Value::Null);
@@ -58,7 +58,7 @@ async fn upsert_island(st: &AppState, it: &Value, is_new: bool) -> Result<(), sq
 }
 
 /// Métriques journalières (7 jours) d'une île, enregistrées jour par jour.
-async fn fetch_metrics(st: &AppState, code: &str) -> Result<bool, String> {
+pub(crate) async fn fetch_metrics(st: &AppState, code: &str) -> Result<bool, String> {
     let mut url = format!("{}/islands/{code}/metrics/day", base());
     let (mut status, mut v) = get_json(st, &url).await?;
     if status == 400 {

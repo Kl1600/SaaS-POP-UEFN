@@ -5,6 +5,7 @@ mod admin;
 mod analytics;
 mod billing;
 mod ideas;
+mod discover;
 mod ai;
 mod mail;
 mod manage;
@@ -239,6 +240,7 @@ fn api() -> Router<AppState> {
         .route("/api/maps/{mid}/plan/recalc", post(plan::recalc))
         .route("/api/maps/{mid}/seasons", get(plan::seasons))
         // Lancer et suivre
+        .route("/api/maps/{mid}/discover", get(discover::get).post(discover::save))
         .route("/api/maps/{mid}/checks", get(launch::checks))
         .route("/api/maps/{mid}/checks/{key}", put(launch::set_check))
         .route("/api/maps/{mid}/launch-steps", get(launch::steps).post(launch::add_step))

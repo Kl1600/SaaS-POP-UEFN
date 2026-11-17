@@ -75,14 +75,14 @@ const THEMES: &[(&str, &str, &str, &str, u8, &str, &str, &str)] = &[
     ("xp", "Maps XP / AFK", "XP / AFK maps", "simulation", 1, "verse", "xp,afk,xp map,level up fast", "risque"),
 ];
 
-const STOP: &[&str] = &["the", "and", "with", "for", "you", "your", "map", "maps", "fortnite", "new", "best", "mode", "game", "games", "creative", "uefn", "season",
+pub const STOP: &[&str] = &["the", "and", "with", "for", "you", "your", "map", "maps", "fortnite", "new", "best", "mode", "game", "games", "creative", "uefn", "season",
     "chapter", "update", "updated", "all", "edition", "version", "official", "free", "fun", "ultimate", "super", "mega", "epic", "pro", "les", "des", "une", "dans", "pour",
     "avec", "sur", "and", "only", "from", "this", "that", "are", "get", "can", "who", "how", "what", "play", "players", "player", "team", "teams", "world", "island",
     "islands", "code", "codes", "remake", "remastered", "beta", "alpha", "classic", "original", "edition", "lobby", "solo", "duo", "duos", "squad", "squads", "trio", "trios"];
 
-struct Theme { key: String, fr: String, en: String, genre: &'static str, complexity: u8, skills: Vec<&'static str>, flag: &'static str, pats: Vec<String>, emerging: bool }
+pub struct Theme { pub key: String, pub fr: String, pub en: String, pub genre: &'static str, complexity: u8, skills: Vec<&'static str>, pub flag: &'static str, pub pats: Vec<String>, emerging: bool }
 
-fn themes() -> Vec<Theme> {
+pub fn themes() -> Vec<Theme> {
     THEMES.iter().map(|t| Theme {
         key: t.0.into(), fr: t.1.into(), en: t.2.into(), genre: t.3, complexity: t.4, skills: t.5.split(',').collect(), flag: t.7,
         pats: t.6.split(',').map(|p| format!(" {} ", p.trim())).collect(), emerging: false,
@@ -90,7 +90,7 @@ fn themes() -> Vec<Theme> {
 }
 
 /// Titre + tags en minuscules, sans accents ni ponctuation, entourés d'espaces (pour chercher des mots entiers).
-fn norm(s: &str) -> String {
+pub fn norm(s: &str) -> String {
     let mut out = String::with_capacity(s.len() + 2);
     out.push(' ');
     for c in s.to_lowercase().chars() {
@@ -109,11 +109,11 @@ struct Isl { code: String, title: String, text: String, is_new: bool, by_day: Ha
 struct Agg { islands: Vec<usize>, newcomers: Vec<usize> }
 
 fn median(mut v: Vec<f64>) -> Option<f64> { if v.is_empty() { return None } v.sort_by(|a, b| a.partial_cmp(b).unwrap()); Some(v[v.len() / 2]) }
-fn quantile(mut v: Vec<f64>, q: f64) -> Option<f64> { if v.is_empty() { return None } v.sort_by(|a, b| a.partial_cmp(b).unwrap()); Some(v[((v.len() - 1) as f64 * q).round() as usize]) }
+pub fn quantile(mut v: Vec<f64>, q: f64) -> Option<f64> { if v.is_empty() { return None } v.sort_by(|a, b| a.partial_cmp(b).unwrap()); Some(v[((v.len() - 1) as f64 * q).round() as usize]) }
 /// Moyenne pondérée par les joueurs (une map à 10 joueurs ne doit pas peser autant qu'une à 10 000).
 fn wmean(v: &[(f64, f64)]) -> Option<f64> { let w: f64 = v.iter().map(|x| x.1).sum(); if w <= 0.0 { None } else { Some(v.iter().map(|x| x.0 * x.1).sum::<f64>() / w) } }
 /// Rang centile de x parmi vals (0..1).
-fn pct(vals: &[f64], x: f64) -> f64 {
+pub fn pct(vals: &[f64], x: f64) -> f64 {
     if vals.len() < 2 { return 0.5 }
     let below = vals.iter().filter(|v| **v < x).count() as f64;
     let eq = vals.iter().filter(|v| **v == x).count() as f64;

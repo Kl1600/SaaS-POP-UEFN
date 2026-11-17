@@ -4,15 +4,17 @@ import { ago, api, frDate } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { CardHead, Modal, PageHead, Tabs } from '../components/ui'
 import { tr, tx } from '../i18n/t'
+import LaunchDiscover from './LaunchDiscover'
 
 const ST: Record<string, [string, string, any]> = { ok: [tr("Conforme"), 'b-g', CheckCircle2], warn: [tr("À corriger"), 'b-o', AlertTriangle], block: [tr("Bloquant"), 'b-r', Ban], todo: [tr("À vérifier"), '', Circle] }
 
 export default function Launch() {
-  const [tab, setTab] = useState<'checks' | 'swap' | 'churn' | 'dday'>('checks')
+  const [tab, setTab] = useState<'discover' | 'checks' | 'swap' | 'churn' | 'dday'>('discover')
   return (
     <main className="content">
-      <PageHead title={tr("Lancer et suivre")} help={tr("Vérifiez la conformité, faites tester votre map et préparez le jour de la sortie.")} />
-      <Tabs value={tab} onChange={setTab} items={[['checks', tr("Vérification")], ['swap', tr("Échange de playtests")], ['churn', tr("Pourquoi ils partent")], ['dday', tr("Jour J")]]} />
+      <PageHead title={tr("Lancer et suivre")} help={tr("Préparez la sortie selon l’algorithme de Discover, suivez les 14 jours de test d’Epic, faites tester la map et préparez le jour J.")} />
+      <Tabs value={tab} onChange={setTab} items={[['discover', 'Discover'], ['checks', tr("Vérification")], ['swap', tr("Échange de playtests")], ['churn', tr("Pourquoi ils partent")], ['dday', tr("Jour J")]]} />
+      {tab === 'discover' && <LaunchDiscover />}
       {tab === 'checks' && <Checks />}
       {tab === 'swap' && <Swap />}
       {tab === 'churn' && <Churn />}
