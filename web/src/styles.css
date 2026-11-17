@@ -569,3 +569,14 @@ body.wb-fs .side,body.wb-fs .top{visibility:hidden}
 .nav-count{margin-left:auto;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:linear-gradient(135deg,#ED753E,#EF8D46);color:#160A03;font-size:11.5px;font-weight:600;display:inline-grid;place-items:center}
 .adm-req{border:1px solid var(--border);border-radius:14px;padding:14px 16px}
 }
+
+@layer app{
+.gitems{display:grid;gap:4px;margin-top:6px}
+.gitems button{all:unset;cursor:pointer;display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:9px;background:var(--surface);border:1px solid var(--border);font-size:13.5px;line-height:1.35}
+.gitems button:hover{border-color:#ED753E}
+.gitems button svg{margin-left:auto;flex:none;color:var(--text3)}
+.gtyping{display:inline-flex;gap:4px;padding:4px 2px}
+.gtyping i{width:6px;height:6px;border-radius:50%;background:var(--text3);animation:gdot 1s infinite}
+.gtyping i:nth-child(2){animation-delay:.15s}.gtyping i:nth-child(3){animation-delay:.3s}
+@keyframes gdot{0%,60%,100%{opacity:.3;transform:none}30%{opacity:1;transform:translateY(-3px)}}
+}

@@ -1,4 +1,4 @@
-import{m}from"./VerseEditor-TImw9wF-.js";import"./index-BBrya0nE.js";import"./sparkles-CHUwzxJU.js";/*!-----------------------------------------------------------------------------
+import{m}from"./VerseEditor-CwMgyytU.js";import"./index-BqGbS6Pp.js";import"./sparkles-CnL9sjmH.js";/*!-----------------------------------------------------------------------------
  * Copyright (c) Microsoft Corporation. All rights reserved.
  * Version: 0.52.0(f6dc0eb8fce67e57f6036f4769d92c1666cdf546)
  * Released under the MIT license

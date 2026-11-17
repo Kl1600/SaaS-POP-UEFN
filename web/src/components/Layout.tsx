@@ -97,7 +97,7 @@ export default function Layout() {
           <button className={'upill ' + uefn.status} onClick={() => nav('/organiseur')} title={uefn.project ? `Projet ${uefn.project}` : 'UEFN Link'}><span className="udot" />{STATUS_LABEL[uefn.status]}{uefn.pending ? ` · ${uefn.pending}` : ''}</button>
           <GlobalSearch />
           <button className="iconbtn" aria-label={app.dark ? 'Thème clair' : 'Thème sombre'} onClick={app.toggleDark}>{app.dark ? <Sun size={20} strokeWidth={1.5} /> : <Moon size={20} strokeWidth={1.5} />}</button>
-          {app.map && <button className="iconbtn" aria-label="Boussole, votre guide du jour" title="Boussole : votre guide du jour" onClick={() => setGuide({})}><Compass size={20} strokeWidth={1.5} /></button>}
+          {app.map && <button className="iconbtn" aria-label="Boussole, assistant intégré" title="Boussole : assistant intégré" onClick={() => setGuide({})}><Compass size={20} strokeWidth={1.5} /></button>}
           <Notifications />
           {app.canEdit && <button className="btn pri" onClick={() => setNewTask(true)}><Plus size={18} strokeWidth={1.5} />Nouvelle tâche</button>}
           <div style={{ position: 'relative' }} ref={acctBox}>

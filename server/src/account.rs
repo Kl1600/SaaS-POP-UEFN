@@ -147,7 +147,7 @@ fn fold(s: &str) -> Vec<char> {
         }
     }).collect()
 }
-fn fold_str(s: &str) -> String { fold(s).into_iter().collect() }
+pub fn fold_str(s: &str) -> String { fold(s).into_iter().collect() }
 
 struct Q { words: Vec<String> }
 impl Q {

@@ -166,3 +166,123 @@ pub async fn guide(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64>
         "counts": { "today": my_today.len(), "late": my_late.len(), "doing": my_doing.len(), "blocked": blocked.len(), "team_late": team_late.len() },
     })))
 }
+
+// ---------- Questions sur les données de la map ----------
+
+#[derive(serde::Deserialize)]
+pub struct AskQ { q: String }
+
+fn status_fr(s: &str) -> &'static str {
+    match s { "todo" => "à faire", "doing" => "en cours", "blocked" => "bloquée", "done" => "faite", _ => "?" }
+}
+
+/// Répond avec les vraies données de la map (retards, personnes, tâche n°, jalon, chiffres de la semaine…).
+/// Renvoie `{ "answer": null }` quand la question ne porte pas sur les données : l'interface utilise alors le guide de POP.
+pub async fn ask(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64>, axum::extract::Query(q): axum::extract::Query<AskQ>) -> ApiResult<Value> {
+    let ctx = map_ctx(&st, &u, mid).await?;
+    let raw = q.q.chars().take(300).collect::<String>();
+    let f = crate::account::fold_str(&raw);
+    let has = |ws: &[&str]| ws.iter().any(|w| f.contains(w));
+    let today = chrono::Utc::now().with_timezone(&chrono_tz::Europe::Paris).date_naive();
+    let line = |t: &T| format!("#{} {} · {}{}{}", t.number, t.title, status_fr(&t.status),
+        t.assignee.as_deref().map(|a| format!(" · {}", first_name(a))).unwrap_or_default(),
+        day(&t.planned_day).map(|d| if d < today && t.status != "done" { format!(" · en retard depuis le {}", fr_day(d)) } else { format!(" · prévue le {}", fr_day(d)) }).unwrap_or_default());
+    let item = |t: &T| json!({ "label": line(t), "link": format!("/taches?t={}", t.id) });
+    let all: Vec<T> = sqlx::query_as(
+        "SELECT t.id, t.number, t.title, t.tag, t.status, t.assignee_id, u.name AS assignee, t.planned_day, (SELECT MAX(e.at) FROM task_events e WHERE e.task_id = t.id) AS since
+         FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id WHERE t.map_id = ? ORDER BY t.number",
+    ).bind(mid).fetch_all(&st.db).await?;
+    let open: Vec<&T> = all.iter().filter(|t| t.status != "done").collect();
+    let reply = |text: String, items: Vec<Value>| Ok(Json(json!({ "answer": text, "items": items })));
+
+    // 1. Une tâche précise : « #12 », « tâche 12 ».
+    let num_re = regex::Regex::new(r"(?:#|\btache\s*(?:n|numero|no)?\s*)(\d{1,5})\b").unwrap();
+    if let Some(c) = num_re.captures(&f) {
+        let n: i64 = c[1].parse().unwrap_or(0);
+        let Some(t) = all.iter().find(|t| t.number == n) else { return reply(format!("Je ne trouve pas de tâche #{n} dans cette map."), vec![]) };
+        let deps: Vec<(i64, String)> = sqlx::query_as("SELECT o.number, o.status FROM task_deps d JOIN tasks o ON o.id = d.depends_on WHERE d.task_id = ?").bind(t.id).fetch_all(&st.db).await?;
+        let waiting: Vec<String> = deps.iter().filter(|d| d.1 != "done").map(|d| format!("#{}", d.0)).collect();
+        let mut text = format!("#{} « {} » est {}{}.", t.number, t.title, status_fr(&t.status), t.assignee.as_deref().map(|a| format!(", assignée à {}", first_name(a))).unwrap_or_else(|| ", sans personne assignée".into()));
+        if let Some(d) = day(&t.planned_day) { let fd = fr_day(d); text += &format!(" Prévue le {fd}{}", if fd.ends_with('.') { "" } else { "." }) }
+        if !waiting.is_empty() { text += &format!(" Elle attend {}.", waiting.join(", ")) }
+        return reply(text, vec![item(t)]);
+    }
+
+    // Une question « comment… / pourquoi… » porte sur l'utilisation de POP : le guide y répond mieux que les données.
+    let howto = regex::Regex::new(r"^\s*(comment|pourquoi|c est quoi|qu est ce qu|ou (est|se trouve|sont|trouver)|est ce qu(e|on) (je|on) peu|puis je|peut on|peux tu m expliquer|a quoi sert|how)").unwrap().is_match(&f);
+    if howto { return Ok(Json(json!({ "answer": null }))) }
+    // 2. Une personne de l'équipe : « sur quoi travaille Hugo », « tâches de Léa », « moi ».
+    let people: Vec<(i64, String)> = sqlx::query_as("SELECT u.id, u.name FROM memberships m JOIN users u ON u.id = m.user_id WHERE m.studio_id = ?").bind(ctx.studio_id).fetch_all(&st.db).await?;
+    let words: Vec<&str> = f.split(|c: char| !c.is_alphanumeric()).filter(|w| w.len() >= 2).collect();
+    let me_q = regex::Regex::new(r"\b(je|j|mes|moi|ma)\b").unwrap().is_match(&f) && has(&["travaill", "tache", "fais", "faire", "bosse", "journee", "dois", "assign", "occupe"]);
+    let person = people.iter().find(|(_, n)| {
+        let nf = crate::account::fold_str(n);
+        let first = nf.split_whitespace().next().unwrap_or("").to_string();
+        first.len() >= 2 && words.iter().any(|w| *w == first) || words.windows(2).any(|w| format!("{} {}", w[0], w[1]) == nf)
+    }).map(|(id, n)| (*id, n.clone())).or(if me_q { Some((u.id, u.name.clone())) } else { None });
+    if let Some((pid, pname)) = person {
+        let theirs: Vec<&T> = open.iter().copied().filter(|t| t.assignee_id == Some(pid)).collect();
+        let done_w: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tasks WHERE map_id = ? AND assignee_id = ? AND status = 'done' AND done_at > datetime('now', '-7 days')").bind(mid).bind(pid).fetch_one(&st.db).await?;
+        let who = if pid == u.id { "Vous avez".to_string() } else { format!("{} a", first_name(&pname)) };
+        let doing = theirs.iter().filter(|t| t.status == "doing").count();
+        let late = theirs.iter().filter(|t| day(&t.planned_day).map(|d| d < today).unwrap_or(false)).count();
+        let mut text = if theirs.is_empty() { format!("{who} aucune tâche ouverte dans cette map.") }
+            else { format!("{who} {} en cours et {} à faire ou bloquée{}.", doing, theirs.len() - doing, if theirs.len() - doing > 1 { "s" } else { "" }) };
+        if late > 0 { text += &format!(" Dont {} en retard.", plural(late as i64, "tâche", "tâches")) }
+        text += &format!(" {} cette semaine.", if done_w == 0 { "Aucune tâche terminée".to_string() } else { format!("{} terminée{}", plural(done_w, "tâche", "tâches"), if done_w > 1 { "s" } else { "" }) });
+        let mut list = theirs.clone(); list.sort_by_key(|t| (t.status != "doing", t.planned_day.clone()));
+        return reply(text, list.iter().take(8).map(|t| item(t)).collect());
+    }
+
+    // 3. Questions générales sur l'avancement.
+    if has(&["retard", "en retard", "late"]) && !has(&["jalon", "sortie", "beta", "deadline"]) {
+        let late: Vec<&T> = open.iter().copied().filter(|t| day(&t.planned_day).map(|d| d < today).unwrap_or(false)).collect();
+        if late.is_empty() { return reply("Aucune tâche en retard, bravo.".into(), vec![]) }
+        return reply(format!("{} en retard :", plural(late.len() as i64, "tâche", "tâches")), late.iter().take(10).map(|t| item(t)).collect());
+    }
+    if has(&["bloque", "coince", "blocage"]) {
+        let b: Vec<&T> = open.iter().copied().filter(|t| t.status == "blocked").collect();
+        if b.is_empty() { return reply("Aucune tâche bloquée en ce moment.".into(), vec![]) }
+        return reply(format!("{} bloquée{} :", plural(b.len() as i64, "tâche", "tâches"), if b.len() > 1 { "s" } else { "" }), b.iter().take(10).map(|t| item(t)).collect());
+    }
+    if has(&["qui travaille", "qui fait quoi", "qui bosse", "en cours", "equipe fait"]) {
+        let d: Vec<&T> = open.iter().copied().filter(|t| t.status == "doing").collect();
+        if d.is_empty() { return reply("Personne n’a de tâche en cours pour l’instant.".into(), vec![]) }
+        return reply(format!("{} en cours :", plural(d.len() as i64, "tâche", "tâches")), d.iter().map(|t| item(t)).collect());
+    }
+    if has(&["sans personne", "non assign", "personne n a pris", "libre", "dispo"]) && has(&["tache"]) {
+        let free: Vec<&T> = open.iter().copied().filter(|t| t.assignee_id.is_none() && t.status == "todo").collect();
+        if free.is_empty() { return reply("Toutes les tâches à faire ont quelqu’un.".into(), vec![]) }
+        return reply(format!("{} sans personne assignée :", plural(free.len() as i64, "tâche", "tâches")), free.iter().take(10).map(|t| item(t)).collect());
+    }
+    if has(&["jalon", "sortie", "beta", "deadline", "echeance", "on sort quand", "date de sortie"]) {
+        let ms: Vec<(String, String)> = sqlx::query_as("SELECT title, date FROM milestones WHERE map_id = ? AND date >= date('now') ORDER BY date LIMIT 3").bind(mid).fetch_all(&st.db).await?;
+        let Some((title, date)) = ms.first() else { return reply("Aucun jalon à venir. Ajoutez-en un dans Planifier → Jalons.".into(), vec![json!({ "label": "Ouvrir Planifier", "link": "/planifier" })]) };
+        let md = day(&Some(date.clone())).unwrap_or(today);
+        let remaining: Vec<&T> = open.iter().copied().filter(|t| day(&t.planned_day).map(|d| d <= md).unwrap_or(false)).collect();
+        let done14: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tasks WHERE map_id = ? AND status = 'done' AND done_at > datetime('now', '-14 days')").bind(mid).fetch_one(&st.db).await?;
+        let per = done14 as f64 / 14.0; let left = (md - today).num_days();
+        let mut text = format!("Prochain jalon : « {title} » le {} (dans {}). {} à finir avant.", fr_day(md), jours(left), plural(remaining.len() as i64, "tâche", "tâches"));
+        if !remaining.is_empty() {
+            if per > 0.0 { let need = (remaining.len() as f64 / per).ceil() as i64; text += &if need <= left { format!(" Au rythme actuel ({} par jour), c’est dans les temps.", format!("{per:.1}").replace('.', ",")) } else { format!(" Au rythme actuel, il faudrait {} : retard prévu de {}.", jours(need), jours(need - left)) } }
+            else { text += " Aucune tâche terminée ces 14 derniers jours : impossible d’estimer." }
+        }
+        return reply(text, remaining.iter().take(6).map(|t| item(t)).collect());
+    }
+    if has(&["combien", "chiffre", "stat", "avancement", "ou en est", "on en est", "progression", "bilan", "semaine"]) {
+        let (todo, doing, blocked, done) = all.iter().fold((0, 0, 0, 0), |a, t| match t.status.as_str() { "todo" => (a.0 + 1, a.1, a.2, a.3), "doing" => (a.0, a.1 + 1, a.2, a.3), "blocked" => (a.0, a.1, a.2 + 1, a.3), _ => (a.0, a.1, a.2, a.3 + 1) });
+        let week: Vec<(String, i64)> = sqlx::query_as("SELECT COALESCE(u.name, 'Sans personne'), COUNT(*) FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id WHERE t.map_id = ? AND t.status = 'done' AND t.done_at > datetime('now', '-7 days') GROUP BY 1 ORDER BY 2 DESC").bind(mid).fetch_all(&st.db).await?;
+        let total = all.len().max(1);
+        let mut text = format!("{} au total : {} faite{} ({} %), {} en cours, {} à faire, {} bloquée{}.", plural(all.len() as i64, "tâche", "tâches"), done, if done > 1 { "s" } else { "" }, done * 100 / total, doing, todo, blocked, if blocked > 1 { "s" } else { "" });
+        let wk: i64 = week.iter().map(|w| w.1).sum();
+        text += &format!(" Cette semaine : {} terminée{}", plural(wk, "tâche", "tâches"), if wk > 1 { "s" } else { "" });
+        text += &if week.is_empty() { ".".into() } else { format!(" ({}).", week.iter().map(|w| format!("{} {}", first_name(&w.0), w.1)).collect::<Vec<_>>().join(", ")) };
+        return reply(text, vec![]);
+    }
+    if has(&["relais", "uefn est", "uefn connecte", "uefn link", "pop-link"]) && has(&["connecte", "marche", "en ligne", "statut", "etat", "est"]) {
+        let s = st.relays.status(mid);
+        let text = match s { "online" => "Le relais UEFN est en ligne : POP parle à UEFN.".to_string(), "offline" => "Le relais UEFN est hors ligne : lancez pop-link.exe sur le PC où UEFN est ouvert.".to_string(), other => format!("Relais UEFN : {other}.") };
+        return reply(text, vec![json!({ "label": "Ouvrir l’Organiseur", "link": "/organiseur" })]);
+    }
+    Ok(Json(json!({ "answer": null })))
+}

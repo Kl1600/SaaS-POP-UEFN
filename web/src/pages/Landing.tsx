@@ -16,7 +16,7 @@ const PLANS = [
 const ROWS: [string, (string | boolean)[]][] = [
   ['Organisation', []],
   ['Tâches d’une heure, Kanban, dépendances', [true, true, true]],
-  ['Boussole, le guide du jour', [true, true, true]],
+  ['Boussole, l’assistant intégré', [true, true, true]],
   ['Pages, tableau blanc, planning et jalons', [true, true, true]],
   ['Maps', ['1', 'Illimitées', 'Illimitées']],
   ['Membres', ['3', 'Illimités', 'Illimités']],
@@ -36,7 +36,7 @@ const ROWS: [string, (string | boolean)[]][] = [
 const FAQ: [string, string][] = [
   ['Faut-il un PC Windows ?', 'Pour relier UEFN, oui : UEFN ne tourne que sur Windows, et UEFN Link se lance sur ce PC. Le reste de POP s’utilise depuis n’importe quel navigateur, Mac compris.'],
   ['Est-ce que POP publie ma map ?', 'Non. POP prépare tout (vérification avant publication, playtests, plan du jour J), mais la publication se fait toujours dans le portail créateur d’Epic.'],
-  ['Boussole, c’est une IA ?', 'Non. Boussole suit des règles simples à partir de vos tâches, de leurs dates, de leurs dépendances et de vos jalons. Elle répond aussi aux questions sur POP à partir de son guide. Aucune donnée n’est envoyée à un service d’IA.'],
+  ['Comment marche l’assistant Boussole ?', 'Boussole est intégré à POP : il lit vos tâches, leurs dates, leurs dépendances et vos jalons pour résumer la journée, répondre à vos questions (« qu’est-ce qui est en retard ? », « sur quoi travaille Hugo ? ») et expliquer comment utiliser POP. Il tourne entièrement dans POP : vos données ne partent vers aucun service externe.'],
   ['Et si je veux utiliser mon IA ?', 'Connectez Claude, Cursor, Codex ou une autre IA compatible MCP dans « IA connectées ». Elle peut lire et modifier vos tâches, votre Verse et vos acteurs UEFN, et chaque action est notée et annulable.'],
   ['D’où viennent les chiffres de l’analyse ?', 'De l’API officielle Fortnite d’Epic : joueurs, pic de joueurs simultanés, temps de jeu et rétention de chaque map publique, sur 7 jours.'],
   ['Comment avoir accès ?', 'POP est en bêta privée. Rejoignez la liste d’attente : on valide les demandes une par une et vous recevez par e-mail un lien pour créer votre compte.'],
@@ -125,7 +125,7 @@ function MoneyShot() {
 }
 
 const FEATURES = [
-  { n: '01', icon: ListChecks, tag: 'Tâches et Boussole', h: 'Des tâches d’une heure. Un guide chaque matin.', p: 'Le générateur découpe la map en tâches d’une heure, avec leurs dépendances. Boussole résume la journée, signale les retards et propose quoi prendre en premier.', pts: ['Kanban et dépendances', 'Retards et jalons suivis', '« Prendre » en un clic'], shot: <TasksShot /> },
+  { n: '01', icon: ListChecks, tag: 'Tâches et Boussole', h: 'Des tâches d’une heure. Un assistant chaque matin.', p: 'Le générateur découpe la map en tâches d’une heure, avec leurs dépendances. Boussole résume la journée, signale les retards et propose quoi prendre en premier.', pts: ['Kanban et dépendances', 'Retards et jalons suivis', '« Prendre » en un clic'], shot: <TasksShot /> },
   { n: '02', icon: Code2, tag: 'Éditeur Verse', h: 'Ctrl+S, et c’est dans UEFN.', p: 'Le Verse s’écrit dans POP et part directement dans votre projet : compilation, erreurs à la bonne ligne, session de test. L’assistant explique et corrige, sans service externe.', pts: ['Compilation dans UEFN', 'Erreurs à la ligne', 'Corrections proposées'], shot: <VerseShot /> },
   { n: '03', icon: Boxes, tag: 'Organiseur', h: 'Tous vos appareils. Rangés en trois secondes.', p: 'Cherchez par tag, type ou dossier, sélectionnez-en vingt et renommez, déplacez ou dupliquez d’un coup. Ctrl+Z annule. Si UEFN est fermé, les changements attendent.', pts: ['Recherche tag:, type:, dossier:', 'Modifications en lot', 'Tout est annulable'], shot: <OrganizerShot /> },
   { n: '04', icon: PenTool, tag: 'Tableau blanc', h: 'Dessinez la map à plusieurs.', p: 'Post-it, formes, flèches, couleurs, gras, souligné : tout ce qu’il faut pour poser les idées. Votez, puis transformez les meilleurs post-it en tâches.', pts: ['Mise en forme complète', 'Temps réel à plusieurs', 'Post-it → tâches'], shot: <BoardShot /> },
@@ -137,6 +137,7 @@ const DEMO: { q: string; a: React.ReactNode }[] = [
   { q: 'Qu’est-ce que je fais maintenant ?', a: <><p><b>Bonjour Léa, on rattrape le retard ?</b></p><p><AlertCircle size={13} className="r" /> 2 tâches en retard.</p><p><CheckCircle2 size={13} className="g" /> Hier, vous avez terminé 3 tâches.</p><p>À faire maintenant : <b>#42 Système de score</b>, qui débloque 3 autres tâches.</p></> },
   { q: 'Comment relier UEFN ?', a: <><p><b>Comment relier UEFN à POP ?</b></p><ol><li>Organiseur → Télécharger UEFN Link.</li><li>Double-cliquez sur pop-link.exe sur le PC.</li><li>Dans UEFN : Model Context Protocol → Start Server.</li></ol></> },
   { q: 'On est en retard pour la bêta ?', a: <><p><AlertTriangle size={13} className="o" /> Jalon « Bêta » dans 5 jours : 9 tâches à finir.</p><p>Au rythme actuel (1,5 par jour), il faudrait 6 jours. <b>Retard prévu : 1 jour.</b></p></> },
+  { q: 'Sur quoi travaille Hugo ?', a: <><p><b>Hugo</b> a 1 tâche en cours et 2 à faire :</p><p>• <b>#38</b> Décor de la zone 2 · en cours depuis hier</p><p>• <b>#44</b> Écran de fin · attend #42</p><p><CheckCircle2 size={13} className="g" /> 4 tâches terminées cette semaine.</p></> },
   { q: 'Mon IA peut fermer les tâches ?', a: <><p>Oui : connectée dans « IA connectées », elle utilise <b>next_task</b>, <b>set_task_status</b> et <b>comment_task</b>. Chaque action est notée « IA » dans l’historique.</p></> },
 ]
 
@@ -169,7 +170,7 @@ export default function Landing() {
 
     <header className="lhero" id="top">
       <div className="lglow" />
-      <a className="lannounce" href="#boussole" onClick={go('boussole')}><Sparkles size={14} /> Nouveau : Boussole, votre guide du jour <ArrowRight size={14} /></a>
+      <a className="lannounce" href="#boussole" onClick={go('boussole')}><Sparkles size={14} /> Nouveau : Boussole, l’assistant intégré <ArrowRight size={14} /></a>
       <h1 data-reveal>Vos maps Fortnite.<br /><span className="grad">À plusieurs. Sans le chaos.</span></h1>
       <p className="lsub" data-reveal>POP réunit tout le studio UEFN au même endroit : <b>tâches d’une heure</b>, Verse relié à UEFN, tableau blanc, analyse du marché et partage des gains.</p>
       <div className="lctas" data-reveal>
@@ -214,13 +215,13 @@ export default function Landing() {
     <section className="lsec lboussole" id="boussole">
       <div className="lsplit">
         <div className="ltxt" data-reveal>
-          <span className="leyebrow">Boussole</span>
-          <h2>Un guide, pas une IA.</h2>
-          <p>Chaque matin, Boussole lit vos tâches, leurs dates, leurs dépendances et vos jalons. Elle dit ce qui est en retard, ce qui coince et par quoi commencer. Et si quelqu’un ne sait pas utiliser POP, il lui pose la question.</p>
+          <span className="leyebrow">Assistant intégré</span>
+          <h2>Posez la question.<br />Boussole répond.</h2>
+          <p>Boussole connaît vos tâches, vos jalons et votre équipe. Il dit ce qui est en retard, qui travaille sur quoi et par quoi commencer, et il guide pas à pas ceux qui découvrent POP. Le tout sans que vos données quittent POP.</p>
           <div className="lchips">{DEMO.map((d, i) => <button key={d.q} className={i === demo ? 'on' : ''} onClick={() => setDemo(i)}>{d.q}</button>)}</div>
         </div>
         <div className="lchat" data-reveal>
-          <div className="lchath"><span className="gico"><Compass size={15} /></span>Boussole<small>votre guide du jour</small></div>
+          <div className="lchath"><span className="gico"><Compass size={15} /></span>Boussole<small>assistant intégré</small></div>
           <div className="lmsgs" key={demo}>
             <div className="lm me">{DEMO[demo].q}</div>
             <div className="lm bot">{DEMO[demo].a}</div>

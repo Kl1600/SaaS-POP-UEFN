@@ -192,6 +192,7 @@ fn api() -> Router<AppState> {
         .route("/api/admin/users", get(admin::users))
         .route("/api/admin/users/{id}", post(admin::update_user))
         .route("/api/maps/{mid}/guide", get(guide::guide))
+        .route("/api/maps/{mid}/guide/ask", get(guide::ask))
         .route("/api/maps/{mid}/report", get(report))
         // Tâches
         .route("/api/maps/{mid}/tasks", get(tasks::list).post(tasks::create))
