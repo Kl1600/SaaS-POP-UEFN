@@ -167,6 +167,11 @@ pub async fn search(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64
         let (line, text) = c.lines().enumerate().find(|(_, l)| l.to_lowercase().contains(&term)).map(|(i, l)| (i + 1, l.trim().to_string())).unwrap_or((1, String::new()));
         out.push(json!({ "kind": "Verse", "title": p.rsplit('/').next().unwrap_or(&p), "detail": if text.is_empty() { p.clone() } else { format!("ligne {line} : {}", snippet(&text, &term)) }, "link": format!("/verse?f={}&l={line}", urlencode(&p)) }));
     }
+    let boards: Vec<(i64, String, String)> = sqlx::query_as("SELECT id, title, objects FROM boards WHERE map_id = ? AND deleted_at IS NULL AND (lower(title) LIKE ? OR lower(objects) LIKE ?) ORDER BY updated_at DESC LIMIT 6").bind(mid).bind(&like).bind(&like).fetch_all(&st.db).await?;
+    for (id, t, objs) in boards {
+        let text: String = serde_json::from_str::<Value>(&objs).ok().and_then(|v| v.as_object().cloned()).unwrap_or_default().values().filter_map(|o| o["text"].as_str().map(String::from)).find(|x| x.to_lowercase().contains(&term)).unwrap_or_default();
+        out.push(json!({ "kind": "Tableau", "title": t, "detail": if text.is_empty() { String::new() } else { snippet(&text, &term) }, "link": format!("/tableau/{id}") }));
+    }
     let actors: Option<String> = sqlx::query_scalar("SELECT actors FROM uefn_state WHERE map_id = ?").bind(mid).fetch_optional(&st.db).await?;
     let actors: Vec<Value> = actors.and_then(|a| serde_json::from_str(&a).ok()).unwrap_or_default();
     for a in actors.iter().filter(|a| a["name"].as_str().map(|n| n.to_lowercase().contains(&term)).unwrap_or(false)).take(6) {

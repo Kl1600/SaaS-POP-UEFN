@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Home, FileText, PenTool, CalendarDays, KanbanSquare, Rocket, Coins, Users, Settings, LifeBuoy, PanelLeft,
   Search, Moon, Sun, Bell, Plus, ChevronDown, Hexagon, LogOut, FileCode2, ListTree, Bot, ChartNoAxesCombined, Hash, Flame, Sparkle,
@@ -31,6 +31,7 @@ export default function Layout() {
   const nav = useNavigate()
   const [collapsed, setCollapsed] = useState(false)
   const [acct, setAcct] = useState(false)
+  const acctBox = useOutside(acct, () => setAcct(false))
   const [newTask, setNewTask] = useState(false)
   const key = '/' + (loc.pathname.split('/')[1] || '')
   const [group, title] = TITLES[loc.pathname] ?? TITLES[key] ?? ['Général', '']
@@ -92,7 +93,7 @@ export default function Layout() {
           <button className="iconbtn" aria-label={app.dark ? 'Thème clair' : 'Thème sombre'} onClick={app.toggleDark}>{app.dark ? <Sun size={20} strokeWidth={1.5} /> : <Moon size={20} strokeWidth={1.5} />}</button>
           <Notifications />
           {app.canEdit && <button className="btn pri" onClick={() => setNewTask(true)}><Plus size={18} strokeWidth={1.5} />Nouvelle tâche</button>}
-          <div style={{ position: 'relative' }}>
+          <div style={{ position: 'relative' }} ref={acctBox}>
             <button className="acct" onClick={() => setAcct(a => !a)} aria-expanded={acct} aria-label="Compte et studio">
               <span className="acct-av">{(app.me?.user.name ?? '?').split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()}</span>
               <span className="acct-txt"><span className="acct-name">{app.me?.user.name}</span><span className="acct-studio">{app.studio?.name}</span></span>
@@ -113,6 +114,19 @@ export default function Layout() {
       {newTask && <NewTaskModal onClose={() => setNewTask(false)} />}
     </div>
   )
+}
+
+/** Ferme un menu quand on clique ailleurs ou qu'on appuie sur Échap. */
+function useOutside(open: boolean, close: () => void) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const down = (e: PointerEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) close() }
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') close() }
+    document.addEventListener('pointerdown', down, true); document.addEventListener('keydown', key)
+    return () => { document.removeEventListener('pointerdown', down, true); document.removeEventListener('keydown', key) }
+  }, [open])
+  return ref
 }
 
 function GlobalSearch() {
@@ -152,9 +166,10 @@ function Notifications() {
   const [open, setOpen] = useState(false)
   const [data, setData] = useState<{ unread: number; items: any[] }>({ unread: 0, items: [] })
   const load = () => api.get('/api/notifications').then(setData).catch(() => {})
+  const box = useOutside(open, () => setOpen(false))
   useEffect(() => { load() }, [app.me?.user.id])
   useEffect(() => app.subscribe(m => { if (m.t === 'notif' && m.uid === app.me?.user.id) load() }), [app.subscribe, app.me?.user.id])
-  return <div style={{ position: 'relative' }}>
+  return <div style={{ position: 'relative' }} ref={box}>
     <button className="iconbtn" aria-label={`Notifications${data.unread ? ` (${data.unread} non lues)` : ''}`} aria-expanded={open} onClick={async () => { setOpen(o => !o); if (!open && data.unread) { await api.post('/api/notifications/read'); setTimeout(load, 300) } }}>
       <Bell size={20} strokeWidth={1.5} />{data.unread > 0 && <span className="dot" />}
     </button>

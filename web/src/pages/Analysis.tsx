@@ -38,6 +38,7 @@ export function IslandDrawer({ code, onClose }: { code: string; onClose: () => v
         <div className="row" style={{ margin: '14px 0', flexWrap: 'wrap' }}>
           <button className={'btn' + (data.watched ? '' : ' pri')} onClick={async () => { await api.post('/api/analytics/watch', { code, on: !data.watched }); reload(); toast(data.watched ? 'Île retirée du suivi' : 'Île suivie : mesurée à chaque collecte') }}><Star size={16} />{data.watched ? 'Ne plus suivre' : 'Suivre cette île'}</button>
           <a className="btn" href={`https://www.fortnite.com/@${encodeURIComponent(data.creator || '')}/${code}`} target="_blank" rel="noreferrer"><ExternalLink size={16} />Voir sur fortnite.com</a>
+          <a className="btn" href={`https://fortnite.gg/island?code=${code}`} target="_blank" rel="noreferrer"><ExternalLink size={16} />Joueurs en direct (fortnite.gg)</a>
         </div>
         <div className="dsec">Joueurs uniques par jour</div>
         {series.length === 0 ? <p className="small muted">Pas encore de données (moins de 5 joueurs par jour, ou île jamais mesurée).</p> :

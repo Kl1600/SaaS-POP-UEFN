@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Clock, Ban, CheckSquare, Flag, Coins, Users, Zap, Activity, ArrowRight, Upload, FileText, PenTool, AlertTriangle, MessageSquare, CheckCircle2, Rocket,
@@ -15,6 +16,10 @@ export default function Overview() {
   const { map, toast } = useApp()
   const nav = useNavigate()
   const { data, reload } = useLoad<any>(map ? `/api/maps/${map.id}/overview` : null, [map?.id])
+  // Tâches cochées ici : restent affichées (barrées) pour pouvoir annuler.
+  const [checked, setChecked] = useState<Record<number, { item: any; prev: string }>>({})
+  useEffect(() => setChecked({}), [map?.id])
+  const undoRef = useRef<(id: number) => void>(() => {})
   useLive(['tasks', 'activity', 'plan'], reload)
   if (!data) return null
   const t = data.tiles
@@ -31,6 +36,19 @@ export default function Overview() {
   const startTask = async (id: number, status: string) => {
     try { await api.post(`/api/tasks/${id}/status`, { status }); reload() } catch (e: any) { toast(e.message, true) }
   }
+  const undo = async (id: number) => {
+    const c = checked[id]; if (!c) return
+    try { await api.post(`/api/tasks/${id}/status`, { status: c.prev }); setChecked(s => { const n = { ...s }; delete n[id]; return n }); reload(); toast(`#${c.item.number} n’est plus marquée comme faite`) } catch (e: any) { toast(e.message, true) }
+  }
+  const check = async (x: any) => {
+    try {
+      await api.post(`/api/tasks/${x.id}/status`, { status: 'done' })
+      setChecked(s => ({ ...s, [x.id]: { item: x, prev: x.status } })); reload()
+      toast(`#${x.number} marquée comme faite`, false, { label: 'Annuler', run: () => undoRef.current(x.id) })
+    } catch (e: any) { toast(e.message, true) }
+  }
+  undoRef.current = undo
+  const todayList = [...data.today, ...Object.values(checked).map(c => c.item).filter(i => !data.today.some((x: any) => x.id === i.id))]
 
   return (
     <main className="content">
@@ -50,20 +68,21 @@ export default function Overview() {
       <div className="two">
         <section className="card">
           <CardHead icon={<Zap size={22} strokeWidth={1.5} />} title="À faire aujourd'hui" sub="Vos tâches d'une heure prévues pour aujourd'hui et demain" />
-          {data.today.length === 0 ? <Empty text="Rien de prévu pour vous aujourd'hui." action={<button className="btn" onClick={() => nav('/taches')}>Prendre une tâche</button>} /> : (
+          {todayList.length === 0 ? <Empty text="Rien de prévu pour vous aujourd'hui." action={<button className="btn" onClick={() => nav('/taches')}>Prendre une tâche</button>} /> : (
             <div className="list">
-              {data.today.map((x: any) => (
-                <div key={x.id} className="li">
-                  <input type="checkbox" className="chk" aria-label={`Marquer #${x.number} comme fait`} checked={false} onChange={() => startTask(x.id, 'done')} />
+              {todayList.map((x: any) => { const done = !!checked[x.id]; return (
+                <div key={x.id} className={'li' + (done ? ' li-done' : '')}>
+                  <input type="checkbox" className="chk" aria-label={done ? `Annuler : #${x.number} n’est pas faite` : `Marquer #${x.number} comme fait`} checked={done} onChange={() => done ? undo(x.id) : check(x)} />
                   <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ fontWeight: 500 }}><span className="mono muted">#{x.number}</span> {x.title}</span>
+                    <span style={{ fontWeight: 500, textDecoration: done ? 'line-through' : undefined, opacity: done ? 0.55 : 1 }}><span className="mono muted">#{x.number}</span> {x.title}</span>
                     <span className="small muted" style={{ display: 'block' }}>{x.status === 'doing' ? 'En cours' : `Prévu ${frDate(x.planned_day)}`}{x.waiting_on.length ? ` · attend #${x.waiting_on.join(', #')}` : ''}</span>
                   </span>
                   <span className="badge">{x.tag}</span>
-                  {x.status === 'todo' && !x.waiting_on.length && <button className="btn" onClick={() => startTask(x.id, 'doing')}>Commencer</button>}
+                  {done ? <button className="btn" onClick={() => undo(x.id)}>Annuler</button>
+                    : x.status === 'todo' && !x.waiting_on.length && <button className="btn" onClick={() => startTask(x.id, 'doing')}>Commencer</button>}
                   <ArrowRight size={18} strokeWidth={1.5} className="muted" />
                 </div>
-              ))}
+              ) })}
             </div>
           )}
         </section>

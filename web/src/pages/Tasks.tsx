@@ -222,15 +222,18 @@ export function NewTaskModal({ onClose }: { onClose: () => void }) {
   const { data: mem } = useMembers()
   const [f, setF] = useState({ title: '', tag: 'code', assignee_id: '', planned_day: '', deps: '' })
   const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (busy) return
+    setBusy(true)
     try {
       const r = await api.post(`/api/maps/${map!.id}/tasks`, {
         title: f.title, tag: f.tag, assignee_id: f.assignee_id ? Number(f.assignee_id) : null, planned_day: f.planned_day || null,
         deps: f.deps.split(/[^0-9]+/).filter(Boolean).map(Number),
       })
       toast(`Tâche #${r.number} créée`); onClose()
-    } catch (e: any) { setErr(e.message) }
+    } catch (e: any) { setErr(e.message); setBusy(false) }
   }
   return (
     <Modal onClose={onClose} label="Nouvelle tâche">
@@ -245,7 +248,7 @@ export function NewTaskModal({ onClose }: { onClose: () => void }) {
           <label className="label">Dépend de (n°)<input className="field mono" value={f.deps} onChange={e => setF({ ...f, deps: e.target.value })} placeholder="12, 18" /></label>
         </div>
         {err && <div className="err">{err}</div>}
-        <div className="row" style={{ justifyContent: 'flex-end' }}><button type="button" className="btn" onClick={onClose}>Annuler</button><button className="btn pri">Créer la tâche</button></div>
+        <div className="row" style={{ justifyContent: 'flex-end' }}><button type="button" className="btn" onClick={onClose}>Annuler</button><button className="btn pri" disabled={busy}>{busy ? 'Création…' : 'Créer la tâche'}</button></div>
       </form>
     </Modal>
   )

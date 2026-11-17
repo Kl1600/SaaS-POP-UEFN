@@ -504,3 +504,17 @@ body.wb-fs .side,body.wb-fs .top{visibility:hidden}
 .setup ol{margin:0;padding-left:20px;line-height:1.8}
 .ttthumb{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:8px;background:var(--hover)}
 }
+
+@layer app{
+.brand{position:relative;isolation:isolate}
+.brand::before{content:'';position:absolute;left:50%;top:46%;width:170px;height:96px;transform:translate(-50%,-50%);background:radial-gradient(closest-side,rgba(239,141,70,.85),rgba(237,117,62,.35) 55%,transparent);filter:blur(14px);z-index:-1;pointer-events:none;animation:popglow 4s ease-in-out infinite}
+.brand img{filter:drop-shadow(0 0 4px rgba(239,141,70,.9)) drop-shadow(0 0 16px rgba(237,117,62,.6))}
+.app.collapsed .brand::before{width:60px;height:40px}
+@keyframes popglow{0%,100%{opacity:.8}50%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.brand::before{animation:none}}
+}
+@layer app{
+.toast{display:flex;align-items:center;gap:14px}
+.toast-act{all:unset;cursor:pointer;color:#EF8D46;font-weight:600;padding:2px 4px;border-radius:6px}
+.toast-act:hover{text-decoration:underline}
+}
