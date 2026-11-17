@@ -70,6 +70,30 @@ jobs:
             exit 1
           fi
 
+  dependances:
+    name: dépendances (failles connues)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+      # Échoue sur toute faille connue de la base RustSec. Les exceptions, justifiées une par une,
+      # sont dans <dossier>/.cargo/audit.toml (aujourd'hui : server/ seulement).
+      - name: cargo audit (serveur)
+        run: cargo audit
+        working-directory: server
+      - name: cargo audit (relais)
+        run: cargo audit
+        working-directory: link
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Dépendances livrées dans l'interface seulement ; échoue à partir de la gravité élevée.
+      - name: npm audit (web)
+        run: npm audit --omit=dev --audit-level=high
+        working-directory: web
+
   migrations:
     name: migrations inchangées
     if: github.event_name == 'pull_request'
