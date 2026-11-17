@@ -59,18 +59,20 @@ pub async fn change_password(State(st): State<AppState>, u: AuthUser, Json(b): J
     if !crate::auth::verify_password(&b.current, &hash) {
         return Err(bad("Mot de passe actuel incorrect."));
     }
-    set_password(&st, u.id, &b.new).await?;
-    Ok(Json(json!({ "ok": true })))
+    let tokens = set_password(&st, u.id, &b.new).await?;
+    Ok(Json(json!({ "ok": true, "tokens_revoked": tokens })))
 }
 
-async fn set_password(st: &AppState, uid: i64, pw: &str) -> Result<(), AppError> {
+async fn set_password(st: &AppState, uid: i64, pw: &str) -> Result<u64, AppError> {
     let email: String = sqlx::query_scalar("SELECT email FROM users WHERE id = ?").bind(uid).fetch_one(&st.db).await?;
     crate::security::password_policy(pw, &email)?;
     crate::security::audit(st, Some(uid), "mot_de_passe_changé", "", "").await;
     sqlx::query("UPDATE users SET password_hash = ? WHERE id = ?").bind(hash_password(pw)?).bind(uid).execute(&st.db).await?;
-    // Déconnecte les autres appareils.
+    // Déconnecte les autres appareils et révoque les jetons IA : un mot de passe changé après un vol ne doit
+    // laisser aucun accès ouvert (#13). Renvoie le nombre de jetons révoqués.
     sqlx::query("DELETE FROM sessions WHERE user_id = ?").bind(uid).execute(&st.db).await?;
-    Ok(())
+    let tokens = sqlx::query("DELETE FROM api_tokens WHERE user_id = ?").bind(uid).execute(&st.db).await?.rows_affected();
+    Ok(tokens)
 }
 
 async fn new_reset(st: &AppState, uid: i64) -> Result<String, AppError> {
@@ -126,9 +128,9 @@ pub struct ResetIn {
 pub async fn reset(State(st): State<AppState>, Json(b): Json<ResetIn>) -> ApiResult<Value> {
     let row: Option<i64> = sqlx::query_scalar("SELECT user_id FROM password_resets WHERE token_hash = ? AND used_at IS NULL AND expires_at > datetime('now')").bind(sha256_hex(&b.token)).fetch_optional(&st.db).await?;
     let uid = row.ok_or_else(|| bad("Lien expiré ou déjà utilisé."))?;
-    set_password(&st, uid, &b.password).await?;
+    let tokens = set_password(&st, uid, &b.password).await?;
     sqlx::query("UPDATE password_resets SET used_at = datetime('now') WHERE token_hash = ?").bind(sha256_hex(&b.token)).execute(&st.db).await?;
-    Ok(Json(json!({ "ok": true })))
+    Ok(Json(json!({ "ok": true, "tokens_revoked": tokens })))
 }
 
 #[derive(Deserialize)]

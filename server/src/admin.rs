@@ -232,7 +232,11 @@ pub async fn update_user(State(st): State<AppState>, u: AuthUser, Path(id): Path
     if let Some(a) = b.is_admin { sqlx::query("UPDATE users SET is_admin = ? WHERE id = ?").bind(a as i64).bind(id).execute(&st.db).await?; }
     if let Some(d) = b.disabled {
         sqlx::query("UPDATE users SET disabled = ? WHERE id = ?").bind(d as i64).bind(id).execute(&st.db).await?;
-        if d { sqlx::query("DELETE FROM sessions WHERE user_id = ?").bind(id).execute(&st.db).await?; }
+        if d {
+            // Un compte désactivé perd ses sessions et ses jetons IA (#13).
+            sqlx::query("DELETE FROM sessions WHERE user_id = ?").bind(id).execute(&st.db).await?;
+            sqlx::query("DELETE FROM api_tokens WHERE user_id = ?").bind(id).execute(&st.db).await?;
+        }
     }
     Ok(Json(json!({ "ok": true })))
 }
