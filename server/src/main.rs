@@ -3,6 +3,7 @@ mod account;
 mod security;
 mod admin;
 mod analytics;
+mod billing;
 mod ai;
 mod mail;
 mod manage;
@@ -188,6 +189,7 @@ fn api() -> Router<AppState> {
         .route("/api/admin/users", get(admin::users))
         .route("/api/admin/users/{id}", post(admin::update_user))
         .route("/api/admin/accounts", post(admin::create_account))
+        .route("/api/admin/users/{id}/plan", post(admin::set_plan))
         .route("/api/admin/users/{id}/password", post(admin::reset_password))
         .route("/api/maps/{mid}/guide", get(guide::guide))
         .route("/api/maps/{mid}/guide/ask", get(guide::ask))

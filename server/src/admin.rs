@@ -213,13 +213,13 @@ pub async fn invite(State(st): State<AppState>, u: AuthUser, Json(b): Json<Invit
 
 pub async fn users(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
     require(&st, &u).await?;
-    let rows: Vec<(i64, String, String, String, Option<String>, i64, i64, i64, i64, Option<String>, i64)> = sqlx::query_as(
+    let rows: Vec<(i64, String, String, String, Option<String>, i64, i64, i64, i64, Option<String>, i64, String)> = sqlx::query_as(
         "SELECT u.id, u.email, u.name, u.created_at, u.last_seen, u.is_admin, u.disabled,
                 (SELECT COUNT(*) FROM memberships m WHERE m.user_id = u.id),
-                (SELECT COUNT(*) FROM tasks t WHERE t.assignee_id = u.id AND t.status = 'done'), u.username, u.must_change_password
+                (SELECT COUNT(*) FROM tasks t WHERE t.assignee_id = u.id AND t.status = 'done'), u.username, u.must_change_password, u.plan
          FROM users u ORDER BY u.created_at DESC LIMIT 2000",
     ).fetch_all(&st.db).await?;
-    Ok(Json(json!(rows.into_iter().map(|r| json!({ "id": r.0, "email": r.1, "name": r.2, "created_at": r.3, "last_seen": r.4, "is_admin": r.5 == 1, "disabled": r.6 == 1, "studios": r.7, "tasks_done": r.8, "username": r.9, "must_change": r.10 == 1, "me": r.0 == u.id })).collect::<Vec<_>>())))
+    Ok(Json(json!(rows.into_iter().map(|r| json!({ "id": r.0, "email": r.1, "name": r.2, "created_at": r.3, "last_seen": r.4, "is_admin": r.5 == 1, "disabled": r.6 == 1, "studios": r.7, "tasks_done": r.8, "username": r.9, "must_change": r.10 == 1, "plan": r.11, "me": r.0 == u.id })).collect::<Vec<_>>())))
 }
 
 #[derive(Deserialize)]
@@ -233,6 +233,18 @@ pub async fn update_user(State(st): State<AppState>, u: AuthUser, Path(id): Path
         sqlx::query("UPDATE users SET disabled = ? WHERE id = ?").bind(d as i64).bind(id).execute(&st.db).await?;
         if d { sqlx::query("DELETE FROM sessions WHERE user_id = ?").bind(id).execute(&st.db).await?; }
     }
+    Ok(Json(json!({ "ok": true })))
+}
+
+#[derive(Deserialize)]
+pub struct PlanIn { plan: String }
+/// Change l'abonnement d'un compte (bêta : pas encore de paiement).
+pub async fn set_plan(State(st): State<AppState>, u: AuthUser, Path(id): Path<i64>, Json(b): Json<PlanIn>) -> ApiResult<Value> {
+    require(&st, &u).await?;
+    if !crate::billing::PLANS.contains(&b.plan.as_str()) { return Err(bad("Plan inconnu.")) }
+    let n = sqlx::query("UPDATE users SET plan = ? WHERE id = ?").bind(&b.plan).bind(id).execute(&st.db).await?.rows_affected();
+    if n == 0 { return Err(AppError::NotFound) }
+    log(&st, &u, "admin_plan_modifié", &format!("utilisateur {id} : {}", b.plan)).await;
     Ok(Json(json!({ "ok": true })))
 }
 
@@ -264,6 +276,7 @@ pub struct AccountIn {
     email: String,
     password: Option<String>,
     waitlist_id: Option<i64>,
+    plan: Option<String>,
 }
 
 /// Crée le compte d'un bêta-testeur. Le mot de passe (provisoire) n'est montré qu'une fois ;
@@ -282,8 +295,10 @@ pub async fn create_account(State(st): State<AppState>, u: AuthUser, Json(b): Js
         Some(p) => { crate::security::password_policy(p, &email)?; p.to_string() }
         None => temp_password(),
     };
-    let id: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash, username, must_change_password) VALUES (?, ?, ?, ?, 1) RETURNING id")
-        .bind(&email).bind(&name).bind(crate::auth::hash_password(&password)?).bind(&username).fetch_one(&st.db).await?;
+    let plan = b.plan.as_deref().unwrap_or("studio");
+    if !crate::billing::PLANS.contains(&plan) { return Err(bad("Plan inconnu.")) }
+    let id: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash, username, must_change_password, plan) VALUES (?, ?, ?, ?, 1, ?) RETURNING id")
+        .bind(&email).bind(&name).bind(crate::auth::hash_password(&password)?).bind(&username).bind(plan).fetch_one(&st.db).await?;
     // Relie la demande de la liste d'attente (celle choisie, sinon celle de la même adresse).
     let wid: Option<i64> = match b.waitlist_id {
         Some(w) => Some(w),

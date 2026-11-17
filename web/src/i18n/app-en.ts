@@ -1992,6 +1992,21 @@ const EN: Record<string, string> = {
  "Introuvable.": "Not found.",
  "Erreur interne.": "Internal error.",
  "hier": "yesterday",
- "Settings → API & Integrations → copiez le": "Settings → API & Integrations → copy the"
+ "Settings → API & Integrations → copiez le": "Settings → API & Integrations → copy the",
+ "Organiser": "Organize",
+ "Publier": "Publish",
+ "Disponible avec le plan Studio": "Available with the Studio plan",
+ "Votre plan ne comprend pas encore cette partie.": "Your plan doesn't include this yet.",
+ "Plan": "Plan",
+ "Plan mis à jour": "Plan updated",
+ "Créateur": "Creator",
+ "Studio+": "Studio+",
+ "Analyse est comprise à partir du plan Studio": "Analytics is included from the Studio plan",
+ "Genres du marché": "Market genres",
+ "Tendances vidéo du studio": "Studio video trends",
+ "Marché · {0}": "Market · {0}",
+ "Analyse (marché, maps qui marchent, meilleurs démarrages, tendances vidéo) est comprise dans les plans Studio et Studio+. Pendant la bêta, demandez à l’équipe POP de changer votre plan.": "Analytics (market, maps that work, best launches, video trends) is included in the Studio and Studio+ plans. During the beta, ask the POP team to change your plan.",
+ "L’onglet Marché de votre studio est compris dans les plans Studio et Studio+. Avec ce plan, tous les membres du studio y ont accès. Pendant la bêta, demandez à l’équipe POP de changer votre plan.": "Your studio's Market tab is included in the Studio and Studio+ plans. With that plan, every studio member gets access. During the beta, ask the POP team to change your plan.",
+ "L’onglet Marché est ouvert quand le créateur du studio a le plan Studio ou Studio+.": "The Market tab opens when the studio's creator has the Studio or Studio+ plan."
 }
 export default EN

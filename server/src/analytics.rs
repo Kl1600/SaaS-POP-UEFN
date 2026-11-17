@@ -265,7 +265,8 @@ fn island_json(r: &(String, String, String, String, String)) -> Value {
     json!({ "code": r.0, "title": r.1, "creator": r.2, "category": r.3, "tags": serde_json::from_str::<Value>(&r.4).unwrap_or(json!([])) })
 }
 
-pub async fn status(State(st): State<AppState>, _u: AuthUser) -> ApiResult<Value> {
+pub async fn status(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
+    crate::billing::require_market(&st, &u).await?;
     let (last_run, last_ok, err, islands): (Option<String>, Option<String>, Option<String>, i64) = sqlx::query_as("SELECT last_run, last_ok, last_error, islands FROM fn_status WHERE id = 1").fetch_one(&st.db).await?;
     let latest: Option<String> = sqlx::query_scalar("SELECT MAX(day) FROM fn_metrics").fetch_one(&st.db).await?;
     let measured: i64 = sqlx::query_scalar("SELECT COUNT(DISTINCT code) FROM fn_metrics").fetch_one(&st.db).await?;
@@ -280,7 +281,8 @@ pub async fn status(State(st): State<AppState>, _u: AuthUser) -> ApiResult<Value
 
 static REFRESHING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
-pub async fn refresh(State(st): State<AppState>, _u: AuthUser) -> ApiResult<Value> {
+pub async fn refresh(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
+    crate::billing::require_market(&st, &u).await?;
     if REFRESHING.swap(true, std::sync::atomic::Ordering::SeqCst) {
         return Ok(Json(json!({ "running": true })));
     }
@@ -295,7 +297,8 @@ pub async fn refresh(State(st): State<AppState>, _u: AuthUser) -> ApiResult<Valu
 }
 
 /// Maps qui marchent en ce moment : joueurs du dernier jour, évolution sur la veille.
-pub async fn trending(State(st): State<AppState>, _u: AuthUser, Query(q): Query<ListQ>) -> ApiResult<Value> {
+pub async fn trending(State(st): State<AppState>, u: AuthUser, Query(q): Query<ListQ>) -> ApiResult<Value> {
+    crate::billing::require_analyse(&st, &u).await?;
     let rows: Vec<(String, String, String, String, String, Option<i64>, Option<i64>, Option<i64>, Option<f64>, Option<f64>, Option<i64>, String)> = sqlx::query_as(
         "WITH d AS (SELECT MAX(day) AS last FROM fn_metrics WHERE unique_players IS NOT NULL)
          SELECT i.code, i.title, i.creator, i.category, i.tags, m.unique_players, m.peak_ccu, m.plays, m.avg_minutes,
@@ -321,7 +324,8 @@ pub async fn trending(State(st): State<AppState>, _u: AuthUser, Query(q): Query<
 }
 
 /// Meilleurs démarrages : îles sorties récemment, classées sur leur premier jour mesuré.
-pub async fn launches(State(st): State<AppState>, _u: AuthUser, Query(q): Query<ListQ>) -> ApiResult<Value> {
+pub async fn launches(State(st): State<AppState>, u: AuthUser, Query(q): Query<ListQ>) -> ApiResult<Value> {
+    crate::billing::require_analyse(&st, &u).await?;
     let rows: Vec<(String, String, String, String, String, String, String, Option<i64>, Option<i64>, Option<i64>, Option<i64>, Option<f64>)> = sqlx::query_as(
         "SELECT i.code, i.title, i.creator, i.category, i.tags, i.first_seen, f.day, f.unique_players, f.peak_ccu, f.plays,
                 (SELECT l.unique_players FROM fn_metrics l WHERE l.code = i.code AND l.unique_players IS NOT NULL ORDER BY l.day DESC LIMIT 1),
@@ -341,7 +345,8 @@ pub async fn launches(State(st): State<AppState>, _u: AuthUser, Query(q): Query<
 
 /// Analyse du marché : pour chaque genre (tag), joueurs, concurrence, rétention, évolution sur 7 jours
 /// et un verdict simple (opportunité, très disputé, saturé, niche).
-pub async fn market(State(st): State<AppState>, _u: AuthUser) -> ApiResult<Value> {
+pub async fn market(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
+    crate::billing::require_market(&st, &u).await?;
     let islands: Vec<(String, String, String, i64)> = sqlx::query_as(
         "SELECT code, title, tags, (seen_new = 1 AND first_seen > datetime('now', '-7 days')) FROM fn_islands WHERE code NOT LIKE 'playlist_%'",
     ).fetch_all(&st.db).await?;
@@ -438,6 +443,7 @@ pub async fn market(State(st): State<AppState>, _u: AuthUser) -> ApiResult<Value
 }
 
 pub async fn island(State(st): State<AppState>, u: AuthUser, Path(code): Path<String>) -> ApiResult<Value> {
+    crate::billing::require_market(&st, &u).await?;
     if !valid_code(&code) { return Err(bad("Code d’île invalide (format 1234-5678-9012).")) }
     let meta: Option<(String, String, String, String, String)> = sqlx::query_as("SELECT code, title, creator, category, tags FROM fn_islands WHERE code = ?").bind(&code).fetch_optional(&st.db).await?;
     let meta = match meta {
@@ -483,6 +489,7 @@ pub struct WatchIn {
 }
 
 pub async fn watch(State(st): State<AppState>, u: AuthUser, Json(b): Json<WatchIn>) -> ApiResult<Value> {
+    crate::billing::require_market(&st, &u).await?;
     let code = b.code.trim().to_string();
     if !valid_code(&code) { return Err(bad("Code d’île invalide (format 1234-5678-9012).")) }
     if b.on {
@@ -493,7 +500,8 @@ pub async fn watch(State(st): State<AppState>, u: AuthUser, Json(b): Json<WatchI
     Ok(Json(json!({ "ok": true })))
 }
 
-pub async fn watched(State(st): State<AppState>, _u: AuthUser) -> ApiResult<Value> {
+pub async fn watched(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
+    crate::billing::require_market(&st, &u).await?;
     let rows: Vec<(String, Option<String>, Option<i64>)> = sqlx::query_as(
         "SELECT w.code, i.title, (SELECT unique_players FROM fn_metrics m WHERE m.code = w.code AND unique_players IS NOT NULL ORDER BY day DESC LIMIT 1) FROM fn_watch w LEFT JOIN fn_islands i ON i.code = w.code ORDER BY w.added_at DESC",
     ).fetch_all(&st.db).await?;
@@ -685,6 +693,7 @@ pub async fn social_loop(st: AppState) {
 
 pub async fn tiktok_refresh(State(st): State<AppState>, u: AuthUser, Path(sid): Path<i64>) -> ApiResult<Value> {
     if studio_role(&st, &u, sid).await? < Role::Member { return Err(AppError::Forbidden) }
+    crate::billing::require_studio(&st, sid).await?;
     let social = integ_cfg(&st, sid, "apify").await?;
     let yt = integ_cfg(&st, sid, "youtube").await?;
     if secret(&social, "token").is_none() && secret(&yt, "key").is_none() {
@@ -700,6 +709,7 @@ pub async fn tiktok_refresh(State(st): State<AppState>, u: AuthUser, Path(sid): 
 /// Tendances calculées sur les vidéos collectées (TikTok + YouTube Shorts).
 pub async fn tiktok(State(st): State<AppState>, u: AuthUser, Path(sid): Path<i64>) -> ApiResult<Value> {
     studio_role(&st, &u, sid).await?;
+    crate::billing::require_studio(&st, sid).await?;
     let social = integ_cfg(&st, sid, "apify").await?;
     let yt = integ_cfg(&st, sid, "youtube").await?;
     let rows: Vec<(String, String, String, String, String, String, Option<String>, i64, i64, i64, i64, String, String, String)> = sqlx::query_as(

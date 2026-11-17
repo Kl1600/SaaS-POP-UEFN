@@ -13,7 +13,7 @@ const TONE: Record<string, [any, string]> = {
 }
 
 /** /map/12/taches → /taches ; /studio/3/equipe → /equipe (pages des fiches d’aide). */
-const shortPath = (p: string) => p.replace(/^\/map\/\d+/, '').replace(/^\/studio\/\d+\/(integrations|maps)/, '/equipe').replace(/^\/studio\/\d+\/tendances/, '/analyse/tiktok').replace(/^\/studio\/\d+/, '') || '/'
+const shortPath = (p: string) => p.replace(/^\/map\/\d+/, '').replace(/^\/studio\/\d+\/(integrations|maps)/, '/equipe').replace(/^\/studio\/\d+\/marche/, '/analyse/marche').replace(/^\/analyse\/videos/, '/analyse/tiktok').replace(/^\/studio\/\d+/, '') || '/'
 
 export function GuidePanel({ compact, onNavigate }: { compact?: boolean; onNavigate?: () => void }) {
   const { map, me, toast } = useApp()

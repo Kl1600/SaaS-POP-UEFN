@@ -1,6 +1,6 @@
 import React, { Suspense, lazy } from 'react'
 import ReactDOM from 'react-dom/client'
-import { BrowserRouter, Route, Routes, useParams } from 'react-router-dom'
+import { BrowserRouter, Route, Routes, useParams, Navigate } from 'react-router-dom'
 import './styles.css'
 import { AppProvider, useApp } from './state'
 import Layout from './components/Layout'
@@ -18,7 +18,8 @@ import Team, { Account } from './pages/Team'
 import { PageHead } from './components/ui'
 import Help from './pages/Help'
 import AI from './pages/AI'
-import { Market, TikTok, Trending, Launches } from './pages/Analysis'
+import { Market, Trending, Launches } from './pages/Analysis'
+import { AnalyseGate, AnalyseVideos, StudioMarket } from './components/Access'
 import { tr } from './i18n/t'
 const Landing = lazy(() => import('./pages/Landing'))
 const Admin = lazy(() => import('./pages/Admin'))
@@ -59,14 +60,16 @@ function Gate() {
           <Route path="equipe" element={<Team tab="members" />} />
           <Route path="integrations" element={<Team tab="integ" />} />
           <Route path="maps" element={<Team tab="maps" />} />
-          <Route path="tendances" element={<TikTok />} />
+          <Route path="marche" element={<StudioMarket />} />
+          <Route path="tendances" element={<Navigate to="../marche?v=videos" replace />} />
         </Route>
         <Route path="aide" element={<Help />} />
         <Route path="admin" element={L(Admin)} />
         <Route path="parametres" element={<main className="content"><PageHead title={tr("Paramètres")} help={tr("Votre compte : nom, mot de passe, données personnelles.")} /><Account /></main>} />
-        <Route path="analyse/marche" element={<Market />} />
-        <Route path="analyse/tendances" element={<Trending />} />
-        <Route path="analyse/lancements" element={<Launches />} />
+        <Route path="analyse/marche" element={<AnalyseGate title={tr("Analyse du marché")}><Market /></AnalyseGate>} />
+        <Route path="analyse/tendances" element={<AnalyseGate title={tr("Maps qui marchent")}><Trending /></AnalyseGate>} />
+        <Route path="analyse/lancements" element={<AnalyseGate title={tr("Meilleurs démarrages")}><Launches /></AnalyseGate>} />
+        <Route path="analyse/videos" element={<AnalyseVideos />} />
         {['pages', 'pages/:pid', 'tableau', 'tableau/:bid', 'planifier', 'taches', 'organiseur', 'ia', 'lancer', 'remunerer', 'equipe', 'analyse/tiktok'].map(p => <Route key={p} path={p} element={<Legacy />} />)}
         <Route path="*" element={<Home />} />
       </Route>

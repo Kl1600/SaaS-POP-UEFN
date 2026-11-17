@@ -38,12 +38,18 @@ function CredBox({ c, onClose }: { c: Cred; onClose?: () => void }) {
 }
 
 /** Formulaire de création d'un compte bêta (depuis une demande ou à la main). */
+const PLANS: [string, string][] = [['createur', 'Créateur'], ['studio', 'Studio'], ['studio_plus', 'Studio+']]
+/** Plan d'un compte. Analyse est comprise à partir du plan Studio. */
+function PlanSelect({ value, onChange }: { value: string; onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void }) {
+  return <select className="field" value={value} onChange={onChange} title={tr("Analyse est comprise à partir du plan Studio")}>{PLANS.map(([v, l]) => <option key={v} value={v}>{tr(l)}</option>)}</select>
+}
+
 function AccountForm({ init, waitlistId, onCreated, onCancel }: { init?: { name: string; email: string }; waitlistId?: number; onCreated: (c: Cred) => void; onCancel?: () => void }) {
   const { toast } = useApp()
-  const [f, setF] = useState({ name: init?.name ?? '', email: init?.email ?? '', username: suggestUsername(init?.name ?? '', init?.email ?? ''), password: '' })
+  const [f, setF] = useState({ name: init?.name ?? '', email: init?.email ?? '', username: suggestUsername(init?.name ?? '', init?.email ?? ''), password: '', plan: 'studio' })
   const [touched, setTouched] = useState(false)
   const [busy, setBusy] = useState(false)
-  const up = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => {
+  const up = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const v = { ...f, [k]: e.target.value }
     if (k === 'username') setTouched(true)
     else if (!touched && (k === 'name' || k === 'email')) v.username = suggestUsername(v.name, v.email)
@@ -60,6 +66,7 @@ function AccountForm({ init, waitlistId, onCreated, onCancel }: { init?: { name:
     <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
       <label className="label" style={{ flex: '1 1 180px' }}>{tr("Identifiant")}<input className="field mono" required minLength={3} maxLength={32} pattern="[a-zA-Z0-9._\-]+" title={tr("Lettres sans accent, chiffres, points, tirets")} autoCapitalize="off" spellCheck={false} value={f.username} onChange={up('username')} /></label>
       <label className="label" style={{ flex: '1 1 220px' }}>{tr("Mot de passe provisoire")}<input className="field mono" placeholder={tr("Généré automatiquement si vide")} value={f.password} onChange={up('password')} autoComplete="off" /></label>
+      <label className="label" style={{ flex: '1 1 160px' }}>{tr("Plan")}<PlanSelect value={f.plan} onChange={up('plan')} /></label>
     </div>
     <div className="row" style={{ gap: 8 }}>
       {onCancel && <button type="button" className="btn" onClick={onCancel}>{tr("Annuler")}</button>}
@@ -150,11 +157,12 @@ function Users() {
   return <section className="card">
     <CardHead title={tr("Utilisateurs")} sub={data ? `${data.length} comptes` : ''}><input className="field" style={{ height: 34, width: 220 }} placeholder={tr("Chercher")} value={q} onChange={e => setQ(e.target.value)} /></CardHead>
     {cred && <CredBox c={cred} onClose={() => setCred(null)} />}
-    <div style={{ overflowX: 'auto' }}><table className="tbl"><thead><tr><th>{tr("Nom")}</th><th>{tr("Identifiant")}</th><th>E-mail</th><th>{tr("Inscrit")}</th><th>Vu</th><th>{tr("Studios")}</th><th>{tr("Tâches faites")}</th><th>{tr("Rôle")}</th><th /></tr></thead>
+    <div style={{ overflowX: 'auto' }}><table className="tbl"><thead><tr><th>{tr("Nom")}</th><th>{tr("Identifiant")}</th><th>E-mail</th><th>{tr("Inscrit")}</th><th>Vu</th><th>{tr("Studios")}</th><th>{tr("Tâches faites")}</th><th>{tr("Plan")}</th><th>{tr("Rôle")}</th><th /></tr></thead>
       <tbody>{list.map(u => <tr key={u.id} style={{ opacity: u.disabled ? 0.5 : 1 }}>
         <td><b style={{ fontWeight: 500 }}>{u.name}</b>{u.me && <span className="small muted"> {tr("(vous)")}</span>}{u.must_change && <span className="badge b-o" style={{ marginLeft: 6 }} title={tr("N’a pas encore choisi son mot de passe")}>{tr("Mot de passe provisoire")}</span>}</td><td className="small mono">{u.username ?? '—'}</td><td className="small">{u.email}</td>
         <td className="small muted">{frDate(u.created_at)}</td><td className="small muted">{u.last_seen ? ago(u.last_seen) : '—'}</td>
         <td>{u.studios}</td><td>{u.tasks_done}</td>
+        <td><PlanSelect value={u.plan ?? 'studio'} onChange={async e => { try { await api.post(`/api/admin/users/${u.id}/plan`, { plan: e.target.value }); toast(tr("Plan mis à jour")); reload() } catch (er: any) { toast(er.message, true) } }} /></td>
         <td>{u.disabled ? <span className="badge b-r">{tr("Désactivé")}</span> : u.is_admin ? <span className="badge b-v">{tr("Admin")}</span> : <span className="badge">{tr("Utilisateur")}</span>}</td>
         <td>{!u.me && <div className="row" style={{ gap: 4, justifyContent: 'flex-end' }}>
           <button className="iconbtn" title={tr("Nouveau mot de passe provisoire")} aria-label={tr("Réinitialiser le mot de passe")} onClick={async () => { if (!confirm(tr("Donner un nouveau mot de passe provisoire à {0} ? Son mot de passe actuel ne marchera plus et il sera déconnecté.", [u.name]))) return; try { const r = await api.post(`/api/admin/users/${u.id}/password`); setCred({ ...r, name: u.name }); reload() } catch (e: any) { toast(e.message, true) } }}><KeyRound size={16} /></button>

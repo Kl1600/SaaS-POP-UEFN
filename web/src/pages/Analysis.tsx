@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { RefreshCw, Star, X, ExternalLink, TrendingUp, TrendingDown, Search } from 'lucide-react'
 import { ago, api } from '../api'
 import { useApp, useLoad } from '../state'
@@ -170,7 +170,7 @@ function GenreDrawer({ g, onClose, openIsland }: { g: any; onClose: () => void; 
   </>
 }
 
-export function Market() {
+export function Market({ title, bar }: { title?: string; bar?: ReactNode } = {}) {
   const { map, isAdmin, toast } = useApp()
   const { data } = useLoad<any>('/api/analytics/market')
   const { data: mine, reload: reloadMine } = useLoad<any>(map ? `/api/maps/${map.id}/island` : null, [map?.id])
@@ -191,7 +191,8 @@ export function Market() {
   const maxP = Math.max(1, ...(data?.players_per_day ?? []).map((d: any) => d.players ?? 0))
   const Pick = ({ t }: { t: any }) => <button className="link" style={{ fontWeight: 500 }} onClick={() => setGenre(t)}>{cap(t.tag)}</button>
   return <main className="content">
-    <PageHead title={tr("Analyse du marché")} help={tr("Quels genres de maps attirent les joueurs, où il y a de la place, et où la concurrence est trop forte.")} />
+    <PageHead title={title ?? tr("Analyse du marché")} help={tr("Quels genres de maps attirent les joueurs, où il y a de la place, et où la concurrence est trop forte.")} />
+    {bar}
     <Status />
     {!data ? null : all.length === 0 ? <section className="card"><Empty text={tr("Pas encore assez de données : la première collecte prend quelques minutes, revenez un peu plus tard.")} /></section> : <>
       <section className="card">
@@ -266,8 +267,13 @@ function Source({ name, desc, src, children }: { name: string; desc: string; src
   </div>
 }
 
-export function TikTok() {
-  const { studio, isAdmin, role, toast } = useApp()
+export function TikTok({ sid, title, bar }: { sid?: number; title?: string; bar?: ReactNode } = {}) {
+  const app = useApp()
+  const { toast } = app
+  // Studio dont on lit les tendances : celui passé en paramètre (espace perso ou studio), sinon le studio en cours.
+  const studio = (sid ? app.me?.studios.find(s => s.id === sid) : app.studio) ?? null
+  const role = studio?.role ?? 'viewer'
+  const isAdmin = role === 'owner' || role === 'admin'
   const { data, reload } = useLoad<any>(studio ? `/api/studios/${studio.id}/tiktok` : null, [studio?.id])
   const { data: integ, reload: reloadI } = useLoad<any>(studio && isAdmin ? `/api/studios/${studio.id}/integrations` : null, [studio?.id])
   const [busy, setBusy] = useState(false)
@@ -285,9 +291,10 @@ export function TikTok() {
   const KeyForm = ({ kind, k, ph, cfg }: { kind: string; k: string; ph: string; cfg: any }) => <form className="row" style={{ marginTop: 10 }} onSubmit={e => { e.preventDefault(); const t = (e.currentTarget.elements.namedItem('t') as HTMLInputElement).value.trim(); if (t) save(kind, { ...cfg, [k]: t }) }}>
     <input name="t" type="password" className="field mono" style={{ flex: 1 }} placeholder={ph} /><button className="btn pri">{tr("Enregistrer")}</button></form>
   return <main className="content">
-    <PageHead title={tr("Tendances vidéo")} help={tr("Ce qui marche en vidéo autour de Fortnite, sur TikTok et YouTube Shorts : hashtags qui montent, sons, vidéos qui décollent et maps mises en avant.")}>
+    <PageHead title={title ?? tr("Tendances vidéo")} help={tr("Ce qui marche en vidéo autour de Fortnite, sur TikTok et YouTube Shorts : hashtags qui montent, sons, vidéos qui décollent et maps mises en avant.")}>
       {data?.configured && ['owner', 'admin', 'member'].includes(role) && <button className="btn pri" disabled={busy} onClick={refresh}><RefreshCw size={16} className={busy ? 'spin' : ''} />{busy ? tr("Collecte (1 à 4 min)…") : tr("Collecter maintenant")}</button>}
     </PageHead>
+    {bar}
 
     <section className="card">
       <CardHead title={tr("Sources")} sub={tr("Plus il y a de sources, plus il y a de vidéos analysées. YouTube Shorts est gratuit et collecté automatiquement toutes les 6 heures.")} />

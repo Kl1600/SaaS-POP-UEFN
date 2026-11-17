@@ -238,10 +238,12 @@ pub async fn me(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
                 .bind(sid)
                 .fetch_all(&st.db)
                 .await?;
+        let analyse = crate::billing::studio_analyse(&st, sid).await?;
         out.push(json!({
-            "id": sid, "name": sname, "role": role, "personal": personal == 1,
+            "id": sid, "name": sname, "role": role, "personal": personal == 1, "analyse": analyse,
             "maps": maps.into_iter().map(|(id, name, genre, rd, status)| json!({"id": id, "name": name, "genre": genre, "release_date": rd, "status": status})).collect::<Vec<_>>()
         }));
     }
-    Ok(Json(json!({ "user": u, "credits": credits, "studios": out, "admin": admin, "admin_pending": pending, "username": username, "must_change_password": must_change == 1 })))
+    Ok(Json(json!({ "user": u, "credits": credits, "studios": out, "admin": admin, "admin_pending": pending, "username": username, "must_change_password": must_change == 1,
+        "plan": crate::billing::user_plan(&st, u.id).await?, "analyse": crate::billing::user_analyse(&st, u.id).await? })))
 }

@@ -1,6 +1,6 @@
 // Adresses de l'application, sur trois niveaux :
 //   compte  : /, /analyse/…, /aide, /parametres, /admin
-//   studio  : /studio/:sid/equipe | integrations | tendances | maps
+//   studio  : /studio/:sid/equipe | integrations | maps | marche
 //   map     : /map/:mid, /map/:mid/pages, /tableau, /planifier, /taches, /organiseur, /ia, /lancer, /remunerer
 // Les anciennes adresses (/taches, /equipe…) restent valables : elles sont redirigées vers la map ou le studio en cours.
 import { useCallback } from 'react'
@@ -21,7 +21,7 @@ export function resolvePath(to: string, mapId?: number | null, studioId?: number
     const sub = tab === 'maps' ? 'maps' : tab === 'integ' ? 'integrations' : 'equipe'
     return `/studio/${studioId}/${sub}`
   }
-  if (studioId && pathname === '/analyse/tiktok') return `/studio/${studioId}/tendances${q}`
+  if (pathname === '/analyse/tiktok') return `/analyse/videos${q}`
   return to
 }
 

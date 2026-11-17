@@ -21,7 +21,7 @@ export default function Team({ tab }: { tab: 'members' | 'integ' | 'maps' }) {
   const sub = { members: 'equipe', integ: 'integrations', maps: 'maps' } as const
   return (
     <main className="content">
-      <PageHead title={studio.personal ? tr("Mes outils") : tr("Studio {0}", [studio.name])} help={studio.personal ? tr("Vos maps perso et les outils reliés à votre compte (Discord, GitHub, Lore).") : tr("Qui fait partie du studio, ce que chacun peut faire, ses maps et les outils reliés.")} />
+      <PageHead title={studio.personal ? tr("Mes outils") : studio.name} help={studio.personal ? tr("Vos maps perso et les outils reliés à votre compte (Discord, GitHub, Lore).") : tr("Qui fait partie du studio, ce que chacun peut faire, ses maps et les outils reliés.")} />
       <Tabs value={tab} onChange={t => nav(`/studio/${studio.id}/${sub[t as keyof typeof sub]}`)} items={items} />
       {tab === 'members' && <Members />}
       {tab === 'integ' && <Integrations />}

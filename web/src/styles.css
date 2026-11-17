@@ -630,3 +630,13 @@ body.wb-fs .side,body.wb-fs .top{visibility:hidden}
 .home-map.add{align-items:center;justify-content:center;gap:8px;border-style:dashed;color:var(--text2);min-height:120px}
 .home-map.add b{font-weight:500}
 }
+
+@layer app {
+  .side .nav a.locked { opacity: .55; }
+  .nav-lock { margin-left: auto; opacity: .7; flex: none; }
+  .navsec .nav-lock { margin-left: 6px; vertical-align: -1px; }
+  .locked { display: grid; justify-items: center; text-align: center; gap: 10px; padding: 48px 24px; }
+  .locked h2 { margin: 0; font-size: 20px; font-weight: 500; }
+  .locked p { max-width: 520px; margin: 0; line-height: 1.55; }
+  .locked-ic { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: var(--soft, rgba(0,0,0,.05)); }
+}

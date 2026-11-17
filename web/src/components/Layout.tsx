@@ -2,7 +2,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import {
   Home, FileText, PenTool, CalendarDays, KanbanSquare, Rocket, Coins, Users, Settings, LifeBuoy, PanelLeft,
-  Search, Moon, Sun, Bell, Plus, ChevronDown, Hexagon, LogOut, ListTree, Bot, ChartNoAxesCombined, Hash, Flame, Sparkle, Layers, Plug, LayoutGrid,
+  Search, Moon, Sun, Bell, Plus, ChevronDown, Hexagon, LogOut, ListTree, Bot, ChartNoAxesCombined, Hash, Flame, Sparkle, Layers, LayoutGrid, Lock,
 } from 'lucide-react'
 import { useApp, studioName } from '../state'
 import { ago, api } from '../api'
@@ -17,21 +17,17 @@ import { MapSwitcher, CreateHost, openCreate } from './MapSwitcher'
 import { useNav } from '../routes'
 
 type Item = [string, string, any]
-/** Onglets de la map (changent quand on change de map). */
+/** Onglets de la map (changent quand on change de map). Le premier groupe n'a pas de titre. */
 const mapGroups = (mid: number): [string, Item[]][] => [
-  [tr("Général"), [[`/map/${mid}`, tr("Vue d'ensemble"), Home]]],
-  [tr("Espace"), [[`/map/${mid}/pages`, tr("Pages"), FileText], [`/map/${mid}/tableau`, tr("Tableau blanc"), PenTool]]],
-  [tr("Production"), [[`/map/${mid}/planifier`, tr("Planifier"), CalendarDays], [`/map/${mid}/taches`, tr("Tâches"), KanbanSquare]]],
-  ['UEFN', [[`/map/${mid}/organiseur`, tr("Organiseur"), ListTree], [`/map/${mid}/ia`, tr("IA connectées"), Bot]]],
-  [tr("Publication"), [[`/map/${mid}/lancer`, tr("Lancer et suivre"), Rocket], [`/map/${mid}/remunerer`, tr("Rémunérer"), Coins]]],
+  ['', [[`/map/${mid}`, tr("Vue d'ensemble"), Home]]],
+  [tr("Organiser"), [[`/map/${mid}/planifier`, tr("Planifier"), CalendarDays], [`/map/${mid}/taches`, tr("Tâches"), KanbanSquare]]],
+  [tr("Créer"), [[`/map/${mid}/pages`, tr("Pages"), FileText], [`/map/${mid}/tableau`, tr("Tableau blanc"), PenTool], [`/map/${mid}/organiseur`, tr("Organiseur"), ListTree], [`/map/${mid}/ia`, tr("IA connectées"), Bot]]],
+  [tr("Publier"), [[`/map/${mid}/lancer`, tr("Lancer et suivre"), Rocket], [`/map/${mid}/remunerer`, tr("Rémunérer"), Coins]]],
 ]
-/** Onglets du studio, ou de l'espace perso (« Mes outils »). */
-const studioItems = (sid: number, personal?: boolean): Item[] => personal
-  ? [[`/studio/${sid}/maps`, tr("Mes maps"), Layers], [`/studio/${sid}/integrations`, tr("Intégrations"), Plug], [`/studio/${sid}/tendances`, tr("Tendances vidéo"), Hash]]
-  : [[`/studio/${sid}/equipe`, tr("Équipe"), Users], [`/studio/${sid}/maps`, tr("Maps du studio"), Layers], [`/studio/${sid}/integrations`, tr("Intégrations"), Plug], [`/studio/${sid}/tendances`, tr("Tendances vidéo"), Hash]]
-/** Onglets du compte (les mêmes partout). */
-const accountItems = (): Item[] => [
-  ['/', tr("Accueil"), LayoutGrid], ['/analyse/marche', tr("Marché"), ChartNoAxesCombined], ['/analyse/tendances', tr("Maps qui marchent"), Flame], ['/analyse/lancements', tr("Meilleurs démarrages"), Sparkle],
+/** Catégorie Analyse (plan du compte). */
+const analyseItems = (): Item[] => [
+  ['/analyse/marche', tr("Marché"), ChartNoAxesCombined], ['/analyse/tendances', tr("Maps qui marchent"), Flame],
+  ['/analyse/lancements', tr("Meilleurs démarrages"), Sparkle], ['/analyse/videos', tr("Tendances vidéo"), Hash],
 ]
 
 export default function Layout() {
@@ -47,17 +43,23 @@ export default function Layout() {
   // Pas d'onglets de map quand le studio ouvert n'a pas cette map (ex. espace perso encore vide).
   const showMap = !!app.map && (!app.studio || app.studio.maps.some(m => m.id === app.map!.id))
   const mGroups = showMap ? mapGroups(app.map!.id) : []
-  const sItems = app.studio ? studioItems(app.studio.id, app.studio.personal) : []
-  const aItems = accountItems()
-  const sLabel = app.studio ? (app.studio.personal ? tr("Mes outils") : tr("Studio · {0}", [app.studio.name])) : ''
+  const st = app.studio
+  const sLabel = st ? (st.personal ? tr("Mes outils") : st.name) : ''
+  const sHome = st ? `/studio/${st.id}/${st.personal ? 'maps' : 'equipe'}` : ''
+  // Onglet « Marché » du studio : seulement dans un studio d'équipe, si son créateur a le plan (cadenas pour le créateur sinon).
+  const sMarket = st && !st.personal && (st.analyse || st.role === 'owner') ? `/studio/${st.id}/marche` : ''
+  const onStudio = !!st && loc.pathname.startsWith(`/studio/${st.id}`) && !loc.pathname.startsWith(`/studio/${st.id}/marche`)
+  const aItems = analyseItems()
+  const locked = !app.me?.analyse
   const all: [string, string, string][] = [
     ...mGroups.flatMap(([, items]) => items.map(([p, l]) => [p, app.map!.name, l] as [string, string, string])),
-    ...sItems.map(([p, l]) => [p, sLabel, l] as [string, string, string]),
-    ...aItems.map(([p, l]) => [p, tr("Compte"), l] as [string, string, string]),
-    ['/parametres', tr("Compte"), tr("Paramètres")], ['/aide', tr("Compte"), tr("Aide et support")], ['/admin', 'POP', tr("Administration")],
+    ...(st ? [[`/studio/${st.id}`, tr("Studio"), sLabel] as [string, string, string]] : []),
+    ...(sMarket ? [[sMarket, sLabel, tr("Marché")] as [string, string, string]] : []),
+    ...aItems.map(([p, l]) => [p, tr("Analyse"), l] as [string, string, string]),
+    ['/', 'POP', tr("Accueil")], ['/parametres', tr("Compte"), tr("Paramètres")], ['/aide', 'POP', tr("Aide et support")], ['/admin', 'POP', tr("Administration")],
   ]
   const hit = all.filter(([p]) => p === '/' ? loc.pathname === '/' : loc.pathname === p || loc.pathname.startsWith(p + '/')).sort((x, y) => y[0].length - x[0].length)[0]
-  const [, group, title] = hit ?? ['', tr("Compte"), tr("Accueil")]
+  const [, group, title] = hit ?? ['', 'POP', tr("Accueil")]
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -76,27 +78,29 @@ export default function Layout() {
     <div className={'app' + (collapsed ? ' collapsed' : '') + (app.dark ? ' dark' : '')}>
       <aside className="side">
         <div className="brand"><img src="/logo.png" alt="POP" /></div>
+        <nav className="nav" aria-label={tr("Accueil")}>
+          <NavLink to="/" end className={({ isActive }) => (isActive ? 'on' : '')}><LayoutGrid size={20} strokeWidth={1.5} /><span className="lbl">{tr("Accueil")}</span></NavLink>
+        </nav>
         <MapSwitcher />
         <nav className="nav" aria-label={tr("Sections")}>
-          {mGroups.map(([g, items]) => (
-            <div key={g} className="nav">
-              <span className="navsec lbl">{g}</span>
+          {mGroups.map(([g, items], gi) => (
+            <div key={gi} className="nav">
+              {g && <span className="navsec lbl">{g}</span>}
               {items.map(([p, l, I]) => <NavLink key={p} to={p} end={p === `/map/${app.map!.id}`} className={({ isActive }) => (isActive ? 'on' : '')}><I size={20} strokeWidth={1.5} /><span className="lbl">{l}</span></NavLink>)}
             </div>
           ))}
-          {app.studio && <div className="nav navblock">
-            <span className="navsec lbl" title={sLabel}>{sLabel}</span>
-            {sItems.map(([p, l, I]) => <NavLink key={p} to={p} className={({ isActive }) => (isActive ? 'on' : '')}><I size={20} strokeWidth={1.5} /><span className="lbl">{l}</span></NavLink>)}
+          {st && <div className="nav">
+            <span className="navsec lbl">{tr("Studio")}</span>
+            <NavLink to={sHome} className={onStudio ? 'on' : ''} title={sLabel}>{st.personal ? <Layers size={20} strokeWidth={1.5} /> : <Users size={20} strokeWidth={1.5} />}<span className="lbl">{sLabel}</span></NavLink>
+            {sMarket && <NavLink to={sMarket} className={({ isActive }) => (isActive ? 'on' : '')}><ChartNoAxesCombined size={20} strokeWidth={1.5} /><span className="lbl">{tr("Marché")}</span>{!st.analyse && <Lock size={14} className="nav-lock" />}</NavLink>}
           </div>}
-          <div className="nav navblock">
-            <span className="navsec lbl">{tr("Compte")}</span>
-            {aItems.map(([p, l, I]) => <NavLink key={p} to={p} end={p === '/'} className={({ isActive }) => (isActive ? 'on' : '')}><I size={20} strokeWidth={1.5} /><span className="lbl">{l}</span></NavLink>)}
+          <div className="nav">
+            <span className="navsec lbl">{tr("Analyse")}{locked && <Lock size={12} className="nav-lock" />}</span>
+            {aItems.map(([p, l, I]) => <NavLink key={p} to={p} className={({ isActive }) => (isActive ? 'on' : '') + (locked ? ' locked' : '')}><I size={20} strokeWidth={1.5} /><span className="lbl">{l}</span></NavLink>)}
           </div>
         </nav>
-        <nav className="nav" style={{ marginTop: 'auto' }} aria-label={tr("Compte")}>
-          <NavLink to="/parametres" className={({ isActive }) => (isActive ? 'on' : '')}><Settings size={20} strokeWidth={1.5} /><span className="lbl">{tr("Paramètres")}</span></NavLink>
-          <NavLink to="/aide"><LifeBuoy size={20} strokeWidth={1.5} /><span className="lbl">{tr("Aide et support")}</span></NavLink>
-          {app.me?.admin && <NavLink to="/admin" className={({ isActive }) => (isActive ? 'on' : '')}><ShieldCheck size={20} strokeWidth={1.5} /><span className="lbl">{tr("Administration")}</span>{!!app.me.admin_pending && <span className="nav-count">{app.me.admin_pending}</span>}</NavLink>}
+        <nav className="nav" style={{ marginTop: 'auto' }} aria-label={tr("Aide")}>
+          <NavLink to="/aide" className={({ isActive }) => (isActive ? 'on' : '')}><LifeBuoy size={20} strokeWidth={1.5} /><span className="lbl">{tr("Aide et support")}</span></NavLink>
         </nav>
       </aside>
       <div className="main">
@@ -127,6 +131,7 @@ export default function Layout() {
                 <button onClick={() => { setAcct(false); openCreate({ kind: 'map' }) }}><Plus size={16} />{tr("Nouvelle map")}</button>
                 <button onClick={() => { setAcct(false); openCreate({ kind: 'studio' }) }}><Plus size={16} />{tr("Nouveau studio")}</button>
                 <button onClick={() => { setAcct(false); nav('/parametres') }}><Settings size={16} />{tr("Paramètres")}</button>
+                {app.me?.admin && <button onClick={() => { setAcct(false); nav('/admin') }}><ShieldCheck size={16} />{tr("Administration")}{!!app.me.admin_pending && <span className="nav-count">{app.me.admin_pending}</span>}</button>}
                 <button onClick={async () => { await api.post('/api/auth/logout'); location.href = '/' }}><LogOut size={16} />{tr("Se déconnecter")}</button>
               </div>
             )}
