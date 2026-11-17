@@ -23,7 +23,7 @@ const hu: Dict = {
       { tag: 'Elemzés', h: 'Tudd, mit építs, mielőtt építenél.', p: 'Mely műfajok vonzzák a játékosokat, hol van szabad hely, mely pályák szárnyalnak már a megjelenéskor, és mi megy videón. Számok az Epic hivatalos API-jából.', pts: ['Műfajonkénti ítélet', 'Működő pályák', 'TikTok- és Shorts-trendek'] },
       { tag: 'Kifizetések', h: 'Mindenki tudja, mennyit kap.', p: 'Megosztási szabályok százalékban, fix összegben vagy feladatonként, bevételimport, személyenkénti kimutatás. Vége a Discordon elveszett táblázatoknak.', pts: ['Százalék, fix, feladatonként', 'CSV-import', 'Mindenki kimutatása'] },
     ],
-    aiB: 'Már használsz MI-t?', aiText: 'Kösd be a Claude-ot, Cursort, Codexet vagy más MCP-kompatibilis MI-t: elvállal egy feladatot, megírja a Verse-t, lefordítja, majd egy megjegyzéssel lezárja a feladatot. Minden művelet naplózva és visszavonható.',
+    aiB: 'Már használsz MI-t?', aiText: 'Kösd be a Claude-ot, Cursort, Codexet vagy más MCP-kompatibilis MI-t: elvállal egy feladatot, megírja a Verse-t, lefordítja, majd egy megjegyzéssel lezárja a feladatot. Minden művelet naplózva és visszavonható. Kompatibilis: Claude Code, Claude Desktop, Cursor, Codex, Windsurf, VS Code (GitHub Copilot), Gemini CLI.',
   },
   stats: [['1 óra', 'feladatonként, hogy minden nap haladj'], ['0', 'kötelező külső MI-szolgáltatás'], ['7 nap', 'statisztika pályánként, az Epic API-jából'], ['100%', 'az UEFN-műveletek visszavonhatók']],
   pricing: {
@@ -42,7 +42,7 @@ const hu: Dict = {
       ['Kell Windowsos PC?', 'Az UEFN bekötéséhez igen: az UEFN csak Windowson fut, és az UEFN Link azon a PC-n indul. A POP többi része bármilyen böngészőben működik, Macen is.'],
       ['Közzéteszi a POP a pályámat?', 'Nem. A POP mindent előkészít (közzététel előtti ellenőrzés, playtestek, a megjelenési nap terve), de a közzététel mindig az Epic alkotói portálján történik.'],
       ['Működik a POP, ha egyedül alkotok?', 'Igen. A POP egyéni alkotóknak és csapatoknak egyaránt szól: az Alkotó csomag egy pályára ingyenes, tagokat pedig később is meghívhatsz, semmin sem kell változtatni.'],
-      ['És ha a saját MI-met akarom használni?', 'Kösd be a Claude-ot, Cursort, Codexet vagy más MCP-kompatibilis MI-t a „Bekötött MI-k” között. Olvashatja és szerkesztheti a feladataidat, a Verse-t és az UEFN-aktorokat, és minden művelet naplózva és visszavonható.'],
+      ['Milyen MI-ket köthetek be?', 'Azokat, amelyek támogatják az MCP-szervereket: Claude Code, Claude Desktop, Cursor, Codex, Windsurf, VS Code (GitHub Copilot), Gemini CLI. A Claude Desktophoz a POP-nak HTTPS-en elérhetőnek kell lennie. Az MI-előfizetésed nincs benne a POP árában. A böngészős csevegő MI-k (ChatGPT, Gemini, webes Copilot) egyelőre nem támogatottak. A „Bekötött MI-k” között bekötve az MI-d olvassa és szerkeszti a feladataidat és az UEFN-aktorokat, Verse-t ír, és minden művelet naplózva és visszavonható.'],
       ['Honnan származnak az elemzés számai?', 'Az Epic hivatalos Fortnite API-jából: játékosszám, egyidejű játékoscsúcs, játékidő és megtartás minden nyilvános pályára, 7 napra.'],
       ['Hogyan kapok hozzáférést?', 'A POP zárt bétában van. Iratkozz fel a várólistára: a kéréseket egyenként bíráljuk el, majd elküldjük a felhasználóneved és egy ideiglenes jelszót, amelyet az első belépéskor megváltoztatsz.'],
       ['Mennyibe kerül?', 'Az árak fentebb láthatók. A POP indulásakor lépnek életbe; a béta tagjait bármilyen fizetés előtt értesítjük.'],

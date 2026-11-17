@@ -1,9 +1,9 @@
 // Sélecteur de map dans la barre latérale : changer de map, créer une map ou un studio sans quitter la page.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Check, ChevronsUpDown, Plus, Settings2, Building2 } from 'lucide-react'
+import { Check, ChevronsUpDown, Plus, Settings2, Building2, User, Users } from 'lucide-react'
 import { api } from '../api'
-import { useApp } from '../state'
+import { useApp, studioName } from '../state'
 import { Modal } from './ui'
 import { tr } from '../i18n/t'
 
@@ -36,19 +36,20 @@ export function MapSwitcher() {
   return <div className="mapsw lbl">
     <span className="navsec" style={{ padding: '0 4px 2px' }}>{tr('Map')}</span>
     <button ref={btn} className="mapsw-btn" onClick={() => setOpen(o => !o)} aria-haspopup="menu" aria-expanded={open}>
-      <span className="mapsw-txt"><b>{app.map?.name ?? '—'}</b><small>{app.studio?.name}</small></span>
+      <span className="mapsw-txt"><b>{app.map?.name ?? '—'}</b><small>{studioName(app.studio)}</small></span>
       <ChevronsUpDown size={16} strokeWidth={1.75} />
     </button>
     {open && <div ref={pop} className="mapsw-pop" role="menu" style={{ top: pos.top, left: pos.left, width: pos.width }}>
       {studios.map(s => <div key={s.id} className="mapsw-group">
-        <div className="mapsw-studio"><Building2 size={14} />{s.name}</div>
+        <div className="mapsw-studio">{s.personal ? <User size={14} /> : <Building2 size={14} />}{studioName(s)}</div>
         {s.maps.map(m => <button key={m.id} role="menuitem" className={'mapsw-item' + (m.id === app.map?.id ? ' on' : '')} onClick={() => go(() => app.setMapId(m.id))}>
           <span>{m.name}</span>{m.id === app.map?.id && <Check size={15} />}
         </button>)}
-        {(s.role === 'owner' || s.role === 'admin') && <button role="menuitem" className="mapsw-item add" onClick={() => go(() => openCreate({ kind: 'map', studioId: s.id }))}><Plus size={15} />{tr('Nouvelle map dans ce studio')}</button>}
+        {s.personal && s.maps.length === 0 && <div className="mapsw-empty">{tr('Les maps que vous faites seul.')}</div>}
+        {(s.role === 'owner' || s.role === 'admin') && <button role="menuitem" className="mapsw-item add" onClick={() => go(() => openCreate({ kind: 'map', studioId: s.id }))}><Plus size={15} />{s.personal ? tr('Nouvelle map perso') : tr('Nouvelle map dans ce studio')}</button>}
       </div>)}
       <div className="mapsw-foot">
-        <button role="menuitem" className="mapsw-item add" onClick={() => go(() => openCreate({ kind: 'studio' }))}><Plus size={15} />{tr('Nouveau studio')}</button>
+        <button role="menuitem" className="mapsw-item add" onClick={() => go(() => openCreate({ kind: 'studio' }))}><Users size={15} />{tr('Créer un studio (équipe)')}</button>
         <button role="menuitem" className="mapsw-item" onClick={() => go(() => nav('/equipe?tab=maps'))}><Settings2 size={15} />{tr('Gérer les maps')}</button>
       </div>
     </div>}
@@ -68,12 +69,15 @@ export function CreateHost() {
 
 function CreateModal({ c, onClose }: { c: Create; onClose: () => void }) {
   const { me, studio, reload, setMapId, toast } = useApp()
-  const admins = (me?.studios ?? []).filter(s => s.role === 'owner' || s.role === 'admin')
-  const [kind, setKind] = useState(c.kind === 'map' && admins.length === 0 ? 'studio' : c.kind)
-  const [sid, setSid] = useState<number>(c.studioId ?? (admins.find(s => s.id === studio?.id)?.id ?? admins[0]?.id ?? 0))
+  const all = me?.studios ?? []
+  const personal = all.find(s => s.personal)
+  const teams = all.filter(s => !s.personal && (s.role === 'owner' || s.role === 'admin'))
+  const [kind, setKind] = useState(c.kind)
+  const [sid, setSid] = useState<number>(c.studioId ?? (studio && (studio.personal || teams.some(t => t.id === studio.id)) ? studio.id : personal?.id ?? teams[0]?.id ?? 0))
   const [f, setF] = useState({ name: '', genre: '', release_date: '', studio: '' })
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
+  const solo = sid === personal?.id
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); if (busy) return
     setBusy(true); setErr('')
@@ -89,14 +93,23 @@ function CreateModal({ c, onClose }: { c: Create; onClose: () => void }) {
   return <Modal onClose={onClose} label={kind === 'map' ? tr('Nouvelle map') : tr('Nouveau studio')}>
     <form className="stack" onSubmit={submit}>
       <h2 style={{ margin: 0, fontWeight: 400 }}>{kind === 'map' ? tr('Nouvelle map') : tr('Nouveau studio')}</h2>
-      {admins.length > 0 && <div className="tabs" role="tablist" style={{ alignSelf: 'flex-start' }}>
+      <div className="tabs" role="tablist" style={{ alignSelf: 'flex-start' }}>
         <button type="button" role="tab" aria-selected={kind === 'map'} className={kind === 'map' ? 'on' : ''} onClick={() => setKind('map')}>{tr('Une map')}</button>
         <button type="button" role="tab" aria-selected={kind === 'studio'} className={kind === 'studio' ? 'on' : ''} onClick={() => setKind('studio')}>{tr('Un studio')}</button>
-      </div>}
-      <p className="muted" style={{ margin: 0 }}>{kind === 'map'
-        ? tr('Une map = un projet UEFN, avec ses tâches, ses pages, son planning et ses gains. L’équipe du studio y a accès.')
-        : tr('Un studio = une équipe. Créez-en un autre seulement si vous travaillez avec d’autres personnes sur d’autres maps.')}</p>
-      {kind === 'map' && admins.length > 1 && <label className="label">{tr('Studio')}<select className="field" value={sid} onChange={e => setSid(Number(e.target.value))}>{admins.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>}
+      </div>
+      {kind === 'map' ? <>
+        <div className="mapsw-choice" role="radiogroup" aria-label={tr('Pour qui ?')}>
+          {personal && <label className={'mapsw-opt' + (solo ? ' on' : '')}>
+            <input type="radio" name="who" checked={solo} onChange={() => setSid(personal.id)} />
+            <User size={20} /><span><b>{tr('Seul')}</b><small>{tr('Dans vos maps perso. Vous pourrez la passer en équipe plus tard.')}</small></span>
+          </label>}
+          <label className={'mapsw-opt' + (!solo ? ' on' : '') + (teams.length === 0 ? ' off' : '')}>
+            <input type="radio" name="who" checked={!solo} disabled={teams.length === 0} onChange={() => teams[0] && setSid(teams.find(t => t.id === studio?.id)?.id ?? teams[0].id)} />
+            <Users size={20} /><span><b>{tr('En équipe')}</b><small>{teams.length ? tr('Dans un studio : toute l’équipe y a accès.') : tr('Vous n’avez pas encore de studio : créez-en un avec l’onglet « Un studio ».')}</small></span>
+          </label>
+        </div>
+        {!solo && teams.length > 1 && <label className="label">{tr('Studio')}<select className="field" value={sid} onChange={e => setSid(Number(e.target.value))}>{teams.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>}
+      </> : <p className="muted" style={{ margin: 0 }}>{tr('Un studio = une équipe : vous invitez des membres, et toutes les maps du studio sont partagées avec eux.')}</p>}
       {kind === 'studio' && <label className="label">{tr('Nom du studio')}<input className="field" autoFocus value={f.studio} onChange={e => setF({ ...f, studio: e.target.value })} required maxLength={60} /></label>}
       <label className="label">{kind === 'map' ? tr('Nom de la map') : tr('Première map')}<input className="field" autoFocus={kind === 'map'} value={f.name} onChange={e => setF({ ...f, name: e.target.value })} required maxLength={60} placeholder={tr('Nom de la map (ex. VaultRush)')} /></label>
       <div className="grid2" style={{ gridTemplateColumns: '1fr 1fr' }}>

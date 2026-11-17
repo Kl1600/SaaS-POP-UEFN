@@ -1,9 +1,9 @@
 import { SecuritySettings } from '../components/Security'
 import { useState } from 'react'
-import { Navigate, useSearchParams } from 'react-router-dom'
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { Copy, KeyRound, Plus, Trash2 } from 'lucide-react'
 import { api, euros } from '../api'
-import { useApp, useLoad } from '../state'
+import { useApp, useLoad, studioName } from '../state'
 import { Avatar, CardHead, PageHead, ROLE, Tabs } from '../components/ui'
 import { tr } from '../i18n/t'
 import LangPicker from '../components/LangPicker'
@@ -11,17 +11,55 @@ import { openCreate } from '../components/MapSwitcher'
 
 export default function Team() {
   const [params, setParams] = useSearchParams()
+  const { studio } = useApp()
   const tab = (params.get('tab') as any) || 'members'
   return (
     <main className="content">
       <PageHead title={tr("Équipe et intégrations")} help={tr("Qui fait partie du studio, ce que chacun peut faire, et les outils reliés.")} />
-      <Tabs value={tab} onChange={t => setParams({ tab: t })} items={[['members', tr("Membres et rôles")], ['integ', tr("Intégrations")], ['maps', tr("Maps du studio")]]} />
-      {tab === 'members' && <Members />}
+      <Tabs value={tab} onChange={t => setParams({ tab: t })} items={[['members', studio?.personal ? tr("Seul ou en équipe") : tr("Membres et rôles")], ['integ', tr("Intégrations")], ['maps', studio?.personal ? tr("Mes maps") : tr("Maps du studio")]]} />
+      {tab === 'members' && (studio?.personal ? <SoloTeam /> : <Members />)}
       {tab === 'integ' && <Integrations />}
       {tab === 'maps' && <Maps />}
       {tab === 'compte' && <Navigate to="/parametres" replace />}
     </main>
   )
+}
+
+/** Map perso : on travaille seul ; pour inviter des gens, la map passe dans un studio. */
+function SoloTeam() {
+  const { me, map, reload, toast } = useApp()
+  const nav = useNavigate()
+  const teams = (me?.studios ?? []).filter(s => !s.personal && (s.role === 'owner' || s.role === 'admin'))
+  const [mode, setMode] = useState<'new' | 'existing'>(teams.length ? 'existing' : 'new')
+  const [sid, setSid] = useState(teams[0]?.id ?? 0)
+  const [name, setName] = useState('')
+  const [busy, setBusy] = useState(false)
+  if (!map) return null
+  return <div className="grid2">
+    <section className="card">
+      <CardHead title={tr("Vous travaillez seul sur « {0} »", [map.name])} sub={tr("Cette map est dans vos maps perso : personne d’autre n’y a accès.")} />
+      <p style={{ margin: 0 }}>{tr("Tout marche pareil en solo : tâches, planning, pages, tableau blanc, Organiseur, IA connectées et analyse. Boussole vous propose quoi faire chaque jour.")}</p>
+    </section>
+    <section className="card">
+      <CardHead title={tr("Travailler en équipe sur cette map")} sub={tr("La map passe dans un studio avec tout son contenu (tâches, pages, tableaux, gains). Vous pourrez ensuite inviter des membres.")} />
+      <form className="stack" onSubmit={async e => {
+        e.preventDefault(); if (busy) return; setBusy(true)
+        try {
+          await api.post(`/api/maps/${map.id}/move`, mode === 'new' ? { new_studio: name } : { studio_id: sid })
+          await reload(); toast(tr("« {0} » est maintenant une map d’équipe", [map.name])); nav('/equipe?tab=members')
+        } catch (er: any) { toast(er.message, true) } finally { setBusy(false) }
+      }}>
+        {teams.length > 0 && <div className="row" style={{ gap: 16, flexWrap: 'wrap' }}>
+          <label className="row" style={{ gap: 6 }}><input type="radio" checked={mode === 'existing'} onChange={() => setMode('existing')} />{tr("Dans un studio existant")}</label>
+          <label className="row" style={{ gap: 6 }}><input type="radio" checked={mode === 'new'} onChange={() => setMode('new')} />{tr("Dans un nouveau studio")}</label>
+        </div>}
+        {mode === 'existing' && teams.length > 0
+          ? <label className="label">{tr("Studio")}<select className="field" value={sid} onChange={e => setSid(Number(e.target.value))}>{teams.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+          : <label className="label">{tr("Nom du studio")}<input className="field" value={name} onChange={e => setName(e.target.value)} required maxLength={60} placeholder={tr("Ex. Studio Nova")} /></label>}
+        <button className="btn pri" style={{ alignSelf: 'flex-start' }} disabled={busy}>{tr("Passer en équipe")}</button>
+      </form>
+    </section>
+  </div>
 }
 
 function Members() {
@@ -129,7 +167,7 @@ function Maps() {
           <button className="btn" onClick={() => openCreate({ kind: 'studio' })}><Plus size={16} />{tr("Nouveau studio")}</button>
         </div>
       </section>
-      <StudioSettings />
+      {!studio?.personal && <StudioSettings />}
     </div>
   </>
 }
@@ -142,7 +180,7 @@ export function Account() {
     <div className="grid2">
       <section className="card">
         <CardHead title={tr("Mon compte")} />
-        <div className="props"><span className="muted">E-mail</span><span>{me?.user.email}</span><span className="muted">{tr("Langue")}</span><span><LangPicker app /></span><span className="muted">{tr("Crédits de playtest")}</span><span>{me?.credits}</span><span className="muted">{tr("Studios")}</span><span>{me?.studios.map(s => `${s.name} (${ROLE[s.role]})`).join(', ')}</span></div>
+        <div className="props"><span className="muted">E-mail</span><span>{me?.user.email}</span><span className="muted">{tr("Langue")}</span><span><LangPicker app /></span><span className="muted">{tr("Crédits de playtest")}</span><span>{me?.credits}</span><span className="muted">{tr("Studios")}</span><span>{me?.studios.map(s => s.personal ? studioName(s) : `${s.name} (${ROLE[s.role]})`).join(', ')}</span></div>
         <form className="row" style={{ marginTop: 16 }} onSubmit={async e => { e.preventDefault(); try { await api.post('/api/me/profile', { name }); await reload(); toast(tr("Nom enregistré")) } catch (er: any) { toast(er.message, true) } }}>
           <label className="label" style={{ flex: 1 }}>{tr("Nom affiché")}<input className="field" value={name} onChange={e => setName(e.target.value)} maxLength={80} required /></label>
           <button className="btn" style={{ alignSelf: 'flex-end' }}>{tr("Enregistrer")}</button>

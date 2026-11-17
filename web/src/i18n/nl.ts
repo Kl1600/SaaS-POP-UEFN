@@ -23,7 +23,7 @@ const nl: Dict = {
       { tag: 'Analyse', h: 'Weet wat je bouwt voordat je bouwt.', p: 'Welke genres spelers trekken, waar ruimte is, welke maps meteen bij de lancering scoren en wat populair is op video. Cijfers uit de officiële API van Epic.', pts: ['Oordeel per genre', 'Maps die werken', 'TikTok- en Shorts-trends'] },
       { tag: 'Uitbetalingen', h: 'Iedereen weet wat hij verdient.', p: 'Verdeelregels per percentage, vast bedrag of per taak, import van inkomsten, overzicht per persoon. Geen spreadsheet meer die in Discord verdwijnt.', pts: ['Percentage, vast, per taak', 'CSV-import', 'Overzicht per persoon'] },
     ],
-    aiB: 'Gebruik je al een AI?', aiText: 'Koppel Claude, Cursor, Codex of een andere MCP-compatibele AI: die pakt een taak op, schrijft de Verse, compileert en sluit de taak af met een notitie. Elke actie wordt vastgelegd en kan ongedaan.',
+    aiB: 'Gebruik je al een AI?', aiText: 'Koppel Claude, Cursor, Codex of een andere MCP-compatibele AI: die pakt een taak op, schrijft de Verse, compileert en sluit de taak af met een notitie. Elke actie wordt vastgelegd en kan ongedaan. Compatibel: Claude Code, Claude Desktop, Cursor, Codex, Windsurf, VS Code (GitHub Copilot), Gemini CLI.',
   },
   stats: [['1 u', 'per taak, om elke dag vooruit te gaan'], ['0', 'externe AI-diensten verplicht'], ['7 dagen', 'statistieken per map, uit de API van Epic'], ['100%', 'van de UEFN-acties kan ongedaan']],
   pricing: {
@@ -42,7 +42,7 @@ const nl: Dict = {
       ['Heb ik een Windows-pc nodig?', 'Om UEFN te koppelen wel: UEFN draait alleen op Windows en UEFN Link draait op die pc. De rest van POP werkt in elke browser, ook op Mac.'],
       ['Publiceert POP mijn map?', 'Nee. POP bereidt alles voor (controle vóór publicatie, playtests, plan voor de lanceerdag), maar publiceren gebeurt altijd in het creatorportaal van Epic.'],
       ['Werkt POP ook als ik alleen maak?', 'Ja. POP is er voor solomakers én teams: het Creator-plan is gratis voor één map, en je kunt later leden uitnodigen zonder iets te veranderen.'],
-      ['En als ik mijn eigen AI wil gebruiken?', 'Koppel Claude, Cursor, Codex of een andere MCP-compatibele AI in “Gekoppelde AI’s”. Die kan je taken, Verse en UEFN-actors lezen en wijzigen, en elke actie wordt vastgelegd en kan ongedaan.'],
+      ['Welke AI’s kan ik koppelen?', 'AI’s die MCP-servers ondersteunen: Claude Code, Claude Desktop, Cursor, Codex, Windsurf, VS Code (GitHub Copilot), Gemini CLI. Claude Desktop vereist dat POP online staat via HTTPS. Het abonnement op je AI zit niet in POP. Chat-AI’s in de browser (ChatGPT, Gemini, Copilot op het web) worden voorlopig niet ondersteund. Eenmaal gekoppeld in ‘Gekoppelde AI’s’ leest en bewerkt je AI je taken en UEFN-actors, schrijft Verse, en elke actie wordt vastgelegd en is ongedaan te maken.'],
       ['Waar komen de cijfers van de analyse vandaan?', 'Uit de officiële Fortnite-API van Epic: spelers, piek gelijktijdige spelers, speeltijd en retentie van elke openbare map, over 7 dagen.'],
       ['Hoe krijg ik toegang?', 'POP is in besloten bèta. Meld je aan voor de wachtlijst: we bekijken de aanvragen één voor één en sturen je daarna je gebruikersnaam en een tijdelijk wachtwoord, dat je bij de eerste keer inloggen wijzigt.'],
       ['Wat kost het?', 'De prijzen staan hierboven. Ze gelden vanaf de lancering van POP; bètaleden worden vóór elke betaling geïnformeerd.'],

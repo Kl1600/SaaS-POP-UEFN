@@ -219,31 +219,27 @@ pub async fn logout(State(st): State<AppState>, jar: CookieJar) -> Result<(Cooki
 }
 
 pub async fn me(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
-    // Chaque compte a d'office son studio : pas de formulaire à l'arrivée.
-    let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM memberships WHERE user_id = ?").bind(u.id).fetch_one(&st.db).await?;
-    if n == 0 {
-        let sid: i64 = sqlx::query_scalar("INSERT INTO studios (name) VALUES (?) RETURNING id").bind(format!("Studio de {}", u.name.split_whitespace().next().unwrap_or(&u.name))).fetch_one(&st.db).await?;
-        sqlx::query("INSERT INTO memberships (studio_id, user_id, role) VALUES (?, ?, 'owner')").bind(sid).bind(u.id).execute(&st.db).await?;
-    }
+    // Chaque compte a d'office son espace perso (maps faites seul) : pas de formulaire à l'arrivée.
+    crate::studio::ensure_personal(&st, u.id).await?;
     let (credits, username, must_change): (i64, Option<String>, i64) = sqlx::query_as("SELECT credits, username, must_change_password FROM users WHERE id = ?").bind(u.id).fetch_one(&st.db).await?;
     let _ = sqlx::query("UPDATE users SET last_seen = datetime('now') WHERE id = ?").bind(u.id).execute(&st.db).await;
     let admin = crate::admin::is_admin(&st, u.id).await?;
     let pending: i64 = if admin { sqlx::query_scalar("SELECT COUNT(*) FROM waitlist WHERE status = 'pending'").fetch_one(&st.db).await? } else { 0 };
-    let studios: Vec<(i64, String, String)> = sqlx::query_as(
-        "SELECT s.id, s.name, m.role FROM memberships m JOIN studios s ON s.id = m.studio_id WHERE m.user_id = ? ORDER BY s.id",
+    let studios: Vec<(i64, String, String, i64)> = sqlx::query_as(
+        "SELECT s.id, s.name, m.role, s.personal FROM memberships m JOIN studios s ON s.id = m.studio_id WHERE m.user_id = ? ORDER BY s.personal DESC, s.id",
     )
     .bind(u.id)
     .fetch_all(&st.db)
     .await?;
     let mut out = vec![];
-    for (sid, sname, role) in studios {
+    for (sid, sname, role, personal) in studios {
         let maps: Vec<(i64, String, String, Option<String>, String)> =
             sqlx::query_as("SELECT id, name, genre, release_date, status FROM maps WHERE studio_id = ? ORDER BY id")
                 .bind(sid)
                 .fetch_all(&st.db)
                 .await?;
         out.push(json!({
-            "id": sid, "name": sname, "role": role,
+            "id": sid, "name": sname, "role": role, "personal": personal == 1,
             "maps": maps.into_iter().map(|(id, name, genre, rd, status)| json!({"id": id, "name": name, "genre": genre, "release_date": rd, "status": status})).collect::<Vec<_>>()
         }));
     }

@@ -23,7 +23,7 @@ const pl: Dict = {
       { tag: 'Analiza', h: 'Wiedz, co budować, zanim zaczniesz.', p: 'Które gatunki przyciągają graczy, gdzie jest miejsce, które mapy startują od premiery i co jest hitem w wideo. Dane z oficjalnego API Epic.', pts: ['Werdykt dla gatunku', 'Mapy, które działają', 'Trendy TikTok i Shorts'] },
       { tag: 'Wypłaty', h: 'Każdy wie, ile zarabia.', p: 'Zasady podziału procentowe, stałe lub za zadanie, import zarobków, zestawienie dla każdej osoby. Koniec z arkuszem zgubionym na Discordzie.', pts: ['Procent, stała kwota, za zadanie', 'Import CSV', 'Zestawienie dla każdego'] },
     ],
-    aiB: 'Masz już AI?', aiText: 'Połącz Claude, Cursor, Codex lub inne AI zgodne z MCP: bierze zadanie, pisze Verse, kompiluje i zamyka zadanie z notatką. Każda akcja jest zapisana i odwracalna.',
+    aiB: 'Masz już AI?', aiText: 'Połącz Claude, Cursor, Codex lub inne AI zgodne z MCP: bierze zadanie, pisze Verse, kompiluje i zamyka zadanie z notatką. Każda akcja jest zapisana i odwracalna. Zgodne: Claude Code, Claude Desktop, Cursor, Codex, Windsurf, VS Code (GitHub Copilot), Gemini CLI.',
   },
   stats: [['1 h', 'na zadanie, by codziennie iść do przodu'], ['0', 'wymaganych zewnętrznych usług AI'], ['7 dni', 'statystyk na mapę, z API Epic'], ['100%', 'akcji w UEFN do cofnięcia']],
   pricing: {
@@ -42,7 +42,7 @@ const pl: Dict = {
       ['Czy potrzebuję PC z Windows?', 'Do połączenia z UEFN tak: UEFN działa tylko na Windows, a UEFN Link uruchamia się na tym PC. Reszta POP działa w każdej przeglądarce, także na Macu.'],
       ['Czy POP publikuje moją mapę?', 'Nie. POP przygotowuje wszystko (kontrola przed publikacją, playtesty, plan dnia premiery), ale publikacja zawsze odbywa się w portalu twórców Epic.'],
       ['Czy POP działa, jeśli tworzę sam?', 'Tak. POP jest dla twórców solo i dla zespołów: plan Twórca jest darmowy dla jednej mapy, a członków możesz zaprosić później bez żadnych zmian.'],
-      ['A jeśli chcę używać własnego AI?', 'Połącz Claude, Cursor, Codex lub inne AI zgodne z MCP w „Połączone AI”. Może czytać i edytować zadania, Verse i aktorów UEFN, a każda akcja jest zapisana i odwracalna.'],
+      ['Jakie AI mogę połączyć?', 'Te, które obsługują serwery MCP: Claude Code, Claude Desktop, Cursor, Codex, Windsurf, VS Code (GitHub Copilot), Gemini CLI. Claude Desktop wymaga, by POP był dostępny online przez HTTPS. Subskrypcja twojego AI nie jest wliczona w POP. Czatowe AI w przeglądarce (ChatGPT, Gemini, Copilot w sieci) na razie nie są obsługiwane. Po połączeniu w „Połączone AI” twoje AI czyta i edytuje zadania oraz aktorów UEFN, pisze Verse, a każda akcja jest zapisana i odwracalna.'],
       ['Skąd pochodzą dane w analizie?', 'Z oficjalnego API Fortnite od Epic: gracze, szczyt jednoczesnych graczy, czas gry i retencja każdej publicznej mapy, z 7 dni.'],
       ['Jak uzyskać dostęp?', 'POP jest w zamkniętej becie. Dołącz do listy oczekujących: sprawdzamy zgłoszenia pojedynczo, a potem wysyłamy ci login i tymczasowe hasło, które zmienisz przy pierwszym logowaniu.'],
       ['Ile to kosztuje?', 'Ceny są podane wyżej. Obowiązują od otwarcia POP; uczestnicy bety zostaną powiadomieni przed każdą płatnością.'],

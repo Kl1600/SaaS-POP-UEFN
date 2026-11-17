@@ -23,7 +23,7 @@ const tr: Dict = {
       { tag: 'Analiz', h: 'İnşa etmeden önce neyi inşa edeceğinizi bilin.', p: 'Hangi türler oyuncu çekiyor, nerede boşluk var, hangi haritalar çıkışta uçuyor ve videoda ne trend. Epic’in resmî API’sinden rakamlar.', pts: ['Tür başına karar', 'İşe yarayan haritalar', 'TikTok ve Shorts trendleri'] },
       { tag: 'Ödemeler', h: 'Herkes ne kazandığını bilir.', p: 'Yüzde, sabit tutar veya görev başına paylaşım kuralları, gelir içe aktarma, kişi başına döküm. Discord’da kaybolan tablolara son.', pts: ['Yüzde, sabit, görev başına', 'CSV içe aktarma', 'Herkese döküm'] },
     ],
-    aiB: 'Zaten bir yapay zekâ mı kullanıyorsunuz?', aiText: 'Claude, Cursor, Codex veya MCP uyumlu başka bir yapay zekâyı bağlayın: görevi alır, Verse yazar, derler ve görevi bir notla kapatır. Her işlem kaydedilir ve geri alınabilir.',
+    aiB: 'Zaten bir yapay zekâ mı kullanıyorsunuz?', aiText: 'Claude, Cursor, Codex veya MCP uyumlu başka bir yapay zekâyı bağlayın: görevi alır, Verse yazar, derler ve görevi bir notla kapatır. Her işlem kaydedilir ve geri alınabilir. Uyumlu: Claude Code, Claude Desktop, Cursor, Codex, Windsurf, VS Code (GitHub Copilot), Gemini CLI.',
   },
   stats: [['1 sa', 'görev başına, her gün ilerlemek için'], ['0', 'zorunlu harici yapay zekâ hizmeti'], ['7 gün', 'harita başına istatistik, Epic API’sinden'], ['%100', 'UEFN işlemleri geri alınabilir']],
   pricing: {
@@ -42,7 +42,7 @@ const tr: Dict = {
       ['Windows bilgisayar gerekli mi?', 'UEFN’i bağlamak için evet: UEFN yalnızca Windows’ta çalışır ve UEFN Link o bilgisayarda açılır. POP’un geri kalanı Mac dahil her tarayıcıda çalışır.'],
       ['POP haritamı yayımlar mı?', 'Hayır. POP her şeyi hazırlar (yayın öncesi kontrol, playtest’ler, çıkış günü planı), ancak yayın her zaman Epic’in içerik üretici portalında yapılır.'],
       ['Tek başıma üretirsem POP işe yarar mı?', 'Evet. POP hem tek başına üretenler hem ekipler içindir: Üretici planı bir harita için ücretsizdir, üyeleri daha sonra hiçbir şeyi değiştirmeden davet edebilirsiniz.'],
-      ['Kendi yapay zekâmı kullanmak istersem?', 'Claude, Cursor, Codex veya MCP uyumlu başka bir yapay zekâyı “Bağlı yapay zekâlar”da bağlayın. Görevlerinizi, Verse’ünüzü ve UEFN aktörlerinizi okuyup düzenleyebilir; her işlem kaydedilir ve geri alınabilir.'],
+      ['Hangi yapay zekâları bağlayabilirim?', 'MCP sunucularını destekleyenler: Claude Code, Claude Desktop, Cursor, Codex, Windsurf, VS Code (GitHub Copilot), Gemini CLI. Claude Desktop için POP’un HTTPS ile çevrimiçi olması gerekir. Yapay zekâ aboneliğiniz POP’a dahil değildir. Tarayıcıdaki sohbet yapay zekâları (ChatGPT, Gemini, web’de Copilot) şimdilik desteklenmiyor. “Bağlı yapay zekâlar”da bağlandıktan sonra yapay zekânız görevlerinizi ve UEFN aktörlerinizi okuyup düzenler, Verse yazar; her işlem kaydedilir ve geri alınabilir.'],
       ['Analizdeki rakamlar nereden geliyor?', 'Epic’in resmî Fortnite API’sinden: her herkese açık harita için 7 günlük oyuncu sayısı, eşzamanlı oyuncu zirvesi, oynama süresi ve elde tutma.'],
       ['Nasıl erişim alırım?', 'POP kapalı betada. Bekleme listesine katılın: talepleri tek tek inceliyor, ardından kullanıcı adınızı ve ilk girişte değiştireceğiniz geçici bir şifre gönderiyoruz.'],
       ['Ne kadar tutuyor?', 'Fiyatlar yukarıda. POP açıldığında geçerli olur; beta üyelerine herhangi bir ödemeden önce haber verilir.'],

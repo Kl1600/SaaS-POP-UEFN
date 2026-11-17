@@ -23,7 +23,7 @@ const cs: Dict = {
       { tag: 'Analýza', h: 'Vězte, co stavět, dřív než začnete.', p: 'Které žánry přitahují hráče, kde je volné místo, které mapy hned po vydání letí a co frčí ve videích. Čísla z oficiálního API Epicu.', pts: ['Verdikt podle žánru', 'Mapy, které fungují', 'Trendy TikTok a Shorts'] },
       { tag: 'Výplaty', h: 'Každý ví, kolik dostane.', p: 'Pravidla dělení v procentech, pevnou částkou nebo za úkol, import výdělků, výpis pro každého. Konec tabulek ztracených na Discordu.', pts: ['Procenta, pevně, za úkol', 'Import CSV', 'Výpis pro každého'] },
     ],
-    aiB: 'Už používáte AI?', aiText: 'Připojte Claude, Cursor, Codex nebo jinou AI kompatibilní s MCP: vezme úkol, napíše Verse, zkompiluje a úkol uzavře s poznámkou. Každá akce je zaznamenaná a vratná.',
+    aiB: 'Už používáte AI?', aiText: 'Připojte Claude, Cursor, Codex nebo jinou AI kompatibilní s MCP: vezme úkol, napíše Verse, zkompiluje a úkol uzavře s poznámkou. Každá akce je zaznamenaná a vratná. Kompatibilní: Claude Code, Claude Desktop, Cursor, Codex, Windsurf, VS Code (GitHub Copilot), Gemini CLI.',
   },
   stats: [['1 h', 'na úkol, abyste se každý den posunuli'], ['0', 'povinných externích AI služeb'], ['7 dní', 'statistik na mapu z API Epicu'], ['100 %', 'akcí v UEFN lze vrátit']],
   pricing: {
@@ -42,7 +42,7 @@ const cs: Dict = {
       ['Potřebuji PC s Windows?', 'Pro propojení s UEFN ano: UEFN běží jen na Windows a UEFN Link se spouští na tomto PC. Zbytek POP funguje v jakémkoli prohlížeči, i na Macu.'],
       ['Publikuje POP moji mapu?', 'Ne. POP vše připraví (kontrola před publikací, playtesty, plán dne vydání), ale publikace vždy probíhá na portálu tvůrců Epicu.'],
       ['Funguje POP, i když tvořím sám?', 'Ano. POP je pro samostatné tvůrce i pro týmy: tarif Tvůrce je pro jednu mapu zdarma a členy můžete pozvat později, aniž byste cokoli měnili.'],
-      ['A když chci použít vlastní AI?', 'Připojte Claude, Cursor, Codex nebo jinou AI kompatibilní s MCP v „Připojené AI“. Může číst a upravovat úkoly, Verse i aktéry v UEFN a každá akce je zaznamenaná a vratná.'],
+      ['Jaké AI můžu připojit?', 'Ty, které podporují servery MCP: Claude Code, Claude Desktop, Cursor, Codex, Windsurf, VS Code (GitHub Copilot), Gemini CLI. Claude Desktop vyžaduje, aby byl POP online přes HTTPS. Předplatné vaší AI není součástí POP. Chatovací AI v prohlížeči (ChatGPT, Gemini, Copilot na webu) zatím podporované nejsou. Po připojení v „Připojené AI“ vaše AI čte a upravuje úkoly a aktéry v UEFN, píše Verse a každá akce je zaznamenaná a vratná.'],
       ['Odkud jsou čísla v analýze?', 'Z oficiálního Fortnite API od Epicu: hráči, špička současných hráčů, herní čas a retence každé veřejné mapy za 7 dní.'],
       ['Jak získám přístup?', 'POP je v uzavřené betě. Zapište se na čekací listinu: žádosti procházíme jednu po druhé a pak vám pošleme uživatelské jméno a dočasné heslo, které při prvním přihlášení změníte.'],
       ['Kolik to stojí?', 'Ceny jsou uvedeny výše. Platí od otevření POP; členové bety budou upozorněni před jakoukoli platbou.'],

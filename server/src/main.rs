@@ -152,6 +152,7 @@ fn api() -> Router<AppState> {
         .route("/api/invitations/{id}", axum::routing::delete(manage::cancel_invite))
         .route("/api/studios", post(studio::create_studio))
         .route("/api/studios/{sid}/maps", post(studio::create_map).get(studio::maps_summary))
+        .route("/api/maps/{mid}/move", post(studio::move_map))
         .route("/api/studios/{sid}/members", get(studio::members))
         .route("/api/studios/{sid}/members/{uid}", patch(studio::update_member).delete(studio::remove_member))
         .route("/api/studios/{sid}/invitations", post(studio::invite))

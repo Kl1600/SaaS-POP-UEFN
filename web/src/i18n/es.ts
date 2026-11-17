@@ -23,7 +23,7 @@ const es: Dict = {
       { tag: 'Análisis', h: 'Sabe qué construir antes de construir.', p: 'Qué géneros atraen jugadores, dónde hay hueco, qué mapas despegan desde su salida y qué triunfa en vídeo. Cifras de la API oficial de Epic.', pts: ['Veredicto por género', 'Mapas que funcionan', 'Tendencias TikTok y Shorts'] },
       { tag: 'Pagos', h: 'Cada uno sabe lo que cobra.', p: 'Reglas de reparto por porcentaje, fijo o por tarea, importación de ingresos, extracto por persona. Se acabó la hoja perdida en Discord.', pts: ['Porcentaje, fijo, por tarea', 'Importación CSV', 'Extracto de cada uno'] },
     ],
-    aiB: '¿Ya usas una IA?', aiText: 'Conecta Claude, Cursor, Codex u otra IA compatible con MCP: toma una tarea, escribe el Verse, compila y cierra la tarea con una nota. Cada acción queda registrada y se puede deshacer.',
+    aiB: '¿Ya usas una IA?', aiText: 'Conecta Claude, Cursor, Codex u otra IA compatible con MCP: toma una tarea, escribe el Verse, compila y cierra la tarea con una nota. Cada acción queda registrada y se puede deshacer. Compatibles: Claude Code, Claude Desktop, Cursor, Codex, Windsurf, VS Code (GitHub Copilot), Gemini CLI.',
   },
   stats: [['1 h', 'por tarea, para avanzar cada día'], ['0', 'servicios de IA externos obligatorios'], ['7 días', 'de estadísticas por mapa, de la API de Epic'], ['100 %', 'de las acciones UEFN se pueden deshacer']],
   pricing: {
@@ -42,7 +42,7 @@ const es: Dict = {
       ['¿Hace falta un PC con Windows?', 'Para conectar UEFN, sí: UEFN solo funciona en Windows y UEFN Link se ejecuta en ese PC. El resto de POP funciona en cualquier navegador, Mac incluido.'],
       ['¿POP publica mi mapa?', 'No. POP lo prepara todo (revisión previa, playtests, plan del día del lanzamiento), pero la publicación se hace siempre en el portal de creadores de Epic.'],
       ['¿POP sirve si creo solo?', 'Sí. POP sirve tanto a creadores en solitario como a equipos: el plan Creador es gratis para un mapa y puedes invitar a miembros más adelante sin cambiar nada.'],
-      ['¿Y si quiero usar mi propia IA?', 'Conecta Claude, Cursor, Codex u otra IA compatible con MCP en «IA conectadas». Puede leer y modificar tus tareas, tu Verse y tus actores UEFN, y cada acción queda registrada y se puede deshacer.'],
+      ['¿Qué IA puedo conectar?', 'Las que admiten servidores MCP: Claude Code, Claude Desktop, Cursor, Codex, Windsurf, VS Code (GitHub Copilot), Gemini CLI. Claude Desktop requiere que POP esté en línea con HTTPS. La suscripción a tu IA no está incluida en POP. Las IA de chat en el navegador (ChatGPT, Gemini, Copilot en la web) no son compatibles por ahora. Una vez conectada en «IA conectadas», tu IA lee y modifica tus tareas y tus actores de UEFN, escribe Verse, y cada acción queda registrada y se puede deshacer.'],
       ['¿De dónde salen las cifras del análisis?', 'De la API oficial de Fortnite de Epic: jugadores, pico de jugadores simultáneos, tiempo de juego y retención de cada mapa público, durante 7 días.'],
       ['¿Cómo consigo acceso?', 'POP está en beta privada. Únete a la lista de espera: revisamos las solicitudes una a una y luego te enviamos tu usuario y una contraseña provisional, que cambiarás al iniciar sesión por primera vez.'],
       ['¿Cuánto cuesta?', 'Los precios están más arriba. Se aplican en el lanzamiento de POP; los miembros de la beta reciben aviso antes de cualquier pago.'],

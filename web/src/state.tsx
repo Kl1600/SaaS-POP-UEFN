@@ -1,8 +1,11 @@
+import { tr } from './i18n/t'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { api } from './api'
 
 export type MapInfo = { id: number; name: string; genre: string; release_date: string | null; status: string }
-export type Studio = { id: number; name: string; role: string; maps: MapInfo[] }
+export type Studio = { id: number; name: string; role: string; personal?: boolean; maps: MapInfo[] }
+/** Nom affiché d’un studio : « Mes maps » pour l’espace perso. */
+export const studioName = (s?: { name: string; personal?: boolean } | null) => s ? (s.personal ? tr("Mes maps (seul)") : s.name) : ""
 export type Me = { user: { id: number; name: string; email: string }; credits: number; studios: Studio[]; admin?: boolean; admin_pending?: number; username?: string | null; must_change_password?: boolean }
 export type Presence = { uid: number; name: string; place: string }
 

@@ -23,7 +23,7 @@ const ro: Dict = {
       { tag: 'Analiză', h: 'Află ce să construiești înainte să construiești.', p: 'Ce genuri atrag jucători, unde e loc liber, ce hărți decolează de la lansare și ce e în trend pe video. Cifre din API-ul oficial Epic.', pts: ['Verdict pe gen', 'Hărți care merg', 'Trenduri TikTok și Shorts'] },
       { tag: 'Plăți', h: 'Fiecare știe cât câștigă.', p: 'Reguli de împărțire procentuale, fixe sau pe sarcină, import de câștiguri, extras pe persoană. Gata cu tabelele pierdute pe Discord.', pts: ['Procent, fix, pe sarcină', 'Import CSV', 'Extrasul fiecăruia'] },
     ],
-    aiB: 'Folosești deja o IA?', aiText: 'Conectează Claude, Cursor, Codex sau altă IA compatibilă MCP: preia o sarcină, scrie Verse-ul, compilează, apoi închide sarcina cu o notă. Fiecare acțiune e înregistrată și reversibilă.',
+    aiB: 'Folosești deja o IA?', aiText: 'Conectează Claude, Cursor, Codex sau altă IA compatibilă MCP: preia o sarcină, scrie Verse-ul, compilează, apoi închide sarcina cu o notă. Fiecare acțiune e înregistrată și reversibilă. Compatibile: Claude Code, Claude Desktop, Cursor, Codex, Windsurf, VS Code (GitHub Copilot), Gemini CLI.',
   },
   stats: [['1 h', 'pe sarcină, ca să avansezi zilnic'], ['0', 'servicii IA externe obligatorii'], ['7 zile', 'de statistici pe hartă, din API-ul Epic'], ['100%', 'din acțiunile UEFN reversibile']],
   pricing: {
@@ -42,7 +42,7 @@ const ro: Dict = {
       ['Am nevoie de un PC cu Windows?', 'Pentru a lega UEFN, da: UEFN rulează doar pe Windows, iar UEFN Link pornește pe acel PC. Restul POP merge în orice browser, inclusiv pe Mac.'],
       ['POP îmi publică harta?', 'Nu. POP pregătește totul (verificare înainte de publicare, playtesturi, planul zilei lansării), dar publicarea se face mereu în portalul de creatori Epic.'],
       ['Merge POP dacă lucrez singur?', 'Da. POP e făcut atât pentru creatorii care lucrează singuri, cât și pentru echipe: planul Creator e gratuit pentru o hartă și poți invita membri mai târziu fără să schimbi nimic.'],
-      ['Și dacă vreau să folosesc IA mea?', 'Conectează Claude, Cursor, Codex sau altă IA compatibilă MCP în „IA conectate”. Poate citi și modifica sarcinile, Verse-ul și actorii UEFN, iar fiecare acțiune e înregistrată și reversibilă.'],
+      ['Ce IA pot conecta?', 'Pe cele care acceptă servere MCP: Claude Code, Claude Desktop, Cursor, Codex, Windsurf, VS Code (GitHub Copilot), Gemini CLI. Claude Desktop cere ca POP să fie online prin HTTPS. Abonamentul la IA ta nu e inclus în POP. IA de chat din browser (ChatGPT, Gemini, Copilot pe web) nu sunt suportate deocamdată. Odată conectată în „IA conectate”, IA ta citește și modifică sarcinile și actorii UEFN, scrie Verse, iar fiecare acțiune e înregistrată și reversibilă.'],
       ['De unde vin cifrele din analiză?', 'Din API-ul oficial Fortnite de la Epic: jucători, vârf de jucători simultani, timp de joc și retenție pentru fiecare hartă publică, pe 7 zile.'],
       ['Cum obțin acces?', 'POP e în beta privată. Intră pe lista de așteptare: verificăm cererile una câte una, apoi îți trimitem numele de utilizator și o parolă provizorie, pe care o schimbi la prima conectare.'],
       ['Cât costă?', 'Prețurile sunt afișate mai sus. Se aplică la deschiderea POP; membrii beta sunt anunțați înainte de orice plată.'],

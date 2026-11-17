@@ -4,7 +4,7 @@ import {
   Home, FileText, PenTool, CalendarDays, KanbanSquare, Rocket, Coins, Users, Settings, LifeBuoy, PanelLeft,
   Search, Moon, Sun, Bell, Plus, ChevronDown, Hexagon, LogOut, ListTree, Bot, ChartNoAxesCombined, Hash, Flame, Sparkle,
 } from 'lucide-react'
-import { useApp } from '../state'
+import { useApp, studioName } from '../state'
 import { ago, api } from '../api'
 import { Avatar } from './ui'
 import { NewTaskModal } from '../pages/Tasks'
@@ -99,7 +99,7 @@ export default function Layout() {
           <div style={{ position: 'relative' }} ref={acctBox}>
             <button className="acct" onClick={() => setAcct(a => !a)} aria-expanded={acct} aria-label={tr("Compte et studio")}>
               <span className="acct-av">{(app.me?.user.name ?? '?').split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()}</span>
-              <span className="acct-txt"><span className="acct-name">{app.me?.user.name}</span><span className="acct-studio">{app.studio?.name}</span></span>
+              <span className="acct-txt"><span className="acct-name">{app.me?.user.name}</span><span className="acct-studio">{studioName(app.studio)}</span></span>
               <ChevronDown size={16} strokeWidth={1.75} className="acct-chev" />
             </button>
             {acct && (
