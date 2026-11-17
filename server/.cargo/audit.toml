@@ -6,4 +6,7 @@ ignore = [
     # de données : pas exploitable aujourd'hui. Le correctif demande sqlx 0.9 (version majeure) :
     # à retirer dès que le serveur passe à sqlx 0.9.
     "RUSTSEC-2026-0459",
+    # rsa (attaque Marvin) : présent dans Cargo.lock à cause de sqlx-mysql, mais jamais compilé
+    # (`cargo tree -i rsa --target all` n'affiche rien) : POP n'utilise que SQLite.
+    "RUSTSEC-2023-0071",
 ]
