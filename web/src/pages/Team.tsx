@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Navigate, useSearchParams } from 'react-router-dom'
 import { Copy, KeyRound, Trash2 } from 'lucide-react'
 import { api, euros } from '../api'
 import { useApp, useLoad } from '../state'
@@ -11,11 +11,11 @@ export default function Team() {
   return (
     <main className="content">
       <PageHead title="Équipe et intégrations" help="Qui fait partie du studio, ce que chacun peut faire, et les outils reliés." />
-      <Tabs value={tab} onChange={t => setParams({ tab: t })} items={[['members', 'Membres et rôles'], ['integ', 'Intégrations'], ['maps', 'Maps du studio'], ['compte', 'Mon compte']]} />
+      <Tabs value={tab} onChange={t => setParams({ tab: t })} items={[['members', 'Membres et rôles'], ['integ', 'Intégrations'], ['maps', 'Maps du studio']]} />
       {tab === 'members' && <Members />}
       {tab === 'integ' && <Integrations />}
       {tab === 'maps' && <Maps />}
-      {tab === 'compte' && <Account />}
+      {tab === 'compte' && <Navigate to="/parametres" replace />}
     </main>
   )
 }
@@ -142,7 +142,7 @@ function Maps() {
   </>
 }
 
-function Account() {
+export function Account() {
   const { me, toast, reload } = useApp()
   const [name, setName] = useState(me?.user.name ?? '')
   const [pw, setPw] = useState({ current: '', new: '' })

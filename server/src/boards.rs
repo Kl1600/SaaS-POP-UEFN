@@ -175,6 +175,9 @@ pub async fn apply_op(st: &AppState, u: &AuthUser, map_id: i64, v: &Value) -> Re
                         continue;
                     }
                 }
+                if o["html"].as_str().map(|h| h.len() > 40_000).unwrap_or(false) {
+                    continue;
+                }
                 // Les votes, l'auteur et le lien vers la tâche sont gérés par le serveur.
                 match objs.get(&id) {
                     Some(prev) => {

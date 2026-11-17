@@ -1,0 +1,91 @@
+# Contrôles de chaque PR et de main. `python tools/task.py done` refuse de fusionner tant qu'ils ne sont pas verts.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  serveur:
+    name: serveur (build + tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: server
+      - run: cargo build --locked
+        working-directory: server
+      - run: cargo test --locked
+        working-directory: server
+
+  relais:
+    name: relais pop-link (build + tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: link
+      - run: cargo build --locked
+        working-directory: link
+      - run: cargo test --locked
+        working-directory: link
+
+  web:
+    name: web (types + build + dist à jour)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --no-audit --no-fund
+        working-directory: web
+      - run: npx tsc -b
+        working-directory: web
+      - run: npx vite build
+        working-directory: web
+      # web/dist est versionné pour lancer POP sans Node : il doit correspondre aux sources.
+      - name: web/dist correspond aux sources
+        run: |
+          if [ -n "$(git status --porcelain -- web/dist)" ]; then
+            git status --short -- web/dist | head -20
+            echo "::error::web/dist n'est pas à jour : lancez « npm run build » dans web/ et commitez web/dist."
+            exit 1
+          fi
+
+  migrations:
+    name: migrations inchangées
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # Une migration existante ne se modifie jamais : on en ajoute une nouvelle, numérotée à la suite.
+      - name: seules des migrations nouvelles
+        run: |
+          changed=$(git diff --name-status "origin/${{ github.base_ref }}...HEAD" -- server/migrations | grep -v '^A' || true)
+          if [ -n "$changed" ]; then
+            echo "$changed"
+            echo "::error::Une migration existante a été modifiée, renommée ou supprimée : créez plutôt une nouvelle migration numérotée à la suite."
+            exit 1
+          fi
+          last=$(ls server/migrations | sort | tail -1)
+          echo "Dernière migration : $last"

@@ -4,6 +4,21 @@ L'espace de travail des créateurs de maps Fortnite (UEFN) : pages, tableau blan
 
 - `server/` : serveur Rust (Axum + SQLite). API, sessions, temps réel (WebSocket).
 - `web/` : interface React + TypeScript (Vite).
+- `link/` : relais Windows `pop-link.exe` entre UEFN et POP.
+
+## Travailler sur POP (humains et agents IA)
+
+| Quoi | Où |
+|---|---|
+| Les règles, à lire en premier | [AGENTS.md](AGENTS.md) (agents IA, et humains qui travaillent avec eux) |
+| Les tâches | les **Issues** du dépôt, avec jalon, priorité et liens « Blocked by » |
+| L'outil des tâches | `python tools/task.py next` · `start N` · `review N` · `done N` (Python 3.9+, `gh` connecté) |
+| La KB : état, décisions, faits UEFN | [KB/](KB/README.md) |
+| Le CI | `.github/workflows/ci.yml` : serveur, relais, web et `web/dist` à jour, migrations inchangées |
+
+Une tâche suit toujours le même circuit : `start` (branche `issue/N-…`), travail, `review` (PR et plan de test),
+test par un humain, `done` (CI vert, fusion). L'action `règles des tâches` rouvre une issue fermée sans validation
+humaine ou avec une dépendance ouverte.
 
 ## Lancer sur le Mac
 
@@ -67,6 +82,7 @@ Sur un VPS : `docker build -t pop . && docker run -d -p 8080:8080 -v pop-data:/d
 - **Lancer et suivre** : checklist de modération avec statut et explication, échange de playtests à crédits (questionnaire guidé), « pourquoi ils partent » par minute, checklist heure par heure du jour J.
 - **Rémunérer** : règles (%, fixe, à la tâche finie), import manuel ou CSV, relevés par personne (chacun ne voit que le sien, sauf admins), historique, simulateur du passage à 50 % au 01/02/2027, offres en jeu. Aucun virement.
 - **Assistant Verse (moteur local)** : analyse du fichier sans aucun service externe : explication en français (rôle, réglages, état, fonctions, événements), relecture (parenthèses, `set` manquant, effets `<suspends>` manquants, appels non annulables dans un `if`, `using` manquants d'après les digests, réglages inutilisés, gestionnaires d'événements absents), corrections automatiques proposées en diff, écriture d'un module depuis une tâche (modèle choisi d'après la tâche, appareils et tags du niveau reliés), documentation dans une page.
+- **Analyse** : statistiques publiques des îles Fortnite (API officielle d'Epic, sans clé, collectées toutes les 30 minutes) : maps qui marchent (joueurs du jour, évolution, pic CCU, rétention), meilleurs démarrages (statistiques du premier jour des sorties récentes), marché par genre (part des joueurs, concurrence, opportunités), îles suivies et code de votre propre île. Tendances TikTok autour de Fortnite (hashtags et sons qui montent, vidéos phares, codes de maps cités) via Apify avec le jeton du studio (5 $ de crédit gratuit par mois chez Apify). `POP_ANALYTICS=0` coupe la collecte.
 - **Compte et notifications** : nom, mot de passe, mot de passe oublié (e-mail) ou lien de réinitialisation donné par un admin ; notifications (tâche assignée, @mention, tâche débloquée, validation IA demandée) ; recherche globale Ctrl K (tâches, pages, Verse, acteurs, membres) ; page Aide.
 - **Intégrations** : webhook Lore / UEFN fonctionnel (check-ins reliés aux tâches, verrous de fichiers, « fini #15 »), verrous Lore pris en compte par l'Éditeur Verse et l'Organiseur. Discord : rapport du soir envoyé automatiquement à l'heure choisie (webhook) et commandes /tache-suivante, /fini, /rapport (application Discord, POP en ligne). GitHub : synchronisation issues ↔ tâches dans les deux sens et webhook (issue fermée → tâche faite).
 
