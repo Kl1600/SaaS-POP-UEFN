@@ -1,0 +1,49 @@
+name: Tâche
+description: Un livrable, avec ses critères d'acceptation (voir AGENTS.md)
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Une issue = un livrable. Ajoutez ensuite **un jalon**, **une étiquette `priorité:P0|P1|P2`**, ses étiquettes
+        `domaine:*` et ses liens **« Blocked by »**. `python tools/task.py check` signale ce qui manque.
+  - type: textarea
+    id: objectif
+    attributes:
+      label: Objectif
+      description: Pourquoi cette tâche, pour qui, en deux ou trois phrases.
+    validations:
+      required: true
+  - type: textarea
+    id: perimetre
+    attributes:
+      label: Périmètre
+      description: Ce qui est à faire, en liste.
+    validations:
+      required: true
+  - type: textarea
+    id: criteres
+    attributes:
+      label: Critères d'acceptation
+      description: Chacun vérifiable par un humain sans lire le code ; ils deviennent le plan de test.
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: hors
+    attributes:
+      label: Hors périmètre
+      description: Ce qu'on ne fait pas ici.
+  - type: textarea
+    id: dependances
+    attributes:
+      label: Dépendances
+      description: Les issues à finir avant (ajoutez aussi le lien « Blocked by »), ou « Aucune ».
+  - type: input
+    id: estimation
+    attributes:
+      label: Estimation
+      description: En heures. À environ 1,5 fois l'estimation, l'agent s'arrête et demande.
+      placeholder: "2 h"
+    validations:
+      required: true
