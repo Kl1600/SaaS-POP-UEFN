@@ -280,7 +280,8 @@ async fn on_relay_msg(st: &AppState, mid: i64, pending: &Arc<Mutex<HashMap<Strin
             notify(st, mid, json!({ "t": "verse", "what": "symbols" }));
         }
         "actors" => {
-            sqlx::query("UPDATE uefn_state SET actors = ?, updated_at = datetime('now') WHERE map_id = ?").bind(v["actors"].to_string()).bind(mid).execute(&st.db).await?;
+            let actors = keep_device_values(st, mid, &v["actors"], None).await?;
+            sqlx::query("UPDATE uefn_state SET actors = ?, updated_at = datetime('now') WHERE map_id = ?").bind(actors.to_string()).bind(mid).execute(&st.db).await?;
             notify(st, mid, json!({ "t": "uefn", "what": "actors" }));
         }
         "locks" => {
@@ -297,6 +298,39 @@ async fn on_relay_msg(st: &AppState, mid: i64, pending: &Arc<Mutex<HashMap<Strin
         _ => {}
     }
     Ok(())
+}
+
+/// La liste d'acteurs envoyée par le relais ne contient pas les options des appareils (elles sont lues
+/// une par une, à la sélection). On garde donc les valeurs déjà connues, et on y applique les options
+/// que l'on vient de modifier (`patches`) : sans cela, l'annulation suivante n'aurait plus la valeur d'avant.
+async fn keep_device_values(st: &AppState, mid: i64, actors: &Value, patches: Option<&Value>) -> Result<Value, AppError> {
+    let Some(list) = actors.as_array() else { return Ok(actors.clone()) };
+    let old: Option<(String,)> = sqlx::query_as("SELECT actors FROM uefn_state WHERE map_id = ?").bind(mid).fetch_optional(&st.db).await?;
+    let old: Vec<Value> = old.and_then(|(s,)| serde_json::from_str(&s).ok()).unwrap_or_default();
+    let known: HashMap<&str, &Value> = old.iter().filter_map(|a| Some((a["id"].as_str()?, a))).collect();
+    let empty = |v: &Value| v.as_object().map(|m| m.is_empty()).unwrap_or(true);
+    let mut out = list.clone();
+    for a in out.iter_mut() {
+        let id = a["id"].as_str().unwrap_or("").to_string();
+        for field in ["options", "props"] {
+            if empty(&a[field]) {
+                if let Some(prev) = known.get(id.as_str()).map(|p| &p[field]).filter(|p| !empty(p)) {
+                    a[field] = (*prev).clone();
+                }
+            }
+            for p in patches.and_then(|p| p.as_array()).into_iter().flatten().filter(|p| p["id"].as_str() == Some(id.as_str())) {
+                if let Some(m) = p["changes"][field].as_object() {
+                    if !a[field].is_object() {
+                        a[field] = json!({});
+                    }
+                    for (k, v) in m {
+                        a[field][k] = v.clone();
+                    }
+                }
+            }
+        }
+    }
+    Ok(Value::Array(out))
 }
 
 pub fn valid_path(p: &str) -> bool {
@@ -607,6 +641,8 @@ async fn run_action(st: &AppState, mid: i64, aid: Option<i64>, action: &str, arg
     match &res {
         Ok(data) => {
             if let Some(actors) = data.get("actors").filter(|a| a.is_array()) {
+                let patches = if matches!(action, "actor_update" | "actor_update_raw") { Some(&args["patches"]) } else { None };
+                let actors = keep_device_values(st, mid, actors, patches).await?;
                 sqlx::query("UPDATE uefn_state SET actors = ?, updated_at = datetime('now') WHERE map_id = ?").bind(actors.to_string()).bind(mid).execute(&st.db).await?;
                 notify(st, mid, json!({ "t": "uefn", "what": "actors" }));
             }
@@ -618,9 +654,20 @@ async fn run_action(st: &AppState, mid: i64, aid: Option<i64>, action: &str, arg
                         extra_undo = Some(json!({ "action": "actor_delete", "args": { "ids": ids } }).to_string());
                     }
                 }
+                // Une suppression s'annule en recréant les acteurs depuis la sauvegarde faite par le relais.
+                if action == "actor_delete" {
+                    if let Some(saved) = data.get("saved").and_then(|s| s.as_str()) {
+                        let cur: Option<(Option<String>,)> = sqlx::query_as("SELECT undo FROM uefn_actions WHERE id = ?").bind(id).fetch_optional(&st.db).await?;
+                        if let Some(mut u) = cur.and_then(|(u,)| u).and_then(|u| serde_json::from_str::<Value>(&u).ok()) {
+                            u["args"]["saved"] = json!(saved);
+                            extra_undo = Some(u.to_string());
+                        }
+                    }
+                }
                 let mut short_data = data.clone();
                 if let Some(o) = short_data.as_object_mut() {
                     o.remove("actors");
+                    o.remove("saved");
                 }
                 sqlx::query("UPDATE uefn_actions SET status = 'done', after = ?, undo = COALESCE(?, undo) WHERE id = ?").bind(short_data.to_string()).bind(extra_undo).bind(id).execute(&st.db).await?;
             }
@@ -635,6 +682,7 @@ async fn run_action(st: &AppState, mid: i64, aid: Option<i64>, action: &str, arg
     res.map(|mut d| {
         if let Some(o) = d.as_object_mut() {
             o.remove("actors");
+            o.remove("saved");
         }
         d
     })

@@ -189,13 +189,14 @@ impl Link {
             }
             "actor_delete" => {
                 self.need_uefn()?;
-                self.mcp.delete(&ids).await?;
+                // La sauvegarde repart vers POP, qui la garde dans l'action d'annulation.
+                out["saved"] = json!(self.mcp.delete(&ids).await?);
                 out["actors"] = json!(self.mcp.list_actors().await?);
             }
             "actor_restore" => {
                 self.need_uefn()?;
-                let want: Vec<String> = a["actors"].as_array().cloned().unwrap_or_default().iter().filter_map(|x| x["id"].as_str().map(String::from)).collect();
-                self.mcp.restore(&want).await?;
+                let expected = a["actors"].as_array().map(|x| x.len()).unwrap_or(ids.len());
+                out["created_ids"] = json!(self.mcp.restore(a["saved"].as_str().unwrap_or(""), expected).await?);
                 out["actors"] = json!(self.mcp.list_actors().await?);
             }
             "actor_props" => {
@@ -232,7 +233,15 @@ impl Link {
             }
             "lore_checkin" => {
                 let msg = a["message"].as_str().unwrap_or("").to_string();
-                let Some(cmd) = &self.cfg.lore_cmd else { bail!("Archivage Lore non configuré : ajoutez « lore_cmd » dans {} (ex. \"lore commit -m {{message}}\").", config_path().display()) };
+                // Sans commande imposée : archivage par UEFN lui-même (enregistre tout, puis check-in).
+                let Some(cmd) = &self.cfg.lore_cmd else {
+                    self.need_uefn()?;
+                    if !self.mcp.can_checkin() {
+                        bail!("Archivage impossible : UEFN n'expose pas CheckIn. Ajoutez « lore_cmd » dans {} (ex. \"lore commit -m {{message}}\").", config_path().display());
+                    }
+                    self.mcp.checkin(&msg).await?;
+                    return Ok(out);
+                };
                 let parts: Vec<String> = cmd.split_whitespace().map(|w| if w == "{message}" { msg.clone() } else { w.to_string() }).collect();
                 let st = std::process::Command::new(&parts[0]).args(&parts[1..]).current_dir(&self.cfg.project).output()?;
                 if !st.status.success() {
@@ -519,9 +528,15 @@ async fn diagnostic() -> Result<()> {
     let url = mcpdriver::find_url(cfg.as_ref().and_then(|c| c.uefn_mcp_url.as_deref()), &root);
     println!("Serveur MCP d'UEFN : {url}");
     let mut m = mcpdriver::Mcp::new(url, cfg.as_ref().map(|c| c.tools.clone()).unwrap_or_default());
-    m.connect().await.context("UEFN injoignable : ouvrez le projet dans UEFN, puis Édition → Préférences de l'éditeur → Agentic Workflows → Model Context Protocol → Start Server")?;
+    m.connect_with(true).await.context("UEFN injoignable : ouvrez le projet dans UEFN, puis Édition → Préférences de l'éditeur → Agentic Workflows → Model Context Protocol → Start Server")?;
+    if !m.toolsets.is_empty() {
+        println!("{} toolsets :", m.toolsets.len());
+        for (n, d) in &m.toolsets { println!("  · {n} : {}", d.chars().take(90).collect::<String>()) }
+        println!();
+    }
     println!("{} outils :", m.tools.len());
-    for t in &m.tools { println!("  - {} : {}", t["name"].as_str().unwrap_or(""), t["description"].as_str().unwrap_or("").chars().take(110).collect::<String>()) }
+    let one_line = |s: &str| s.split_whitespace().collect::<Vec<_>>().join(" ").chars().take(110).collect::<String>();
+    for t in &m.tools { println!("  - {} : {}", t["name"].as_str().unwrap_or(""), one_line(t["description"].as_str().unwrap_or(""))) }
     println!("\nRôles choisis : {}", m.roles());
     match m.list_actors().await {
         Ok(a) => println!("Python OK : {} acteurs dans le niveau ouvert.", a.len()),

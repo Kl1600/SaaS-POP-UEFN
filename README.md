@@ -41,11 +41,23 @@ Les données sont dans `server/pop-data.db` (une sauvegarde = copier ce fichier,
 3. Double-cliquer sur `pop-link.exe` : il demande l'adresse de POP, le code et propose les projets trouvés dans `Documents\Fortnite Projects`. Laisser la fenêtre ouverte. Page d'état : http://127.0.0.1:47800.
 4. Dans POP, la pastille passe à « UEFN connecté » : l'Organiseur affiche les acteurs du niveau ouvert, l'Éditeur Verse les fichiers `.verse` du projet.
 
-Si quelque chose ne marche pas : dans un terminal sur le PC, `pop-link.exe diagnostic` affiche l'adresse MCP trouvée, la liste des outils qu'UEFN expose et teste Python. Epic ne publie pas la liste exacte des outils ; le relais les choisit par leur nom. Si un rôle est « introuvable », on peut imposer le nom dans `%APPDATA%\pop-link\config.json` :
+Le serveur MCP d'UEFN n'expose que trois outils (`list_toolsets`, `describe_toolset`, `call_tool`) : les vrais outils sont rangés dans des toolsets, que le relais découvre au démarrage et appelle par `call_tool`. Il utilise :
+
+| Rôle | Outil UEFN |
+| --- | --- |
+| Python (acteurs, renommer, déplacer, dupliquer, supprimer, vue du dessus) | `PythonScriptingTools.execute_python` |
+| Compilation | `VerseToolset.BuildAll` (erreurs structurées : fichier, ligne, colonne) |
+| Session de test | `SessionToolset.PushChanges` (vérifie d'abord `GetSessionStatus`) |
+| Options des appareils | `DeviceToolset` : `ListClassicDeviceOptions` / `SetClassicDeviceOption`, et `ListDeviceProperties` / `GetDeviceProperties` / `SetDeviceProperty` pour les réglages `@editable` |
+| Archivage Lore | `ValkyrieRevisionControl.CheckIn` (enregistre tout puis archive) |
+
+Si quelque chose ne marche pas : dans un terminal sur le PC, `pop-link.exe diagnostic` affiche l'adresse MCP trouvée, les toolsets et outils qu'UEFN expose, les rôles retenus, et teste Python. Si un rôle est « introuvable » (Epic a renommé un outil), on peut imposer le nom dans `%APPDATA%\pop-link\config.json` (nom court ou complet) :
 ```json
-"tools": { "python": "nom_outil_python", "compile": "nom_outil_compile", "push": "nom_outil_session" }
+"tools": { "python": "execute_python", "compile": "BuildAll", "push": "PushChanges", "checkin": "CheckIn" }
 ```
-Archivage Lore : ajouter `"lore_cmd": "<commande Lore> {message}"` dans le même fichier.
+Archivage Lore par une commande plutôt que par UEFN : ajouter `"lore_cmd": "<commande Lore> {message}"` dans le même fichier.
+
+Le serveur MCP d'UEFN refuse les requêtes venant d'un site web (seules les origines `localhost` / `127.0.0.1` sont acceptées) : une page POP en ligne ne peut pas piloter UEFN directement, d'où le relais local.
 
 Recompiler le relais : `cd link && cargo build --release` (sur Windows) ; l'exécutable fourni est dans `web/public/downloads/pop-link.exe`.
 
