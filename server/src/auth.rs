@@ -65,7 +65,7 @@ impl FromRequestParts<AppState> for AuthUser {
 pub async fn user_from_token(state: &AppState, token: &str) -> Result<Option<AuthUser>, AppError> {
     let row: Option<(i64, String, String)> = sqlx::query_as(
         "SELECT u.id, u.email, u.name FROM sessions s JOIN users u ON u.id = s.user_id
-         WHERE s.token_hash = ? AND s.expires_at > datetime('now')",
+         WHERE s.token_hash = ? AND s.expires_at > datetime('now') AND u.disabled = 0",
     )
     .bind(sha256_hex(token))
     .fetch_optional(&state.db)
@@ -112,6 +112,7 @@ pub struct RegisterIn {
     name: String,
     password: String,
     invite: Option<String>,
+    access: Option<String>,
 }
 
 pub async fn register(State(st): State<AppState>, jar: CookieJar, Json(b): Json<RegisterIn>) -> Result<(CookieJar, Json<Value>), AppError> {
@@ -128,13 +129,21 @@ pub async fn register(State(st): State<AppState>, jar: CookieJar, Json(b): Json<
     if exists.is_some() {
         return Err(AppError::Conflict("Un compte existe déjà avec cette adresse.".into()));
     }
+    // Inscriptions sur liste d'attente : il faut une invitation de studio ou un lien d'accès validé.
+    let first: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users").fetch_one(&st.db).await?;
+    let wid = crate::admin::signup_allowed(&st, &email, b.invite.as_deref(), b.access.as_deref()).await.map_err(|e| match e {
+        AppError::Forbidden => AppError::Conflict("Les inscriptions se font sur liste d’attente : demandez l’accès à la bêta depuis la page d’accueil.".into()),
+        other => other,
+    })?;
     let hash = hash_password(&b.password)?;
-    let id: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash) VALUES (?, ?, ?) RETURNING id")
+    let id: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash, is_admin) VALUES (?, ?, ?, ?) RETURNING id")
         .bind(&email)
         .bind(b.name.trim())
         .bind(hash)
+        .bind((first == 0) as i64)
         .fetch_one(&st.db)
         .await?;
+    if let Some(w) = wid { crate::admin::mark_registered(&st, w, id).await; }
     if let Some(tok) = b.invite.filter(|t| !t.is_empty()) {
         crate::studio::accept_invite_for(&st, id, &tok).await?;
     }
@@ -150,7 +159,7 @@ pub struct LoginIn {
 
 pub async fn login(State(st): State<AppState>, jar: CookieJar, Json(b): Json<LoginIn>) -> Result<(CookieJar, Json<Value>), AppError> {
     rate_limit(&st, &b.email)?;
-    let row: Option<(i64, String, String)> = sqlx::query_as("SELECT id, name, password_hash FROM users WHERE email = ?")
+    let row: Option<(i64, String, String)> = sqlx::query_as("SELECT id, name, password_hash FROM users WHERE email = ? AND disabled = 0")
         .bind(b.email.trim().to_lowercase())
         .fetch_optional(&st.db)
         .await?;
@@ -184,6 +193,9 @@ pub async fn me(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
         sqlx::query("INSERT INTO memberships (studio_id, user_id, role) VALUES (?, ?, 'owner')").bind(sid).bind(u.id).execute(&st.db).await?;
     }
     let credits: i64 = sqlx::query_scalar("SELECT credits FROM users WHERE id = ?").bind(u.id).fetch_one(&st.db).await?;
+    let _ = sqlx::query("UPDATE users SET last_seen = datetime('now') WHERE id = ?").bind(u.id).execute(&st.db).await;
+    let admin = crate::admin::is_admin(&st, u.id).await?;
+    let pending: i64 = if admin { sqlx::query_scalar("SELECT COUNT(*) FROM waitlist WHERE status = 'pending'").fetch_one(&st.db).await? } else { 0 };
     let studios: Vec<(i64, String, String)> = sqlx::query_as(
         "SELECT s.id, s.name, m.role FROM memberships m JOIN studios s ON s.id = m.studio_id WHERE m.user_id = ? ORDER BY s.id",
     )
@@ -202,5 +214,5 @@ pub async fn me(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
             "maps": maps.into_iter().map(|(id, name, genre, rd, status)| json!({"id": id, "name": name, "genre": genre, "release_date": rd, "status": status})).collect::<Vec<_>>()
         }));
     }
-    Ok(Json(json!({ "user": u, "credits": credits, "studios": out })))
+    Ok(Json(json!({ "user": u, "credits": credits, "studios": out, "admin": admin, "admin_pending": pending })))
 }

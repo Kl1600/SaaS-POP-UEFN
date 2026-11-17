@@ -5,11 +5,12 @@ import {
   ArrowRight, Check, ChevronDown, Compass, ListChecks, Code2, Boxes, PenTool, LineChart, Coins, Bot, Minus, Sparkles, Send, AlertTriangle, AlertCircle, CheckCircle2,
 } from 'lucide-react'
 import '../landing.css'
+import { WaitlistModal } from '../components/Waitlist'
 
-// Tarifs : à ajuster ici. Pendant la bêta, tout est gratuit (aucun paiement n'est branché).
+// Tarifs : à ajuster ici. Accès sur liste d'attente pendant la bêta privée (aucun paiement n'est branché).
 const PLANS = [
-  { id: 'createur', name: 'Créateur', tag: 'Pour se lancer', price: '0 €', per: '', desc: 'Une map, une petite équipe, tout l’essentiel.', cta: 'Commencer gratuitement' },
-  { id: 'studio', name: 'Studio', tag: 'Le plus complet', price: '19 €', per: '/ mois', desc: 'Pour les studios qui sortent des maps en équipe.', cta: 'Créer mon studio', best: true },
+  { id: 'createur', name: 'Créateur', tag: 'Pour se lancer', price: '0 €', per: '', desc: 'Une map, une petite équipe, tout l’essentiel.', cta: 'Rejoindre la liste' },
+  { id: 'studio', name: 'Studio', tag: 'Le plus complet', price: '19 €', per: '/ mois', desc: 'Pour les studios qui sortent des maps en équipe.', cta: 'Rejoindre la liste', best: true },
   { id: 'forge', name: 'Studio+', tag: 'Bientôt', price: '49 €', per: '/ mois', desc: 'Tout Studio, plus POP Forge : l’app de bureau qui construit dans UEFN.', cta: 'Rejoindre la liste', soon: true },
 ]
 const ROWS: [string, (string | boolean)[]][] = [
@@ -38,7 +39,8 @@ const FAQ: [string, string][] = [
   ['Boussole, c’est une IA ?', 'Non. Boussole suit des règles simples à partir de vos tâches, de leurs dates, de leurs dépendances et de vos jalons. Elle répond aussi aux questions sur POP à partir de son guide. Aucune donnée n’est envoyée à un service d’IA.'],
   ['Et si je veux utiliser mon IA ?', 'Connectez Claude, Cursor, Codex ou une autre IA compatible MCP dans « IA connectées ». Elle peut lire et modifier vos tâches, votre Verse et vos acteurs UEFN, et chaque action est notée et annulable.'],
   ['D’où viennent les chiffres de l’analyse ?', 'De l’API officielle Fortnite d’Epic : joueurs, pic de joueurs simultanés, temps de jeu et rétention de chaque map publique, sur 7 jours.'],
-  ['Combien ça coûte ?', 'POP est gratuit pendant la bêta, tous plans compris. Les prix affichés s’appliqueront à la sortie de la bêta, et vous serez prévenu avant.'],
+  ['Comment avoir accès ?', 'POP est en bêta privée. Rejoignez la liste d’attente : on valide les demandes une par une et vous recevez par e-mail un lien pour créer votre compte.'],
+  ['Combien ça coûte ?', 'Les tarifs sont affichés plus haut. Ils s’appliquent à l’ouverture de POP ; les membres de la bêta sont prévenus avant tout paiement.'],
 ]
 
 function useReveal() {
@@ -148,7 +150,8 @@ export default function Landing() {
   useEffect(() => { document.title = 'POP · Le studio des créateurs Fortnite' }, [])
   useEffect(() => { const t = setInterval(() => setDemo(d => (d + 1) % DEMO.length), 6000); return () => clearInterval(t) }, [demo])
   const go = (id: string) => (e: React.MouseEvent) => { e.preventDefault(); document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
-  const signup = () => nav('/inscription')
+  const [wait, setWait] = useState(false)
+  const signup = () => setWait(true)
   return <div className="lp" ref={root} onScroll={e => setScrolled((e.target as HTMLDivElement).scrollTop > 10)}>
     <nav className={'lnav' + (scrolled ? ' solid' : '')}>
       <a href="#top" onClick={go('top')} className="lbrand" aria-label="POP, accueil"><img src="/logo.png" alt="POP" /></a>
@@ -160,7 +163,7 @@ export default function Landing() {
       </div>
       <div className="lacts">
         <button className="lghost" onClick={() => nav('/connexion')}>Se connecter</button>
-        <button className="lpill" onClick={signup}>Créer un compte</button>
+        <button className="lpill" onClick={signup}>Rejoindre la bêta</button>
       </div>
     </nav>
 
@@ -170,10 +173,10 @@ export default function Landing() {
       <h1 data-reveal>Vos maps Fortnite.<br /><span className="grad">À plusieurs. Sans le chaos.</span></h1>
       <p className="lsub" data-reveal>POP réunit tout le studio UEFN au même endroit : <b>tâches d’une heure</b>, Verse relié à UEFN, tableau blanc, analyse du marché et partage des gains.</p>
       <div className="lctas" data-reveal>
-        <button className="lbtn pri" onClick={signup}>Créer mon studio <ArrowRight size={18} /></button>
+        <button className="lbtn pri" onClick={signup}>Rejoindre la liste d’attente <ArrowRight size={18} /></button>
         <button className="lbtn" onClick={go('fonctionnalites')}>Voir les fonctionnalités</button>
       </div>
-      <p className="lmicro" data-reveal><span className="ldot" /> <b>Gratuit pendant la bêta</b> · Relié à UEFN · Dans le navigateur</p>
+      <p className="lmicro" data-reveal><span className="ldot" /> <b>Bêta privée</b> · Accès sur liste d’attente · Relié à UEFN</p>
       <div className="lshot" data-reveal><AppShot /></div>
     </header>
 
@@ -232,7 +235,7 @@ export default function Landing() {
     </section>
 
     <section className="lsec" id="tarifs">
-      <div className="lhead" data-reveal><span className="leyebrow">Tarifs</span><h2>Gratuit pendant la bêta.</h2><p>Tous les plans sont ouverts gratuitement pendant la bêta. Les prix ci-dessous s’appliqueront ensuite, et vous serez prévenu avant.</p></div>
+      <div className="lhead" data-reveal><span className="leyebrow">Tarifs</span><h2>Choisissez votre plan.</h2><p>POP est en bêta privée : l’accès se fait sur liste d’attente. Les tarifs s’appliquent à l’ouverture, et vous serez prévenu avant tout paiement.</p></div>
       <div className="lplans" data-reveal>{PLANS.map(p => <div key={p.id} className={'lplan' + (p.best ? ' best' : '')}>
         <div className="mrow" style={{ justifyContent: 'space-between' }}><h3>{p.name}</h3><span className={'ltag' + (p.soon ? ' soon' : '')}>{p.tag}</span></div>
         <div className="lprice"><b>{p.price}</b><span>{p.per}</span></div>
@@ -257,16 +260,17 @@ export default function Landing() {
     <section className="lfinal" data-reveal>
       <div className="lglow" />
       <h2>Votre prochaine map<br /><span className="grad">commence ici.</span></h2>
-      <p>Créez votre studio, reliez UEFN, et laissez Boussole vous dire par où commencer.</p>
-      <div className="lctas"><button className="lbtn pri" onClick={signup}>Créer mon studio <ArrowRight size={18} /></button><button className="lbtn" onClick={() => nav('/connexion')}>Se connecter</button></div>
+      <p>Rejoignez la liste d’attente : on vous envoie votre accès dès qu’une place se libère.</p>
+      <div className="lctas"><button className="lbtn pri" onClick={signup}>Rejoindre la liste d’attente <ArrowRight size={18} /></button><button className="lbtn" onClick={() => nav('/connexion')}>Se connecter</button></div>
     </section>
 
+    {wait && <WaitlistModal onClose={() => setWait(false)} />}
     <footer className="lfoot">
       <div className="lfb"><img src="/logo.png" alt="POP" /><span>© {new Date().getFullYear()} POP · Fait par des créateurs Fortnite, pour des créateurs Fortnite.</span><small>Fortnite et UEFN sont des marques d’Epic Games. POP n’est ni affilié à Epic Games ni approuvé par Epic Games.</small></div>
       <div className="lfcols">
         <div><h4>Produit</h4><a href="#fonctionnalites" onClick={go('fonctionnalites')}>Fonctionnalités</a><a href="#boussole" onClick={go('boussole')}>Boussole</a><a href="#tarifs" onClick={go('tarifs')}>Tarifs</a></div>
         <div><h4>Aide</h4><a href="#faq" onClick={go('faq')}>FAQ</a></div>
-        <div><h4>Compte</h4><a href="/connexion" onClick={e => { e.preventDefault(); nav('/connexion') }}>Se connecter</a><a href="/inscription" onClick={e => { e.preventDefault(); signup() }}>Créer un compte</a></div>
+        <div><h4>Compte</h4><a href="/connexion" onClick={e => { e.preventDefault(); nav('/connexion') }}>Se connecter</a><a href="#beta" onClick={e => { e.preventDefault(); signup() }}>Rejoindre la bêta</a></div>
       </div>
     </footer>
   </div>

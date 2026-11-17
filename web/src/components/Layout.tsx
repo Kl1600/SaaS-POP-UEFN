@@ -9,7 +9,7 @@ import { ago, api } from '../api'
 import { Avatar } from './ui'
 import { NewTaskModal } from '../pages/Tasks'
 import { GuideDrawer } from './Guide'
-import { Compass } from 'lucide-react'
+import { Compass, ShieldCheck } from 'lucide-react'
 import { useUefnStatus, STATUS_LABEL } from '../uefnState'
 
 const GROUPS: [string, [string, string, any][]][] = [
@@ -25,6 +25,7 @@ const TITLES: Record<string, [string, string]> = {}
 GROUPS.forEach(([g, items]) => items.forEach(([p, l]) => (TITLES[p] = [g, l])))
 TITLES['/parametres'] = ['Compte', 'Paramètres']
 TITLES['/aide'] = ['Compte', 'Aide et support']
+TITLES['/admin'] = ['POP', 'Administration']
 TITLES['/equipe'] = ['Studio', 'Équipe et intégrations']
 
 export default function Layout() {
@@ -81,6 +82,7 @@ export default function Layout() {
         <nav className="nav" style={{ marginTop: 'auto' }} aria-label="Compte">
           <NavLink to="/parametres" className={({ isActive }) => (isActive ? 'on' : '')}><Settings size={20} strokeWidth={1.5} /><span className="lbl">Paramètres</span></NavLink>
           <NavLink to="/aide"><LifeBuoy size={20} strokeWidth={1.5} /><span className="lbl">Aide et support</span></NavLink>
+          {app.me?.admin && <NavLink to="/admin" className={({ isActive }) => (isActive ? 'on' : '')}><ShieldCheck size={20} strokeWidth={1.5} /><span className="lbl">Administration</span>{!!app.me.admin_pending && <span className="nav-count">{app.me.admin_pending}</span>}</NavLink>}
         </nav>
       </aside>
       <div className="main">

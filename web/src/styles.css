@@ -564,3 +564,8 @@ body.wb-fs .side,body.wb-fs .top{visibility:hidden}
 .gask .field{flex:1;min-width:0}
 .gask .btn{flex:none}
 }
+
+@layer app{
+.nav-count{margin-left:auto;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:linear-gradient(135deg,#ED753E,#EF8D46);color:#160A03;font-size:11.5px;font-weight:600;display:inline-grid;place-items:center}
+.adm-req{border:1px solid var(--border);border-radius:14px;padding:14px 16px}
+}

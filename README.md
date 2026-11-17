@@ -83,6 +83,8 @@ Chaque action est journalisée et annulable ; droits par rôle (invité en lectu
 | --- | --- | --- |
 | `DATABASE_URL` | `sqlite://pop-data.db` | Base SQLite |
 | `POP_PUBLIC_URL` | `http://127.0.0.1:8080` | Adresse publique utilisée dans les e-mails |
+| `POP_ADMIN_EMAILS` | — | E-mails des administrateurs de la plateforme (séparés par des virgules). Le premier compte créé est aussi administrateur. |
+| `POP_OPEN_SIGNUP` | `0` | `1` = inscriptions ouvertes à tous (sinon : liste d’attente + lien d’accès validé dans Administration) |
 | `POP_SMTP_HOST`, `POP_SMTP_PORT`, `POP_SMTP_USER`, `POP_SMTP_PASS`, `POP_SMTP_FROM` | — | Envoi d'e-mails (invitations, mot de passe oublié). Sans eux, les liens s'affichent à copier |
 | `POP_BIND` | `127.0.0.1` | `0.0.0.0` pour le réseau local ou l'hébergement |
 | `PORT` | `8080` | Port (écoute sur 127.0.0.1) |
