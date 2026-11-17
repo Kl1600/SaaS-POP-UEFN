@@ -1,3 +1,4 @@
+import { SecuritySettings } from '../components/Security'
 import { useState } from 'react'
 import { Navigate, useSearchParams } from 'react-router-dom'
 import { Copy, KeyRound, Trash2 } from 'lucide-react'
@@ -146,7 +147,7 @@ export function Account() {
   const { me, toast, reload } = useApp()
   const [name, setName] = useState(me?.user.name ?? '')
   const [pw, setPw] = useState({ current: '', new: '' })
-  return (
+  return (<>
     <div className="grid2">
       <section className="card">
         <CardHead title="Mon compte" />
@@ -170,7 +171,8 @@ export function Account() {
         </form>
       </section>
     </div>
-  )
+    <SecuritySettings />
+  </>)
 }
 
 function McpTokens() {

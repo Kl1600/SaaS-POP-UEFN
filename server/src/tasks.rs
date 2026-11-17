@@ -174,6 +174,10 @@ pub async fn insert_task(st: &AppState, ctx: &MapCtx, b: &NewTask) -> Result<(i6
 pub async fn create(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64>, Json(b): Json<NewTask>) -> ApiResult<Value> {
     let ctx = map_ctx(&st, &u, mid).await?;
     ctx.require(Role::Member)?;
+    // Anti-doublon : même titre créé par la même personne dans les 10 dernières secondes (double-clic, Entrée répétée).
+    let dup: Option<(i64, i64)> = sqlx::query_as("SELECT t.id, t.number FROM tasks t WHERE t.map_id = ? AND t.title = ? AND t.created_at > datetime('now', '-10 seconds') AND EXISTS (SELECT 1 FROM task_events e WHERE e.task_id = t.id AND e.user_id = ?) ORDER BY t.id DESC LIMIT 1")
+        .bind(mid).bind(b.title.trim()).bind(u.id).fetch_optional(&st.db).await.unwrap_or(None);
+    if let Some((id, number)) = dup { return Ok(Json(json!({ "id": id, "number": number, "duplicate": true }))) }
     let (id, number) = insert_task(&st, &ctx, &b).await?;
     log_activity(&st, mid, Some(u.id), "task", "Tâche créée", &format!("#{number} {}", b.title.trim())).await?;
     notify(&st, mid, json!({ "t": "refresh", "what": "tasks" }));

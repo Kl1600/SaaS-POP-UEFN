@@ -150,7 +150,7 @@ function Locks() {
 }
 
 function TaskDrawer({ id, onClose, members, tasks }: { id: number; onClose: () => void; members: any[]; tasks: Task[] }) {
-  const { canEdit, toast } = useApp()
+  const { canEdit, isAdmin, toast } = useApp()
   const { data, reload } = useLoad<any>(`/api/tasks/${id}`, [id])
   const [comment, setComment] = useState('')
   const [sub, setSub] = useState('')
@@ -213,6 +213,9 @@ function TaskDrawer({ id, onClose, members, tasks }: { id: number; onClose: () =
           <div key={i} className="li" style={{ padding: '8px 0' }}><span className="small muted mono" style={{ width: 110, flex: 'none' }}>{frDate(e.at, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span><span style={{ flex: 1 }}>{e.what}</span><span className="small muted">{e.via}{e.who ? ` · ${e.who.split(' ')[0]}` : ''}</span></div>
         ))}
       </div>
+      {isAdmin && <div style={{ marginTop: 20, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+        <button className="btn" style={{ color: 'var(--tr)' }} onClick={async () => { if (!confirm(`Supprimer définitivement la tâche #${t.number} « ${t.title} » ?`)) return; try { await api.del(`/api/tasks/${t.id}`); toast(`Tâche #${t.number} supprimée`); onClose() } catch (e: any) { toast(e.message, true) } }}>Supprimer la tâche</button>
+      </div>}
     </Drawer>
   )
 }
@@ -222,15 +225,18 @@ export function NewTaskModal({ onClose }: { onClose: () => void }) {
   const { data: mem } = useMembers()
   const [f, setF] = useState({ title: '', tag: 'code', assignee_id: '', planned_day: '', deps: '' })
   const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (busy) return
+    setBusy(true)
     try {
       const r = await api.post(`/api/maps/${map!.id}/tasks`, {
         title: f.title, tag: f.tag, assignee_id: f.assignee_id ? Number(f.assignee_id) : null, planned_day: f.planned_day || null,
         deps: f.deps.split(/[^0-9]+/).filter(Boolean).map(Number),
       })
       toast(`Tâche #${r.number} créée`); onClose()
-    } catch (e: any) { setErr(e.message) }
+    } catch (e: any) { setErr(e.message); setBusy(false) }
   }
   return (
     <Modal onClose={onClose} label="Nouvelle tâche">
@@ -245,7 +251,7 @@ export function NewTaskModal({ onClose }: { onClose: () => void }) {
           <label className="label">Dépend de (n°)<input className="field mono" value={f.deps} onChange={e => setF({ ...f, deps: e.target.value })} placeholder="12, 18" /></label>
         </div>
         {err && <div className="err">{err}</div>}
-        <div className="row" style={{ justifyContent: 'flex-end' }}><button type="button" className="btn" onClick={onClose}>Annuler</button><button className="btn pri">Créer la tâche</button></div>
+        <div className="row" style={{ justifyContent: 'flex-end' }}><button type="button" className="btn" onClick={onClose}>Annuler</button><button className="btn pri" disabled={busy}>{busy ? 'Création…' : 'Créer la tâche'}</button></div>
       </form>
     </Modal>
   )

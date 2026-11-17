@@ -3,7 +3,7 @@ import { api } from './api'
 
 export type MapInfo = { id: number; name: string; genre: string; release_date: string | null; status: string }
 export type Studio = { id: number; name: string; role: string; maps: MapInfo[] }
-export type Me = { user: { id: number; name: string; email: string }; credits: number; studios: Studio[] }
+export type Me = { user: { id: number; name: string; email: string }; credits: number; studios: Studio[]; admin?: boolean; admin_pending?: number }
 export type Presence = { uid: number; name: string; place: string }
 
 type Ctx = {
@@ -18,7 +18,7 @@ type Ctx = {
   isAdmin: boolean
   dark: boolean
   toggleDark: () => void
-  toast: (msg: string, bad?: boolean) => void
+  toast: (msg: string, bad?: boolean, action?: { label: string; run: () => void }) => void
   presence: Presence[]
   subscribe: (fn: (m: any) => void) => () => void
   send: (m: any) => void
@@ -32,7 +32,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [mapId, setMapIdState] = useState<number | null>(() => Number(localStorage.getItem('pop.map')) || null)
   const [dark, setDark] = useState(() => localStorage.getItem('pop.dark') === '1')
-  const [toastMsg, setToast] = useState<{ m: string; bad: boolean } | null>(null)
+  const [toastMsg, setToast] = useState<{ m: string; bad: boolean; action?: { label: string; run: () => void }; k: number } | null>(null)
   const [presence, setPresence] = useState<Presence[]>([])
   const subs = useRef(new Set<(m: any) => void>())
   const sock = useRef<WebSocket | null>(null)
@@ -50,7 +50,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const setMapId = (id: number) => { setMapIdState(id); try { localStorage.setItem('pop.map', String(id)) } catch {} }
   const toggleDark = () => setDark(d => { try { localStorage.setItem('pop.dark', d ? '0' : '1') } catch {}; return !d })
-  const toast = useCallback((m: string, bad = false) => { setToast({ m, bad }); setTimeout(() => setToast(null), 3200) }, [])
+  const toastTimer = useRef<any>(null)
+  const toast = useCallback((m: string, bad = false, action?: { label: string; run: () => void }) => {
+    clearTimeout(toastTimer.current); setToast({ m, bad, action, k: Date.now() })
+    toastTimer.current = setTimeout(() => setToast(null), action ? 6000 : 3200)
+  }, [])
 
   // Un WebSocket par map : présence, curseurs, opérations du tableau blanc, rafraîchissements.
   useEffect(() => {
@@ -84,7 +88,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   return (
     <C.Provider value={value}>
       {children}
-      {toastMsg && <div className={'toast' + (toastMsg.bad ? ' bad' : '')} role="status">{toastMsg.m}</div>}
+      {toastMsg && <div key={toastMsg.k} className={'toast' + (toastMsg.bad ? ' bad' : '')} role="status">{toastMsg.m}{toastMsg.action && <button className="toast-act" onClick={() => { toastMsg.action!.run(); setToast(null) }}>{toastMsg.action.label}</button>}</div>}
     </C.Provider>
   )
 }

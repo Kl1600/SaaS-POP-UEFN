@@ -82,11 +82,17 @@ fn tools() -> Value {
         tool("push_to_session", "Pousse les changements dans la session de test.", json!({}), &[]),
         tool("save_level", "Enregistre le niveau dans UEFN.", json!({}), &[]),
         tool("lore_checkin", "Archive dans Lore avec un message (« #n ce qui a été fait »).", json!({ "message": { "type": "string" } }), &["message"]),
+        tool("list_tasks", "Liste les tâches de la map (numéro, titre, statut, étiquette, personne, jour prévu, dépendances en attente). Filtres facultatifs : status (todo, doing, blocked, done), mine (vos tâches seulement), query (texte).", json!({ "status": { "type": "string" }, "mine": { "type": "boolean" }, "query": { "type": "string" } }), &[]),
+        tool("get_task", "Détail d'une tâche par son numéro : description, dépendances, sous-tâches, commentaires.", json!({ "number": { "type": "integer" } }), &["number"]),
+        tool("next_task", "Ce que Boussole conseille de faire maintenant : retards, tâches du jour et tâches qui en débloquent d'autres.", json!({}), &[]),
+        tool("create_task", "Crée une tâche d'environ une heure. tag : code, carte, conception ou test. depends_on : numéros de tâches. assign_to_me : vous l'assigner.", json!({ "title": { "type": "string" }, "description": { "type": "string" }, "tag": { "type": "string" }, "planned_day": { "type": "string", "description": "AAAA-MM-JJ" }, "depends_on": { "type": "array", "items": { "type": "integer" } }, "assign_to_me": { "type": "boolean" } }), &["title"]),
+        tool("set_task_status", "Change le statut d'une tâche : todo (à faire), doing (en cours), blocked (bloquée), done (faite). Passer en cours exige que ses dépendances soient faites. note : commentaire facultatif (ce qui a été fait, ce qui bloque).", json!({ "number": { "type": "integer" }, "status": { "type": "string", "enum": ["todo", "doing", "blocked", "done"] }, "note": { "type": "string" } }), &["number", "status"]),
+        tool("comment_task", "Ajoute un commentaire à une tâche.", json!({ "number": { "type": "integer" }, "text": { "type": "string" } }), &["number", "text"]),
         tool("undo_action", "Annule une action du journal par son identifiant.", json!({ "id": { "type": "integer" } }), &["id"]),
     ])
 }
 
-const READ_TOOLS: &[&str] = &["uefn_status", "list_actors", "get_actor", "list_verse_files", "read_verse_file"];
+const READ_TOOLS: &[&str] = &["uefn_status", "list_actors", "get_actor", "list_verse_files", "read_verse_file", "list_tasks", "get_task", "next_task"];
 
 fn rpc_ok(id: Value, result: Value) -> Response {
     Json(json!({ "jsonrpc": "2.0", "id": id, "result": result })).into_response()
@@ -119,14 +125,14 @@ pub async fn mcp(State(st): State<AppState>, headers: HeaderMap, axum::extract::
     };
     let _ = sqlx::query("UPDATE api_tokens SET last_used = datetime('now'), calls = calls + 1 WHERE token_hash = ?").bind(sha256_hex(token)).execute(&st.db).await;
     crate::access::notify(&st, mid, json!({ "t": "refresh", "what": "ai" }));
-    let user = AuthUser { id: uid, email, name };
+    let user = AuthUser { id: uid, email, name, sid: String::new() };
     let method = req["method"].as_str().unwrap_or("");
     match method {
         "initialize" => rpc_ok(id, json!({
             "protocolVersion": req["params"]["protocolVersion"].as_str().unwrap_or("2025-06-18"),
             "capabilities": { "tools": {} },
             "serverInfo": { "name": "pop", "version": "0.1.0" },
-            "instructions": "Outils POP pour piloter UEFN via le relais du créateur. Toute action est journalisée et annulable. Les suppressions attendent une validation humaine."
+            "instructions": "Outils POP : gérer les tâches de la map (list_tasks, next_task, create_task, set_task_status, comment_task) et piloter UEFN via le relais du créateur. Avant de travailler, prenez une tâche avec next_task et passez-la en cours ; quand elle est finie, passez-la en done avec une note. Toute action UEFN est journalisée et annulable ; les suppressions attendent une validation humaine."
         })),
         m if m.starts_with("notifications/") => StatusCode::ACCEPTED.into_response(),
         "ping" => rpc_ok(id, json!({})),
@@ -150,7 +156,64 @@ async fn call(st: &AppState, user: &AuthUser, mid: i64, name: &str, a: Value) ->
     let ctx = map_ctx(st, user, mid).await?;
     let task = a["task"].as_i64();
     let o = || Origin { ctx: &ctx, source: "mcp", task };
+    let task_by_number = |n: Option<i64>| async move {
+        let n = n.ok_or_else(|| crate::error::bad("Numéro de tâche manquant."))?;
+        let r: Option<(i64,)> = sqlx::query_as("SELECT id FROM tasks WHERE map_id = ? AND number = ?").bind(mid).bind(n).fetch_optional(&st.db).await?;
+        r.map(|r| r.0).ok_or_else(|| crate::error::bad(&format!("Tâche #{n} introuvable dans cette map.")))
+    };
     match name {
+        "list_tasks" => {
+            let rows: Vec<(i64, String, String, String, Option<String>, Option<i64>, Option<String>, i64)> = sqlx::query_as(
+                "SELECT t.number, t.title, t.status, t.tag, u.name, t.assignee_id, t.planned_day, t.id FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id WHERE t.map_id = ? ORDER BY t.status = 'done', t.planned_day IS NULL, t.planned_day, t.number",
+            ).bind(mid).fetch_all(&st.db).await?;
+            let deps: Vec<(i64, i64)> = sqlx::query_as("SELECT d.task_id, o.number FROM task_deps d JOIN tasks o ON o.id = d.depends_on JOIN tasks t ON t.id = d.task_id WHERE t.map_id = ? AND o.status != 'done'").bind(mid).fetch_all(&st.db).await?;
+            let q = a["query"].as_str().unwrap_or("").to_lowercase();
+            let out: Vec<Value> = rows.into_iter().filter(|r| a["status"].as_str().map(|s| s == r.2).unwrap_or(true) && (!a["mine"].as_bool().unwrap_or(false) || r.5 == Some(user.id)) && (q.is_empty() || r.1.to_lowercase().contains(&q)))
+                .take(200).map(|r| json!({ "number": r.0, "title": r.1, "status": r.2, "tag": r.3, "assignee": r.4, "planned_day": r.6, "waiting_on": deps.iter().filter(|d| d.0 == r.7).map(|d| d.1).collect::<Vec<_>>() })).collect();
+            Ok(json!(out))
+        }
+        "get_task" => {
+            let tid = task_by_number(a["number"].as_i64()).await?;
+            let crate::Json(v) = crate::tasks::detail(State(st.clone()), user.clone(), axum::extract::Path(tid)).await?;
+            Ok(v)
+        }
+        "next_task" => {
+            let crate::Json(v) = crate::guide::guide(State(st.clone()), user.clone(), axum::extract::Path(mid)).await?;
+            Ok(json!({ "résumé": v["points"], "suggestions": v["suggestions"] }))
+        }
+        "create_task" => {
+            ctx.can_edit()?;
+            let b = crate::tasks::NewTask {
+                title: a["title"].as_str().unwrap_or("").to_string(), tag: a["tag"].as_str().map(String::from), description: a["description"].as_str().map(String::from),
+                assignee_id: if a["assign_to_me"].as_bool().unwrap_or(false) { Some(user.id) } else { None },
+                deps: a["depends_on"].as_array().map(|d| d.iter().filter_map(|x| x.as_i64()).collect()), planned_day: a["planned_day"].as_str().map(String::from),
+                lot: None, status: None, ai: Some(true), origin: Some("ia".into()),
+            };
+            if b.title.trim().is_empty() { return Err(crate::error::bad("Titre manquant.")) }
+            let (tid, number) = crate::tasks::insert_task(st, &ctx, &b).await?;
+            crate::access::notify(st, mid, json!({ "t": "refresh", "what": "tasks" }));
+            Ok(json!({ "id": tid, "number": number, "message": format!("Tâche #{number} créée.") }))
+        }
+        "set_task_status" => {
+            ctx.can_edit()?;
+            let tid = task_by_number(a["number"].as_i64()).await?;
+            let status = a["status"].as_str().unwrap_or("");
+            crate::tasks::set_status_internal(st, mid, tid, user.id, status, "IA").await?;
+            if let Some(note) = a["note"].as_str().filter(|n| !n.trim().is_empty()) {
+                sqlx::query("INSERT INTO comments (map_id, target, user_id, body) VALUES (?, ?, ?, ?)").bind(mid).bind(format!("task:{tid}")).bind(user.id).bind(format!("[IA] {}", note.trim())).execute(&st.db).await?;
+            }
+            crate::access::notify(st, mid, json!({ "t": "refresh", "what": "tasks" }));
+            Ok(json!({ "message": format!("Tâche #{} : {}.", a["number"], crate::tasks::status_label(status)) }))
+        }
+        "comment_task" => {
+            ctx.can_edit()?;
+            let tid = task_by_number(a["number"].as_i64()).await?;
+            let body = a["text"].as_str().unwrap_or("").trim();
+            if body.is_empty() { return Err(crate::error::bad("Commentaire vide.")) }
+            sqlx::query("INSERT INTO comments (map_id, target, user_id, body) VALUES (?, ?, ?, ?)").bind(mid).bind(format!("task:{tid}")).bind(user.id).bind(format!("[IA] {body}")).execute(&st.db).await?;
+            crate::access::notify(st, mid, json!({ "t": "refresh", "what": "tasks" }));
+            Ok(json!({ "message": "Commentaire ajouté." }))
+        }
         "uefn_status" => {
             let pending: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM uefn_actions WHERE map_id = ? AND status = 'queued'").bind(mid).fetch_one(&st.db).await?;
             Ok(json!({ "status": st.relays.status(mid), "pending": pending }))

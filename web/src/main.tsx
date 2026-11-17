@@ -4,7 +4,7 @@ import { BrowserRouter, Route, Routes, useParams } from 'react-router-dom'
 import './styles.css'
 import { AppProvider, useApp } from './state'
 import Layout from './components/Layout'
-import { Login, Onboarding, InviteAccept, PublicPage, ResetPassword, Welcome } from './pages/Auth'
+import { Login, Signup, Onboarding, InviteAccept, PublicPage, ResetPassword, Welcome } from './pages/Auth'
 import Overview from './pages/Overview'
 import Pages from './pages/Pages'
 import Board from './pages/Board'
@@ -17,6 +17,8 @@ import { PageHead } from './components/ui'
 import Help from './pages/Help'
 import AI from './pages/AI'
 import { Market, TikTok, Trending, Launches } from './pages/Analysis'
+const Landing = lazy(() => import('./pages/Landing'))
+const Admin = lazy(() => import('./pages/Admin'))
 const VerseEditor = lazy(() => import('./pages/VerseEditor'))
 const Organizer = lazy(() => import('./pages/Organizer'))
 const L = (C: any) => <Suspense fallback={<main className="content"><p className="muted" style={{ padding: 28 }}>Chargement…</p></main>}><C /></Suspense>
@@ -24,7 +26,11 @@ const L = (C: any) => <Suspense fallback={<main className="content"><p className
 function Gate() {
   const { me, loading } = useApp()
   if (loading) return <div className="auth" />
-  if (!me) return <Login />
+  if (!me) return <Routes>
+    <Route path="/" element={<Suspense fallback={<div className="auth" />}><Landing /></Suspense>} />
+    <Route path="/inscription" element={<Signup />} />
+    <Route path="*" element={<Login />} />
+  </Routes>
   if (me.studios.length === 0) return <Onboarding />
   if (me.studios.every(s => s.maps.length === 0)) return <Welcome />
   return (
@@ -43,6 +49,7 @@ function Gate() {
         <Route path="verse" element={L(VerseEditor)} />
         <Route path="organiseur" element={L(Organizer)} />
         <Route path="aide" element={<Help />} />
+        <Route path="admin" element={L(Admin)} />
         <Route path="parametres" element={<main className="content"><PageHead title="Paramètres" help="Votre compte : nom, mot de passe, données personnelles." /><Account /></main>} />
         <Route path="ia" element={<AI />} />
         <Route path="analyse/marche" element={<Market />} />

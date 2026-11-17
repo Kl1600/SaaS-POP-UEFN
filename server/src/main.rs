@@ -1,10 +1,13 @@
 mod access;
 mod account;
+mod security;
+mod admin;
 mod analytics;
 mod ai;
 mod mail;
 mod manage;
 mod engine;
+mod guide;
 mod integrations;
 mod link;
 mod catalog;
@@ -50,6 +53,8 @@ pub struct AppState {
     pub db: sqlx::SqlitePool,
     pub hub: Arc<ws::Hub>,
     pub limiter: Arc<Mutex<HashMap<String, (u32, Instant)>>>,
+    /// Connexions en attente du code de double authentification : empreinte du ticket → (utilisateur, création, essais).
+    pub mfa_tickets: Arc<Mutex<HashMap<String, (i64, Instant, u32)>>>,
     pub board_lock: Arc<tokio::sync::Mutex<()>>,
     pub secure_cookies: bool,
     pub dummy_hash: String,
@@ -73,6 +78,15 @@ async fn csrf(req: Request<Body>, next: Next) -> Response {
     h.insert("x-content-type-options", "nosniff".parse().unwrap());
     h.insert("x-frame-options", "DENY".parse().unwrap());
     h.insert("referrer-policy", "same-origin".parse().unwrap());
+    h.insert("permissions-policy", "camera=(), microphone=(), geolocation=(), payment=()".parse().unwrap());
+    h.insert("cross-origin-opener-policy", "same-origin".parse().unwrap());
+    // Politique de contenu : scripts uniquement de POP, aucune intégration de POP dans un autre site.
+    h.insert("content-security-policy", "default-src 'self'; script-src 'self' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' ws: wss:; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'".parse().unwrap());
+    if std::env::var("POP_SECURE_COOKIES").map(|v| v == "1").unwrap_or(false) {
+        h.insert("strict-transport-security", "max-age=31536000; includeSubDomains".parse().unwrap());
+    }
+    // Pas de mise en cache des réponses de l'API (données personnelles).
+    if path.starts_with("/api/") { h.insert("cache-control", "no-store".parse().unwrap()); }
     res
 }
 
@@ -155,6 +169,29 @@ fn api() -> Router<AppState> {
         .route("/api/maps/{mid}", patch(studio::update_map).delete(manage::delete_map))
         .route("/api/maps/{mid}/ws", get(ws::ws_handler))
         .route("/api/maps/{mid}/overview", get(plan::overview))
+        .route("/api/waitlist", post(admin::join))
+        .route("/api/waitlist/access", get(admin::check_access))
+        .route("/api/auth/mfa", post(auth::login_mfa))
+        .route("/api/me/security", get(security::overview))
+        .route("/api/me/2fa/setup", post(security::setup_2fa))
+        .route("/api/me/2fa/enable", post(security::enable_2fa))
+        .route("/api/me/2fa/disable", post(security::disable_2fa))
+        .route("/api/me/sessions/{id}", delete(security::revoke_session))
+        .route("/api/me/sessions/close-others", post(security::revoke_others))
+        .route("/api/admin/unlock", post(security::unlock_admin))
+        .route("/api/admin/lock", post(security::lock_admin))
+        .route("/api/admin/audit", get(security::admin_audit))
+        .route("/api/admin/overview", get(admin::overview))
+        .route("/api/admin/waitlist", get(admin::waitlist))
+        .route("/api/admin/waitlist/{id}/approve", post(admin::approve))
+        .route("/api/admin/waitlist/{id}/refuse", post(admin::refuse))
+        .route("/api/admin/waitlist/{id}/reopen", post(admin::reopen))
+        .route("/api/admin/waitlist/{id}/note", post(admin::note))
+        .route("/api/admin/waitlist/{id}", delete(admin::remove))
+        .route("/api/admin/invite", post(admin::invite))
+        .route("/api/admin/users", get(admin::users))
+        .route("/api/admin/users/{id}", post(admin::update_user))
+        .route("/api/maps/{mid}/guide", get(guide::guide))
         .route("/api/maps/{mid}/report", get(report))
         // Tâches
         .route("/api/maps/{mid}/tasks", get(tasks::list).post(tasks::create))
@@ -250,6 +287,7 @@ async fn main() -> anyhow::Result<()> {
         db,
         hub: Arc::new(ws::Hub::default()),
         limiter: Arc::new(Mutex::new(HashMap::new())),
+        mfa_tickets: Arc::new(Mutex::new(HashMap::new())),
         board_lock: Arc::new(tokio::sync::Mutex::new(())),
         secure_cookies: std::env::var("POP_SECURE_COOKIES").map(|v| v == "1").unwrap_or(false),
         dummy_hash: auth::hash_password("mot-de-passe-factice").map_err(|e| anyhow::anyhow!("{e:?}"))?,
@@ -261,12 +299,14 @@ async fn main() -> anyhow::Result<()> {
         let exists: Option<i64> = sqlx::query_scalar("SELECT id FROM users WHERE email = 'kl'").fetch_optional(&st.db).await?;
         if exists.is_none() {
             let h = auth::hash_password("kl").map_err(|e| anyhow::anyhow!("{e:?}"))?;
-            sqlx::query("INSERT INTO users (email, name, password_hash) VALUES ('kl', 'KL', ?)").bind(h).execute(&st.db).await?;
+            sqlx::query("INSERT INTO users (email, name, password_hash, is_admin) VALUES ('kl', 'KL', ?, 1)").bind(h).execute(&st.db).await?;
         }
+        sqlx::query("UPDATE users SET is_admin = 1 WHERE email = 'kl'").execute(&st.db).await?;
         println!("Compte de test : identifiant « kl », mot de passe « kl »");
     }
     tokio::spawn(integrations::scheduler(st.clone()));
     tokio::spawn(analytics::crawler(st.clone()));
+    tokio::spawn(analytics::social_loop(st.clone()));
     tokio::spawn(manage::backup_loop(st.clone(), db_url.clone()));
     let web = std::env::var("POP_WEB_DIR").unwrap_or_else(|_| "../web/dist".into());
     let spa = ServeDir::new(&web).fallback(ServeFile::new(format!("{web}/index.html")));
@@ -274,6 +314,10 @@ async fn main() -> anyhow::Result<()> {
         .fallback_service(spa)
         .layer(middleware::from_fn(csrf))
         .layer(RequestBodyLimitLayer::new(16 * 1024 * 1024))
+        .layer(tower_http::catch_panic::CatchPanicLayer::custom(|_| {
+            tracing::error!("erreur interne (panic) pendant une requête");
+            (axum::http::StatusCode::INTERNAL_SERVER_ERROR, [(axum::http::header::CONTENT_TYPE, "application/json")], r#"{"error":"Erreur interne du serveur POP. Réessayez ; si ça continue, regardez le terminal."}"#).into_response()
+        }))
         .with_state(st);
     let port: u16 = std::env::var("PORT").ok().and_then(|p| p.parse().ok()).unwrap_or(8080);
     // 127.0.0.1 par défaut ; POP_BIND=0.0.0.0 pour le réseau local ou un hébergement.
@@ -281,6 +325,6 @@ async fn main() -> anyhow::Result<()> {
     let addr = SocketAddr::new(ip, port);
     println!("POP écoute sur http://{addr}");
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).await?;
     Ok(())
 }

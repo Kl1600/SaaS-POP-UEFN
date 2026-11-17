@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
 import { useApp } from '../state'
+import { WaitlistPage } from '../components/Waitlist'
 import { BlockView } from './Pages'
 
-export function Login({ invite }: { invite?: string }) {
+export function Login({ invite, initial, access }: { invite?: string; initial?: 'login' | 'register'; access?: { token: string; email: string; name: string } }) {
   const { reload } = useApp()
-  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>(invite ? 'register' : 'login')
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>(invite ? 'register' : initial ?? 'login')
   const [sent, setSent] = useState('')
-  const [f, setF] = useState({ email: '', name: '', password: '' })
+  const [f, setF] = useState({ email: access?.email ?? '', name: access?.name ?? '', password: '' })
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
+  const [mfa, setMfa] = useState<{ ticket: string; code: string } | null>(null)
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setBusy(true); setErr('')
     try {
@@ -18,30 +20,46 @@ export function Login({ invite }: { invite?: string }) {
         setSent(r.mail ? 'Si un compte existe avec cette adresse, un e-mail avec un lien vient de partir (valable 2 heures).' : 'L’envoi d’e-mails n’est pas configuré sur ce POP : demandez à un admin de votre studio un lien de réinitialisation (Équipe et intégrations → Membres).')
         return
       }
-      if (mode === 'login') await api.post('/api/auth/login', { email: f.email, password: f.password })
-      else await api.post('/api/auth/register', { ...f, invite })
+      if (mfa) { await api.post('/api/auth/mfa', { ticket: mfa.ticket, code: mfa.code }) }
+      else if (mode === 'login') {
+        const r = await api.post('/api/auth/login', { email: f.email, password: f.password })
+        if (r?.mfa) { setMfa({ ticket: r.ticket, code: '' }); setF({ ...f, password: '' }); return }
+      }
+      else await api.post('/api/auth/register', { ...f, invite, access: access?.token })
       if (invite && mode === 'login') await api.post('/api/invitations/accept', { token: invite })
       await reload()
-      if (invite) location.href = '/'
+      if (invite || access) location.href = '/'
     } catch (e: any) { setErr(e.message) } finally { setBusy(false) }
   }
   return (
     <div className="auth app">
+      {mfa ? <form className="card stack" onSubmit={submit} style={{ gap: 16 }}>
+        <img src="/logo.png" alt="POP" style={{ filter: 'invert(1)' }} />
+        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 400 }}>Double authentification</h1>
+        <p className="muted" style={{ margin: 0 }}>Entrez le code à 6 chiffres de votre application d’authentification, ou un code de secours.</p>
+        <input className="field mono" autoFocus required inputMode="numeric" autoComplete="one-time-code" value={mfa.code} onChange={e => setMfa({ ...mfa, code: e.target.value })} style={{ letterSpacing: 4, fontSize: 20, textAlign: 'center' }} aria-label="Code" />
+        {err && <div className="err" role="alert">{err}</div>}
+        <button className="btn pri" disabled={busy}>Valider</button>
+        <button type="button" className="link" onClick={() => { setMfa(null); setErr('') }}>Revenir</button>
+      </form> :
       <form className="card stack" onSubmit={submit} style={{ gap: 16 }}>
         <img src="/logo.png" alt="POP" style={{ filter: 'invert(1)' }} />
         <h1 style={{ margin: 0, fontSize: 24, fontWeight: 400 }}>{mode === 'login' ? 'Connexion' : mode === 'forgot' ? 'Mot de passe oublié' : 'Créer un compte'}</h1>
-        <p className="muted" style={{ margin: 0 }}>{invite ? 'Vous avez été invité dans un studio.' : "L'espace de travail des créateurs de maps UEFN."}</p>
+        <p className="muted" style={{ margin: 0 }}>{invite ? 'Vous avez été invité dans un studio.' : access && mode === 'register' ? 'Votre accès à la bêta est validé : créez votre compte.' : "L'espace de travail des créateurs de maps UEFN."}</p>
         {mode === 'register' && <label className="label">Nom<input className="field" value={f.name} onChange={e => setF({ ...f, name: e.target.value })} required maxLength={80} autoComplete="name" /></label>}
-        <label className="label">{mode === 'login' ? 'E-mail ou identifiant' : 'E-mail'}<input className="field" type={mode === 'login' ? 'text' : 'email'} inputMode="email" autoCapitalize="off" value={f.email} onChange={e => setF({ ...f, email: e.target.value })} required autoComplete="email" /></label>
-        {mode !== 'forgot' && <label className="label">Mot de passe<input className="field" type="password" value={f.password} onChange={e => setF({ ...f, password: e.target.value })} required minLength={mode === 'register' ? 10 : 1} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} /></label>}
+        <label className="label">{mode === 'login' ? 'E-mail ou identifiant' : 'E-mail'}<input className="field" type={mode === 'login' ? 'text' : 'email'} inputMode="email" autoCapitalize="off" value={f.email} onChange={e => setF({ ...f, email: e.target.value })} required autoComplete="email" readOnly={!!access && mode === 'register'} /></label>
+        {mode !== 'forgot' && <label className="label">Mot de passe{mode === 'register' && <span className="small muted"> (10 caractères minimum, pas un mot courant)</span>}<input className="field" type="password" value={f.password} onChange={e => setF({ ...f, password: e.target.value })} required minLength={mode === 'register' ? 10 : 1} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} /></label>}
         {sent && <div className="b-callout small">{sent}</div>}
         {err && <div className="err" role="alert">{err}</div>}
         <button className="btn pri" disabled={busy}>{mode === 'login' ? 'Se connecter' : mode === 'forgot' ? 'Recevoir un lien' : 'Créer mon compte'}</button>
         {mode === 'login' && <button type="button" className="link" onClick={() => { setMode('forgot'); setErr('') }}>Mot de passe oublié ?</button>}
-        <button type="button" className="link" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setSent('') }}>
-          {mode === 'login' ? 'Pas encore de compte ? Créer un compte' : "J'ai déjà un compte"}
-        </button>
-      </form>
+        {mode === 'login' && !invite && !access
+          ? <a className="link" href="/inscription">Pas encore de compte ? Rejoindre la liste d’attente</a>
+          : <button type="button" className="link" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setSent('') }}>
+            {mode === 'login' ? 'Pas encore de compte ? Créer un compte' : "J'ai déjà un compte"}
+          </button>}
+      </form>}
+      {!invite && <a href="/" className="small" style={{ color: 'rgba(255,255,255,.6)', marginTop: 16, display: 'inline-block' }}>← Retour au site</a>}
     </div>
   )
 }
@@ -155,4 +173,14 @@ export function Welcome() {
       </div>
     </div>
   )
+}
+
+/** /inscription : avec un lien d'accès validé → création du compte ; sinon → demande de liste d'attente. */
+export function Signup() {
+  const token = new URLSearchParams(location.search).get('acces')
+  const [state, setState] = useState<{ email: string; name: string } | null | 'bad'>(null)
+  useEffect(() => { if (token) api.get(`/api/waitlist/access?token=${encodeURIComponent(token)}`).then(setState).catch(() => setState('bad')) }, [token])
+  if (token && state && state !== 'bad') return <Login initial="register" access={{ token, ...state }} />
+  if (token && state === null) return <div className="auth" />
+  return <WaitlistPage invalid={state === 'bad'} />
 }
