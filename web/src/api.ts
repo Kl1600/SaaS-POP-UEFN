@@ -8,12 +8,16 @@ export class ApiError extends Error {
 }
 
 async function req<T>(method: string, url: string, body?: unknown): Promise<T> {
-  const res = await fetch(url, {
+  let res: Response
+  try { res = await fetch(url, {
     method,
     credentials: 'same-origin',
     headers: { 'x-pop': '1', ...(body !== undefined ? { 'content-type': 'application/json' } : {}) },
     body: body !== undefined ? JSON.stringify(body) : undefined,
-  })
+  }) } catch {
+    // « Load failed » (Safari) / « Failed to fetch » (Chrome) : le serveur POP ne répond pas.
+    throw new ApiError(0, 'Le serveur POP ne répond pas. Vérifiez qu’il tourne toujours dans le terminal (./start.sh), puis réessayez.')
+  }
   const text = await res.text()
   let data: any = null
   try { data = text ? JSON.parse(text) : null } catch { data = text }

@@ -433,12 +433,26 @@ pub async fn island(State(st): State<AppState>, u: AuthUser, Path(code): Path<St
     let meta = match meta {
         Some(m) => m,
         None => {
-            // Île jamais vue : on la récupère tout de suite.
-            let (status, v) = get_json(&st, &format!("{}/islands/{code}", base())).await.map_err(|e| AppError::Conflict(format!("API Fortnite injoignable : {e}")))?;
-            if status != 200 { return Err(AppError::Conflict("Île introuvable dans l’API Fortnite (elle doit être publique et découvrable).".into())) }
-            upsert_island(&st, &v, false).await?;
-            let _ = fetch_metrics(&st, &code).await;
-            sqlx::query_as("SELECT code, title, creator, category, tags FROM fn_islands WHERE code = ?").bind(&code).fetch_one(&st.db).await?
+            // Île jamais vue : on la récupère tout de suite. Si Epic ne la connaît pas, on le dit sans planter.
+            let reason = match get_json(&st, &format!("{}/islands/{code}", base())).await {
+                Ok((200, v)) => {
+                    let mut v = v;
+                    if v["code"].as_str().is_none() { v["code"] = json!(code) }
+                    upsert_island(&st, &v, false).await?;
+                    let _ = fetch_metrics(&st, &code).await;
+                    None
+                }
+                Ok((404, _)) => Some("Cette île n’est pas dans l’API publique d’Epic : elle est privée, non découvrable, retirée, ou le code cité dans la vidéo est faux.".to_string()),
+                Ok((429, _)) => Some("L’API Fortnite limite les requêtes en ce moment : réessayez dans une minute.".to_string()),
+                Ok((s, _)) => Some(format!("L’API Fortnite a répondu une erreur (HTTP {s}).")),
+                Err(e) => Some(format!("API Fortnite injoignable : {e}")),
+            };
+            let row: Option<(String, String, String, String, String)> = sqlx::query_as("SELECT code, title, creator, category, tags FROM fn_islands WHERE code = ?").bind(&code).fetch_optional(&st.db).await?;
+            match row {
+                Some(r) => r,
+                None => return Ok(Json(json!({ "code": code, "title": "", "creator": "", "tags": [], "series": [], "watched": false,
+                    "unavailable": reason.unwrap_or_else(|| "Île introuvable dans l’API Fortnite.".into()) }))),
+            }
         }
     };
     let series: Vec<(String, Option<i64>, Option<i64>, Option<i64>, Option<i64>, Option<f64>, Option<i64>, Option<i64>, Option<f64>, Option<f64>)> = sqlx::query_as(

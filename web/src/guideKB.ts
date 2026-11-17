@@ -42,6 +42,7 @@ export const KB: Fiche[] = [
   { id: 'verse-send', q: 'Comment envoyer mon code Verse à UEFN ?', k: 'verse code envoyer compiler sauvegarder ctrl s erreur compilation editeur', a: 'Dans l’Éditeur Verse, Ctrl+S (Cmd+S sur Mac) envoie le fichier à UEFN : écriture, compilation, et les erreurs s’affichent à la bonne ligne.', go: ['/verse', 'Ouvrir l’Éditeur Verse'], pages: ['/verse'] },
   { id: 'verse-help', q: 'Comment comprendre ou corriger une erreur Verse ?', k: 'erreur verse corriger comprendre expliquer bug assistant relire', a: 'L’assistant de l’Éditeur Verse explique, relit et corrige votre code sans service externe. Sélectionnez le code ou l’erreur et demandez une explication ou une correction.', go: ['/verse', 'Ouvrir l’Éditeur Verse'], pages: ['/verse'] },
   { id: 'organizer', q: 'Comment organiser les acteurs de ma map ?', k: 'organiser acteur device dossier renommer deplacer tag outliner organiseur filtrer chercher', a: 'L’Organiseur liste les acteurs de la map. Recherchez avec « tag:x type:x dossier:x », sélectionnez-en plusieurs (Ctrl/Maj) puis renommez, déplacez, dupliquez ou masquez. Ctrl+Z annule votre dernière action.', go: ['/organiseur', 'Ouvrir l’Organiseur'], pages: ['/organiseur'] },
+  { id: 'ai-tasks', q: 'Comment laisser mes IA gérer les tâches (créer, commencer, fermer) ?', k: 'ia ias intelligence artificielle claude cursor codex agent automatique gerer creer fermer terminer cloturer finir tache taches statut automatiquement mcp', a: 'Une fois connectée dans IA connectées avec les modifications autorisées, votre IA dispose d’outils pour les tâches : list_tasks, next_task, create_task, set_task_status (à faire, en cours, bloquée, faite) et comment_task. Chaque action est notée « IA » dans l’historique de la tâche.', steps: ['Ouvrez IA connectées et connectez votre outil (Claude Code, Cursor, Codex…).', 'Laissez « Autoriser les modifications » activé : en lecture seule, l’IA peut seulement lire les tâches.', 'Demandez-lui par exemple : « Prends la tâche suivante avec next_task, passe-la en cours, et marque-la faite avec une note quand tu as fini. »', 'Une tâche qui attend d’autres tâches ne peut pas passer en cours : l’IA reçoit un message qui explique pourquoi.'], go: ['/ia', 'Ouvrir IA connectées'], pages: ['/ia', '/taches'] },
   { id: 'ai-connect', q: 'Comment connecter Claude, Cursor ou une autre IA ?', k: 'connecter ia claude cursor codex windsurf gemini chatgpt mcp jeton token assistant code', a: 'Dans IA connectées, choisissez votre outil : POP crée un jeton et affiche la configuration à copier. Vous pouvez en connecter plusieurs, en lecture seule ou en écriture.', go: ['/ia', 'Ouvrir IA connectées'], pages: ['/ia'] },
   // ----- Analyse -----
   { id: 'market', q: 'Comment lire l’analyse du marché ?', k: 'analyse marche genre opportunite sature niche dispute verdict comprendre lire chiffre', a: 'Chaque genre a un verdict (bonne opportunité, disputé, dominé, saturé, niche) et le nombre de joueurs pour une map typique. Cliquez sur un genre pour le détail et un conseil.', go: ['/analyse/marche', 'Ouvrir l’analyse'], pages: ['/analyse/marche'] },
@@ -67,7 +68,7 @@ export const KB: Fiche[] = [
 
 const STOP = new Set('a au aux avec ce ces cette comment de des du en est et faire fait je j la le les leur ma me mes moi mon ne on ou par pas peut peux pour quand que quel quelle quels qui sa se ses son sur ta te tes ton tu un une vos votre vous y il elle dans d l qu c s n t m est-ce ca cela svp stp merci bonjour salut hey aide aider besoin veux voudrais faut dois peut-on possible'.split(' '))
 export const fold = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/œ/g, 'oe').replace(/[^a-z0-9@+ ]+/g, ' ')
-const stem = (w: string) => w.length > 4 ? w.replace(/(ements|ement|ations|ation|euses|euse|eurs|eur|ees|ee|es|er|ez|s|x|e)$/, '') : w
+const stem = (w: string) => w.length > 4 ? w.replace(/(ements|ement|ations|ation|euses|euse|eurs|eur|ees|ee|es|er|ez|s|x|e)$/, '') : w.length > 2 ? w.replace(/s$/, '') : w
 const words = (s: string) => fold(s).split(/\s+/).filter(w => w && !STOP.has(w)).map(stem)
 function near(a: string, b: string) {
   if (a === b) return true
@@ -79,6 +80,10 @@ function near(a: string, b: string) {
   return d + (a.length - i) + (b.length - j) <= 1
 }
 const index = KB.map(f => ({ f, kw: [...new Set(words(f.k + ' ' + f.q))] }))
+// Poids des mots : un mot présent dans peu de fiches (« ia », « discord ») compte plus qu'un mot courant (« tâche », « créer »).
+const df = new Map<string, number>()
+index.forEach(x => x.kw.forEach(w => df.set(w, (df.get(w) ?? 0) + 1)))
+const idf = (w: string) => 1 + Math.log(index.length / (df.get(w) ?? 1))
 
 /** Les fiches qui répondent le mieux à la question (score décroissant). */
 export function ask(question: string, page = ''): { f: Fiche; score: number }[] {
@@ -86,10 +91,13 @@ export function ask(question: string, page = ''): { f: Fiche; score: number }[] 
   if (!qs.length) return []
   return index.map(({ f, kw }) => {
     let s = 0
-    for (const w of qs) { if (kw.includes(w)) s += 3; else if (kw.some(k => near(w, k))) s += 2 }
+    for (const w of qs) {
+      if (kw.includes(w)) s += 1.6 * idf(w)
+      else { const k = kw.find(k => near(w, k)); if (k) s += 1.1 * idf(k) }
+    }
     if (s && f.pages?.some(p => page === p || (p !== '/' && page.startsWith(p)))) s += 1.5
     return { f, score: s / Math.sqrt(qs.length + 1) }
-  }).filter(x => x.score >= 1.2).sort((a, b) => b.score - a.score)
+  }).filter(x => x.score >= 1.6).sort((a, b) => b.score - a.score)
 }
 /** Questions proposées selon la page ouverte. */
 export function suggested(page: string): Fiche[] {

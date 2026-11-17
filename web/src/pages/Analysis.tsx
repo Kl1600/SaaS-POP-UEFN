@@ -38,8 +38,10 @@ export function IslandDrawer({ code, onClose }: { code: string; onClose: () => v
     <div className="scrim" onClick={onClose} />
     <aside className="drawer" aria-label="Fiche de l’île">
       <div className="row" style={{ justifyContent: 'space-between' }}><h2 style={{ margin: 0, fontWeight: 500, fontSize: 20 }}>{data?.title || code}</h2><button className="iconbtn" aria-label="Fermer" onClick={onClose}><X size={18} /></button></div>
-      {error && <p className="err">{String(error)}</p>}
-      {data && <>
+      {error && <p className="err">{String((error as any)?.message ?? error)}</p>}
+      {data?.unavailable && <><p className="small muted mono" style={{ margin: '6px 0 12px' }}>{code}</p><div className="b-callout" style={{ lineHeight: 1.5 }}>{data.unavailable}</div>
+        <div className="row" style={{ marginTop: 12 }}><a className="btn" href={`https://fortnite.gg/island?code=${code}`} target="_blank" rel="noreferrer"><ExternalLink size={16} />Chercher sur fortnite.gg</a></div></>}
+      {data && !data.unavailable && <>
         <p className="small muted" style={{ margin: '6px 0 12px' }}><span className="mono">{code}</span>{data.creator && ` · ${data.creator}`}</p>
         <div className="row" style={{ flexWrap: 'wrap', gap: 6 }}>{(data.tags ?? []).map((t: string) => <span key={t} className="chip" style={{ height: 26 }}>{t}</span>)}</div>
         <div className="row" style={{ margin: '14px 0', flexWrap: 'wrap' }}>

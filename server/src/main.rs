@@ -277,6 +277,10 @@ async fn main() -> anyhow::Result<()> {
         .fallback_service(spa)
         .layer(middleware::from_fn(csrf))
         .layer(RequestBodyLimitLayer::new(16 * 1024 * 1024))
+        .layer(tower_http::catch_panic::CatchPanicLayer::custom(|_| {
+            tracing::error!("erreur interne (panic) pendant une requête");
+            (axum::http::StatusCode::INTERNAL_SERVER_ERROR, [(axum::http::header::CONTENT_TYPE, "application/json")], r#"{"error":"Erreur interne du serveur POP. Réessayez ; si ça continue, regardez le terminal."}"#).into_response()
+        }))
         .with_state(st);
     let port: u16 = std::env::var("PORT").ok().and_then(|p| p.parse().ok()).unwrap_or(8080);
     // 127.0.0.1 par défaut ; POP_BIND=0.0.0.0 pour le réseau local ou un hébergement.
