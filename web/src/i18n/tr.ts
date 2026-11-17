@@ -4,20 +4,19 @@ const tr: Dict = {
   nav: { features: 'Özellikler', pricing: 'Fiyatlar', faq: 'SSS', login: 'Giriş yap', join: 'Betaya katıl', home: 'POP, ana sayfa', lang: 'Dil', search: 'Ülke ara' },
   hero: {
     announce: 'Kapalı beta UEFN üreticilerine açık', h1a: 'UEFN’de üret.', h1b: 'Tek başına ya da ekiple, kaos olmadan.',
-    subA: 'POP, UEFN üreticilerine fikirden çıkışa kadar yardım eden SaaS’tır: ', subB: 'bir saatlik görevler', subC: ', UEFN’e bağlı Verse, beyaz tahta, pazar analizi ve gelir paylaşımı.',
+    subA: 'POP, UEFN üreticilerine fikirden çıkışa kadar yardım eden SaaS’tır: ', subB: 'bir saatlik görevler', subC: ', beyaz tahta, UEFN’e bağlı Düzenleyici, bağlı yapay zekâlar, pazar analizi ve gelir paylaşımı.',
     cta: 'Bekleme listesine katıl', see: 'Özellikleri gör', micro1: 'Kapalı beta', micro2: 'Bekleme listesiyle erişim', micro3: 'UEFN’e bağlı',
   },
   marquee: { label: 'Araçlarınızla çalışır', epic: 'Epic’in Fortnite API’si' },
   pain: {
-    eyebrow: 'Sorun', h2a: 'Discord, Google Docs, .txt içinde Verse…', h2b: 've harita ilerlemiyor.', without: 'POP olmadan', with: 'POP ile',
-    bad: ['“Spawner’a kim dokundu?”', 'Verse Discord’da .txt olarak dolaşıyor', 'Google Doc’ta bir görev listesi', 'Gelir tablosu, sürüm 7', '“Ne zaman çıkıyorduk?”', 'Türün işe yarayıp yaramadığını bilmeden inşa etmek'],
-    good: ['Her işlem kaydedilir ve geri alınabilir', 'Ctrl+S Verse’ü UEFN’e gönderir', 'Bağımlılıklarıyla bir saatlik görevler', 'Herkes için net bir döküm', 'Kilometre taşları ve gecikmeler otomatik izlenir', 'Gerçek rakamlarla tür başına karar'],
+    eyebrow: 'Sorun', h2a: 'Discord, Google Docs, her yerde dosyalar…', h2b: 've harita ilerlemiyor.', without: 'POP olmadan', with: 'POP ile',
+    bad: ['“Spawner’a kim dokundu?”', 'Fikirler Discord’da kayboluyor', 'Google Doc’ta bir görev listesi', 'Gelir tablosu, sürüm 7', '“Ne zaman çıkıyorduk?”', 'Türün işe yarayıp yaramadığını bilmeden inşa etmek'],
+    good: ['Her işlem kaydedilir ve geri alınabilir', 'Tahtadaki fikirler göreve dönüşür', 'Bağımlılıklarıyla bir saatlik görevler', 'Herkes için net bir döküm', 'Kilometre taşları ve gecikmeler otomatik izlenir', 'Gerçek rakamlarla tür başına karar'],
   },
   feat: {
     eyebrow: 'Özellikler', h2: 'Fikirden çıkış gününe kadar UEFN’de üretmek için her şey.', p: 'Burada gördükleriniz POP’un gerçek ekranlarının sadeleştirilmiş hâli.',
     items: [
       { tag: 'Görevler ve planlama', h: 'Bir saatlik görevler. Tutan bir plan.', p: 'Oluşturucu haritayı bağımlılıklarıyla bir saatlik görevlere böler. Plan kilometre taşlarını izler ve gecikmeleri bildirir; yerleşik bir asistan günü özetler.', pts: ['Kanban ve bağımlılıklar', 'Kilometre taşı ve gecikme takibi', 'Günün özeti'] },
-      { tag: 'Verse editörü', h: 'Ctrl+S ve UEFN’de.', p: 'Verse POP’ta yazılır ve doğrudan projenize gider: derleme, doğru satırda hatalar, test oturumu. Asistan harici hizmet olmadan açıklar ve düzeltir.', pts: ['UEFN’de derleme', 'Satırda hatalar', 'Önerilen düzeltmeler'] },
       { tag: 'Düzenleyici', h: 'Tüm cihazlarınız. Üç saniyede düzenli.', p: 'Etiket, tür veya klasöre göre arayın, yirmisini seçin ve tek seferde yeniden adlandırın, taşıyın ya da çoğaltın. Ctrl+Z geri alır. UEFN kapalıysa değişiklikler bekler.', pts: ['tag:, type:, klasör: ile arama', 'Toplu düzenleme', 'Her şey geri alınabilir'] },
       { tag: 'Beyaz tahta', h: 'Haritayı birlikte çizin.', p: 'Yapışkan notlar, şekiller, oklar, renkler, kalın, altı çizili: fikirleri yerleştirmek için her şey. Oylayın, en iyi notları göreve dönüştürün.', pts: ['Tam biçimlendirme', 'Gerçek zamanlı ortak çalışma', 'Notlar → görevler'] },
       { tag: 'Analiz', h: 'İnşa etmeden önce neyi inşa edeceğinizi bilin.', p: 'Hangi türler oyuncu çekiyor, nerede boşluk var, hangi haritalar çıkışta uçuyor ve videoda ne trend. Epic’in resmî API’sinden rakamlar.', pts: ['Tür başına karar', 'İşe yarayan haritalar', 'TikTok ve Shorts trendleri'] },
@@ -34,7 +33,7 @@ const tr: Dict = {
       { name: 'Studio', tag: 'En kapsamlı', desc: 'Ekip olarak harita çıkaran stüdyolar için.', cta: 'Listeye katıl' },
       { name: 'Studio+', tag: 'Yakında', desc: 'Studio’daki her şey artı POP Forge: UEFN içinde inşa eden masaüstü uygulaması.', cta: 'Listeye katıl' },
     ],
-    rows: ['Organizasyon', 'Bir saatlik görevler, Kanban, bağımlılıklar', 'Yerleşik asistan (günün özeti, gecikmeler)', 'Sayfalar, beyaz tahta, planlama ve kilometre taşları', 'Haritalar', 'Üyeler', 'UEFN', 'UEFN Link: senkronize projeler', 'Bağlı Verse editörü (derleme, satırda hatalar)', 'Aktör düzenleyici ve toplu düzenleme', 'Bağlı yapay zekâlar (Claude, Cursor, Codex…)', 'POP Forge: UEFN’de destekli inşa', 'Büyüme', 'Pazar analizi ve işe yarayan haritalar', 'TikTok ve YouTube Shorts video trendleri', 'Playtest takası ve çıkış günü', 'Gelir paylaşımı ve dökümler', 'Discord, GitHub, Lore'],
+    rows: ['Organizasyon', 'Bir saatlik görevler, Kanban, bağımlılıklar', 'Yerleşik asistan (günün özeti, gecikmeler)', 'Sayfalar, beyaz tahta, planlama ve kilometre taşları', 'Haritalar', 'Üyeler', 'UEFN', 'UEFN Link: senkronize projeler', 'Aktör düzenleyici ve toplu düzenleme', 'Bağlı yapay zekâlar (Claude, Cursor, Codex…)', 'POP Forge: UEFN’de destekli inşa', 'Büyüme', 'Pazar analizi ve işe yarayan haritalar', 'TikTok ve YouTube Shorts video trendleri', 'Playtest takası ve çıkış günü', 'Gelir paylaşımı ve dökümler', 'Discord, GitHub, Lore'],
   },
   faq: {
     eyebrow: 'SSS', h2: 'Bize sorulan sorular.',
@@ -51,7 +50,7 @@ const tr: Dict = {
   final: { h2a: 'Bir sonraki haritanız', h2b: 'burada başlıyor.', p: 'Bekleme listesine katılın: bir yer açılır açılmaz erişiminizi gönderelim.' },
   foot: { made: 'Fortnite üreticileri tarafından, Fortnite üreticileri için yapıldı.', legal: 'Fortnite ve UEFN, Epic Games’in ticari markalarıdır. POP, Epic Games ile bağlantılı değildir ve onun tarafından onaylanmamıştır.', product: 'Ürün', help: 'Yardım', account: 'Hesap' },
   mock: {
-    overview: 'Genel bakış', nav: ['Genel bakış', 'Sayfalar', 'Beyaz tahta', 'Görevler', 'Verse editörü', 'Düzenleyici', 'Pazar'],
+    overview: 'Genel bakış', nav: ['Genel bakış', 'Sayfalar', 'Beyaz tahta', 'Görevler', 'Düzenleyici', 'Pazar'],
     hello: 'Merhaba Léa, #42 ile başlamanızı öneririm.', late: '2 görev gecikmede (en eskisi 12 Kasım’a planlanmıştı).', mile: '“Beta” kilometre taşına 5 gün: 9 görev kaldı, beklenen gecikme 1 gün.',
     take: 'Al', start: 'Başla', unlocks: '3 görevin önünü açar', today: 'bugün teslim', waits: '#42’yi bekliyor',
     todo: 'Yapılacak', doing: 'Sürüyor', done: 'Bitti', tasks: ['Puan sistemi', 'Bölge 2 dekoru', 'Bitiş ekranı', 'İç playtest', 'Oyuncu spawn’ı', 'Fırtına'],

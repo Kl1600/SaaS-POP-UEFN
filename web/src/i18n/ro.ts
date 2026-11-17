@@ -4,20 +4,19 @@ const ro: Dict = {
   nav: { features: 'Funcționalități', pricing: 'Prețuri', faq: 'Întrebări', login: 'Conectare', join: 'Intră în beta', home: 'POP, acasă', lang: 'Limbă', search: 'Caută o țară' },
   hero: {
     announce: 'Beta privată deschisă creatorilor UEFN', h1a: 'Creează în UEFN.', h1b: 'Singur sau în echipă, fără haos.',
-    subA: 'POP este SaaS-ul care îi ajută pe creatorii UEFN de la idee la lansare: ', subB: 'sarcini de o oră', subC: ', Verse legat de UEFN, tablă albă, analiza pieței și împărțirea câștigurilor.',
+    subA: 'POP este SaaS-ul care îi ajută pe creatorii UEFN de la idee la lansare: ', subB: 'sarcini de o oră', subC: ', tablă albă, Organizator legat de UEFN, IA conectate, analiza pieței și împărțirea câștigurilor.',
     cta: 'Intră pe lista de așteptare', see: 'Vezi funcționalitățile', micro1: 'Beta privată', micro2: 'Acces pe lista de așteptare', micro3: 'Legat de UEFN',
   },
   marquee: { label: 'Funcționează cu instrumentele tale', epic: 'API-ul Fortnite de la Epic' },
   pain: {
-    eyebrow: 'Problema', h2a: 'Discord, Google Docs, Verse în .txt…', h2b: 'iar harta nu avansează.', without: 'Fără POP', with: 'Cu POP',
-    bad: ['„Cine s-a atins de spawner?”', 'Verse-ul circulă pe Discord în .txt', 'O listă de sarcini într-un Google Doc', 'Tabelul câștigurilor, versiunea 7', '„Deci când lansăm?”', 'Construim fără să știm dacă genul merge'],
-    good: ['Fiecare acțiune e înregistrată și reversibilă', 'Ctrl+S trimite Verse-ul în UEFN', 'Sarcini de o oră, cu dependențe', 'Un extras clar pentru fiecare', 'Etape și întârzieri urmărite automat', 'Un verdict pe gen, cu cifre reale'],
+    eyebrow: 'Problema', h2a: 'Discord, Google Docs, fișiere peste tot…', h2b: 'iar harta nu avansează.', without: 'Fără POP', with: 'Cu POP',
+    bad: ['„Cine s-a atins de spawner?”', 'Ideile se pierd pe Discord', 'O listă de sarcini într-un Google Doc', 'Tabelul câștigurilor, versiunea 7', '„Deci când lansăm?”', 'Construim fără să știm dacă genul merge'],
+    good: ['Fiecare acțiune e înregistrată și reversibilă', 'Ideile de pe tablă devin sarcini', 'Sarcini de o oră, cu dependențe', 'Un extras clar pentru fiecare', 'Etape și întârzieri urmărite automat', 'Un verdict pe gen, cu cifre reale'],
   },
   feat: {
     eyebrow: 'Funcționalități', h2: 'Tot ce trebuie ca să creezi în UEFN, de la idee la ziua lansării.', p: 'Ce vezi aici sunt ecranele reale din POP, simplificate.',
     items: [
       { tag: 'Sarcini și planificare', h: 'Sarcini de o oră. O planificare care ține.', p: 'Generatorul împarte harta în sarcini de o oră, cu dependențele lor. Planificarea urmărește etapele și semnalează întârzierile, iar un asistent integrat rezumă ziua.', pts: ['Kanban și dependențe', 'Etape și întârzieri urmărite', 'Rezumatul zilei'] },
-      { tag: 'Editor Verse', h: 'Ctrl+S și e deja în UEFN.', p: 'Verse-ul se scrie în POP și ajunge direct în proiect: compilare, erori la linia corectă, sesiune de test. Asistentul explică și corectează, fără serviciu extern.', pts: ['Compilare în UEFN', 'Erori la linie', 'Corecturi propuse'] },
       { tag: 'Organizator', h: 'Toate dispozitivele. Ordonate în trei secunde.', p: 'Caută după tag, tip sau dosar, selectează douăzeci și redenumește, mută sau duplică dintr-odată. Ctrl+Z anulează. Dacă UEFN e închis, modificările așteaptă.', pts: ['Căutare tag:, type:, dosar:', 'Modificări în masă', 'Totul e reversibil'] },
       { tag: 'Tablă albă', h: 'Desenați harta împreună.', p: 'Notițe, forme, săgeți, culori, aldin, subliniat: tot ce trebuie pentru idei. Votați, apoi transformați cele mai bune notițe în sarcini.', pts: ['Formatare completă', 'Colaborare în timp real', 'Notițe → sarcini'] },
       { tag: 'Analiză', h: 'Află ce să construiești înainte să construiești.', p: 'Ce genuri atrag jucători, unde e loc liber, ce hărți decolează de la lansare și ce e în trend pe video. Cifre din API-ul oficial Epic.', pts: ['Verdict pe gen', 'Hărți care merg', 'Trenduri TikTok și Shorts'] },
@@ -34,7 +33,7 @@ const ro: Dict = {
       { name: 'Studio', tag: 'Cel mai complet', desc: 'Pentru studiourile care lansează hărți în echipă.', cta: 'Intră pe listă' },
       { name: 'Studio+', tag: 'În curând', desc: 'Tot din Studio, plus POP Forge: aplicația desktop care construiește în UEFN.', cta: 'Intră pe listă' },
     ],
-    rows: ['Organizare', 'Sarcini de o oră, Kanban, dependențe', 'Asistent integrat (rezumatul zilei, întârzieri)', 'Pagini, tablă albă, planificare și etape', 'Hărți', 'Membri', 'UEFN', 'UEFN Link: proiecte sincronizate', 'Editor Verse legat (compilare, erori la linie)', 'Organizator de actori și modificări în masă', 'IA conectate (Claude, Cursor, Codex…)', 'POP Forge: construcție asistată în UEFN', 'Creștere', 'Analiza pieței și hărți care merg', 'Trenduri video TikTok și YouTube Shorts', 'Schimb de playtesturi și ziua lansării', 'Împărțirea câștigurilor și extrase', 'Discord, GitHub, Lore'],
+    rows: ['Organizare', 'Sarcini de o oră, Kanban, dependențe', 'Asistent integrat (rezumatul zilei, întârzieri)', 'Pagini, tablă albă, planificare și etape', 'Hărți', 'Membri', 'UEFN', 'UEFN Link: proiecte sincronizate', 'Organizator de actori și modificări în masă', 'IA conectate (Claude, Cursor, Codex…)', 'POP Forge: construcție asistată în UEFN', 'Creștere', 'Analiza pieței și hărți care merg', 'Trenduri video TikTok și YouTube Shorts', 'Schimb de playtesturi și ziua lansării', 'Împărțirea câștigurilor și extrase', 'Discord, GitHub, Lore'],
   },
   faq: {
     eyebrow: 'Întrebări', h2: 'Întrebările pe care le primim.',
@@ -51,7 +50,7 @@ const ro: Dict = {
   final: { h2a: 'Următoarea ta hartă', h2b: 'începe aici.', p: 'Intră pe lista de așteptare: îți trimitem accesul imediat ce se eliberează un loc.' },
   foot: { made: 'Făcut de creatori Fortnite, pentru creatori Fortnite.', legal: 'Fortnite și UEFN sunt mărci comerciale ale Epic Games. POP nu este afiliat cu Epic Games și nici aprobat de aceasta.', product: 'Produs', help: 'Ajutor', account: 'Cont' },
   mock: {
-    overview: 'Prezentare', nav: ['Prezentare', 'Pagini', 'Tablă albă', 'Sarcini', 'Editor Verse', 'Organizator', 'Piață'],
+    overview: 'Prezentare', nav: ['Prezentare', 'Pagini', 'Tablă albă', 'Sarcini', 'Organizator', 'Piață'],
     hello: 'Bună, Léa, îți propun să începi cu #42.', late: '2 sarcini întârziate (cea mai veche era pe 12 nov.).', mile: 'Etapa „Beta” în 5 zile: mai sunt 9 sarcini, întârziere estimată de 1 zi.',
     take: 'Preia', start: 'Începe', unlocks: 'deblochează alte 3 sarcini', today: 'termen azi', waits: 'așteaptă #42',
     todo: 'De făcut', doing: 'În lucru', done: 'Gata', tasks: ['Sistem de scor', 'Decor zona 2', 'Ecran final', 'Playtest intern', 'Spawn jucători', 'Furtuna'],

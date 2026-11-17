@@ -4,20 +4,19 @@ const cs: Dict = {
   nav: { features: 'Funkce', pricing: 'Ceník', faq: 'Otázky', login: 'Přihlásit se', join: 'Do bety', home: 'POP, domů', lang: 'Jazyk', search: 'Hledat zemi' },
   hero: {
     announce: 'Uzavřená beta otevřená tvůrcům v UEFN', h1a: 'Tvořte v UEFN.', h1b: 'Sami nebo v týmu, bez chaosu.',
-    subA: 'POP je SaaS, který pomáhá tvůrcům v UEFN od nápadu po vydání: ', subB: 'hodinové úkoly', subC: ', Verse propojený s UEFN, tabule, analýza trhu a dělení výdělků.',
+    subA: 'POP je SaaS, který pomáhá tvůrcům v UEFN od nápadu po vydání: ', subB: 'hodinové úkoly', subC: ', tabule, organizér propojený s UEFN, připojené AI, analýza trhu a dělení výdělků.',
     cta: 'Zapsat se na čekací listinu', see: 'Zobrazit funkce', micro1: 'Uzavřená beta', micro2: 'Přístup přes čekací listinu', micro3: 'Propojeno s UEFN',
   },
   marquee: { label: 'Funguje s vašimi nástroji', epic: 'Fortnite API od Epicu' },
   pain: {
-    eyebrow: 'Problém', h2a: 'Discord, Google Docs, Verse v .txt…', h2b: 'a mapa se nehýbe.', without: 'Bez POP', with: 'S POP',
-    bad: ['„Kdo sahal na spawner?“', 'Verse koluje po Discordu jako .txt', 'Seznam úkolů v Google Docu', 'Tabulka výdělků, verze 7', '„Tak kdy to vlastně vydáme?“', 'Stavíme, aniž víme, jestli žánr funguje'],
-    good: ['Každá akce je zaznamenaná a vratná', 'Ctrl+S pošle Verse do UEFN', 'Hodinové úkoly se závislostmi', 'Přehledný výpis pro každého', 'Milníky a zpoždění se sledují automaticky', 'Verdikt pro každý žánr podle skutečných čísel'],
+    eyebrow: 'Problém', h2a: 'Discord, Google Docs, soubory všude…', h2b: 'a mapa se nehýbe.', without: 'Bez POP', with: 'S POP',
+    bad: ['„Kdo sahal na spawner?“', 'Nápady se ztrácejí na Discordu', 'Seznam úkolů v Google Docu', 'Tabulka výdělků, verze 7', '„Tak kdy to vlastně vydáme?“', 'Stavíme, aniž víme, jestli žánr funguje'],
+    good: ['Každá akce je zaznamenaná a vratná', 'Nápady z tabule se mění v úkoly', 'Hodinové úkoly se závislostmi', 'Přehledný výpis pro každého', 'Milníky a zpoždění se sledují automaticky', 'Verdikt pro každý žánr podle skutečných čísel'],
   },
   feat: {
     eyebrow: 'Funkce', h2: 'Vše pro tvorbu v UEFN, od nápadu po den vydání.', p: 'To, co tu vidíte, jsou skutečné obrazovky POP, jen zjednodušené.',
     items: [
       { tag: 'Úkoly a plánování', h: 'Hodinové úkoly. Plán, který platí.', p: 'Generátor rozdělí mapu na hodinové úkoly i se závislostmi. Plán sleduje milníky a upozorní na zpoždění a vestavěný asistent shrne den.', pts: ['Kanban a závislosti', 'Sledování milníků a zpoždění', 'Shrnutí dne'] },
-      { tag: 'Editor Verse', h: 'Ctrl+S a je to v UEFN.', p: 'Verse píšete v POP a jde rovnou do projektu: kompilace, chyby na správném řádku, testovací relace. Asistent vysvětluje a opravuje bez externí služby.', pts: ['Kompilace v UEFN', 'Chyby na řádku', 'Navržené opravy'] },
       { tag: 'Organizér', h: 'Všechna zařízení. Uklizená za tři vteřiny.', p: 'Hledejte podle tagu, typu nebo složky, vyberte dvacet a přejmenujte, přesuňte nebo duplikujte najednou. Ctrl+Z vrací. Když je UEFN zavřený, změny počkají.', pts: ['Hledání tag:, type:, složka:', 'Hromadné úpravy', 'Vše jde vrátit'] },
       { tag: 'Tabule', h: 'Kreslete mapu společně.', p: 'Lístečky, tvary, šipky, barvy, tučné písmo, podtržení: vše pro rozvržení nápadů. Hlasujte a z nejlepších lístečků udělejte úkoly.', pts: ['Kompletní formátování', 'Spolupráce v reálném čase', 'Lístečky → úkoly'] },
       { tag: 'Analýza', h: 'Vězte, co stavět, dřív než začnete.', p: 'Které žánry přitahují hráče, kde je volné místo, které mapy hned po vydání letí a co frčí ve videích. Čísla z oficiálního API Epicu.', pts: ['Verdikt podle žánru', 'Mapy, které fungují', 'Trendy TikTok a Shorts'] },
@@ -34,7 +33,7 @@ const cs: Dict = {
       { name: 'Studio', tag: 'Nejkompletnější', desc: 'Pro studia, která vydávají mapy v týmu.', cta: 'Zapsat se' },
       { name: 'Studio+', tag: 'Brzy', desc: 'Vše ze Studia plus POP Forge: desktopová aplikace, která staví v UEFN.', cta: 'Zapsat se' },
     ],
-    rows: ['Organizace', 'Hodinové úkoly, Kanban, závislosti', 'Vestavěný asistent (shrnutí dne, zpoždění)', 'Stránky, tabule, plánování a milníky', 'Mapy', 'Členové', 'UEFN', 'UEFN Link: synchronizované projekty', 'Propojený editor Verse (kompilace, chyby na řádku)', 'Organizér aktérů a hromadné úpravy', 'Připojené AI (Claude, Cursor, Codex…)', 'POP Forge: asistované stavění v UEFN', 'Růst', 'Analýza trhu a mapy, které fungují', 'Video trendy TikTok a YouTube Shorts', 'Výměna playtestů a den vydání', 'Dělení výdělků a výpisy', 'Discord, GitHub, Lore'],
+    rows: ['Organizace', 'Hodinové úkoly, Kanban, závislosti', 'Vestavěný asistent (shrnutí dne, zpoždění)', 'Stránky, tabule, plánování a milníky', 'Mapy', 'Členové', 'UEFN', 'UEFN Link: synchronizované projekty', 'Organizér aktérů a hromadné úpravy', 'Připojené AI (Claude, Cursor, Codex…)', 'POP Forge: asistované stavění v UEFN', 'Růst', 'Analýza trhu a mapy, které fungují', 'Video trendy TikTok a YouTube Shorts', 'Výměna playtestů a den vydání', 'Dělení výdělků a výpisy', 'Discord, GitHub, Lore'],
   },
   faq: {
     eyebrow: 'Otázky', h2: 'Na co se nás ptáte.',
@@ -51,7 +50,7 @@ const cs: Dict = {
   final: { h2a: 'Vaše další mapa', h2b: 'začíná tady.', p: 'Zapište se na čekací listinu: přístup pošleme, jakmile se uvolní místo.' },
   foot: { made: 'Vytvořeno tvůrci Fortnite pro tvůrce Fortnite.', legal: 'Fortnite a UEFN jsou ochranné známky společnosti Epic Games. POP není s Epic Games spojen ani jí schválen.', product: 'Produkt', help: 'Nápověda', account: 'Účet' },
   mock: {
-    overview: 'Přehled', nav: ['Přehled', 'Stránky', 'Tabule', 'Úkoly', 'Editor Verse', 'Organizér', 'Trh'],
+    overview: 'Přehled', nav: ['Přehled', 'Stránky', 'Tabule', 'Úkoly', 'Organizér', 'Trh'],
     hello: 'Ahoj Léo, navrhuji začít úkolem #42.', late: '2 úkoly ve zpoždění (nejstarší měl termín 12. 11.).', mile: 'Milník „Beta“ za 5 dní: zbývá 9 úkolů, očekávané zpoždění 1 den.',
     take: 'Vzít', start: 'Začít', unlocks: 'odemkne 3 další úkoly', today: 'termín dnes', waits: 'čeká na #42',
     todo: 'K udělání', doing: 'Rozpracováno', done: 'Hotovo', tasks: ['Systém skóre', 'Dekorace zóny 2', 'Závěrečná obrazovka', 'Interní playtest', 'Spawn hráčů', 'Bouře'],

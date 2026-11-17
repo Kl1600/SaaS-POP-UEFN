@@ -20,7 +20,6 @@ import { Market, TikTok, Trending, Launches } from './pages/Analysis'
 import { tr } from './i18n/t'
 const Landing = lazy(() => import('./pages/Landing'))
 const Admin = lazy(() => import('./pages/Admin'))
-const VerseEditor = lazy(() => import('./pages/VerseEditor'))
 const Organizer = lazy(() => import('./pages/Organizer'))
 const L = (C: any) => <Suspense fallback={<main className="content"><p className="muted" style={{ padding: 28 }}>{tr("Chargement…")}</p></main>}><C /></Suspense>
 
@@ -48,7 +47,6 @@ function Gate() {
         <Route path="lancer" element={<Launch />} />
         <Route path="remunerer" element={<Money />} />
         <Route path="equipe" element={<Team />} />
-        <Route path="verse" element={L(VerseEditor)} />
         <Route path="organiseur" element={L(Organizer)} />
         <Route path="aide" element={<Help />} />
         <Route path="admin" element={L(Admin)} />

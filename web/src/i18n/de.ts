@@ -4,20 +4,19 @@ const de: Dict = {
   nav: { features: 'Funktionen', pricing: 'Preise', faq: 'FAQ', login: 'Anmelden', join: 'Zur Beta', home: 'POP, Startseite', lang: 'Sprache', search: 'Land suchen' },
   hero: {
     announce: 'Private Beta für UEFN-Creator geöffnet', h1a: 'Erschaffe in UEFN.', h1b: 'Allein oder im Team, ohne Chaos.',
-    subA: 'POP ist das SaaS, das UEFN-Creatorn von der Idee bis zum Release hilft: ', subB: 'einstündige Aufgaben', subC: ', mit UEFN verbundenes Verse, Whiteboard, Marktanalyse und Umsatzaufteilung.',
+    subA: 'POP ist das SaaS, das UEFN-Creatorn von der Idee bis zum Release hilft: ', subB: 'einstündige Aufgaben', subC: ', Whiteboard, mit UEFN verbundener Organizer, verbundene KIs, Marktanalyse und Umsatzaufteilung.',
     cta: 'Auf die Warteliste', see: 'Funktionen ansehen', micro1: 'Private Beta', micro2: 'Zugang über Warteliste', micro3: 'Mit UEFN verbunden',
   },
   marquee: { label: 'Funktioniert mit deinen Tools', epic: 'Fortnite-API von Epic' },
   pain: {
-    eyebrow: 'Das Problem', h2a: 'Discord, Google Docs, Verse als .txt…', h2b: 'und die Map kommt nicht voran.', without: 'Ohne POP', with: 'Mit POP',
-    bad: ['„Wer hat den Spawner angefasst?“', 'Verse wird als .txt über Discord verschickt', 'Eine Aufgabenliste in einem Google Doc', 'Die Umsatztabelle, Version 7', '„Wann releasen wir nochmal?“', 'Bauen, ohne zu wissen, ob das Genre läuft'],
-    good: ['Jede Aktion wird protokolliert und ist rückgängig machbar', 'Strg+S schickt das Verse nach UEFN', 'Einstündige Aufgaben mit Abhängigkeiten', 'Eine klare Abrechnung für alle', 'Meilensteine und Verzug werden automatisch verfolgt', 'Ein Urteil pro Genre, mit echten Zahlen'],
+    eyebrow: 'Das Problem', h2a: 'Discord, Google Docs, Dateien überall…', h2b: 'und die Map kommt nicht voran.', without: 'Ohne POP', with: 'Mit POP',
+    bad: ['„Wer hat den Spawner angefasst?“', 'Ideen gehen im Discord verloren', 'Eine Aufgabenliste in einem Google Doc', 'Die Umsatztabelle, Version 7', '„Wann releasen wir nochmal?“', 'Bauen, ohne zu wissen, ob das Genre läuft'],
+    good: ['Jede Aktion wird protokolliert und ist rückgängig machbar', 'Ideen vom Whiteboard werden zu Aufgaben', 'Einstündige Aufgaben mit Abhängigkeiten', 'Eine klare Abrechnung für alle', 'Meilensteine und Verzug werden automatisch verfolgt', 'Ein Urteil pro Genre, mit echten Zahlen'],
   },
   feat: {
     eyebrow: 'Funktionen', h2: 'Alles, um in UEFN zu erschaffen – von der Idee bis zum Release.', p: 'Was du hier siehst, sind die echten Bildschirme von POP, vereinfacht.',
     items: [
       { tag: 'Aufgaben und Planung', h: 'Einstündige Aufgaben. Eine Planung, die hält.', p: 'Der Generator teilt deine Map in einstündige Aufgaben mit Abhängigkeiten. Die Planung verfolgt Meilensteine und meldet Verzug, und ein integrierter Assistent fasst den Tag zusammen.', pts: ['Kanban und Abhängigkeiten', 'Meilensteine und Verzug im Blick', 'Tageszusammenfassung'] },
-      { tag: 'Verse-Editor', h: 'Strg+S, und es ist in UEFN.', p: 'Verse wird in POP geschrieben und landet direkt in deinem Projekt: Kompilierung, Fehler in der richtigen Zeile, Testsitzung. Der Assistent erklärt und korrigiert, ohne externen Dienst.', pts: ['Kompilierung in UEFN', 'Fehler in der Zeile', 'Vorgeschlagene Korrekturen'] },
       { tag: 'Organizer', h: 'Alle deine Geräte. In drei Sekunden sortiert.', p: 'Suche nach Tag, Typ oder Ordner, wähle zwanzig aus und benenne sie um, verschiebe oder dupliziere sie auf einmal. Strg+Z macht rückgängig. Ist UEFN geschlossen, warten die Änderungen.', pts: ['Suche tag:, type:, ordner:', 'Massenbearbeitung', 'Alles rückgängig machbar'] },
       { tag: 'Whiteboard', h: 'Zeichnet die Map gemeinsam.', p: 'Haftnotizen, Formen, Pfeile, Farben, fett, unterstrichen: alles, um Ideen festzuhalten. Stimmt ab und macht aus den besten Notizen Aufgaben.', pts: ['Volle Formatierung', 'Echtzeit im Team', 'Notizen → Aufgaben'] },
       { tag: 'Analyse', h: 'Wisse, was du baust, bevor du baust.', p: 'Welche Genres Spieler anziehen, wo Platz ist, welche Maps zum Release abheben und was im Video gerade angesagt ist. Zahlen aus der offiziellen API von Epic.', pts: ['Urteil pro Genre', 'Maps, die laufen', 'TikTok- und Shorts-Trends'] },
@@ -34,7 +33,7 @@ const de: Dict = {
       { name: 'Studio', tag: 'Am umfassendsten', desc: 'Für Studios, die Maps im Team veröffentlichen.', cta: 'Auf die Liste' },
       { name: 'Studio+', tag: 'Bald', desc: 'Alles aus Studio, plus POP Forge: die Desktop-App, die in UEFN baut.', cta: 'Auf die Liste' },
     ],
-    rows: ['Organisation', 'Einstündige Aufgaben, Kanban, Abhängigkeiten', 'Integrierter Assistent (Tageszusammenfassung, Verzug)', 'Seiten, Whiteboard, Planung und Meilensteine', 'Maps', 'Mitglieder', 'UEFN', 'UEFN Link: synchronisierte Projekte', 'Verbundener Verse-Editor (Kompilierung, Fehler pro Zeile)', 'Actor-Organizer und Massenbearbeitung', 'Verbundene KIs (Claude, Cursor, Codex…)', 'POP Forge: unterstütztes Bauen in UEFN', 'Wachstum', 'Marktanalyse und Maps, die laufen', 'Videotrends TikTok und YouTube Shorts', 'Playtest-Austausch und Release-Tag', 'Umsatzaufteilung und Abrechnungen', 'Discord, GitHub, Lore'],
+    rows: ['Organisation', 'Einstündige Aufgaben, Kanban, Abhängigkeiten', 'Integrierter Assistent (Tageszusammenfassung, Verzug)', 'Seiten, Whiteboard, Planung und Meilensteine', 'Maps', 'Mitglieder', 'UEFN', 'UEFN Link: synchronisierte Projekte', 'Actor-Organizer und Massenbearbeitung', 'Verbundene KIs (Claude, Cursor, Codex…)', 'POP Forge: unterstütztes Bauen in UEFN', 'Wachstum', 'Marktanalyse und Maps, die laufen', 'Videotrends TikTok und YouTube Shorts', 'Playtest-Austausch und Release-Tag', 'Umsatzaufteilung und Abrechnungen', 'Discord, GitHub, Lore'],
   },
   faq: {
     eyebrow: 'FAQ', h2: 'Fragen, die uns gestellt werden.',
@@ -51,7 +50,7 @@ const de: Dict = {
   final: { h2a: 'Deine nächste Map', h2b: 'beginnt hier.', p: 'Trag dich in die Warteliste ein: Wir schicken dir den Zugang, sobald ein Platz frei wird.' },
   foot: { made: 'Von Fortnite-Creatorn für Fortnite-Creator gemacht.', legal: 'Fortnite und UEFN sind Marken von Epic Games. POP ist weder mit Epic Games verbunden noch von Epic Games unterstützt.', product: 'Produkt', help: 'Hilfe', account: 'Konto' },
   mock: {
-    overview: 'Übersicht', nav: ['Übersicht', 'Seiten', 'Whiteboard', 'Aufgaben', 'Verse-Editor', 'Organizer', 'Markt'],
+    overview: 'Übersicht', nav: ['Übersicht', 'Seiten', 'Whiteboard', 'Aufgaben', 'Organizer', 'Markt'],
     hello: 'Hallo Léa, ich schlage vor, mit #42 anzufangen.', late: '2 Aufgaben im Verzug (die älteste war für den 12. Nov. geplant).', mile: 'Meilenstein „Beta“ in 5 Tagen: noch 9 Aufgaben, erwarteter Verzug 1 Tag.',
     take: 'Übernehmen', start: 'Starten', unlocks: 'schaltet 3 andere Aufgaben frei', today: 'heute geplant', waits: 'wartet auf #42',
     todo: 'Offen', doing: 'In Arbeit', done: 'Erledigt', tasks: ['Punktesystem', 'Kulisse Zone 2', 'Endbildschirm', 'Interner Playtest', 'Spieler-Spawn', 'Sturm'],

@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  ArrowRight, Check, ChevronDown, Compass, ListChecks, Code2, Boxes, PenTool, LineChart, Coins, Bot, Minus, Sparkles, AlertTriangle, AlertCircle,
+  ArrowRight, Check, ChevronDown, Compass, ListChecks, Boxes, PenTool, LineChart, Coins, Bot, Minus, Sparkles, AlertTriangle, AlertCircle,
 } from 'lucide-react'
 import '../landing.css'
 import { WaitlistModal } from '../components/Waitlist'
@@ -19,7 +19,7 @@ const PLANS = [
 // U = illimité, S = bientôt ; [] = titre de groupe. Même ordre que pricing.rows.
 const ROWS: (string | boolean)[][] = [
   [], [true, true, true], [true, true, true], [true, true, true], ['1', 'U', 'U'], ['3', 'U', 'U'],
-  [], [true, true, true], [true, true, true], [false, true, true], ['1', 'U', 'U'], [false, false, 'S'],
+  [], [true, true, true], [false, true, true], ['1', 'U', 'U'], [false, false, 'S'],
   [], [true, true, true], [false, true, true], [true, true, true], [false, true, true], [false, true, true],
 ]
 
@@ -66,14 +66,6 @@ function TasksShot({ m }: { m: M }) {
     </div>
   </div></div>
 }
-function VerseShot({ m }: { m: M }) {
-  const L = ['using { /Fortnite.com/Devices }', 'using { /Verse.org/Simulation }', '', 'score_manager := class(creative_device):', '    @editable Bouton : button_device = button_device{}', '    var Points : int = 0', '', '    OnBegin<override>()<suspends> : void =', '        Bouton.InteractedWithEvent.Subscribe(OnClic)', '', '    OnClic(Agent : agent) : void =', '        set Points += 1.5']
-  return <div className="mock code" aria-hidden dir="ltr">
-    <div className="mbar"><i /><i /><i /><span>score_manager.verse · {m.sent}</span></div>
-    <pre>{L.map((l, i) => <div key={i} className={i === 11 ? 'lerr' : ''}><span className="ln">{i + 1}</span>{l || ' '}</div>)}</pre>
-    <div className="cerr"><AlertCircle size={14} /> {m.err} <b>{m.fix}</b></div>
-  </div>
-}
 function OrganizerShot({ m }: { m: M }) {
   const rows = [['Spawn_Rouge_01', 'Player Spawner', m.red], ['Spawn_Rouge_02', 'Player Spawner', m.red], ['Bouton_Score', 'Button', 'Gameplay'], ['Minuteur_Manche', 'Timer', 'Gameplay'], ['Barriere_Zone2', 'Barrier', 'Zone 2']]
   return <div className="mock" aria-hidden><div className="mpad">
@@ -107,11 +99,10 @@ function MoneyShot({ m }: { m: M }) {
 
 const FEATURES = [
   { n: '01', icon: ListChecks, Shot: TasksShot },
-  { n: '02', icon: Code2, Shot: VerseShot },
-  { n: '03', icon: Boxes, Shot: OrganizerShot },
-  { n: '04', icon: PenTool, Shot: BoardShot },
-  { n: '05', icon: LineChart, Shot: MarketShot },
-  { n: '06', icon: Coins, Shot: MoneyShot },
+  { n: '02', icon: Boxes, Shot: OrganizerShot },
+  { n: '03', icon: PenTool, Shot: BoardShot },
+  { n: '04', icon: LineChart, Shot: MarketShot },
+  { n: '05', icon: Coins, Shot: MoneyShot },
 ]
 
 export default function Landing() {

@@ -210,7 +210,7 @@ fn block_text(blocks: &str) -> String {
     out
 }
 
-/// Recherche globale dans la map : tâches, pages, tableaux, fichiers Verse, acteurs, jalons, membres et actions.
+/// Recherche globale dans la map : tâches, pages, tableaux, acteurs, jalons, membres et actions.
 /// Insensible aux majuscules et aux accents ; plusieurs mots = tous doivent être présents.
 pub async fn search(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64>, Query(q): Query<SearchQ>) -> ApiResult<Value> {
     let ctx = map_ctx(&st, &u, mid).await?;
@@ -252,15 +252,6 @@ pub async fn search(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64
             out.push((sc, json!({ "kind": "Tableau", "title": t, "detail": if query.score(&t, "").is_some() { String::new() } else { snippet(&text, &query) }, "link": format!("/tableau/{id}") })));
         }
     }
-    // Fichiers Verse.
-    let files: Vec<(String, String)> = sqlx::query_as("SELECT path, content FROM verse_files WHERE map_id = ? LIMIT 2000").bind(mid).fetch_all(&st.db).await?;
-    for (p, c) in files {
-        let name = p.rsplit('/').next().unwrap_or(&p).to_string();
-        let Some(sc) = query.score(&p, &c) else { continue };
-        let first = query.words[0].clone();
-        let (line, text) = c.lines().enumerate().find(|(_, l)| fold_str(l).contains(first.as_str())).map(|(i, l)| (i + 1, l.trim().to_string())).unwrap_or((1, String::new()));
-        out.push((sc, json!({ "kind": "Verse", "title": name, "detail": if text.is_empty() { p.clone() } else { format!("ligne {line} : {}", snippet(&text, &query)) }, "link": format!("/verse?f={}&l={line}", urlencode(&p)) })));
-    }
     // Acteurs UEFN.
     let actors: Option<String> = sqlx::query_scalar("SELECT actors FROM uefn_state WHERE map_id = ?").bind(mid).fetch_optional(&st.db).await?;
     let actors: Vec<Value> = actors.and_then(|a| serde_json::from_str(&a).ok()).unwrap_or_default();
@@ -296,7 +287,7 @@ pub async fn search(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64
         let by_person = uid.map(|x| found_people.contains(&x)).unwrap_or(false);
         let sc = if by_person { Some(4) } else { query.score(&t, &d).map(|s| s - 4) };
         let Some(sc) = sc else { continue };
-        let link = match kind.as_str() { "task" | "comment" => "/taches", "page" => "/pages", "board" => "/tableau", "checkin" => "/verse", "plan" => "/planifier", "money" => "/remunerer", "playtest" => "/lancer", "team" => "/equipe", _ => "/" };
+        let link = match kind.as_str() { "task" | "comment" => "/taches", "page" => "/pages", "board" => "/tableau", "checkin" => "/organiseur", "plan" => "/planifier", "money" => "/remunerer", "playtest" => "/lancer", "team" => "/equipe", _ => "/" };
         out.push((sc, json!({ "kind": "Action", "title": format!("{t}{}", if d.is_empty() { String::new() } else { format!(" · {d}") }), "detail": format!("{} · {}", who.unwrap_or_else(|| "Système".into()), at.get(..16).unwrap_or(&at).replace('T', " ")), "link": link, "at": at })));
         nact += 1; if nact >= 8 { break }
     }

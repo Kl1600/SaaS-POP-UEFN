@@ -4,20 +4,19 @@ const en: Dict = {
   nav: { features: 'Features', pricing: 'Pricing', faq: 'FAQ', login: 'Log in', join: 'Join the beta', home: 'POP, home', lang: 'Language', search: 'Search a country' },
   hero: {
     announce: 'Private beta open to UEFN creators', h1a: 'Create on UEFN.', h1b: 'Solo or as a team, without the chaos.',
-    subA: 'POP is the SaaS that helps UEFN creators from idea to launch: ', subB: 'one-hour tasks', subC: ', Verse linked to UEFN, whiteboard, market analysis and revenue sharing.',
+    subA: 'POP is the SaaS that helps UEFN creators from idea to launch: ', subB: 'one-hour tasks', subC: ', whiteboard, an Organizer linked to UEFN, connected AIs, market analysis and revenue sharing.',
     cta: 'Join the waitlist', see: 'See the features', micro1: 'Private beta', micro2: 'Waitlist access', micro3: 'Linked to UEFN',
   },
   marquee: { label: 'Works with your tools', epic: 'Epic’s Fortnite API' },
   pain: {
-    eyebrow: 'The problem', h2a: 'Discord, Google Docs, Verse in .txt files…', h2b: 'and the map isn’t moving.', without: 'Without POP', with: 'With POP',
-    bad: ['“Who touched the spawner?”', 'Verse gets passed around Discord as .txt', 'A task list in a Google Doc', 'The revenue spreadsheet, version 7', '“When are we shipping again?”', 'Building without knowing if the genre works'],
-    good: ['Every action is tracked and undoable', 'Ctrl+S sends the Verse into UEFN', 'One-hour tasks, with dependencies', 'A clear statement for everyone', 'Milestones and delays tracked automatically', 'A verdict per genre, with real numbers'],
+    eyebrow: 'The problem', h2a: 'Discord, Google Docs, files everywhere…', h2b: 'and the map isn’t moving.', without: 'Without POP', with: 'With POP',
+    bad: ['“Who touched the spawner?”', 'Ideas get lost in Discord', 'A task list in a Google Doc', 'The revenue spreadsheet, version 7', '“When are we shipping again?”', 'Building without knowing if the genre works'],
+    good: ['Every action is tracked and undoable', 'Whiteboard ideas become tasks', 'One-hour tasks, with dependencies', 'A clear statement for everyone', 'Milestones and delays tracked automatically', 'A verdict per genre, with real numbers'],
   },
   feat: {
     eyebrow: 'Features', h2: 'Everything to create on UEFN, from idea to launch day.', p: 'What you see here are POP’s real screens, simplified.',
     items: [
       { tag: 'Tasks and planning', h: 'One-hour tasks. A schedule that holds.', p: 'The generator splits your map into one-hour tasks with their dependencies. The schedule tracks milestones and flags delays, and a built-in assistant sums up the day.', pts: ['Kanban and dependencies', 'Milestones and delays tracked', 'Daily summary'] },
-      { tag: 'Verse editor', h: 'Ctrl+S, and it’s in UEFN.', p: 'Write Verse in POP and it goes straight into your project: compilation, errors on the right line, test session. The assistant explains and fixes, with no external service.', pts: ['Compiles in UEFN', 'Errors on the line', 'Suggested fixes'] },
       { tag: 'Organizer', h: 'All your devices. Sorted in three seconds.', p: 'Search by tag, type or folder, select twenty and rename, move or duplicate them at once. Ctrl+Z undoes. If UEFN is closed, changes wait.', pts: ['Search tag:, type:, folder:', 'Bulk edits', 'Everything is undoable'] },
       { tag: 'Whiteboard', h: 'Sketch the map together.', p: 'Sticky notes, shapes, arrows, colors, bold, underline: everything you need to lay out ideas. Vote, then turn the best notes into tasks.', pts: ['Full formatting', 'Real-time collaboration', 'Notes → tasks'] },
       { tag: 'Analytics', h: 'Know what to build before you build it.', p: 'Which genres attract players, where there’s room, which maps take off at launch, and what’s trending on video. Numbers from Epic’s official API.', pts: ['Verdict per genre', 'Maps that work', 'TikTok and Shorts trends'] },
@@ -34,7 +33,7 @@ const en: Dict = {
       { name: 'Studio', tag: 'Most complete', desc: 'For studios that ship maps as a team.', cta: 'Join the list' },
       { name: 'Studio+', tag: 'Soon', desc: 'Everything in Studio, plus POP Forge: the desktop app that builds inside UEFN.', cta: 'Join the list' },
     ],
-    rows: ['Organization', 'One-hour tasks, Kanban, dependencies', 'Built-in assistant (daily summary, delays)', 'Pages, whiteboard, planning and milestones', 'Maps', 'Members', 'UEFN', 'UEFN Link: synced projects', 'Linked Verse editor (compilation, line errors)', 'Actor organizer and bulk edits', 'Connected AIs (Claude, Cursor, Codex…)', 'POP Forge: assisted building in UEFN', 'Growth', 'Market analysis and maps that work', 'TikTok and YouTube Shorts video trends', 'Playtest exchange and launch day', 'Revenue sharing and statements', 'Discord, GitHub, Lore'],
+    rows: ['Organization', 'One-hour tasks, Kanban, dependencies', 'Built-in assistant (daily summary, delays)', 'Pages, whiteboard, planning and milestones', 'Maps', 'Members', 'UEFN', 'UEFN Link: synced projects', 'Actor organizer and bulk edits', 'Connected AIs (Claude, Cursor, Codex…)', 'POP Forge: assisted building in UEFN', 'Growth', 'Market analysis and maps that work', 'TikTok and YouTube Shorts video trends', 'Playtest exchange and launch day', 'Revenue sharing and statements', 'Discord, GitHub, Lore'],
   },
   faq: {
     eyebrow: 'FAQ', h2: 'Questions we get asked.',
@@ -51,7 +50,7 @@ const en: Dict = {
   final: { h2a: 'Your next map', h2b: 'starts here.', p: 'Join the waitlist: we’ll send you access as soon as a spot opens.' },
   foot: { made: 'Made by Fortnite creators, for Fortnite creators.', legal: 'Fortnite and UEFN are trademarks of Epic Games. POP is not affiliated with or endorsed by Epic Games.', product: 'Product', help: 'Help', account: 'Account' },
   mock: {
-    overview: 'Overview', nav: ['Overview', 'Pages', 'Whiteboard', 'Tasks', 'Verse editor', 'Organizer', 'Market'],
+    overview: 'Overview', nav: ['Overview', 'Pages', 'Whiteboard', 'Tasks', 'Organizer', 'Market'],
     hello: 'Hi Léa, I suggest starting with #42.', late: '2 tasks late (the oldest was due on Nov 12).', mile: '“Beta” milestone in 5 days: 9 tasks left, expected delay of 1 day.',
     take: 'Take', start: 'Start', unlocks: 'unblocks 3 other tasks', today: 'due today', waits: 'waiting for #42',
     todo: 'To do', doing: 'In progress', done: 'Done', tasks: ['Score system', 'Zone 2 scenery', 'End screen', 'Internal playtest', 'Player spawn', 'Storm'],

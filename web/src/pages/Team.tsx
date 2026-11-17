@@ -1,12 +1,13 @@
 import { SecuritySettings } from '../components/Security'
 import { useState } from 'react'
 import { Navigate, useSearchParams } from 'react-router-dom'
-import { Copy, KeyRound, Trash2 } from 'lucide-react'
+import { Copy, KeyRound, Plus, Trash2 } from 'lucide-react'
 import { api, euros } from '../api'
 import { useApp, useLoad } from '../state'
 import { Avatar, CardHead, PageHead, ROLE, Tabs } from '../components/ui'
 import { tr } from '../i18n/t'
 import LangPicker from '../components/LangPicker'
+import { openCreate } from '../components/MapSwitcher'
 
 export default function Team() {
   const [params, setParams] = useSearchParams()
@@ -101,8 +102,6 @@ function Integrations() {
 function Maps() {
   const { studio, isAdmin, setMapId, reload: reloadMe, toast } = useApp()
   const { data, reload } = useLoad<any[]>(studio ? `/api/studios/${studio.id}/maps` : null, [studio?.id])
-  const [f, setF] = useState({ name: '', genre: '', release_date: '' })
-  const [s, setS] = useState({ name: '', map_name: '' })
   return <>
     <div className="two">
       {data?.map(m => (
@@ -123,22 +122,12 @@ function Maps() {
       ))}
     </div>
     <div className="two">
-      {isAdmin && <section className="card">
-        <CardHead title={tr("Nouvelle map")} sub={tr("Dans {0} · chaque map a ses gains, son équipe et son avancement", [studio?.name])} />
-        <form className="stack" onSubmit={async e => { e.preventDefault(); try { const r = await api.post(`/api/studios/${studio!.id}/maps`, f); await reloadMe(); setMapId(r.map_id); reload(); setF({ name: '', genre: '', release_date: '' }) } catch (er: any) { toast(er.message, true) } }}>
-          <label className="label">{tr("Nom")}<input className="field" value={f.name} onChange={e => setF({ ...f, name: e.target.value })} required /></label>
-          <label className="label">{tr("Genre")}<input className="field" value={f.genre} onChange={e => setF({ ...f, genre: e.target.value })} /></label>
-          <label className="label">{tr("Sortie visée")}<input className="field" type="date" value={f.release_date} onChange={e => setF({ ...f, release_date: e.target.value })} /></label>
-          <button className="btn pri" style={{ alignSelf: 'flex-start' }}>{tr("Créer la map")}</button>
-        </form>
-      </section>}
       <section className="card">
-        <CardHead title={tr("Nouveau studio")} sub={tr("Pour une autre équipe")} />
-        <form className="stack" onSubmit={async e => { e.preventDefault(); try { const r = await api.post('/api/studios', s); await reloadMe(); setMapId(r.map_id) } catch (er: any) { toast(er.message, true) } }}>
-          <label className="label">{tr("Nom du studio")}<input className="field" value={s.name} onChange={e => setS({ ...s, name: e.target.value })} required /></label>
-          <label className="label">{tr("Première map")}<input className="field" value={s.map_name} onChange={e => setS({ ...s, map_name: e.target.value })} required /></label>
-          <button className="btn" style={{ alignSelf: 'flex-start' }}>{tr("Créer le studio")}</button>
-        </form>
+        <CardHead title={tr("Créer")} sub={tr("Une nouvelle map pour ce studio, ou un nouveau studio pour une autre équipe.")} />
+        <div className="row" style={{ flexWrap: 'wrap' }}>
+          {isAdmin && <button className="btn pri" onClick={() => openCreate({ kind: 'map', studioId: studio?.id })}><Plus size={16} />{tr("Nouvelle map")}</button>}
+          <button className="btn" onClick={() => openCreate({ kind: 'studio' })}><Plus size={16} />{tr("Nouveau studio")}</button>
+        </div>
       </section>
       <StudioSettings />
     </div>

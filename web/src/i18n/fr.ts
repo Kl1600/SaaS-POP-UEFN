@@ -5,20 +5,19 @@ const fr = {
   nav: { features: 'Fonctionnalités', pricing: 'Tarifs', faq: 'FAQ', login: 'Se connecter', join: 'Rejoindre la bêta', home: 'POP, accueil', lang: 'Langue', search: 'Chercher un pays' },
   hero: {
     announce: 'Bêta privée ouverte aux créateurs UEFN', h1a: 'Créez sur UEFN.', h1b: 'Seul ou en équipe, sans le chaos.',
-    subA: 'POP est le SaaS qui aide les créateurs UEFN, de l’idée à la sortie : ', subB: 'tâches d’une heure', subC: ', Verse relié à UEFN, tableau blanc, analyse du marché et partage des gains.',
+    subA: 'POP est le SaaS qui aide les créateurs UEFN, de l’idée à la sortie : ', subB: 'tâches d’une heure', subC: ', tableau blanc, Organiseur relié à UEFN, IA connectées, analyse du marché et partage des gains.',
     cta: 'Rejoindre la liste d’attente', see: 'Voir les fonctionnalités', micro1: 'Bêta privée', micro2: 'Accès sur liste d’attente', micro3: 'Relié à UEFN',
   },
   marquee: { label: 'Fonctionne avec vos outils', epic: 'API Fortnite d’Epic' },
   pain: {
-    eyebrow: 'Le problème', h2a: 'Discord, des Google Docs, du Verse en .txt…', h2b: 'et la map n’avance pas.', without: 'Sans POP', with: 'Avec POP',
-    bad: ['« Qui a touché au spawner ? »', 'Le Verse passe par Discord en .txt', 'Une liste de tâches sur un Google Doc', 'Le tableur des gains, version 7', '« On sort quand déjà ? »', 'On construit sans savoir si le genre marche'],
-    good: ['Chaque action est tracée et annulable', 'Ctrl+S envoie le Verse dans UEFN', 'Des tâches d’une heure, avec dépendances', 'Un relevé clair pour chacun', 'Jalons et retards suivis automatiquement', 'Un verdict par genre, avec les vrais chiffres'],
+    eyebrow: 'Le problème', h2a: 'Discord, des Google Docs, des fichiers partout…', h2b: 'et la map n’avance pas.', without: 'Sans POP', with: 'Avec POP',
+    bad: ['« Qui a touché au spawner ? »', 'Les idées se perdent dans Discord', 'Une liste de tâches sur un Google Doc', 'Le tableur des gains, version 7', '« On sort quand déjà ? »', 'On construit sans savoir si le genre marche'],
+    good: ['Chaque action est tracée et annulable', 'Les idées du tableau deviennent des tâches', 'Des tâches d’une heure, avec dépendances', 'Un relevé clair pour chacun', 'Jalons et retards suivis automatiquement', 'Un verdict par genre, avec les vrais chiffres'],
   },
   feat: {
     eyebrow: 'Fonctionnalités', h2: 'Tout pour créer sur UEFN, de l’idée au jour J.', p: 'Ce que vous voyez ici, ce sont les vrais écrans de POP, en plus simple.',
     items: [
       { tag: 'Tâches et planning', h: 'Des tâches d’une heure. Un planning qui tient.', p: 'Le générateur découpe la map en tâches d’une heure, avec leurs dépendances. Le planning suit les jalons et signale les retards, et un assistant intégré résume la journée.', pts: ['Kanban et dépendances', 'Jalons et retards suivis', 'Résumé du jour'] },
-      { tag: 'Éditeur Verse', h: 'Ctrl+S, et c’est dans UEFN.', p: 'Le Verse s’écrit dans POP et part directement dans votre projet : compilation, erreurs à la bonne ligne, session de test. L’assistant explique et corrige, sans service externe.', pts: ['Compilation dans UEFN', 'Erreurs à la ligne', 'Corrections proposées'] },
       { tag: 'Organiseur', h: 'Tous vos appareils. Rangés en trois secondes.', p: 'Cherchez par tag, type ou dossier, sélectionnez-en vingt et renommez, déplacez ou dupliquez d’un coup. Ctrl+Z annule. Si UEFN est fermé, les changements attendent.', pts: ['Recherche tag:, type:, dossier:', 'Modifications en lot', 'Tout est annulable'] },
       { tag: 'Tableau blanc', h: 'Dessinez la map à plusieurs.', p: 'Post-it, formes, flèches, couleurs, gras, souligné : tout ce qu’il faut pour poser les idées. Votez, puis transformez les meilleurs post-it en tâches.', pts: ['Mise en forme complète', 'Temps réel à plusieurs', 'Post-it → tâches'] },
       { tag: 'Analyse', h: 'Sachez quoi construire avant de construire.', p: 'Quels genres attirent les joueurs, où la place est libre, quelles maps décollent dès leur sortie, et ce qui buzze en vidéo. Chiffres de l’API officielle d’Epic.', pts: ['Verdict par genre', 'Maps qui marchent', 'Tendances TikTok et Shorts'] },
@@ -35,7 +34,7 @@ const fr = {
       { name: 'Studio', tag: 'Le plus complet', desc: 'Pour les studios qui sortent des maps en équipe.', cta: 'Rejoindre la liste' },
       { name: 'Studio+', tag: 'Bientôt', desc: 'Tout Studio, plus POP Forge : l’app de bureau qui construit dans UEFN.', cta: 'Rejoindre la liste' },
     ],
-    rows: ['Organisation', 'Tâches d’une heure, Kanban, dépendances', 'Assistant intégré (résumé du jour, retards)', 'Pages, tableau blanc, planning et jalons', 'Maps', 'Membres', 'UEFN', 'UEFN Link : projets synchronisés', 'Éditeur Verse relié (compilation, erreurs à la ligne)', 'Organiseur d’acteurs et modifications en lot', 'IA connectées (Claude, Cursor, Codex…)', 'POP Forge : construction assistée dans UEFN', 'Croissance', 'Analyse du marché et maps qui marchent', 'Tendances vidéo TikTok et YouTube Shorts', 'Échange de playtests et jour J', 'Partage des gains et relevés', 'Discord, GitHub, Lore'],
+    rows: ['Organisation', 'Tâches d’une heure, Kanban, dépendances', 'Assistant intégré (résumé du jour, retards)', 'Pages, tableau blanc, planning et jalons', 'Maps', 'Membres', 'UEFN', 'UEFN Link : projets synchronisés', 'Organiseur d’acteurs et modifications en lot', 'IA connectées (Claude, Cursor, Codex…)', 'POP Forge : construction assistée dans UEFN', 'Croissance', 'Analyse du marché et maps qui marchent', 'Tendances vidéo TikTok et YouTube Shorts', 'Échange de playtests et jour J', 'Partage des gains et relevés', 'Discord, GitHub, Lore'],
   },
   faq: {
     eyebrow: 'FAQ', h2: 'Les questions qu’on nous pose.',
@@ -52,7 +51,7 @@ const fr = {
   final: { h2a: 'Votre prochaine map', h2b: 'commence ici.', p: 'Rejoignez la liste d’attente : on vous envoie votre accès dès qu’une place se libère.' },
   foot: { made: 'Fait par des créateurs Fortnite, pour des créateurs Fortnite.', legal: 'Fortnite et UEFN sont des marques d’Epic Games. POP n’est ni affilié à Epic Games ni approuvé par Epic Games.', product: 'Produit', help: 'Aide', account: 'Compte' },
   mock: {
-    overview: 'Vue d’ensemble', nav: ['Vue d’ensemble', 'Pages', 'Tableau blanc', 'Tâches', 'Éditeur Verse', 'Organiseur', 'Marché'],
+    overview: 'Vue d’ensemble', nav: ['Vue d’ensemble', 'Pages', 'Tableau blanc', 'Tâches', 'Organiseur', 'Marché'],
     hello: 'Bonjour Léa, je vous propose de commencer par #42.', late: '2 tâches en retard (la plus ancienne était prévue le 12 nov.).', mile: 'Jalon « Bêta » dans 5 jours : 9 tâches à finir, retard prévu de 1 jour.',
     take: 'Prendre', start: 'Commencer', unlocks: 'débloque 3 autres tâches', today: 'prévue aujourd’hui', waits: 'attend #42',
     todo: 'À faire', doing: 'En cours', done: 'Fait', tasks: ['Système de score', 'Décor de la zone 2', 'Écran de fin', 'Playtest interne', 'Spawn des joueurs', 'Tempête'],

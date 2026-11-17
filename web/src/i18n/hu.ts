@@ -4,20 +4,19 @@ const hu: Dict = {
   nav: { features: 'Funkciók', pricing: 'Árak', faq: 'GYIK', login: 'Belépés', join: 'Csatlakozás a bétához', home: 'POP, kezdőlap', lang: 'Nyelv', search: 'Ország keresése' },
   hero: {
     announce: 'Zárt béta UEFN-alkotóknak', h1a: 'Alkoss az UEFN-ben.', h1b: 'Egyedül vagy csapatban, káosz nélkül.',
-    subA: 'A POP az a SaaS, amely az ötlettől a megjelenésig segíti az UEFN-alkotókat: ', subB: 'egyórás feladatok', subC: ', UEFN-hez kötött Verse, tábla, piacelemzés és bevételmegosztás.',
+    subA: 'A POP az a SaaS, amely az ötlettől a megjelenésig segíti az UEFN-alkotókat: ', subB: 'egyórás feladatok', subC: ', tábla, UEFN-hez kötött Rendező, bekötött MI-k, piacelemzés és bevételmegosztás.',
     cta: 'Feliratkozás a várólistára', see: 'Funkciók megtekintése', micro1: 'Zárt béta', micro2: 'Hozzáférés várólistán', micro3: 'UEFN-hez kötve',
   },
   marquee: { label: 'Működik az eszközeiddel', epic: 'Az Epic Fortnite API-ja' },
   pain: {
-    eyebrow: 'A probléma', h2a: 'Discord, Google Docs, Verse .txt-ben…', h2b: 'és a pálya nem halad.', without: 'POP nélkül', with: 'POP-pal',
-    bad: ['„Ki nyúlt a spawnerhez?”', 'A Verse .txt-ben kering Discordon', 'Feladatlista egy Google Docban', 'A bevételi táblázat, 7. verzió', '„Mikor is adjuk ki?”', 'Építünk, de nem tudjuk, működik-e a műfaj'],
-    good: ['Minden művelet naplózva és visszavonható', 'A Ctrl+S elküldi a Verse-t az UEFN-be', 'Egyórás feladatok, függőségekkel', 'Átlátható kimutatás mindenkinek', 'Mérföldkövek és csúszások automatikus követése', 'Műfajonkénti ítélet, valós számokkal'],
+    eyebrow: 'A probléma', h2a: 'Discord, Google Docs, mindenhol fájlok…', h2b: 'és a pálya nem halad.', without: 'POP nélkül', with: 'POP-pal',
+    bad: ['„Ki nyúlt a spawnerhez?”', 'Az ötletek elvesznek a Discordon', 'Feladatlista egy Google Docban', 'A bevételi táblázat, 7. verzió', '„Mikor is adjuk ki?”', 'Építünk, de nem tudjuk, működik-e a műfaj'],
+    good: ['Minden művelet naplózva és visszavonható', 'A tábla ötleteiből feladatok lesznek', 'Egyórás feladatok, függőségekkel', 'Átlátható kimutatás mindenkinek', 'Mérföldkövek és csúszások automatikus követése', 'Műfajonkénti ítélet, valós számokkal'],
   },
   feat: {
     eyebrow: 'Funkciók', h2: 'Minden, ami az UEFN-alkotáshoz kell, az ötlettől a megjelenés napjáig.', p: 'Amit itt látsz, azok a POP valódi képernyői, egyszerűsítve.',
     items: [
       { tag: 'Feladatok és tervezés', h: 'Egyórás feladatok. Egy terv, ami tartható.', p: 'A generátor egyórás feladatokra bontja a pályát, a függőségekkel együtt. A terv követi a mérföldköveket és jelzi a csúszást, egy beépített asszisztens pedig összefoglalja a napot.', pts: ['Kanban és függőségek', 'Mérföldkövek és csúszások', 'A nap összefoglalója'] },
-      { tag: 'Verse-szerkesztő', h: 'Ctrl+S, és már az UEFN-ben van.', p: 'A Verse-t a POP-ban írod, és egyenesen a projektedbe kerül: fordítás, hibák a megfelelő sorban, tesztmenet. Az asszisztens külső szolgáltatás nélkül magyaráz és javít.', pts: ['Fordítás az UEFN-ben', 'Hibák soronként', 'Javasolt javítások'] },
       { tag: 'Rendező', h: 'Minden eszközöd. Három másodperc alatt rendben.', p: 'Keress tag, típus vagy mappa szerint, jelölj ki húszat, és nevezd át, helyezd át vagy duplikáld egyszerre. A Ctrl+Z visszavon. Ha az UEFN zárva van, a módosítások várnak.', pts: ['Keresés tag:, type:, mappa:', 'Tömeges szerkesztés', 'Minden visszavonható'] },
       { tag: 'Tábla', h: 'Rajzoljátok meg együtt a pályát.', p: 'Cetlik, alakzatok, nyilak, színek, félkövér, aláhúzás: minden az ötletekhez. Szavazzatok, majd a legjobb cetliket alakítsátok feladattá.', pts: ['Teljes formázás', 'Valós idejű közös munka', 'Cetlik → feladatok'] },
       { tag: 'Elemzés', h: 'Tudd, mit építs, mielőtt építenél.', p: 'Mely műfajok vonzzák a játékosokat, hol van szabad hely, mely pályák szárnyalnak már a megjelenéskor, és mi megy videón. Számok az Epic hivatalos API-jából.', pts: ['Műfajonkénti ítélet', 'Működő pályák', 'TikTok- és Shorts-trendek'] },
@@ -34,7 +33,7 @@ const hu: Dict = {
       { name: 'Studio', tag: 'A legteljesebb', desc: 'Csapatban pályákat kiadó stúdióknak.', cta: 'Feliratkozom' },
       { name: 'Studio+', tag: 'Hamarosan', desc: 'Minden a Studióból, plusz POP Forge: az asztali alkalmazás, amely az UEFN-ben épít.', cta: 'Feliratkozom' },
     ],
-    rows: ['Szervezés', 'Egyórás feladatok, Kanban, függőségek', 'Beépített asszisztens (napi összefoglaló, csúszások)', 'Oldalak, tábla, tervezés és mérföldkövek', 'Pályák', 'Tagok', 'UEFN', 'UEFN Link: szinkronizált projektek', 'Bekötött Verse-szerkesztő (fordítás, soronkénti hibák)', 'Aktorrendező és tömeges szerkesztés', 'Bekötött MI-k (Claude, Cursor, Codex…)', 'POP Forge: segített építés az UEFN-ben', 'Növekedés', 'Piacelemzés és működő pályák', 'TikTok- és YouTube Shorts-videótrendek', 'Playtest-csere és megjelenési nap', 'Bevételmegosztás és kimutatások', 'Discord, GitHub, Lore'],
+    rows: ['Szervezés', 'Egyórás feladatok, Kanban, függőségek', 'Beépített asszisztens (napi összefoglaló, csúszások)', 'Oldalak, tábla, tervezés és mérföldkövek', 'Pályák', 'Tagok', 'UEFN', 'UEFN Link: szinkronizált projektek', 'Aktorrendező és tömeges szerkesztés', 'Bekötött MI-k (Claude, Cursor, Codex…)', 'POP Forge: segített építés az UEFN-ben', 'Növekedés', 'Piacelemzés és működő pályák', 'TikTok- és YouTube Shorts-videótrendek', 'Playtest-csere és megjelenési nap', 'Bevételmegosztás és kimutatások', 'Discord, GitHub, Lore'],
   },
   faq: {
     eyebrow: 'GYIK', h2: 'Amit kérdezni szoktak.',
@@ -51,7 +50,7 @@ const hu: Dict = {
   final: { h2a: 'A következő pályád', h2b: 'itt kezdődik.', p: 'Iratkozz fel a várólistára: amint felszabadul egy hely, küldjük a hozzáférést.' },
   foot: { made: 'Fortnite-alkotók készítették, Fortnite-alkotóknak.', legal: 'A Fortnite és az UEFN az Epic Games védjegyei. A POP nem áll kapcsolatban az Epic Games-szel, és az nem hagyta jóvá.', product: 'Termék', help: 'Súgó', account: 'Fiók' },
   mock: {
-    overview: 'Áttekintés', nav: ['Áttekintés', 'Oldalak', 'Tábla', 'Feladatok', 'Verse-szerkesztő', 'Rendező', 'Piac'],
+    overview: 'Áttekintés', nav: ['Áttekintés', 'Oldalak', 'Tábla', 'Feladatok', 'Rendező', 'Piac'],
     hello: 'Szia Léa, javaslom, hogy a #42-vel kezdj.', late: '2 feladat késésben (a legrégebbi határideje nov. 12. volt).', mile: '„Béta” mérföldkő 5 nap múlva: 9 feladat van hátra, várható csúszás 1 nap.',
     take: 'Elvállalom', start: 'Kezdés', unlocks: '3 másik feladatot old fel', today: 'ma esedékes', waits: 'a #42-re vár',
     todo: 'Teendő', doing: 'Folyamatban', done: 'Kész', tasks: ['Pontrendszer', 'A 2. zóna díszlete', 'Záróképernyő', 'Belső playtest', 'Játékos-spawn', 'Vihar'],

@@ -2,7 +2,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import {
   Home, FileText, PenTool, CalendarDays, KanbanSquare, Rocket, Coins, Users, Settings, LifeBuoy, PanelLeft,
-  Search, Moon, Sun, Bell, Plus, ChevronDown, Hexagon, LogOut, FileCode2, ListTree, Bot, ChartNoAxesCombined, Hash, Flame, Sparkle,
+  Search, Moon, Sun, Bell, Plus, ChevronDown, Hexagon, LogOut, ListTree, Bot, ChartNoAxesCombined, Hash, Flame, Sparkle,
 } from 'lucide-react'
 import { useApp } from '../state'
 import { ago, api } from '../api'
@@ -13,12 +13,13 @@ import { Compass, ShieldCheck } from 'lucide-react'
 import { useUefnStatus, STATUS_LABEL } from '../uefnState'
 import { tr, tx } from '../i18n/t'
 import LangPicker from './LangPicker'
+import { MapSwitcher, CreateHost, openCreate } from './MapSwitcher'
 
 const GROUPS: [string, [string, string, any][]][] = [
   [tr("Général"), [['/', tr("Vue d'ensemble"), Home]]],
   [tr("Espace"), [['/pages', tr("Pages"), FileText], ['/tableau', tr("Tableau blanc"), PenTool]]],
   [tr("Production"), [['/planifier', tr("Planifier"), CalendarDays], ['/taches', tr("Tâches"), KanbanSquare]]],
-  ['UEFN', [['/verse', tr("Éditeur Verse"), FileCode2], ['/organiseur', tr("Organiseur"), ListTree], ['/ia', tr("IA connectées"), Bot]]],
+  ['UEFN', [['/organiseur', tr("Organiseur"), ListTree], ['/ia', tr("IA connectées"), Bot]]],
   [tr("Analyse"), [['/analyse/marche', tr("Marché"), ChartNoAxesCombined], ['/analyse/tiktok', tr("Tendances vidéo"), Hash], ['/analyse/tendances', tr("Maps qui marchent"), Flame], ['/analyse/lancements', tr("Meilleurs démarrages"), Sparkle]]],
   [tr("Publication"), [['/lancer', tr("Lancer et suivre"), Rocket]]],
   [tr("Studio"), [['/remunerer', tr("Rémunérer"), Coins], ['/equipe', tr("Équipe"), Users]]],
@@ -60,15 +61,7 @@ export default function Layout() {
     <div className={'app' + (collapsed ? ' collapsed' : '') + (app.dark ? ' dark' : '')}>
       <aside className="side">
         <div className="brand"><img src="/logo.png" alt="POP" /></div>
-        <label className="projsel lbl">
-          <span className="navsec" style={{ padding: '0 4px 2px' }}>{tr("Map")}</span>
-          <select aria-label={tr("Map")} value={app.map?.id ?? ''} onChange={e => {
-            if (e.target.value === 'new') nav('/equipe?tab=maps'); else app.setMapId(Number(e.target.value))
-          }}>
-            {allMaps.map(({ s, m }) => <option key={m.id} value={m.id}>{m.name}{app.me!.studios.length > 1 ? ` · ${s.name}` : ''}</option>)}
-            <option value="new">{tr("+ Nouvelle map")}</option>
-          </select>
-        </label>
+        <MapSwitcher />
         <nav className="nav" aria-label={tr("Sections")}>
           {GROUPS.map(([g, items]) => (
             <div key={g} className="nav">
@@ -112,7 +105,8 @@ export default function Layout() {
             {acct && (
               <div className="menu" style={{ right: 0, top: 54 }}>
                 <div className="small muted" style={{ padding: '6px 10px' }}>{app.me?.user.email}</div>
-                <button onClick={() => { setAcct(false); nav('/equipe?tab=maps') }}><Plus size={16} />{tr("Nouveau studio ou map")}</button>
+                <button onClick={() => { setAcct(false); openCreate({ kind: 'map' }) }}><Plus size={16} />{tr("Nouvelle map")}</button>
+                <button onClick={() => { setAcct(false); openCreate({ kind: 'studio' }) }}><Plus size={16} />{tr("Nouveau studio")}</button>
                 <button onClick={() => { setAcct(false); nav('/parametres') }}><Settings size={16} />{tr("Paramètres")}</button>
                 <button onClick={async () => { await api.post('/api/auth/logout'); location.href = '/' }}><LogOut size={16} />{tr("Se déconnecter")}</button>
               </div>
@@ -123,6 +117,7 @@ export default function Layout() {
       </div>
       {guide && <GuideDrawer key={guide.ask ?? 'day'} ask={guide.ask} onClose={() => setGuide(false)} />}
       {newTask && <NewTaskModal onClose={() => setNewTask(false)} />}
+      <CreateHost />
     </div>
   )
 }

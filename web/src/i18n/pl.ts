@@ -4,20 +4,19 @@ const pl: Dict = {
   nav: { features: 'Funkcje', pricing: 'Cennik', faq: 'FAQ', login: 'Zaloguj się', join: 'Dołącz do bety', home: 'POP, strona główna', lang: 'Język', search: 'Szukaj kraju' },
   hero: {
     announce: 'Zamknięta beta otwarta dla twórców UEFN', h1a: 'Twórz w UEFN.', h1b: 'Sam lub w zespole, bez chaosu.',
-    subA: 'POP to SaaS, który pomaga twórcom UEFN od pomysłu do premiery: ', subB: 'zadania na godzinę', subC: ', Verse połączony z UEFN, tablica, analiza rynku i podział zarobków.',
+    subA: 'POP to SaaS, który pomaga twórcom UEFN od pomysłu do premiery: ', subB: 'zadania na godzinę', subC: ', tablica, Organizer połączony z UEFN, połączone AI, analiza rynku i podział zarobków.',
     cta: 'Dołącz do listy oczekujących', see: 'Zobacz funkcje', micro1: 'Zamknięta beta', micro2: 'Dostęp z listy oczekujących', micro3: 'Połączony z UEFN',
   },
   marquee: { label: 'Działa z twoimi narzędziami', epic: 'API Fortnite od Epic' },
   pain: {
-    eyebrow: 'Problem', h2a: 'Discord, Google Docs, Verse w .txt…', h2b: 'a mapa stoi w miejscu.', without: 'Bez POP', with: 'Z POP',
-    bad: ['„Kto ruszał spawner?”', 'Verse krąży po Discordzie w .txt', 'Lista zadań w Google Doc', 'Arkusz zarobków, wersja 7', '„To kiedy w końcu wydajemy?”', 'Budujemy, nie wiedząc, czy gatunek działa'],
-    good: ['Każda akcja jest zapisana i odwracalna', 'Ctrl+S wysyła Verse do UEFN', 'Zadania na godzinę, z zależnościami', 'Jasne zestawienie dla każdego', 'Kamienie milowe i opóźnienia śledzone automatycznie', 'Werdykt dla każdego gatunku, na prawdziwych danych'],
+    eyebrow: 'Problem', h2a: 'Discord, Google Docs, pliki wszędzie…', h2b: 'a mapa stoi w miejscu.', without: 'Bez POP', with: 'Z POP',
+    bad: ['„Kto ruszał spawner?”', 'Pomysły giną na Discordzie', 'Lista zadań w Google Doc', 'Arkusz zarobków, wersja 7', '„To kiedy w końcu wydajemy?”', 'Budujemy, nie wiedząc, czy gatunek działa'],
+    good: ['Każda akcja jest zapisana i odwracalna', 'Pomysły z tablicy stają się zadaniami', 'Zadania na godzinę, z zależnościami', 'Jasne zestawienie dla każdego', 'Kamienie milowe i opóźnienia śledzone automatycznie', 'Werdykt dla każdego gatunku, na prawdziwych danych'],
   },
   feat: {
     eyebrow: 'Funkcje', h2: 'Wszystko do tworzenia w UEFN, od pomysłu do premiery.', p: 'To, co tu widzisz, to prawdziwe ekrany POP, w uproszczeniu.',
     items: [
       { tag: 'Zadania i planowanie', h: 'Zadania na godzinę. Plan, który się trzyma.', p: 'Generator dzieli mapę na zadania na godzinę z zależnościami. Plan śledzi kamienie milowe i zgłasza opóźnienia, a wbudowany asystent podsumowuje dzień.', pts: ['Kanban i zależności', 'Kamienie milowe i opóźnienia', 'Podsumowanie dnia'] },
-      { tag: 'Edytor Verse', h: 'Ctrl+S i już jest w UEFN.', p: 'Verse piszesz w POP, a trafia prosto do projektu: kompilacja, błędy we właściwej linii, sesja testowa. Asystent wyjaśnia i poprawia, bez zewnętrznych usług.', pts: ['Kompilacja w UEFN', 'Błędy w linii', 'Proponowane poprawki'] },
       { tag: 'Organizer', h: 'Wszystkie urządzenia. Uporządkowane w trzy sekundy.', p: 'Szukaj po tagu, typie lub folderze, zaznacz dwadzieścia i zmień nazwę, przenieś lub zduplikuj za jednym razem. Ctrl+Z cofa. Gdy UEFN jest zamknięty, zmiany czekają.', pts: ['Wyszukiwanie tag:, type:, folder:', 'Zmiany zbiorcze', 'Wszystko można cofnąć'] },
       { tag: 'Tablica', h: 'Rysujcie mapę razem.', p: 'Karteczki, kształty, strzałki, kolory, pogrubienie, podkreślenie: wszystko, by rozpisać pomysły. Głosujcie, a najlepsze karteczki zamieńcie w zadania.', pts: ['Pełne formatowanie', 'Współpraca na żywo', 'Karteczki → zadania'] },
       { tag: 'Analiza', h: 'Wiedz, co budować, zanim zaczniesz.', p: 'Które gatunki przyciągają graczy, gdzie jest miejsce, które mapy startują od premiery i co jest hitem w wideo. Dane z oficjalnego API Epic.', pts: ['Werdykt dla gatunku', 'Mapy, które działają', 'Trendy TikTok i Shorts'] },
@@ -34,7 +33,7 @@ const pl: Dict = {
       { name: 'Studio', tag: 'Najpełniejszy', desc: 'Dla studiów, które wydają mapy zespołowo.', cta: 'Dołącz do listy' },
       { name: 'Studio+', tag: 'Wkrótce', desc: 'Wszystko ze Studio plus POP Forge: aplikacja desktopowa, która buduje w UEFN.', cta: 'Dołącz do listy' },
     ],
-    rows: ['Organizacja', 'Zadania na godzinę, Kanban, zależności', 'Wbudowany asystent (podsumowanie dnia, opóźnienia)', 'Strony, tablica, planowanie i kamienie milowe', 'Mapy', 'Członkowie', 'UEFN', 'UEFN Link: zsynchronizowane projekty', 'Połączony edytor Verse (kompilacja, błędy w linii)', 'Organizer aktorów i zmiany zbiorcze', 'Połączone AI (Claude, Cursor, Codex…)', 'POP Forge: wspomagane budowanie w UEFN', 'Rozwój', 'Analiza rynku i mapy, które działają', 'Trendy wideo TikTok i YouTube Shorts', 'Wymiana playtestów i dzień premiery', 'Podział zarobków i zestawienia', 'Discord, GitHub, Lore'],
+    rows: ['Organizacja', 'Zadania na godzinę, Kanban, zależności', 'Wbudowany asystent (podsumowanie dnia, opóźnienia)', 'Strony, tablica, planowanie i kamienie milowe', 'Mapy', 'Członkowie', 'UEFN', 'UEFN Link: zsynchronizowane projekty', 'Organizer aktorów i zmiany zbiorcze', 'Połączone AI (Claude, Cursor, Codex…)', 'POP Forge: wspomagane budowanie w UEFN', 'Rozwój', 'Analiza rynku i mapy, które działają', 'Trendy wideo TikTok i YouTube Shorts', 'Wymiana playtestów i dzień premiery', 'Podział zarobków i zestawienia', 'Discord, GitHub, Lore'],
   },
   faq: {
     eyebrow: 'FAQ', h2: 'Pytania, które słyszymy.',
@@ -51,7 +50,7 @@ const pl: Dict = {
   final: { h2a: 'Twoja następna mapa', h2b: 'zaczyna się tutaj.', p: 'Dołącz do listy oczekujących: wyślemy ci dostęp, gdy tylko zwolni się miejsce.' },
   foot: { made: 'Stworzone przez twórców Fortnite, dla twórców Fortnite.', legal: 'Fortnite i UEFN są znakami towarowymi Epic Games. POP nie jest powiązany z Epic Games ani przez nie wspierany.', product: 'Produkt', help: 'Pomoc', account: 'Konto' },
   mock: {
-    overview: 'Przegląd', nav: ['Przegląd', 'Strony', 'Tablica', 'Zadania', 'Edytor Verse', 'Organizer', 'Rynek'],
+    overview: 'Przegląd', nav: ['Przegląd', 'Strony', 'Tablica', 'Zadania', 'Organizer', 'Rynek'],
     hello: 'Cześć Léa, proponuję zacząć od #42.', late: '2 zadania opóźnione (najstarsze miało termin 12 lis.).', mile: 'Kamień milowy „Beta” za 5 dni: zostało 9 zadań, przewidywane opóźnienie 1 dzień.',
     take: 'Weź', start: 'Zacznij', unlocks: 'odblokowuje 3 inne zadania', today: 'termin dziś', waits: 'czeka na #42',
     todo: 'Do zrobienia', doing: 'W toku', done: 'Zrobione', tasks: ['System punktów', 'Scenografia strefy 2', 'Ekran końcowy', 'Wewnętrzny playtest', 'Spawn graczy', 'Burza'],

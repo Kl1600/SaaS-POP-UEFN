@@ -4,20 +4,19 @@ const nl: Dict = {
   nav: { features: 'Functies', pricing: 'Prijzen', faq: 'FAQ', login: 'Inloggen', join: 'Doe mee aan de bèta', home: 'POP, home', lang: 'Taal', search: 'Zoek een land' },
   hero: {
     announce: 'Besloten bèta open voor UEFN-makers', h1a: 'Maak in UEFN.', h1b: 'Alleen of als team, zonder chaos.',
-    subA: 'POP is de SaaS die UEFN-makers helpt van idee tot release: ', subB: 'taken van een uur', subC: ', Verse gekoppeld aan UEFN, whiteboard, marktanalyse en verdeling van inkomsten.',
+    subA: 'POP is de SaaS die UEFN-makers helpt van idee tot release: ', subB: 'taken van een uur', subC: ', whiteboard, Organizer gekoppeld aan UEFN, gekoppelde AI’s, marktanalyse en opbrengstverdeling.',
     cta: 'Op de wachtlijst', see: 'Bekijk de functies', micro1: 'Privébèta', micro2: 'Toegang via wachtlijst', micro3: 'Gekoppeld aan UEFN',
   },
   marquee: { label: 'Werkt met je tools', epic: 'Fortnite-API van Epic' },
   pain: {
-    eyebrow: 'Het probleem', h2a: 'Discord, Google Docs, Verse in .txt…', h2b: 'en de map schiet niet op.', without: 'Zonder POP', with: 'Met POP',
-    bad: ['“Wie heeft aan de spawner gezeten?”', 'Verse gaat als .txt rond in Discord', 'Een takenlijst in een Google Doc', 'Het inkomstenblad, versie 7', '“Wanneer lanceren we ook alweer?”', 'Bouwen zonder te weten of het genre werkt'],
-    good: ['Elke actie wordt vastgelegd en kan ongedaan', 'Ctrl+S stuurt de Verse naar UEFN', 'Taken van een uur, met afhankelijkheden', 'Een duidelijk overzicht voor iedereen', 'Mijlpalen en vertraging automatisch gevolgd', 'Een oordeel per genre, met echte cijfers'],
+    eyebrow: 'Het probleem', h2a: 'Discord, Google Docs, overal bestanden…', h2b: 'en de map schiet niet op.', without: 'Zonder POP', with: 'Met POP',
+    bad: ['“Wie heeft aan de spawner gezeten?”', 'Ideeën raken kwijt in Discord', 'Een takenlijst in een Google Doc', 'Het inkomstenblad, versie 7', '“Wanneer lanceren we ook alweer?”', 'Bouwen zonder te weten of het genre werkt'],
+    good: ['Elke actie wordt vastgelegd en kan ongedaan', 'Ideeën van het whiteboard worden taken', 'Taken van een uur, met afhankelijkheden', 'Een duidelijk overzicht voor iedereen', 'Mijlpalen en vertraging automatisch gevolgd', 'Een oordeel per genre, met echte cijfers'],
   },
   feat: {
     eyebrow: 'Functies', h2: 'Alles om in UEFN te maken, van idee tot releasedag.', p: 'Wat je hier ziet zijn de echte schermen van POP, vereenvoudigd.',
     items: [
       { tag: 'Taken en planning', h: 'Taken van een uur. Een planning die standhoudt.', p: 'De generator verdeelt je map in taken van een uur met hun afhankelijkheden. De planning volgt mijlpalen en meldt vertraging, en een ingebouwde assistent vat de dag samen.', pts: ['Kanban en afhankelijkheden', 'Mijlpalen en vertraging gevolgd', 'Dagoverzicht'] },
-      { tag: 'Verse-editor', h: 'Ctrl+S, en het staat in UEFN.', p: 'Verse schrijf je in POP en gaat direct naar je project: compileren, fouten op de juiste regel, testsessie. De assistent legt uit en corrigeert, zonder externe dienst.', pts: ['Compileren in UEFN', 'Fouten op de regel', 'Voorgestelde correcties'] },
       { tag: 'Organizer', h: 'Al je apparaten. In drie seconden geordend.', p: 'Zoek op tag, type of map, selecteer er twintig en hernoem, verplaats of dupliceer ze in één keer. Ctrl+Z maakt ongedaan. Is UEFN gesloten, dan wachten de wijzigingen.', pts: ['Zoeken op tag:, type:, map:', 'Bulkbewerking', 'Alles kan ongedaan'] },
       { tag: 'Whiteboard', h: 'Teken de map samen.', p: 'Notities, vormen, pijlen, kleuren, vet, onderstreept: alles om ideeën neer te zetten. Stem en maak van de beste notities taken.', pts: ['Volledige opmaak', 'Realtime samen', 'Notities → taken'] },
       { tag: 'Analyse', h: 'Weet wat je bouwt voordat je bouwt.', p: 'Welke genres spelers trekken, waar ruimte is, welke maps meteen bij de lancering scoren en wat populair is op video. Cijfers uit de officiële API van Epic.', pts: ['Oordeel per genre', 'Maps die werken', 'TikTok- en Shorts-trends'] },
@@ -34,7 +33,7 @@ const nl: Dict = {
       { name: 'Studio', tag: 'Het meest compleet', desc: 'Voor studio’s die als team maps uitbrengen.', cta: 'Op de lijst' },
       { name: 'Studio+', tag: 'Binnenkort', desc: 'Alles van Studio, plus POP Forge: de desktop-app die in UEFN bouwt.', cta: 'Op de lijst' },
     ],
-    rows: ['Organisatie', 'Taken van een uur, Kanban, afhankelijkheden', 'Ingebouwde assistent (dagoverzicht, vertraging)', 'Pagina’s, whiteboard, planning en mijlpalen', 'Maps', 'Leden', 'UEFN', 'UEFN Link: gesynchroniseerde projecten', 'Gekoppelde Verse-editor (compileren, fouten per regel)', 'Actor-organizer en bulkbewerking', 'Gekoppelde AI’s (Claude, Cursor, Codex…)', 'POP Forge: ondersteund bouwen in UEFN', 'Groei', 'Marktanalyse en maps die werken', 'Videotrends TikTok en YouTube Shorts', 'Playtest-uitwisseling en lanceerdag', 'Verdeling van inkomsten en overzichten', 'Discord, GitHub, Lore'],
+    rows: ['Organisatie', 'Taken van een uur, Kanban, afhankelijkheden', 'Ingebouwde assistent (dagoverzicht, vertraging)', 'Pagina’s, whiteboard, planning en mijlpalen', 'Maps', 'Leden', 'UEFN', 'UEFN Link: gesynchroniseerde projecten', 'Actor-organizer en bulkbewerking', 'Gekoppelde AI’s (Claude, Cursor, Codex…)', 'POP Forge: ondersteund bouwen in UEFN', 'Groei', 'Marktanalyse en maps die werken', 'Videotrends TikTok en YouTube Shorts', 'Playtest-uitwisseling en lanceerdag', 'Verdeling van inkomsten en overzichten', 'Discord, GitHub, Lore'],
   },
   faq: {
     eyebrow: 'FAQ', h2: 'Vragen die we krijgen.',
@@ -51,7 +50,7 @@ const nl: Dict = {
   final: { h2a: 'Je volgende map', h2b: 'begint hier.', p: 'Zet je op de wachtlijst: we sturen je toegang zodra er een plek vrijkomt.' },
   foot: { made: 'Gemaakt door Fortnite-creators, voor Fortnite-creators.', legal: 'Fortnite en UEFN zijn merken van Epic Games. POP is niet gelieerd aan of goedgekeurd door Epic Games.', product: 'Product', help: 'Hulp', account: 'Account' },
   mock: {
-    overview: 'Overzicht', nav: ['Overzicht', 'Pagina’s', 'Whiteboard', 'Taken', 'Verse-editor', 'Organizer', 'Markt'],
+    overview: 'Overzicht', nav: ['Overzicht', 'Pagina’s', 'Whiteboard', 'Taken', 'Organizer', 'Markt'],
     hello: 'Hoi Léa, ik stel voor te beginnen met #42.', late: '2 taken lopen achter (de oudste stond gepland op 12 nov.).', mile: 'Mijlpaal “Bèta” over 5 dagen: nog 9 taken, verwachte vertraging 1 dag.',
     take: 'Oppakken', start: 'Starten', unlocks: 'geeft 3 andere taken vrij', today: 'vandaag gepland', waits: 'wacht op #42',
     todo: 'Te doen', doing: 'Bezig', done: 'Klaar', tasks: ['Scoresysteem', 'Decor zone 2', 'Eindscherm', 'Interne playtest', 'Spelerspawn', 'Storm'],

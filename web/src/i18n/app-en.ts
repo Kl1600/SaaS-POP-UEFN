@@ -1,6 +1,22 @@
 // Traduction anglaise de l'application. Clé = texte français de l'interface (ou du serveur), valeur = anglais.
 // Généré à partir des textes enveloppés dans tr(...) ; à compléter quand on ajoute des textes.
 const EN: Record<string, string> = {
+ "Cliquez sur le sélecteur « Map » en haut à gauche : vous y changez de map, et vous trouvez « Nouvelle map dans ce studio » et « Nouveau studio ». C’est aussi dans le menu du compte (en haut à droite).": "Click the “Map” selector at the top left: that’s where you switch maps, and where you’ll find “New map in this studio” and “New studio”. It’s also in the account menu (top right).",
+ "Ctrl+K (Cmd+K) ouvre la recherche : tâches, pages, tableaux, acteurs, membres et actions. Majuscules et accents ne comptent pas.": "Ctrl+K (Cmd+K) opens search: tasks, pages, boards, actors, members and actions. Capital letters and accents don’t matter.",
+ "POP est l’espace de travail des créateurs UEFN : tâches d’une heure et planning, pages et tableau blanc, Organiseur relié à UEFN, IA connectées, analyse du marché, playtests et partage des gains. Boussole, l’assistant intégré, vous guide au quotidien.": "POP is the workspace for UEFN creators: one-hour tasks and planning, pages and whiteboard, an Organizer linked to UEFN, connected AIs, market analysis, playtests and revenue sharing. Boussole, the built-in assistant, guides you day to day.",
+ "Ctrl+K recherche · Ctrl+Z annuler (tableau, Organiseur) · Ctrl+B/I/U gras, italique, souligné sur le tableau · Ctrl+0 tout voir · Échap fermer.": "Ctrl+K search · Ctrl+Z undo (board, Organizer) · Ctrl+B/I/U bold, italic, underline on the board · Ctrl+0 fit all · Esc close.",
+ "UEFN : Organiseur et IA connectées": "UEFN: Organizer and connected AIs",
+ "IA connectées : branchez Claude, Cursor ou Codex (IA connectées). Elles lisent et modifient les acteurs, écrivent le Verse et compilent dans UEFN ; chaque action est notée et annulable.": "Connected AIs: plug in Claude, Cursor or Codex (Connected AIs). They read and edit actors, write Verse and compile in UEFN; every action is logged and undoable.",
+ "Ctrl K : recherche globale (tâches, pages, acteurs, membres) · Ctrl Z dans l’Organiseur : annuler · Échap : fermer.": "Ctrl K: global search (tasks, pages, actors, members) · Ctrl Z in the Organizer: undo · Esc: close.",
+ "Nouvelle map dans ce studio": "New map in this studio",
+ "Gérer les maps": "Manage maps",
+ "Map « {0} » créée": "Map “{0}” created",
+ "Studio « {0} » créé": "Studio “{0}” created",
+ "Une map": "A map",
+ "Un studio": "A studio",
+ "Une map = un projet UEFN, avec ses tâches, ses pages, son planning et ses gains. L’équipe du studio y a accès.": "A map = one UEFN project, with its tasks, pages, schedule and earnings. The studio team has access to it.",
+ "Un studio = une équipe. Créez-en un autre seulement si vous travaillez avec d’autres personnes sur d’autres maps.": "A studio = a team. Only create another one if you work with other people on other maps.",
+ "Une nouvelle map pour ce studio, ou un nouveau studio pour une autre équipe.": "A new map for this studio, or a new studio for another team.",
  "(vous)": "(you)",
  "première connexion": "first login",
  "Gains importés (CSV)": "Earnings imported (CSV)",
