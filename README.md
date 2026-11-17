@@ -71,6 +71,10 @@ Le dépôt contient un `Dockerfile` (interface + serveur, base SQLite dans `/dat
 
 Sur un VPS : `docker build -t pop . && docker run -d -p 8080:8080 -v pop-data:/data pop`, derrière un proxy HTTPS (Caddy, Nginx). Le relais UEFN se connecte alors à `https://votre-domaine`.
 
+- **L'image tourne sans root** : utilisateur `pop` (uid 10001), seul propriétaire de `/data`. Un volume créé avec une
+  image plus ancienne (fichiers à root) doit être confié à cet utilisateur une fois, conteneur arrêté :
+  `docker run --rm -v pop-data:/data --user root --entrypoint chown pop -R 10001:10001 /data`.
+
 - **Derrière un proxy**, réglez `POP_TRUST_PROXY` pour que POP voie la vraie adresse des visiteurs (limites de connexion,
   journal de sécurité) : `1` derrière Caddy ou Nginx (POP lit le **dernier** élément de `X-Forwarded-For`, celui que pose
   le proxy ; avec Nginx, `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`), `cloudflare` si seul Cloudflare
