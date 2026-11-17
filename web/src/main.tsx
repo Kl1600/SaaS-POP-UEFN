@@ -17,6 +17,7 @@ import { PageHead } from './components/ui'
 import Help from './pages/Help'
 import AI from './pages/AI'
 import { Market, TikTok, Trending, Launches } from './pages/Analysis'
+const Landing = lazy(() => import('./pages/Landing'))
 const VerseEditor = lazy(() => import('./pages/VerseEditor'))
 const Organizer = lazy(() => import('./pages/Organizer'))
 const L = (C: any) => <Suspense fallback={<main className="content"><p className="muted" style={{ padding: 28 }}>Chargement…</p></main>}><C /></Suspense>
@@ -24,7 +25,11 @@ const L = (C: any) => <Suspense fallback={<main className="content"><p className
 function Gate() {
   const { me, loading } = useApp()
   if (loading) return <div className="auth" />
-  if (!me) return <Login />
+  if (!me) return <Routes>
+    <Route path="/" element={<Suspense fallback={<div className="auth" />}><Landing /></Suspense>} />
+    <Route path="/inscription" element={<Login initial="register" />} />
+    <Route path="*" element={<Login />} />
+  </Routes>
   if (me.studios.length === 0) return <Onboarding />
   if (me.studios.every(s => s.maps.length === 0)) return <Welcome />
   return (

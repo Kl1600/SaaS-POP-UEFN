@@ -3,9 +3,9 @@ import { api } from '../api'
 import { useApp } from '../state'
 import { BlockView } from './Pages'
 
-export function Login({ invite }: { invite?: string }) {
+export function Login({ invite, initial }: { invite?: string; initial?: 'login' | 'register' }) {
   const { reload } = useApp()
-  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>(invite ? 'register' : 'login')
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>(invite ? 'register' : initial ?? 'login')
   const [sent, setSent] = useState('')
   const [f, setF] = useState({ email: '', name: '', password: '' })
   const [err, setErr] = useState('')
@@ -42,6 +42,7 @@ export function Login({ invite }: { invite?: string }) {
           {mode === 'login' ? 'Pas encore de compte ? Créer un compte' : "J'ai déjà un compte"}
         </button>
       </form>
+      {!invite && <a href="/" className="small" style={{ color: 'rgba(255,255,255,.6)', marginTop: 16, display: 'inline-block' }}>← Retour au site</a>}
     </div>
   )
 }
