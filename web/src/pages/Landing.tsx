@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowRight, Check, ChevronDown, Compass, ListChecks, Boxes, PenTool, LineChart, Coins, Bot, Minus, Sparkles, AlertTriangle, AlertCircle,
+  FileText, Users, Link2, Hammer, Flame, Rocket, MessagesSquare, Monitor,
 } from 'lucide-react'
 import '../landing.css'
 import { WaitlistModal } from '../components/Waitlist'
@@ -98,12 +99,54 @@ function MoneyShot({ m }: { m: M }) {
 }
 
 const FEATURES = [
-  { n: '01', icon: ListChecks, Shot: TasksShot },
-  { n: '02', icon: Boxes, Shot: OrganizerShot },
-  { n: '03', icon: PenTool, Shot: BoardShot },
-  { n: '04', icon: LineChart, Shot: MarketShot },
-  { n: '05', icon: Coins, Shot: MoneyShot },
+  { n: '01', id: 'f-taches', icon: ListChecks, Shot: TasksShot },
+  { n: '02', id: 'f-organiseur', icon: Boxes, Shot: OrganizerShot },
+  { n: '03', id: 'f-tableau', icon: PenTool, Shot: BoardShot },
+  { n: '04', id: 'f-analyse', icon: LineChart, Shot: MarketShot },
+  { n: '05', id: 'f-gains', icon: Coins, Shot: MoneyShot },
 ]
+
+// Menu « Fonctionnalités » : icône et section visée pour chaque entrée (textes dans t.menu.items, même ordre).
+const MENU_ITEMS: { icon: typeof ListChecks; to: string; soon?: boolean }[] = [
+  { icon: ListChecks, to: 'f-taches' }, { icon: FileText, to: 'f-taches' }, { icon: PenTool, to: 'f-tableau' }, { icon: Users, to: 'f-taches' },
+  { icon: Boxes, to: 'f-organiseur' }, { icon: Link2, to: 'f-organiseur' }, { icon: Bot, to: 'ia' }, { icon: Hammer, to: 'tarifs', soon: true },
+  { icon: LineChart, to: 'f-analyse' }, { icon: Flame, to: 'f-analyse' }, { icon: Rocket, to: 'fonctionnalites' }, { icon: Coins, to: 'f-gains' },
+]
+
+function FeaturesMenu({ t, go }: { t: Dict; go: (id: string) => (e: React.MouseEvent) => void }) {
+  const [open, setOpen] = useState(false)
+  const box = useRef<HTMLDivElement>(null)
+  const timer = useRef<number>()
+  const show = () => { window.clearTimeout(timer.current); setOpen(true) }
+  const hide = () => { window.clearTimeout(timer.current); timer.current = window.setTimeout(() => setOpen(false), 160) }
+  useEffect(() => {
+    if (!open) return
+    const down = (e: MouseEvent) => { if (!box.current?.contains(e.target as Node)) setOpen(false) }
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', down); document.addEventListener('keydown', key)
+    return () => { document.removeEventListener('mousedown', down); document.removeEventListener('keydown', key) }
+  }, [open])
+  const pick = (id: string) => (e: React.MouseEvent) => { setOpen(false); go(id)(e) }
+  return <div className="lmenu" ref={box} onMouseEnter={show} onMouseLeave={hide}>
+    <button className={'lmenu-btn' + (open ? ' on' : '')} onClick={() => setOpen(o => !o)} aria-expanded={open} aria-haspopup="true">{t.nav.features}<ChevronDown size={15} /></button>
+    {open && <div className="lmega" onMouseEnter={show}>
+      <div className="lmega-cols">
+        {t.menu.groups.map((g, gi) => <div key={g} className="lmega-col">
+          <span className="lmega-h">{g}</span>
+          {t.menu.items.slice(gi * 4, gi * 4 + 4).map((it, j) => { const m = MENU_ITEMS[gi * 4 + j]; return <a key={it.t} href={'#' + m.to} onClick={pick(m.to)} className="lmega-item">
+            <span className="lmega-ic"><m.icon size={19} strokeWidth={1.6} /></span>
+            <span><b>{it.t}{m.soon && <em className="ltag soon">{t.pricing.soon}</em>}</b><small>{it.d}</small></span>
+          </a> })}
+        </div>)}
+      </div>
+      <div className="lmega-foot">
+        <span><MessagesSquare size={17} />{t.menu.bottom[0]}</span>
+        <span><Monitor size={17} />{t.menu.bottom[1]}</span>
+        <a href="#fonctionnalites" onClick={pick('fonctionnalites')}>{t.menu.all} <ArrowRight size={15} /></a>
+      </div>
+    </div>}
+  </div>
+}
 
 export default function Landing() {
   const nav = useNavigate()
@@ -124,7 +167,7 @@ export default function Landing() {
     <nav className={'lnav' + (scrolled ? ' solid' : '')}>
       <a href="#top" onClick={go('top')} className="lbrand" aria-label={t.nav.home}><img src="/logo.png" alt="POP" /></a>
       <div className="llinks">
-        <a href="#fonctionnalites" onClick={go('fonctionnalites')}>{t.nav.features}</a>
+        <FeaturesMenu t={t} go={go} />
         <a href="#tarifs" onClick={go('tarifs')}>{t.nav.pricing}</a>
         <a href="#faq" onClick={go('faq')}>{t.nav.faq}</a>
       </div>
@@ -165,7 +208,7 @@ export default function Landing() {
 
     <section className="lsec" id="fonctionnalites">
       <div className="lhead" data-reveal><span className="leyebrow">{t.feat.eyebrow}</span><h2>{t.feat.h2}</h2><p>{t.feat.p}</p></div>
-      <div className="lfeats">{FEATURES.map((f, i) => { const it = t.feat.items[i]; return <article key={f.n} className={'lfeat' + (i % 2 ? ' rev' : '')} data-reveal>
+      <div className="lfeats">{FEATURES.map((f, i) => { const it = t.feat.items[i]; return <article key={f.n} id={f.id} className={'lfeat' + (i % 2 ? ' rev' : '')} data-reveal>
         <div className="ltxt">
           <span className="lnum"><b>{f.n}</b><f.icon size={15} />{it.tag}</span>
           <h3>{it.h}</h3><p>{it.p}</p>
@@ -173,7 +216,7 @@ export default function Landing() {
         </div>
         <figure><f.Shot m={t.mock} /></figure>
       </article> })}</div>
-      <div className="lai" data-reveal>
+      <div className="lai" id="ia" data-reveal>
         <Bot size={22} />
         <div><b>{t.feat.aiB}</b> {t.feat.aiText}</div>
       </div>

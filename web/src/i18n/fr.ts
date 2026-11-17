@@ -3,6 +3,7 @@
 const fr = {
   meta: { title: 'POP · Le SaaS des créateurs UEFN' },
   nav: { features: 'Fonctionnalités', pricing: 'Tarifs', faq: 'FAQ', login: 'Se connecter', join: 'Rejoindre la bêta', home: 'POP, accueil', lang: 'Langue', search: 'Chercher un pays' },
+  menu: { groups: ['S’organiser', 'Relier UEFN', 'Faire grandir la map'], items: [{ t: 'Tâches et planning', d: 'Des tâches d’une heure, des jalons, les retards suivis.' }, { t: 'Pages', d: 'Docs, règles et bases de données de la map.' }, { t: 'Tableau blanc', d: 'Post-it, formes et flèches, à plusieurs en direct.' }, { t: 'Équipe et rôles', d: 'Invitez, donnez un rôle, chacun sait quoi faire.' }, { t: 'Organiseur', d: 'Les acteurs du niveau rangés et modifiés en lot.' }, { t: 'UEFN Link', d: 'Vos projets UEFN synchronisés avec POP.' }, { t: 'IA connectées', d: 'Claude, Cursor ou Codex avancent sur vos tâches.' }, { t: 'POP Forge', d: 'L’app de bureau qui construit dans UEFN.' }, { t: 'Analyse du marché', d: 'Les genres qui attirent et ceux qui sont saturés.' }, { t: 'Tendances vidéo', d: 'Ce qui buzze sur TikTok et YouTube Shorts.' }, { t: 'Playtests et jour J', d: 'Faites tester la map et préparez la sortie.' }, { t: 'Rémunérer', d: 'Partage des gains et relevé de chacun.' }], bottom: ['Discord et GitHub reliés', 'Sur Mac comme sur PC'], all: 'Toutes les fonctionnalités' },
   hero: {
     announce: 'Bêta privée ouverte aux créateurs UEFN', h1a: 'Créez sur UEFN.', h1b: 'Seul ou en équipe, sans le chaos.',
     subA: 'POP est le SaaS qui aide les créateurs UEFN, de l’idée à la sortie : ', subB: 'tâches d’une heure', subC: ', tableau blanc, Organiseur relié à UEFN, IA connectées, analyse du marché et partage des gains.',
@@ -15,7 +16,7 @@ const fr = {
     good: ['Chaque action est tracée et annulable', 'Les idées du tableau deviennent des tâches', 'Des tâches d’une heure, avec dépendances', 'Un relevé clair pour chacun', 'Jalons et retards suivis automatiquement', 'Un verdict par genre, avec les vrais chiffres'],
   },
   feat: {
-    eyebrow: 'Fonctionnalités', h2: 'Tout pour créer sur UEFN, de l’idée au jour J.', p: 'Ce que vous voyez ici, ce sont les vrais écrans de POP, en plus simple.',
+    eyebrow: 'Fonctionnalités', h2: 'Tout pour créer sur UEFN, de l’idée au jour J.', p: 'Ce que vous voyez ici, ce sont les vrais écrans de POP, en plus simple.',
     items: [
       { tag: 'Tâches et planning', h: 'Des tâches d’une heure. Un planning qui tient.', p: 'Le générateur découpe la map en tâches d’une heure, avec leurs dépendances. Le planning suit les jalons et signale les retards, et un assistant intégré résume la journée.', pts: ['Kanban et dépendances', 'Jalons et retards suivis', 'Résumé du jour'] },
       { tag: 'Organiseur', h: 'Tous vos appareils. Rangés en trois secondes.', p: 'Cherchez par tag, type ou dossier, sélectionnez-en vingt et renommez, déplacez ou dupliquez d’un coup. Ctrl+Z annule. Si UEFN est fermé, les changements attendent.', pts: ['Recherche tag:, type:, dossier:', 'Modifications en lot', 'Tout est annulable'] },

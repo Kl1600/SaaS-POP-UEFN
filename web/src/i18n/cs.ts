@@ -2,6 +2,7 @@ import type { Dict } from './fr'
 const cs: Dict = {
   meta: { title: 'POP · SaaS pro tvůrce v UEFN' },
   nav: { features: 'Funkce', pricing: 'Ceník', faq: 'Otázky', login: 'Přihlásit se', join: 'Do bety', home: 'POP, domů', lang: 'Jazyk', search: 'Hledat zemi' },
+  menu: { groups: ['Organizace', 'Propojení s UEFN', 'Růst mapy'], items: [{ t: 'Úkoly a plánování', d: 'Hodinové úkoly, milníky, sledované zpoždění.' }, { t: 'Stránky', d: 'Dokumenty, pravidla a databáze mapy.' }, { t: 'Tabule', d: 'Lístečky, tvary a šipky, společně naživo.' }, { t: 'Tým a role', d: 'Pozvěte, přidělte roli, každý ví, co dělat.' }, { t: 'Organizér', d: 'Aktéři úrovně uklizení a upravovaní hromadně.' }, { t: 'UEFN Link', d: 'Vaše projekty UEFN synchronizované s POP.' }, { t: 'Připojené AI', d: 'Claude, Cursor nebo Codex plní vaše úkoly.' }, { t: 'POP Forge', d: 'Desktopová aplikace, která staví v UEFN.' }, { t: 'Analýza trhu', d: 'Žánry, které přitahují, a ty nasycené.' }, { t: 'Video trendy', d: 'Co frčí na TikToku a YouTube Shorts.' }, { t: 'Playtesty a vydání', d: 'Nechte mapu otestovat a připravte vydání.' }, { t: 'Výplaty', d: 'Dělení výdělků a výpis pro každého.' }], bottom: ['Propojený Discord a GitHub', 'Na Macu i PC'], all: 'Všechny funkce' },
   hero: {
     announce: 'Uzavřená beta otevřená tvůrcům v UEFN', h1a: 'Tvořte v UEFN.', h1b: 'Sami nebo v týmu, bez chaosu.',
     subA: 'POP je SaaS, který pomáhá tvůrcům v UEFN od nápadu po vydání: ', subB: 'hodinové úkoly', subC: ', tabule, organizér propojený s UEFN, připojené AI, analýza trhu a dělení výdělků.',
