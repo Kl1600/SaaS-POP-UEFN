@@ -2140,6 +2140,9 @@ const EN: Record<string, string> = {
  "Aucune idée ne correspond pour l’instant. Élargissez les genres ou le délai dans votre profil.": "No idea matches for now. Widen the genres or the deadline in your profile.",
  "Nouvelle idée de map": "New map idea",
  "Voir": "See",
- "Nouvelle idée de map : {0}": "New map idea: {0}"
+ "Nouvelle idée de map : {0}": "New map idea: {0}",
+ "Des idées tirées du marché.": "Ideas drawn from the market.",
+ "POP découpe le marché en niches, note chacune sur la demande, la fidélité des joueurs, la porte ouverte aux nouvelles maps, la place à prendre et l’élan, et vous montre les meilleures.": "POP splits the market into niches, scores each on demand, player loyalty, the door open to new maps, room to grab and momentum, and shows you the best ones.",
+ "Pas encore d’idée : elles arrivent après la prochaine collecte.": "No ideas yet: they arrive after the next collection."
 }
 export default EN

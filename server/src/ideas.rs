@@ -9,16 +9,13 @@
 //!    - porte ouverte : part des maps sorties depuis 30 jours qui ont dépassé 100 / 1 000 joueurs, poids des 3 premières ;
 //!    - place à prendre : beaucoup de joueurs mais des leaders au temps de jeu ou à la rétention faibles ;
 //!    - élan : progression sur 7 (et 14) jours, mentions dans les vidéos TikTok / YouTube récentes.
-//! 3. Les idées sont classées pour chaque créateur selon ce qu'il peut faire (équipe, heures, délai, compétences, genres).
+//! 3. Les 12 meilleures niches deviennent des idées (les mêmes pour tous), avec alertes quand une nouvelle arrive.
 use crate::{auth::AuthUser, error::{bad, ApiResult, AppError}, AppState};
 use axum::{extract::{Path, State}, Json};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
-
-/// Genres officiels de Discover (avril 2026).
-pub const GENRES: &[&str] = &["aventure", "battle_royale", "deathrun", "horreur", "musique", "fete", "social", "tir", "simulation", "sports", "strategie", "survie"];
 
 /// (clé, libellé fr, libellé en, genre, complexité 1-3, compétences, motifs, drapeau)
 /// Drapeau : "" | "risque" (exclu des idées : maps XP/AFK, pénalisées par Epic) | "noel" | "halloween" | "ete" (saisonnier).
@@ -372,73 +369,27 @@ async fn compute(st: &AppState) -> Result<Value, AppError> {
 
 // ---------- Profil et idées de chaque créateur ----------
 
-#[derive(Deserialize, Clone)]
-pub struct Profile { team_size: i64, hours_week: i64, weeks: i64, level: String, skills: Vec<String>, genres: Vec<String>, avoid: Vec<String>, notify: bool }
-
-async fn profile(st: &AppState, uid: i64) -> Result<(Profile, bool, Option<String>), AppError> {
-    let r: Option<(i64, i64, i64, String, String, String, String, i64, i64, Option<String>)> = sqlx::query_as(
-        "SELECT team_size, hours_week, weeks, level, skills, genres, avoid, notify, filled, generated_at FROM idea_profiles WHERE user_id = ?").bind(uid).fetch_optional(&st.db).await?;
-    let p = |s: &str| serde_json::from_str::<Vec<String>>(s).unwrap_or_default();
-    Ok(match r {
-        Some(r) => (Profile { team_size: r.0, hours_week: r.1, weeks: r.2, level: r.3, skills: p(&r.4), genres: p(&r.5), avoid: p(&r.6), notify: r.7 == 1 }, r.8 == 1, r.9),
-        None => {
-            // Valeurs de départ : taille et spécialités de son plus grand studio.
-            let team: Option<(i64, String)> = sqlx::query_as(
-                "SELECT COUNT(*), GROUP_CONCAT(m2.specialty, ' ') FROM memberships m JOIN memberships m2 ON m2.studio_id = m.studio_id WHERE m.user_id = ? GROUP BY m.studio_id ORDER BY COUNT(*) DESC LIMIT 1").bind(uid).fetch_optional(&st.db).await?;
-            let (size, spec) = team.unwrap_or((1, String::new()));
-            let spec = spec.to_lowercase();
-            let mut skills = vec![];
-            for (k, words) in [("verse", ["verse", "dev", "code", "program"]), ("build", ["build", "level", "map", "construct"]), ("art", ["art", "3d", "model", "graph"]), ("design", ["design", "game", "gd", "équilibr"])] {
-                if words.iter().any(|w| spec.contains(w)) { skills.push(k.to_string()) }
-            }
-            (Profile { team_size: size.max(1), hours_week: 10, weeks: 6, level: "confirme".into(), skills, genres: vec![], avoid: vec![], notify: true }, false, None)
-        }
-    })
-}
-
-/// Heures de travail estimées pour une première version publiable, selon la complexité de la niche.
-fn hours_needed(complexity: u8, level: &str) -> f64 {
-    let h = match complexity { 1 => 40.0, 2 => 120.0, _ => 320.0 };
-    match level { "debutant" => h * 1.5, "expert" => h * 0.75, _ => h }
-}
-
-/// Ce que l'idée demande au créateur, et à quel point c'est faisable pour lui (0..100).
-fn fit(n: &Value, p: &Profile) -> (f64, Value) {
-    let complexity = n["complexity"].as_u64().unwrap_or(2) as u8;
-    let need = hours_needed(complexity, &p.level);
-    let per_week = (p.team_size.max(1) * p.hours_week.max(1)) as f64;
-    let capacity = per_week * p.weeks.max(1) as f64;
-    let time_fit = (capacity / need).min(1.0);
-    let needed: Vec<String> = n["skills"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect()).unwrap_or_default();
-    let have: Vec<&String> = needed.iter().filter(|s| p.skills.contains(s)).collect();
-    let missing: Vec<&String> = needed.iter().filter(|s| !p.skills.contains(s)).collect();
-    let skill_fit = if p.skills.is_empty() { 0.7 } else if needed.is_empty() { 1.0 } else { have.len() as f64 / needed.len() as f64 };
-    let genre = n["genre"].as_str().unwrap_or("");
-    let pref = if p.genres.is_empty() { 0.6 } else if p.genres.iter().any(|g| g == genre) { 1.0 } else { 0.3 };
-    let mut f = 0.5 * time_fit + 0.3 * skill_fit + 0.2 * pref;
-    if p.level == "debutant" && complexity >= 3 { f *= 0.6 }
-    (f * 100.0, json!({ "hours": need.round(), "weeks": (need / per_week).ceil(), "time_ok": time_fit >= 1.0, "skills_have": have, "skills_missing": missing, "preferred": pref == 1.0 }))
+/// Réglages du créateur : seulement les alertes (les idées sont les mêmes pour tous).
+async fn settings(st: &AppState, uid: i64) -> Result<(bool, Option<String>), AppError> {
+    let r: Option<(i64, Option<String>)> = sqlx::query_as("SELECT notify, generated_at FROM idea_profiles WHERE user_id = ?").bind(uid).fetch_optional(&st.db).await?;
+    Ok(r.map(|r| (r.0 == 1, r.1)).unwrap_or((true, None)))
 }
 
 /// Recalcule les idées d'un créateur (au plus toutes les 3 heures, sauf `force`). Renvoie les nouvelles idées.
 pub async fn refresh_user(st: &AppState, uid: i64, force: bool) -> Result<Vec<(i64, String)>, AppError> {
-    let (p, _, gen) = profile(st, uid).await?;
+    let (notify, gen) = settings(st, uid).await?;
     if !force {
         if let Some(g) = gen { let stale: bool = sqlx::query_scalar("SELECT ? < datetime('now', '-3 hours')").bind(&g).fetch_one(&st.db).await?; if !stale { return Ok(vec![]) } }
     }
     let all = niches(st).await?;
     let list = all["niches"].as_array().cloned().unwrap_or_default();
     if list.is_empty() { return Ok(vec![]) }
-    let mut ranked: Vec<(f64, f64, Value)> = list.into_iter()
-        .filter(|n| !n["risky"].as_bool().unwrap_or(false) && n["confidence"] != "faible")
-        .filter(|n| !p.avoid.iter().any(|g| Some(g.as_str()) == n["genre"].as_str()))
-        .map(|n| { let (f, detail) = fit(&n, &p); let mut n = n; n["fit"] = json!(f.round()); n["effort"] = detail; let s = n["score"].as_f64().unwrap_or(0.0); (s * (0.5 + 0.5 * f / 100.0), f, n) })
-        .collect();
-    ranked.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
-    let top: Vec<(f64, f64, Value)> = ranked.into_iter().take(12).collect();
+    // Les meilleures opportunités du marché (hors maps XP et niches aux données trop minces).
+    let top: Vec<Value> = list.into_iter().filter(|n| !n["risky"].as_bool().unwrap_or(false) && n["confidence"] != "faible").take(12).collect();
     sqlx::query("UPDATE ideas SET active = 0 WHERE user_id = ?").bind(uid).execute(&st.db).await?;
     let mut fresh = vec![];
-    for (rank, f, n) in &top {
+    for n in &top {
+        let (rank, f) = (n["score"].as_f64().unwrap_or(0.0), 0.0);
         let key = n["key"].as_str().unwrap_or("");
         let existing: Option<i64> = sqlx::query_scalar("SELECT id FROM ideas WHERE user_id = ? AND niche = ?").bind(uid).bind(key).fetch_optional(&st.db).await?;
         match existing {
@@ -451,7 +402,7 @@ pub async fn refresh_user(st: &AppState, uid: i64, force: bool) -> Result<Vec<(i
     }
     sqlx::query("INSERT INTO idea_profiles (user_id, generated_at) VALUES (?, datetime('now')) ON CONFLICT(user_id) DO UPDATE SET generated_at = datetime('now')").bind(uid).execute(&st.db).await?;
     // Alertes, comme une nouvelle annonce : au plus 3 à la fois, seulement si le créateur les veut.
-    if p.notify && gen_is_some(st, uid).await {
+    if notify && gen_is_some(st, uid).await {
         for (id, label) in fresh.iter().take(3) {
             let _ = sqlx::query("INSERT INTO notifications (user_id, map_id, text, link) VALUES (?, NULL, ?, ?)")
                 .bind(uid).bind(format!("Nouvelle idée de map : {label}")).bind(format!("/analyse/idees?i={id}")).execute(&st.db).await;
@@ -477,12 +428,12 @@ pub async fn refresh_all(st: &AppState) {
 pub async fn list(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
     crate::billing::require_analyse(&st, &u).await?;
     refresh_user(&st, u.id, false).await?;
-    let (p, filled, gen) = profile(&st, u.id).await?;
+    let (notify, gen) = settings(&st, u.id).await?;
     let rows: Vec<(i64, String, f64, f64, String, String, Option<i64>, String, i64)> = sqlx::query_as(
         "SELECT id, niche, score, fit, data, status, map_id, created_at, active FROM ideas WHERE user_id = ? AND status <> 'dismissed' AND (active = 1 OR status IN ('saved', 'started')) ORDER BY active DESC, rank DESC").bind(u.id).fetch_all(&st.db).await?;
     let all = niches(&st).await?;
     Ok(Json(json!({
-        "profile": { "team_size": p.team_size, "hours_week": p.hours_week, "weeks": p.weeks, "level": p.level, "skills": p.skills, "genres": p.genres, "avoid": p.avoid, "notify": p.notify, "filled": filled },
+        "notify": notify,
         "generated_at": gen, "ready": all["ready"], "last_day": all["last_day"], "islands": all["islands"], "niches_count": all["niches"].as_array().map(|a| a.len()).unwrap_or(0),
         "ideas": rows.into_iter().map(|r| { let mut d: Value = serde_json::from_str(&r.4).unwrap_or(json!({})); d["id"] = json!(r.0); d["status"] = json!(r.5); d["map_id"] = json!(r.6); d["created_at"] = json!(r.7); d["active"] = json!(r.8 == 1); d }).collect::<Vec<_>>(),
     })))
@@ -495,20 +446,13 @@ pub async fn all_niches(State(st): State<AppState>, u: AuthUser) -> ApiResult<Va
 }
 
 #[derive(Deserialize)]
-pub struct ProfileIn { team_size: i64, hours_week: i64, weeks: i64, level: String, skills: Vec<String>, genres: Vec<String>, avoid: Vec<String>, notify: bool }
+pub struct SettingsIn { notify: bool }
 
-pub async fn save_profile(State(st): State<AppState>, u: AuthUser, Json(b): Json<ProfileIn>) -> ApiResult<Value> {
+/// Alertes de nouvelles idées : oui ou non.
+pub async fn save_settings(State(st): State<AppState>, u: AuthUser, Json(b): Json<SettingsIn>) -> ApiResult<Value> {
     crate::billing::require_analyse(&st, &u).await?;
-    if !(1..=50).contains(&b.team_size) || !(1..=80).contains(&b.hours_week) || !(1..=52).contains(&b.weeks) { return Err(bad("Valeurs hors limites.")) }
-    if !["debutant", "confirme", "expert"].contains(&b.level.as_str()) { return Err(bad("Niveau inconnu.")) }
-    let ok = |v: &Vec<String>, set: &[&str]| v.iter().all(|x| set.contains(&x.as_str()));
-    if !ok(&b.skills, &["verse", "build", "art", "design"]) || !ok(&b.genres, GENRES) || !ok(&b.avoid, GENRES) { return Err(bad("Valeur inconnue.")) }
-    sqlx::query("INSERT INTO idea_profiles (user_id, team_size, hours_week, weeks, level, skills, genres, avoid, notify, filled, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, datetime('now'))
-                 ON CONFLICT(user_id) DO UPDATE SET team_size = excluded.team_size, hours_week = excluded.hours_week, weeks = excluded.weeks, level = excluded.level, skills = excluded.skills,
-                 genres = excluded.genres, avoid = excluded.avoid, notify = excluded.notify, filled = 1, updated_at = datetime('now')")
-        .bind(u.id).bind(b.team_size).bind(b.hours_week).bind(b.weeks).bind(&b.level).bind(json!(b.skills).to_string()).bind(json!(b.genres).to_string()).bind(json!(b.avoid).to_string()).bind(b.notify as i64)
-        .execute(&st.db).await?;
-    refresh_user(&st, u.id, true).await?;
+    sqlx::query("INSERT INTO idea_profiles (user_id, notify) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET notify = excluded.notify, updated_at = datetime('now')")
+        .bind(u.id).bind(b.notify as i64).execute(&st.db).await?;
     Ok(Json(json!({ "ok": true })))
 }
 

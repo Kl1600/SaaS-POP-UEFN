@@ -1,7 +1,7 @@
 // Idées de maps : un fil de fiches, comme des annonces, calculées à partir du marché et adaptées au créateur.
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { Lightbulb, Heart, X, Rocket, SlidersHorizontal, Bell, BellOff, TrendingUp, Users, Clock, DoorOpen, Sparkles } from 'lucide-react'
+import { Lightbulb, Heart, X, Rocket, Bell, BellOff, TrendingUp, Users, Clock, DoorOpen, Sparkles } from 'lucide-react'
 import { ago, api } from '../api'
 import { useApp, useLoad, studioName } from '../state'
 import { CardHead, Empty, PageHead, Tabs } from '../components/ui'
@@ -19,8 +19,6 @@ const BADGE: Record<string, [string, string]> = {
   tendance_video: [tr("Tendance vidéo"), 'b-v'], peu_de_concurrence: [tr("Peu de concurrence"), 'b-g'], joueurs_fideles: [tr("Joueurs fidèles"), ''],
   nouveau_mot: [tr("Nouveau mot"), 'b-v'], saison: [tr("C’est la saison"), 'b-o'], domine: [tr("Dominée par 3 maps"), 'b-r'],
 }
-const SKILL: Record<string, string> = { verse: tr("Code Verse"), build: tr("Construction et level design"), art: tr("Graphisme et 3D"), design: tr("Game design") }
-const LEVEL: [string, string][] = [['debutant', tr("Débutant")], ['confirme', tr("Confirmé")], ['expert', tr("Expert")]]
 const AXES: [string, string, string][] = [
   ['demand', tr("Demande"), tr("Joueurs dans la niche et joueurs d’une map typique.")],
   ['fidelity', tr("Fidélité"), tr("Temps de jeu, retour à J+1 et J+7, recommandations : ce qu’Epic note par joueur pour Discover.")],
@@ -88,7 +86,7 @@ function Card({ d, onOpen, onSave }: { d: any; onOpen: () => void; onSave: () =>
       </div>
     </div>
     <div className="icard-foot small muted">
-      <span>{d.effort ? tr("≈ {0} sem. pour vous", [d.effort.weeks]) : ''}{d.status === 'started' ? ' · ' + tr("Lancée") : ''}</span>
+      <span>{d.status === 'started' ? tr("Lancée") : ''}</span>
       <span>{d.created_at ? ago(d.created_at) : ''}</span>
     </div>
   </article>
@@ -104,7 +102,6 @@ function Axis({ k, name, help, v }: { k: string; name: string; help: string; v: 
 
 function Detail({ d, onClose, onState, onStart }: { d: any; onClose: () => void; onState: (s: string) => void; onStart: () => void }) {
   const [isl, setIsl] = useState<string | null>(null)
-  const e = d.effort ?? {}
   if (isl) return <IslandDrawer code={isl} onClose={() => setIsl(null)} />
   const Map = ({ m }: { m: any }) => <button className="ilink" onClick={() => setIsl(m.code)}><b>{m.title}</b><span className="small muted">{tr("{0} joueurs · {1} min · J+1 {2}", [num(m.players), num(m.minutes), pc(m.d1)])}</span></button>
   return <>
@@ -164,42 +161,9 @@ function Detail({ d, onClose, onState, onStart }: { d: any; onClose: () => void;
         {(d.badges ?? []).includes('domine') && <li>{tr("Trois maps prennent l’essentiel des joueurs : il faudra un vrai angle différent.")}</li>}
       </ul>
 
-      <div className="dsec">{tr("Pour vous")}</div>
-      <ul className="ifacts">
-        <li>{tr("Environ {0} heures de travail pour une première version, soit {1} semaine(s) avec votre rythme.", [e.hours, e.weeks])} {e.time_ok ? tr("Ça tient dans votre délai.") : tr("C’est plus long que votre délai : visez une version plus petite.")}</li>
-        {(e.skills_have ?? []).length > 0 && <li>{tr("Vous avez : {0}.", [e.skills_have.map((s: string) => SKILL[s]).join(', ')])}</li>}
-        {(e.skills_missing ?? []).length > 0 && <li>{tr("Il vous manque : {0}.", [e.skills_missing.map((s: string) => SKILL[s]).join(', ')])}</li>}
-      </ul>
       <p className="small muted" style={{ marginTop: 16 }}>{tr("Calculé sur les chiffres publics d’Epic du {0}. Les idées sont recalculées après chaque collecte.", [d.generated_day ?? ''])}</p>
     </aside>
   </>
-}
-
-function ProfileForm({ p, onDone, onCancel }: { p: any; onDone: () => void; onCancel?: () => void }) {
-  const { toast } = useApp()
-  const [f, setF] = useState({ ...p })
-  const tog = (k: 'skills' | 'genres' | 'avoid', v: string) => setF((x: any) => ({ ...x, [k]: x[k].includes(v) ? x[k].filter((y: string) => y !== v) : [...x[k], v] }))
-  const save = async () => { try { await api.put('/api/ideas/profile', f); toast(tr("Profil enregistré : idées recalculées")); onDone() } catch (e: any) { toast(e.message, true) } }
-  return <section className="card iprofile">
-    <CardHead icon={<SlidersHorizontal size={18} />} title={tr("Votre profil de créateur")} sub={tr("Pour vous proposer des idées que vous pouvez vraiment faire.")} />
-    <div className="row" style={{ gap: 12, flexWrap: 'wrap' }}>
-      <label className="label">{tr("Personnes sur la map")}<input className="field" type="number" min={1} max={50} value={f.team_size} onChange={e => setF({ ...f, team_size: +e.target.value })} /></label>
-      <label className="label">{tr("Heures par semaine, chacun")}<input className="field" type="number" min={1} max={80} value={f.hours_week} onChange={e => setF({ ...f, hours_week: +e.target.value })} /></label>
-      <label className="label">{tr("Sortie visée dans (semaines)")}<input className="field" type="number" min={1} max={52} value={f.weeks} onChange={e => setF({ ...f, weeks: +e.target.value })} /></label>
-      <label className="label">{tr("Niveau")}<select className="field" value={f.level} onChange={e => setF({ ...f, level: e.target.value })}>{LEVEL.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
-    </div>
-    <p className="label" style={{ marginTop: 12 }}>{tr("Ce que votre équipe sait faire")}</p>
-    <div className="row" style={{ flexWrap: 'wrap', gap: 6 }}>{Object.entries(SKILL).map(([k, l]) => <button type="button" key={k} className={'chip' + (f.skills.includes(k) ? ' on' : '')} onClick={() => tog('skills', k)}>{l}</button>)}</div>
-    <p className="label" style={{ marginTop: 12 }}>{tr("Genres qui vous tentent (aucun = tous)")}</p>
-    <div className="row" style={{ flexWrap: 'wrap', gap: 6 }}>{Object.entries(GENRE).map(([k, l]) => <button type="button" key={k} className={'chip' + (f.genres.includes(k) ? ' on' : '')} onClick={() => tog('genres', k)}>{l}</button>)}</div>
-    <p className="label" style={{ marginTop: 12 }}>{tr("Genres à ne jamais proposer")}</p>
-    <div className="row" style={{ flexWrap: 'wrap', gap: 6 }}>{Object.entries(GENRE).map(([k, l]) => <button type="button" key={k} className={'chip' + (f.avoid.includes(k) ? ' on off' : '')} onClick={() => tog('avoid', k)}>{l}</button>)}</div>
-    <label className="row small" style={{ gap: 8, marginTop: 14 }}><input type="checkbox" checked={f.notify} onChange={e => setF({ ...f, notify: e.target.checked })} />{tr("M’alerter quand une nouvelle idée apparaît")}</label>
-    <div className="row" style={{ gap: 8, marginTop: 14 }}>
-      {onCancel && <button className="btn" onClick={onCancel}>{tr("Annuler")}</button>}
-      <button className="btn pri" onClick={save}>{tr("Voir mes idées")}</button>
-    </div>
-  </section>
 }
 
 function StartModal({ d, onClose }: { d: any; onClose: () => void }) {
@@ -245,7 +209,6 @@ export default function Ideas() {
   const [sp, setSp] = useSearchParams()
   const { data, reload } = useLoad<any>('/api/ideas')
   const [tab, setTab] = useState<'feed' | 'saved' | 'all'>('feed')
-  const [edit, setEdit] = useState(false)
   const [start, setStart] = useState<any>(null)
   const openId = Number(sp.get('i')) || null
   const ideas: any[] = data?.ideas ?? []
@@ -255,20 +218,16 @@ export default function Ideas() {
   }
   // Ouvrir une fiche la marque comme vue.
   useEffect(() => { if (open?.status === 'new') setState(open.id, 'seen') }, [open?.id])
-  if (!data) return <main className="content"><PageHead title={tr("Idées de maps")} help={tr("Des idées tirées du marché, adaptées à votre équipe.")} /></main>
-  const p = data.profile
+  if (!data) return <main className="content"><PageHead title={tr("Idées de maps")} help={tr("Des idées tirées du marché.")} /></main>
   const shown = tab === 'saved' ? ideas.filter(x => x.status === 'saved' || x.status === 'started') : ideas.filter(x => x.active)
   const fresh = ideas.filter(x => x.status === 'new').length
   return <main className="content">
-    <PageHead title={tr("Idées de maps")} help={tr("POP découpe le marché en niches, note chacune sur la demande, la fidélité des joueurs, la porte ouverte aux nouvelles maps, la place à prendre et l’élan, puis garde celles que vous pouvez faire.")}>
-      <button className="btn" onClick={() => setEdit(e => !e)}><SlidersHorizontal size={16} />{tr("Mon profil")}</button>
-      <button className="iconbtn" title={p.notify ? tr("Alertes activées") : tr("Alertes coupées")} aria-label={p.notify ? tr("Couper les alertes") : tr("Activer les alertes")} onClick={async () => { await api.put('/api/ideas/profile', { ...p, notify: !p.notify }); reload(); toast(p.notify ? tr("Alertes coupées") : tr("Vous serez alerté des nouvelles idées")) }}>{p.notify ? <Bell size={18} /> : <BellOff size={18} />}</button>
+    <PageHead title={tr("Idées de maps")} help={tr("POP découpe le marché en niches, note chacune sur la demande, la fidélité des joueurs, la porte ouverte aux nouvelles maps, la place à prendre et l’élan, et vous montre les meilleures.")}>
+      <button className="btn" onClick={async () => { await api.put('/api/ideas/profile', { notify: !data.notify }); reload(); toast(data.notify ? tr("Alertes coupées") : tr("Vous serez alerté des nouvelles idées")) }}>{data.notify ? <Bell size={16} /> : <BellOff size={16} />}{data.notify ? tr("Alertes activées") : tr("Alertes coupées")}</button>
     </PageHead>
-    {(!p.filled || edit) && <ProfileForm p={p} onDone={() => { setEdit(false); reload() }} onCancel={p.filled ? () => setEdit(false) : undefined} />}
-    {p.filled && !edit && <p className="small muted iprofile-line">{tr("Pour : {0} personne(s) · {1} h par semaine · sortie dans {2} semaines · {3}", [p.team_size, p.hours_week, p.weeks, LEVEL.find(l => l[0] === p.level)?.[1] ?? ''])}{p.genres.length ? ' · ' + p.genres.map((g: string) => GENRE[g]).join(', ') : ''}</p>}
     <Tabs value={tab} onChange={setTab} items={[['feed', fresh ? tr("Pour vous ({0} nouvelles)", [fresh]) : tr("Pour vous")], ['saved', tr("Sauvegardées")], ['all', tr("Toutes les niches")]]} />
     {tab === 'all' ? <AllNiches /> : !data.ready ? <section className="card"><Empty text={tr("Pas encore de données du marché : la première collecte prend quelques minutes.")} /></section>
-      : shown.length === 0 ? <section className="card"><Empty text={tab === 'saved' ? tr("Aucune idée sauvegardée. Touchez le cœur d’une fiche pour la garder.") : tr("Aucune idée ne correspond pour l’instant. Élargissez les genres ou le délai dans votre profil.")} /></section>
+      : shown.length === 0 ? <section className="card"><Empty text={tab === 'saved' ? tr("Aucune idée sauvegardée. Touchez le cœur d’une fiche pour la garder.") : tr("Pas encore d’idée : elles arrivent après la prochaine collecte.")} /></section>
       : <div className="igrid">{shown.map(d => <Card key={d.id} d={d} onOpen={() => setSp({ i: String(d.id) })} onSave={() => setState(d.id, d.status === 'saved' ? 'seen' : 'saved')} />)}</div>}
     {open && <Detail d={open} onClose={() => setSp({}, { replace: true })} onState={s => setState(open.id, s)} onStart={() => setStart(open)} />}
     {start && <StartModal d={start} onClose={() => setStart(null)} />}
