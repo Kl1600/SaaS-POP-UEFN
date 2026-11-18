@@ -76,7 +76,11 @@ impl Mcp {
 
     /// `all` : décrit tous les toolsets (diagnostic), sinon seulement ceux dont POP se sert.
     pub async fn connect_with(&mut self, all: bool) -> Result<()> {
+        // On repart de zéro : une connexion ratée (UEFN qui se ferme) ne doit pas laisser d'outils sans session,
+        // sinon `alive` croit la connexion bonne à la réouverture et chaque appel est refusé (#4).
         self.session = None;
+        self.tools.clear();
+        self.toolsets.clear();
         self.rpc("initialize", json!({ "protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": { "name": "pop-link", "version": "0.1.0" } })).await?;
         let _ = self.http.post(&self.url).header("content-type", "application/json").header("accept", "application/json, text/event-stream")
             .header("mcp-session-id", self.session.clone().unwrap_or_default())
@@ -111,7 +115,17 @@ impl Mcp {
 
     /// Appel direct d'un outil de premier niveau ; renvoie le texte (erreur si `isError`).
     async fn raw_call(&mut self, name: &str, args: Value) -> Result<String> {
-        let r = self.rpc("tools/call", json!({ "name": name, "arguments": args })).await?;
+        let r = match self.rpc("tools/call", json!({ "name": name, "arguments": args })).await {
+            Ok(r) => r,
+            Err(e) => {
+                // Session MCP perdue (UEFN relancé) : la prochaine vérification refait la connexion complète.
+                if e.to_string().contains("Mcp-Session-Id") {
+                    self.tools.clear();
+                    self.session = None;
+                }
+                return Err(e);
+            }
+        };
         let txt: String = r["content"].as_array().cloned().unwrap_or_default().iter().filter_map(|c| c["text"].as_str()).collect::<Vec<_>>().join("\n");
         if r["isError"].as_bool() == Some(true) {
             bail!("{}", txt.trim());

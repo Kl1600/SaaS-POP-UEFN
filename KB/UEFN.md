@@ -76,3 +76,20 @@ concernée ; corrigez une ligne fausse en le disant.
 - Sans session, `GetSessionStatus` répond `Disconnected` : pop-link refuse avant d'appeler `PushChanges`.
 - L'éditeur de code (Monaco) de POP ne reçoit pas la saisie quand le navigateur qui l'affiche est caché : pour un
   test piloté, garder la page visible.
+
+## Archivage Lore (testé le 18/11/2026, projet TestPopHub, #4)
+
+- `CheckIn { description }` enregistre tout puis archive **toutes** les modifications en attente en une révision ;
+  le message saisi dans POP (préfixé `#N` si une tâche est liée) apparaît tel quel dans l'historique Lore d'UEFN.
+- Sans modification en attente, `CheckIn` répond `CheckIn: there is nothing to check in.` : POP affiche « Rien à
+  archiver : aucune modification en attente dans Lore. »
+- `GetRevisionControlStatus` : `bHasChangesToCheckIn` passe à `false` après l'archivage et `revision` change. Les
+  champs `branch` / `revision` changent aussi quand des modifications sont en attente (un identifiant `01a1…`
+  apparaît, puis la branche principale revient après l'archivage) : ce n'est pas un archivage.
+- Deux projets du même compte ont le même `remote_url` et la même `identity` dans `.lore/config.toml`, mais un
+  `.lore/id` différent : c'est `id` qui identifie le dépôt.
+- **Réouverture d'UEFN** : le serveur MCP répond **avant** que le projet soit chargé (`CheckIn: no project is
+  currently open.` pendant environ 2 min 30, même pour un petit projet). POP garde l'action en attente et réessaie
+  toutes les 20 s pendant 10 minutes.
+- Une session MCP ne survit pas au redémarrage d'UEFN (`Missing required Mcp-Session-Id header`) ; `ping` passe
+  pourtant sans session. pop-link refait donc une connexion complète (initialize) au lieu de se fier au `ping`.
