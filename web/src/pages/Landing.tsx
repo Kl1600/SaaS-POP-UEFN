@@ -13,16 +13,16 @@ import { useI18n, resetHtmlLang, type Dict } from '../i18n'
 
 // Tarifs : à ajuster ici. Accès sur liste d'attente pendant la bêta privée (aucun paiement n'est branché).
 // Les textes viennent du dictionnaire de langue (src/i18n) ; ici seulement les prix et les cases du tableau.
+// Deux abonnements ; à l'ouverture, 7 jours d'essai gratuit de Pro pour chaque nouveau compte.
 const PLANS = [
-  { id: 'createur', price: '0 €', per: false },
-  { id: 'studio', price: '19 €', per: true, best: true },
-  { id: 'forge', price: '49 €', per: true, soon: true },
+  { id: 'starter', price: '12,99 €', per: true },
+  { id: 'pro', price: '24,99 €', per: true, best: true },
 ]
 // U = illimité, S = bientôt ; [] = titre de groupe. Même ordre que pricing.rows.
 const ROWS: (string | boolean)[][] = [
-  [], [true, true, true], [true, true, true], [true, true, true], ['1', 'U', 'U'], ['3', 'U', 'U'],
-  [], [true, true, true], [false, true, true], ['1', 'U', 'U'], [false, false, 'S'],
-  [], [true, true, true], [false, true, true], [true, true, true], [false, true, true], [false, true, true],
+  [], [true, true], [true, true], [true, true], ['U', 'U'], ['U', 'U'],
+  [], [true, true], [true, true], ['U', 'U'], [false, 'S'],
+  [], [false, true], [false, true], [true, true], [true, true], [true, true],
 ]
 
 function useReveal() {
@@ -230,14 +230,14 @@ export default function Landing() {
     <section className="lsec" id="tarifs">
       <div className="lhead" data-reveal><span className="leyebrow">{P.eyebrow}</span><h2>{P.h2}</h2><p>{P.p}</p></div>
       <div className="lplans" data-reveal>{PLANS.map((p, i) => { const tx = P.plans[i]; return <div key={p.id} className={'lplan' + (p.best ? ' best' : '')}>
-        <div className="mrow" style={{ justifyContent: 'space-between' }}><h3>{tx.name}</h3><span className={'ltag' + (p.soon ? ' soon' : '')}>{tx.tag}</span></div>
+        <div className="mrow" style={{ justifyContent: 'space-between' }}><h3>{tx.name}</h3><span className={'ltag' + ((p as any).soon ? " soon" : "")}>{tx.tag}</span></div>
         <div className="lprice"><b>{p.price}</b><span>{p.per ? P.perMonth : ''}</span></div>
         <p>{tx.desc}</p>
         <button className={'lbtn' + (p.best ? ' pri' : '')} onClick={signup}>{tx.cta} <ArrowRight size={16} /></button>
       </div> })}</div>
       <div className="ltable" data-reveal><table>
         <thead><tr><th>{P.compare}</th>{P.plans.map(p => <th key={p.name}>{p.name}</th>)}</tr></thead>
-        <tbody>{ROWS.map((vals, r) => vals.length === 0 ? <tr key={r} className="grp"><td colSpan={4}>{P.rows[r]}</td></tr> :
+        <tbody>{ROWS.map((vals, r) => vals.length === 0 ? <tr key={r} className="grp"><td colSpan={3}>{P.rows[r]}</td></tr> :
           <tr key={r}><td>{P.rows[r]}</td>{vals.map((v, i) => <td key={i}>{cell(v)}</td>)}</tr>)}</tbody>
       </table></div>
     </section>

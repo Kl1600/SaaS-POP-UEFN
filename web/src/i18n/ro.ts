@@ -27,21 +27,20 @@ const ro: Dict = {
   },
   stats: [['1 h', 'pe sarcină, ca să avansezi zilnic'], ['0', 'servicii IA externe obligatorii'], ['7 zile', 'de statistici pe hartă, din API-ul Epic'], ['100%', 'din acțiunile UEFN reversibile']],
   pricing: {
-    eyebrow: 'Prețuri', h2: 'Alege-ți planul.', p: 'POP e în beta privată: accesul se face pe lista de așteptare. Prețurile se aplică la lansare și vei fi anunțat înainte de orice plată.',
+    eyebrow: 'Prețuri', h2: 'Alege-ți planul.', p: "POP este în beta privată: accesul se face prin lista de așteptare. La lansare, fiecare cont începe cu 7 zile de probă gratuită Pro, fără card.",
     perMonth: '/ lună', compare: 'Compară planurile', unlimited: 'Nelimitat', soon: 'În curând',
     plans: [
-      { name: 'Creator', tag: 'Pentru început', desc: 'O hartă, o echipă mică, tot esențialul.', cta: 'Intră pe listă' },
-      { name: 'Studio', tag: 'Cel mai complet', desc: 'Pentru studiourile care lansează hărți în echipă.', cta: 'Intră pe listă' },
-      { name: 'Studio+', tag: 'În curând', desc: 'Tot din Studio, plus POP Forge: aplicația desktop care construiește în UEFN.', cta: 'Intră pe listă' },
+      { name: 'Starter', tag: "Pentru creat", desc: "Tot spațiul de lucru pentru a-ți crea hărțile, singur sau în echipă.", cta: 'Intră pe listă' },
+      { name: 'Pro', tag: "Cel mai complet", desc: "Tot din Starter, plus analiza: idei de hărți, piață, urmărire Discover.", cta: 'Intră pe listă' },
     ],
-    rows: ['Organizare', 'Sarcini de o oră, Kanban, dependențe', 'Asistent integrat (rezumatul zilei, întârzieri)', 'Pagini, tablă albă, planificare și etape', 'Hărți', 'Membri', 'UEFN', 'UEFN Link: proiecte sincronizate', 'Organizator de actori și modificări în masă', 'IA conectate (Claude, Cursor, Codex…)', 'POP Forge: construcție asistată în UEFN', 'Creștere', 'Analiza pieței și hărți care merg', 'Trenduri video TikTok și YouTube Shorts', 'Schimb de playtesturi și ziua lansării', 'Împărțirea câștigurilor și extrase', 'Discord, GitHub, Lore'],
+    rows: ['Organizare', 'Sarcini de o oră, Kanban, dependențe', 'Asistent integrat (rezumatul zilei, întârzieri)', 'Pagini, tablă albă, planificare și etape', 'Hărți', 'Membri', 'UEFN', 'UEFN Link: proiecte sincronizate', 'Organizator de actori și modificări în masă', 'IA conectate (Claude, Cursor, Codex…)', 'POP Forge: construcție asistată în UEFN', 'Creștere', "Idei de hărți, analiza pieței, urmărire Discover", 'Trenduri video TikTok și YouTube Shorts', 'Schimb de playtesturi și ziua lansării', 'Împărțirea câștigurilor și extrase', 'Discord, GitHub, Lore'],
   },
   faq: {
     eyebrow: 'Întrebări', h2: 'Întrebările pe care le primim.',
     items: [
       ['Am nevoie de un PC cu Windows?', 'Pentru a lega UEFN, da: UEFN rulează doar pe Windows, iar UEFN Link pornește pe acel PC. Restul POP merge în orice browser, inclusiv pe Mac.'],
       ['POP îmi publică harta?', 'Nu. POP pregătește totul (verificare înainte de publicare, playtesturi, planul zilei lansării), dar publicarea se face mereu în portalul de creatori Epic.'],
-      ['Merge POP dacă lucrez singur?', 'Da. POP e făcut atât pentru creatorii care lucrează singuri, cât și pentru echipe: planul Creator e gratuit pentru o hartă și poți invita membri mai târziu fără să schimbi nimic.'],
+      ['Merge POP dacă lucrez singur?', "Da. POP e făcut atât pentru creatorii solo, cât și pentru echipe, încă din planul Starter: poți invita membri mai târziu fără să schimbi nimic."],
       ['Ce IA pot conecta?', 'Pe cele care acceptă servere MCP: Claude Code, Claude Desktop, Cursor, Codex, Windsurf, VS Code (GitHub Copilot), Gemini CLI. Claude Desktop cere ca POP să fie online prin HTTPS. Abonamentul la IA ta nu e inclus în POP. IA de chat din browser (ChatGPT, Gemini, Copilot pe web) nu sunt suportate deocamdată. Odată conectată în „IA conectate”, IA ta citește și modifică sarcinile și actorii UEFN, scrie Verse, iar fiecare acțiune e înregistrată și reversibilă.'],
       ['De unde vin cifrele din analiză?', 'Din API-ul oficial Fortnite de la Epic: jucători, vârf de jucători simultani, timp de joc și retenție pentru fiecare hartă publică, pe 7 zile.'],
       ['Cum obțin acces?', 'POP e în beta privată. Intră pe lista de așteptare: verificăm cererile una câte una, apoi îți trimitem numele de utilizator și o parolă provizorie, pe care o schimbi la prima conectare.'],

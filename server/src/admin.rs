@@ -295,7 +295,7 @@ pub async fn create_account(State(st): State<AppState>, u: AuthUser, Json(b): Js
         Some(p) => { crate::security::password_policy(p, &email)?; p.to_string() }
         None => temp_password(),
     };
-    let plan = b.plan.as_deref().unwrap_or("studio");
+    let plan = b.plan.as_deref().unwrap_or("pro");
     if !crate::billing::PLANS.contains(&plan) { return Err(bad("Plan inconnu.")) }
     let id: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash, username, must_change_password, plan) VALUES (?, ?, ?, ?, 1, ?) RETURNING id")
         .bind(&email).bind(&name).bind(crate::auth::hash_password(&password)?).bind(&username).bind(plan).fetch_one(&st.db).await?;

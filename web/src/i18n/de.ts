@@ -27,21 +27,20 @@ const de: Dict = {
   },
   stats: [['1 Std.', 'pro Aufgabe, um jeden Tag voranzukommen'], ['0', 'externe KI-Dienste nötig'], ['7 Tage', 'Statistiken pro Map, aus der API von Epic'], ['100 %', 'der UEFN-Aktionen rückgängig machbar']],
   pricing: {
-    eyebrow: 'Preise', h2: 'Wähle deinen Plan.', p: 'POP ist in der privaten Beta: Zugang über die Warteliste. Die Preise gelten ab dem Start, und du wirst vor jeder Zahlung informiert.',
+    eyebrow: 'Preise', h2: 'Wähle deinen Plan.', p: "POP ist in der privaten Beta: Zugang über die Warteliste. Zum Start beginnt jedes Konto mit 7 Tagen kostenlosem Pro-Test, ohne Karte.",
     perMonth: '/ Monat', compare: 'Pläne vergleichen', unlimited: 'Unbegrenzt', soon: 'Bald',
     plans: [
-      { name: 'Creator', tag: 'Zum Einstieg', desc: 'Eine Map, ein kleines Team, alles Wesentliche.', cta: 'Auf die Liste' },
-      { name: 'Studio', tag: 'Am umfassendsten', desc: 'Für Studios, die Maps im Team veröffentlichen.', cta: 'Auf die Liste' },
-      { name: 'Studio+', tag: 'Bald', desc: 'Alles aus Studio, plus POP Forge: die Desktop-App, die in UEFN baut.', cta: 'Auf die Liste' },
+      { name: 'Starter', tag: "Zum Erstellen", desc: "Der komplette Arbeitsbereich für deine Maps, allein oder im Team.", cta: 'Auf die Liste' },
+      { name: 'Pro', tag: "Am vollständigsten", desc: "Alles aus Starter, plus Analyse: Map-Ideen, Markt, Discover-Tracking.", cta: 'Auf die Liste' },
     ],
-    rows: ['Organisation', 'Einstündige Aufgaben, Kanban, Abhängigkeiten', 'Integrierter Assistent (Tageszusammenfassung, Verzug)', 'Seiten, Whiteboard, Planung und Meilensteine', 'Maps', 'Mitglieder', 'UEFN', 'UEFN Link: synchronisierte Projekte', 'Actor-Organizer und Massenbearbeitung', 'Verbundene KIs (Claude, Cursor, Codex…)', 'POP Forge: unterstütztes Bauen in UEFN', 'Wachstum', 'Marktanalyse und Maps, die laufen', 'Videotrends TikTok und YouTube Shorts', 'Playtest-Austausch und Release-Tag', 'Umsatzaufteilung und Abrechnungen', 'Discord, GitHub, Lore'],
+    rows: ['Organisation', 'Einstündige Aufgaben, Kanban, Abhängigkeiten', 'Integrierter Assistent (Tageszusammenfassung, Verzug)', 'Seiten, Whiteboard, Planung und Meilensteine', 'Maps', 'Mitglieder', 'UEFN', 'UEFN Link: synchronisierte Projekte', 'Actor-Organizer und Massenbearbeitung', 'Verbundene KIs (Claude, Cursor, Codex…)', 'POP Forge: unterstütztes Bauen in UEFN', 'Wachstum', "Map-Ideen, Marktanalyse, Discover-Tracking", 'Videotrends TikTok und YouTube Shorts', 'Playtest-Austausch und Release-Tag', 'Umsatzaufteilung und Abrechnungen', 'Discord, GitHub, Lore'],
   },
   faq: {
     eyebrow: 'FAQ', h2: 'Fragen, die uns gestellt werden.',
     items: [
       ['Brauche ich einen Windows-PC?', 'Um UEFN zu verbinden, ja: UEFN läuft nur unter Windows, und UEFN Link läuft auf diesem PC. Der Rest von POP funktioniert in jedem Browser, auch auf dem Mac.'],
       ['Veröffentlicht POP meine Map?', 'Nein. POP bereitet alles vor (Prüfung vor der Veröffentlichung, Playtests, Plan für den Release-Tag), veröffentlicht wird aber immer im Creator-Portal von Epic.'],
-      ['Funktioniert POP auch, wenn ich allein erstelle?', 'Ja. POP ist für Solo-Creator genauso wie für Teams: Der Creator-Plan ist für eine Map kostenlos, und du kannst später Mitglieder einladen, ohne etwas zu ändern.'],
+      ['Funktioniert POP auch, wenn ich allein erstelle?', "Ja. POP ist ab dem Starter-Plan für Solo-Creator und Teams gemacht: Du kannst später Mitglieder einladen, ohne etwas zu ändern."],
       ['Welche KIs kann ich verbinden?', 'Alle, die MCP-Server unterstützen: Claude Code, Claude Desktop, Cursor, Codex, Windsurf, VS Code (GitHub Copilot), Gemini CLI. Claude Desktop setzt voraus, dass POP per HTTPS online ist. Das Abo deiner KI ist nicht in POP enthalten. Chat-KIs im Browser (ChatGPT, Gemini, Copilot im Web) werden vorerst nicht unterstützt. Einmal unter „Verbundene KIs“ verbunden, liest und bearbeitet deine KI Aufgaben und UEFN-Akteure, schreibt Verse, und jede Aktion wird protokolliert und lässt sich rückgängig machen.'],
       ['Woher kommen die Zahlen der Analyse?', 'Aus der offiziellen Fortnite-API von Epic: Spieler, Spitzenwert gleichzeitiger Spieler, Spielzeit und Bindung jeder öffentlichen Map über 7 Tage.'],
       ['Wie bekomme ich Zugang?', 'POP ist in einer geschlossenen Beta. Trag dich in die Warteliste ein: Wir prüfen die Anfragen einzeln und schicken dir dann deinen Benutzernamen und ein vorläufiges Passwort, das du beim ersten Login änderst.'],

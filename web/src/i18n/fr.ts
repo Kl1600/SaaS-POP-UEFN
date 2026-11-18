@@ -28,21 +28,20 @@ const fr = {
   },
   stats: [['1 h', 'par tâche, pour avancer chaque jour'], ['0', 'service d’IA externe obligatoire'], ['7 jours', 'de stats par map, de l’API d’Epic'], ['100 %', 'des actions UEFN annulables']],
   pricing: {
-    eyebrow: 'Tarifs', h2: 'Choisissez votre plan.', p: 'POP est en bêta privée : l’accès se fait sur liste d’attente. Les tarifs s’appliquent à l’ouverture, et vous serez prévenu avant tout paiement.',
+    eyebrow: 'Tarifs', h2: 'Choisissez votre plan.', p: "POP est en bêta privée : l’accès se fait sur liste d’attente. À l’ouverture, chaque compte commence par 7 jours d’essai gratuit de Pro, sans carte.",
     perMonth: '/ mois', compare: 'Comparer les plans', unlimited: 'Illimité', soon: 'Bientôt',
     plans: [
-      { name: 'Créateur', tag: 'Pour se lancer', desc: 'Une map, une petite équipe, tout l’essentiel.', cta: 'Rejoindre la liste' },
-      { name: 'Studio', tag: 'Le plus complet', desc: 'Pour les studios qui sortent des maps en équipe.', cta: 'Rejoindre la liste' },
-      { name: 'Studio+', tag: 'Bientôt', desc: 'Tout Studio, plus POP Forge : l’app de bureau qui construit dans UEFN.', cta: 'Rejoindre la liste' },
+      { name: 'Starter', tag: "Pour créer", desc: "Tout l’espace de travail pour créer vos maps, seul ou en équipe.", cta: 'Rejoindre la liste' },
+      { name: 'Pro', tag: "Le plus complet", desc: "Tout Starter, plus l’analyse : idées de maps, marché, suivi Discover.", cta: 'Rejoindre la liste' },
     ],
-    rows: ['Organisation', 'Tâches d’une heure, Kanban, dépendances', 'Assistant intégré (résumé du jour, retards)', 'Pages, tableau blanc, planning et jalons', 'Maps', 'Membres', 'UEFN', 'UEFN Link : projets synchronisés', 'Organiseur d’acteurs et modifications en lot', 'IA connectées (Claude, Cursor, Codex…)', 'POP Forge : construction assistée dans UEFN', 'Croissance', 'Analyse du marché et maps qui marchent', 'Tendances vidéo TikTok et YouTube Shorts', 'Échange de playtests et jour J', 'Partage des gains et relevés', 'Discord, GitHub, Lore'],
+    rows: ['Organisation', 'Tâches d’une heure, Kanban, dépendances', 'Assistant intégré (résumé du jour, retards)', 'Pages, tableau blanc, planning et jalons', 'Maps', 'Membres', 'UEFN', 'UEFN Link : projets synchronisés', 'Organiseur d’acteurs et modifications en lot', 'IA connectées (Claude, Cursor, Codex…)', 'POP Forge : construction assistée dans UEFN', 'Croissance', "Idées de maps, analyse du marché, suivi Discover", 'Tendances vidéo TikTok et YouTube Shorts', 'Échange de playtests et jour J', 'Partage des gains et relevés', 'Discord, GitHub, Lore'],
   },
   faq: {
     eyebrow: 'FAQ', h2: 'Les questions qu’on nous pose.',
     items: [
       ['Faut-il un PC Windows ?', 'Pour relier UEFN, oui : UEFN ne tourne que sur Windows, et UEFN Link se lance sur ce PC. Le reste de POP s’utilise depuis n’importe quel navigateur, Mac compris.'],
       ['Est-ce que POP publie ma map ?', 'Non. POP prépare tout (vérification avant publication, playtests, plan du jour J), mais la publication se fait toujours dans le portail créateur d’Epic.'],
-      ['POP marche-t-il si je crée seul ?', 'Oui. POP sert aux créateurs seuls comme aux équipes : le plan Créateur est gratuit pour une map, et vous pouvez inviter des membres plus tard sans rien changer.'],
+      ['POP marche-t-il si je crée seul ?', "Oui. POP sert aux créateurs seuls comme aux équipes, dès le plan Starter : vous pouvez inviter des membres plus tard sans rien changer."],
       ['Quelles IA puis-je connecter ?', 'Celles qui acceptent les serveurs MCP : Claude Code, Claude Desktop, Cursor, Codex, Windsurf, VS Code (GitHub Copilot), Gemini CLI. Claude Desktop demande que POP soit en ligne en HTTPS. L’abonnement à votre IA n’est pas compris dans POP. Les IA de discussion dans le navigateur (ChatGPT, Gemini, Copilot sur le web) ne sont pas prises en charge pour l’instant. Une fois connectée dans « IA connectées », votre IA lit et modifie vos tâches et vos acteurs UEFN, écrit le Verse, et chaque action est notée et annulable.'],
       ['D’où viennent les chiffres de l’analyse ?', 'De l’API officielle Fortnite d’Epic : joueurs, pic de joueurs simultanés, temps de jeu et rétention de chaque map publique, sur 7 jours.'],
       ['Comment avoir accès ?', 'POP est en bêta privée. Rejoignez la liste d’attente : on valide les demandes une par une, puis on vous envoie votre identifiant et un mot de passe provisoire, que vous changez à la première connexion.'],

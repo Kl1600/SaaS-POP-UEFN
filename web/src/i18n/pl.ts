@@ -27,21 +27,20 @@ const pl: Dict = {
   },
   stats: [['1 h', 'na zadanie, by codziennie iść do przodu'], ['0', 'wymaganych zewnętrznych usług AI'], ['7 dni', 'statystyk na mapę, z API Epic'], ['100%', 'akcji w UEFN do cofnięcia']],
   pricing: {
-    eyebrow: 'Cennik', h2: 'Wybierz plan.', p: 'POP jest w zamkniętej becie: dostęp przez listę oczekujących. Ceny obowiązują od startu, a przed każdą płatnością dostaniesz powiadomienie.',
+    eyebrow: 'Cennik', h2: 'Wybierz plan.', p: "POP jest w zamkniętej becie: dostęp przez listę oczekujących. Po otwarciu każde konto zaczyna od 7 dni darmowego okresu próbnego Pro, bez karty.",
     perMonth: '/ mies.', compare: 'Porównaj plany', unlimited: 'Bez limitu', soon: 'Wkrótce',
     plans: [
-      { name: 'Twórca', tag: 'Na start', desc: 'Jedna mapa, mały zespół, wszystko, co najważniejsze.', cta: 'Dołącz do listy' },
-      { name: 'Studio', tag: 'Najpełniejszy', desc: 'Dla studiów, które wydają mapy zespołowo.', cta: 'Dołącz do listy' },
-      { name: 'Studio+', tag: 'Wkrótce', desc: 'Wszystko ze Studio plus POP Forge: aplikacja desktopowa, która buduje w UEFN.', cta: 'Dołącz do listy' },
+      { name: 'Starter', tag: "Do tworzenia", desc: "Cała przestrzeń robocza do tworzenia map, solo lub w zespole.", cta: 'Dołącz do listy' },
+      { name: 'Pro', tag: "Najpełniejszy", desc: "Wszystko ze Starter oraz analiza: pomysły na mapy, rynek, śledzenie Discover.", cta: 'Dołącz do listy' },
     ],
-    rows: ['Organizacja', 'Zadania na godzinę, Kanban, zależności', 'Wbudowany asystent (podsumowanie dnia, opóźnienia)', 'Strony, tablica, planowanie i kamienie milowe', 'Mapy', 'Członkowie', 'UEFN', 'UEFN Link: zsynchronizowane projekty', 'Organizer aktorów i zmiany zbiorcze', 'Połączone AI (Claude, Cursor, Codex…)', 'POP Forge: wspomagane budowanie w UEFN', 'Rozwój', 'Analiza rynku i mapy, które działają', 'Trendy wideo TikTok i YouTube Shorts', 'Wymiana playtestów i dzień premiery', 'Podział zarobków i zestawienia', 'Discord, GitHub, Lore'],
+    rows: ['Organizacja', 'Zadania na godzinę, Kanban, zależności', 'Wbudowany asystent (podsumowanie dnia, opóźnienia)', 'Strony, tablica, planowanie i kamienie milowe', 'Mapy', 'Członkowie', 'UEFN', 'UEFN Link: zsynchronizowane projekty', 'Organizer aktorów i zmiany zbiorcze', 'Połączone AI (Claude, Cursor, Codex…)', 'POP Forge: wspomagane budowanie w UEFN', 'Rozwój', "Pomysły na mapy, analiza rynku, śledzenie Discover", 'Trendy wideo TikTok i YouTube Shorts', 'Wymiana playtestów i dzień premiery', 'Podział zarobków i zestawienia', 'Discord, GitHub, Lore'],
   },
   faq: {
     eyebrow: 'FAQ', h2: 'Pytania, które słyszymy.',
     items: [
       ['Czy potrzebuję PC z Windows?', 'Do połączenia z UEFN tak: UEFN działa tylko na Windows, a UEFN Link uruchamia się na tym PC. Reszta POP działa w każdej przeglądarce, także na Macu.'],
       ['Czy POP publikuje moją mapę?', 'Nie. POP przygotowuje wszystko (kontrola przed publikacją, playtesty, plan dnia premiery), ale publikacja zawsze odbywa się w portalu twórców Epic.'],
-      ['Czy POP działa, jeśli tworzę sam?', 'Tak. POP jest dla twórców solo i dla zespołów: plan Twórca jest darmowy dla jednej mapy, a członków możesz zaprosić później bez żadnych zmian.'],
+      ['Czy POP działa, jeśli tworzę sam?', "Tak. POP służy zarówno twórcom solo, jak i zespołom, już od planu Starter: możesz później zaprosić członków bez żadnych zmian."],
       ['Jakie AI mogę połączyć?', 'Te, które obsługują serwery MCP: Claude Code, Claude Desktop, Cursor, Codex, Windsurf, VS Code (GitHub Copilot), Gemini CLI. Claude Desktop wymaga, by POP był dostępny online przez HTTPS. Subskrypcja twojego AI nie jest wliczona w POP. Czatowe AI w przeglądarce (ChatGPT, Gemini, Copilot w sieci) na razie nie są obsługiwane. Po połączeniu w „Połączone AI” twoje AI czyta i edytuje zadania oraz aktorów UEFN, pisze Verse, a każda akcja jest zapisana i odwracalna.'],
       ['Skąd pochodzą dane w analizie?', 'Z oficjalnego API Fortnite od Epic: gracze, szczyt jednoczesnych graczy, czas gry i retencja każdej publicznej mapy, z 7 dni.'],
       ['Jak uzyskać dostęp?', 'POP jest w zamkniętej becie. Dołącz do listy oczekujących: sprawdzamy zgłoszenia pojedynczo, a potem wysyłamy ci login i tymczasowe hasło, które zmienisz przy pierwszym logowaniu.'],

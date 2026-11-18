@@ -27,21 +27,20 @@ const en: Dict = {
   },
   stats: [['1 h', 'per task, to move forward every day'], ['0', 'external AI service required'], ['7 days', 'of stats per map, from Epic’s API'], ['100%', 'of UEFN actions undoable']],
   pricing: {
-    eyebrow: 'Pricing', h2: 'Choose your plan.', p: 'POP is in private beta: access is by waitlist. Prices apply at launch, and you’ll be notified before any payment.',
+    eyebrow: 'Pricing', h2: 'Choose your plan.', p: "POP is in private beta: access is via the waitlist. At launch, every account starts with a 7-day free trial of Pro, no card needed.",
     perMonth: '/ month', compare: 'Compare plans', unlimited: 'Unlimited', soon: 'Soon',
     plans: [
-      { name: 'Creator', tag: 'To get started', desc: 'One map, a small team, all the essentials.', cta: 'Join the list' },
-      { name: 'Studio', tag: 'Most complete', desc: 'For studios that ship maps as a team.', cta: 'Join the list' },
-      { name: 'Studio+', tag: 'Soon', desc: 'Everything in Studio, plus POP Forge: the desktop app that builds inside UEFN.', cta: 'Join the list' },
+      { name: 'Starter', tag: "To build", desc: "The whole workspace to build your maps, solo or as a team.", cta: 'Join the list' },
+      { name: 'Pro', tag: "Most complete", desc: "Everything in Starter, plus analytics: map ideas, market, Discover tracking.", cta: 'Join the list' },
     ],
-    rows: ['Organization', 'One-hour tasks, Kanban, dependencies', 'Built-in assistant (daily summary, delays)', 'Pages, whiteboard, planning and milestones', 'Maps', 'Members', 'UEFN', 'UEFN Link: synced projects', 'Actor organizer and bulk edits', 'Connected AIs (Claude, Cursor, Codex…)', 'POP Forge: assisted building in UEFN', 'Growth', 'Market analysis and maps that work', 'TikTok and YouTube Shorts video trends', 'Playtest exchange and launch day', 'Revenue sharing and statements', 'Discord, GitHub, Lore'],
+    rows: ['Organization', 'One-hour tasks, Kanban, dependencies', 'Built-in assistant (daily summary, delays)', 'Pages, whiteboard, planning and milestones', 'Maps', 'Members', 'UEFN', 'UEFN Link: synced projects', 'Actor organizer and bulk edits', 'Connected AIs (Claude, Cursor, Codex…)', 'POP Forge: assisted building in UEFN', 'Growth', "Map ideas, market analysis, Discover tracking", 'TikTok and YouTube Shorts video trends', 'Playtest exchange and launch day', 'Revenue sharing and statements', 'Discord, GitHub, Lore'],
   },
   faq: {
     eyebrow: 'FAQ', h2: 'Questions we get asked.',
     items: [
       ['Do I need a Windows PC?', 'To link UEFN, yes: UEFN only runs on Windows, and UEFN Link runs on that PC. The rest of POP works in any browser, Mac included.'],
       ['Does POP publish my map?', 'No. POP prepares everything (pre-publish check, playtests, launch-day plan), but publishing always happens in Epic’s creator portal.'],
-      ['Does POP work if I create solo?', 'Yes. POP is for solo creators and teams alike: the Creator plan is free for one map, and you can invite members later without changing anything.'],
+      ['Does POP work if I create solo?', "Yes. POP works for solo creators and teams alike, from the Starter plan: you can invite members later without changing anything."],
       ['Which AIs can I connect?', 'Those that support MCP servers: Claude Code, Claude Desktop, Cursor, Codex, Windsurf, VS Code (GitHub Copilot), Gemini CLI. Claude Desktop requires POP to be online over HTTPS. Your AI subscription isn’t included in POP. Chat AIs in the browser (ChatGPT, Gemini, Copilot on the web) aren’t supported for now. Once connected in “Connected AIs”, your AI reads and edits your tasks and UEFN actors, writes Verse, and every action is logged and undoable.'],
       ['Where do the analytics numbers come from?', 'From Epic’s official Fortnite API: players, peak concurrent players, playtime and retention for every public map, over 7 days.'],
       ['How do I get access?', 'POP is in private beta. Join the waitlist: we review requests one by one, then send you your username and a temporary password, which you change at your first login.'],

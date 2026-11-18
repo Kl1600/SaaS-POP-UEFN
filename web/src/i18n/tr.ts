@@ -27,21 +27,20 @@ const tr: Dict = {
   },
   stats: [['1 sa', 'görev başına, her gün ilerlemek için'], ['0', 'zorunlu harici yapay zekâ hizmeti'], ['7 gün', 'harita başına istatistik, Epic API’sinden'], ['%100', 'UEFN işlemleri geri alınabilir']],
   pricing: {
-    eyebrow: 'Fiyatlar', h2: 'Planınızı seçin.', p: 'POP kapalı betada: erişim bekleme listesiyle. Fiyatlar açılışta geçerli olur ve herhangi bir ödemeden önce haber verilir.',
+    eyebrow: 'Fiyatlar', h2: 'Planınızı seçin.', p: "POP kapalı betada: erişim bekleme listesiyle. Açılışta her hesap kartsız 7 günlük ücretsiz Pro denemesiyle başlar.",
     perMonth: '/ ay', compare: 'Planları karşılaştır', unlimited: 'Sınırsız', soon: 'Yakında',
     plans: [
-      { name: 'Üretici', tag: 'Başlamak için', desc: 'Bir harita, küçük bir ekip, tüm temel özellikler.', cta: 'Listeye katıl' },
-      { name: 'Studio', tag: 'En kapsamlı', desc: 'Ekip olarak harita çıkaran stüdyolar için.', cta: 'Listeye katıl' },
-      { name: 'Studio+', tag: 'Yakında', desc: 'Studio’daki her şey artı POP Forge: UEFN içinde inşa eden masaüstü uygulaması.', cta: 'Listeye katıl' },
+      { name: 'Starter', tag: "Oluşturmak için", desc: "Haritalarını tek başına ya da ekiple oluşturman için tüm çalışma alanı.", cta: 'Listeye katıl' },
+      { name: 'Pro', tag: "En kapsamlı", desc: "Starter’daki her şey, artı analiz: harita fikirleri, pazar, Discover takibi.", cta: 'Listeye katıl' },
     ],
-    rows: ['Organizasyon', 'Bir saatlik görevler, Kanban, bağımlılıklar', 'Yerleşik asistan (günün özeti, gecikmeler)', 'Sayfalar, beyaz tahta, planlama ve kilometre taşları', 'Haritalar', 'Üyeler', 'UEFN', 'UEFN Link: senkronize projeler', 'Aktör düzenleyici ve toplu düzenleme', 'Bağlı yapay zekâlar (Claude, Cursor, Codex…)', 'POP Forge: UEFN’de destekli inşa', 'Büyüme', 'Pazar analizi ve işe yarayan haritalar', 'TikTok ve YouTube Shorts video trendleri', 'Playtest takası ve çıkış günü', 'Gelir paylaşımı ve dökümler', 'Discord, GitHub, Lore'],
+    rows: ['Organizasyon', 'Bir saatlik görevler, Kanban, bağımlılıklar', 'Yerleşik asistan (günün özeti, gecikmeler)', 'Sayfalar, beyaz tahta, planlama ve kilometre taşları', 'Haritalar', 'Üyeler', 'UEFN', 'UEFN Link: senkronize projeler', 'Aktör düzenleyici ve toplu düzenleme', 'Bağlı yapay zekâlar (Claude, Cursor, Codex…)', 'POP Forge: UEFN’de destekli inşa', 'Büyüme', "Harita fikirleri, pazar analizi, Discover takibi", 'TikTok ve YouTube Shorts video trendleri', 'Playtest takası ve çıkış günü', 'Gelir paylaşımı ve dökümler', 'Discord, GitHub, Lore'],
   },
   faq: {
     eyebrow: 'SSS', h2: 'Bize sorulan sorular.',
     items: [
       ['Windows bilgisayar gerekli mi?', 'UEFN’i bağlamak için evet: UEFN yalnızca Windows’ta çalışır ve UEFN Link o bilgisayarda açılır. POP’un geri kalanı Mac dahil her tarayıcıda çalışır.'],
       ['POP haritamı yayımlar mı?', 'Hayır. POP her şeyi hazırlar (yayın öncesi kontrol, playtest’ler, çıkış günü planı), ancak yayın her zaman Epic’in içerik üretici portalında yapılır.'],
-      ['Tek başıma üretirsem POP işe yarar mı?', 'Evet. POP hem tek başına üretenler hem ekipler içindir: Üretici planı bir harita için ücretsizdir, üyeleri daha sonra hiçbir şeyi değiştirmeden davet edebilirsiniz.'],
+      ['Tek başıma üretirsem POP işe yarar mı?', "Evet. POP, Starter planından itibaren hem tek başına çalışanlara hem ekiplere uygun: daha sonra hiçbir şeyi değiştirmeden üye davet edebilirsin."],
       ['Hangi yapay zekâları bağlayabilirim?', 'MCP sunucularını destekleyenler: Claude Code, Claude Desktop, Cursor, Codex, Windsurf, VS Code (GitHub Copilot), Gemini CLI. Claude Desktop için POP’un HTTPS ile çevrimiçi olması gerekir. Yapay zekâ aboneliğiniz POP’a dahil değildir. Tarayıcıdaki sohbet yapay zekâları (ChatGPT, Gemini, web’de Copilot) şimdilik desteklenmiyor. “Bağlı yapay zekâlar”da bağlandıktan sonra yapay zekânız görevlerinizi ve UEFN aktörlerinizi okuyup düzenler, Verse yazar; her işlem kaydedilir ve geri alınabilir.'],
       ['Analizdeki rakamlar nereden geliyor?', 'Epic’in resmî Fortnite API’sinden: her herkese açık harita için 7 günlük oyuncu sayısı, eşzamanlı oyuncu zirvesi, oynama süresi ve elde tutma.'],
       ['Nasıl erişim alırım?', 'POP kapalı betada. Bekleme listesine katılın: talepleri tek tek inceliyor, ardından kullanıcı adınızı ve ilk girişte değiştireceğiniz geçici bir şifre gönderiyoruz.'],

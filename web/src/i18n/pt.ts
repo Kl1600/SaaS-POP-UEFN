@@ -28,21 +28,20 @@ const ptBR: Dict = {
   },
   stats: [['1 h', 'por tarefa, para avançar todo dia'], ['0', 'serviço de IA externo obrigatório'], ['7 dias', 'de estatísticas por mapa, da API da Epic'], ['100%', 'das ações no UEFN podem ser desfeitas']],
   pricing: {
-    eyebrow: 'Preços', h2: 'Escolha seu plano.', p: 'O POP está em beta fechado: o acesso é por lista de espera. Os preços valem no lançamento, e você será avisado antes de qualquer pagamento.',
+    eyebrow: 'Preços', h2: 'Escolha seu plano.', p: "O POP está em beta fechado: o acesso é pela lista de espera. Na abertura, toda conta começa com 7 dias de teste grátis do Pro, sem cartão.",
     perMonth: '/ mês', compare: 'Comparar planos', unlimited: 'Ilimitado', soon: 'Em breve',
     plans: [
-      { name: 'Criador', tag: 'Para começar', desc: 'Um mapa, uma equipe pequena, o essencial.', cta: 'Entrar na lista' },
-      { name: 'Studio', tag: 'O mais completo', desc: 'Para estúdios que lançam mapas em equipe.', cta: 'Entrar na lista' },
-      { name: 'Studio+', tag: 'Em breve', desc: 'Tudo do Studio, mais o POP Forge: o app de desktop que constrói no UEFN.', cta: 'Entrar na lista' },
+      { name: 'Starter', tag: "Para criar", desc: "Todo o espaço de trabalho para criar seus mapas, sozinho ou em equipe.", cta: 'Entrar na lista' },
+      { name: 'Pro', tag: "O mais completo", desc: "Tudo do Starter, mais a análise: ideias de mapas, mercado, acompanhamento do Discover.", cta: 'Entrar na lista' },
     ],
-    rows: ['Organização', 'Tarefas de uma hora, Kanban, dependências', 'Assistente integrado (resumo do dia, atrasos)', 'Páginas, quadro branco, planejamento e marcos', 'Mapas', 'Membros', 'UEFN', 'UEFN Link: projetos sincronizados', 'Organizador de atores e edição em lote', 'IAs conectadas (Claude, Cursor, Codex…)', 'POP Forge: construção assistida no UEFN', 'Crescimento', 'Análise de mercado e mapas que funcionam', 'Tendências de vídeo TikTok e YouTube Shorts', 'Troca de playtests e dia do lançamento', 'Divisão de ganhos e extratos', 'Discord, GitHub, Lore'],
+    rows: ['Organização', 'Tarefas de uma hora, Kanban, dependências', 'Assistente integrado (resumo do dia, atrasos)', 'Páginas, quadro branco, planejamento e marcos', 'Mapas', 'Membros', 'UEFN', 'UEFN Link: projetos sincronizados', 'Organizador de atores e edição em lote', 'IAs conectadas (Claude, Cursor, Codex…)', 'POP Forge: construção assistida no UEFN', 'Crescimento', "Ideias de mapas, análise de mercado, acompanhamento do Discover", 'Tendências de vídeo TikTok e YouTube Shorts', 'Troca de playtests e dia do lançamento', 'Divisão de ganhos e extratos', 'Discord, GitHub, Lore'],
   },
   faq: {
     eyebrow: 'FAQ', h2: 'As perguntas que nos fazem.',
     items: [
       ['Preciso de um PC com Windows?', 'Para conectar o UEFN, sim: o UEFN só roda no Windows, e o UEFN Link roda nesse PC. O resto do POP funciona em qualquer navegador, inclusive no Mac.'],
       ['O POP publica meu mapa?', 'Não. O POP prepara tudo (verificação antes da publicação, playtests, plano do dia do lançamento), mas a publicação é sempre feita no portal de criadores da Epic.'],
-      ['O POP funciona se eu criar sozinho?', 'Sim. O POP serve tanto para quem cria sozinho quanto para equipes: o plano Criador é gratuito para um mapa, e você pode convidar membros depois sem mudar nada.'],
+      ['O POP funciona se eu criar sozinho?', "Sim. O POP serve tanto para criadores solo quanto para equipes, desde o plano Starter: você pode convidar membros depois sem mudar nada."],
       ['Quais IAs posso conectar?', 'As que aceitam servidores MCP: Claude Code, Claude Desktop, Cursor, Codex, Windsurf, VS Code (GitHub Copilot), Gemini CLI. O Claude Desktop exige que o POP esteja online com HTTPS. A assinatura da sua IA não está incluída no POP. IAs de chat no navegador (ChatGPT, Gemini, Copilot na web) ainda não são suportadas. Depois de conectada em “IAs conectadas”, sua IA lê e edita suas tarefas e atores do UEFN, escreve Verse, e toda ação é registrada e pode ser desfeita.'],
       ['De onde vêm os números da análise?', 'Da API oficial do Fortnite da Epic: jogadores, pico de jogadores simultâneos, tempo de jogo e retenção de cada mapa público, por 7 dias.'],
       ['Como consigo acesso?', 'O POP está em beta fechado. Entre na lista de espera: analisamos os pedidos um a um e depois enviamos seu usuário e uma senha provisória, que você troca no primeiro acesso.'],

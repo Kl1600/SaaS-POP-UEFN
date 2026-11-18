@@ -2317,6 +2317,16 @@ const EN: Record<string, string> = {
  "Appris sur {0} nouvelles maps suivies par POP, dont {1} ont percé. Fiabilité : {2} %.": "Learned from {0} new maps tracked by POP, {1} of which broke through. Reliability: {2}%.",
  "La « chance de percer » s’affichera quand POP aura suivi assez de nouvelles maps ({0} pour l’instant, dont {1} ont dépassé {2} joueurs).": "The “breakout chance” will show once POP has tracked enough new maps ({0} so far, {1} of which passed {2} players).",
  "Les poids des axes sont appris : POP a vérifié {0} fois après coup si une niche bien notée a vraiment fait percer ses nouvelles maps.": "Axis weights are learned: POP checked {0} times after the fact whether a well-scored niche really made its new maps break through.",
- "Les poids des axes sont ceux de départ : ils s’ajusteront tout seuls quand POP aura assez d’historique pour vérifier ses notes après coup (environ un mois de données).": "Axis weights are the starting ones: they’ll adjust themselves once POP has enough history to check its scores after the fact (about a month of data)."
+ "Les poids des axes sont ceux de départ : ils s’ajusteront tout seuls quand POP aura assez d’historique pour vérifier ses notes après coup (environ un mois de données).": "Axis weights are the starting ones: they’ll adjust themselves once POP has enough history to check its scores after the fact (about a month of data).",
+ "Disponible avec le plan Pro": "Available with the Pro plan",
+ "Analyse (idées de maps, marché, maps qui marchent, meilleurs démarrages, tendances vidéo) est comprise dans le plan Pro. Pendant la bêta, demandez à l’équipe POP de changer votre plan.": "Analytics (map ideas, market, maps that work, best launches, video trends) is included in the Pro plan. During the beta, ask the POP team to change your plan.",
+ "L’onglet Marché de votre studio est compris dans le plan Pro. Avec ce plan, tous les membres du studio y ont accès. Pendant la bêta, demandez à l’équipe POP de changer votre plan.": "Your studio’s Market tab is included in the Pro plan. With it, every studio member gets access. During the beta, ask the POP team to change your plan.",
+ "L’onglet Marché est ouvert quand le créateur du studio a le plan Pro.": "The Market tab opens when the studio’s creator has the Pro plan.",
+ "L’onglet Discover prépare votre sortie selon les règles de l’algorithme d’Epic et suit votre map pendant ses 14 jours de test. Il est compris dans le plan Pro.": "The Discover tab prepares your release according to Epic’s algorithm rules and tracks your map during its 14-day test. It’s included in the Pro plan.",
+ "Analyse est comprise dans le plan Pro": "Analytics is included in the Pro plan",
+ "Deux abonnements : Starter (12,99 €/mois), tout l’espace de travail, et Pro (24,99 €/mois), avec en plus Analyse et l’onglet Discover. Chaque nouveau compte a 7 jours d’essai gratuit de Pro. POP est en bêta privée ; les membres sont prévenus avant tout paiement.": "Two plans: Starter (€12.99/month), the whole workspace, and Pro (€24.99/month), which adds Analytics and the Discover tab. Every new account gets a 7-day free trial of Pro. POP is in private beta; members are notified before any payment.",
+ "Essai Pro jusqu’au {0}": "Pro trial until {0}",
+ "Plan Pro": "Pro plan",
+ "Plan Starter": "Starter plan"
 }
 export default EN

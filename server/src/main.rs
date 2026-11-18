@@ -330,7 +330,7 @@ async fn main() -> anyhow::Result<()> {
         let exists: Option<i64> = sqlx::query_scalar("SELECT id FROM users WHERE email = 'kl'").fetch_optional(&st.db).await?;
         if exists.is_none() {
             let h = auth::hash_password("kl").map_err(|e| anyhow::anyhow!("{e:?}"))?;
-            sqlx::query("INSERT INTO users (email, name, password_hash, is_admin) VALUES ('kl', 'KL', ?, 1)").bind(h).execute(&st.db).await?;
+            sqlx::query("INSERT INTO users (email, name, password_hash, is_admin, plan) VALUES ('kl', 'KL', ?, 1, 'pro')").bind(h).execute(&st.db).await?;
         }
         sqlx::query("UPDATE users SET is_admin = 1 WHERE email = 'kl'").execute(&st.db).await?;
         println!("Compte de test : identifiant « kl », mot de passe « kl »");

@@ -27,21 +27,20 @@ const cs: Dict = {
   },
   stats: [['1 h', 'na úkol, abyste se každý den posunuli'], ['0', 'povinných externích AI služeb'], ['7 dní', 'statistik na mapu z API Epicu'], ['100 %', 'akcí v UEFN lze vrátit']],
   pricing: {
-    eyebrow: 'Ceník', h2: 'Vyberte si tarif.', p: 'POP je v uzavřené betě: přístup přes čekací listinu. Ceny platí od spuštění a před jakoukoli platbou vás upozorníme.',
+    eyebrow: 'Ceník', h2: 'Vyberte si tarif.', p: "POP je v uzavřené betě: přístup přes pořadník. Po spuštění začíná každý účet 7denní zkušební verzí Pro zdarma, bez karty.",
     perMonth: '/ měsíc', compare: 'Porovnat tarify', unlimited: 'Neomezeně', soon: 'Brzy',
     plans: [
-      { name: 'Tvůrce', tag: 'Na začátek', desc: 'Jedna mapa, malý tým, vše podstatné.', cta: 'Zapsat se' },
-      { name: 'Studio', tag: 'Nejkompletnější', desc: 'Pro studia, která vydávají mapy v týmu.', cta: 'Zapsat se' },
-      { name: 'Studio+', tag: 'Brzy', desc: 'Vše ze Studia plus POP Forge: desktopová aplikace, která staví v UEFN.', cta: 'Zapsat se' },
+      { name: 'Starter', tag: "Pro tvorbu", desc: "Celý pracovní prostor pro tvorbu map, sám nebo v týmu.", cta: 'Zapsat se' },
+      { name: 'Pro', tag: "Nejúplnější", desc: "Vše ze Starteru a navíc analýza: nápady na mapy, trh, sledování Discover.", cta: 'Zapsat se' },
     ],
-    rows: ['Organizace', 'Hodinové úkoly, Kanban, závislosti', 'Vestavěný asistent (shrnutí dne, zpoždění)', 'Stránky, tabule, plánování a milníky', 'Mapy', 'Členové', 'UEFN', 'UEFN Link: synchronizované projekty', 'Organizér aktérů a hromadné úpravy', 'Připojené AI (Claude, Cursor, Codex…)', 'POP Forge: asistované stavění v UEFN', 'Růst', 'Analýza trhu a mapy, které fungují', 'Video trendy TikTok a YouTube Shorts', 'Výměna playtestů a den vydání', 'Dělení výdělků a výpisy', 'Discord, GitHub, Lore'],
+    rows: ['Organizace', 'Hodinové úkoly, Kanban, závislosti', 'Vestavěný asistent (shrnutí dne, zpoždění)', 'Stránky, tabule, plánování a milníky', 'Mapy', 'Členové', 'UEFN', 'UEFN Link: synchronizované projekty', 'Organizér aktérů a hromadné úpravy', 'Připojené AI (Claude, Cursor, Codex…)', 'POP Forge: asistované stavění v UEFN', 'Růst', "Nápady na mapy, analýza trhu, sledování Discover", 'Video trendy TikTok a YouTube Shorts', 'Výměna playtestů a den vydání', 'Dělení výdělků a výpisy', 'Discord, GitHub, Lore'],
   },
   faq: {
     eyebrow: 'Otázky', h2: 'Na co se nás ptáte.',
     items: [
       ['Potřebuji PC s Windows?', 'Pro propojení s UEFN ano: UEFN běží jen na Windows a UEFN Link se spouští na tomto PC. Zbytek POP funguje v jakémkoli prohlížeči, i na Macu.'],
       ['Publikuje POP moji mapu?', 'Ne. POP vše připraví (kontrola před publikací, playtesty, plán dne vydání), ale publikace vždy probíhá na portálu tvůrců Epicu.'],
-      ['Funguje POP, i když tvořím sám?', 'Ano. POP je pro samostatné tvůrce i pro týmy: tarif Tvůrce je pro jednu mapu zdarma a členy můžete pozvat později, aniž byste cokoli měnili.'],
+      ['Funguje POP, i když tvořím sám?', "Ano. POP slouží sólo tvůrcům i týmům už od plánu Starter: členy můžete pozvat později, aniž byste cokoli měnili."],
       ['Jaké AI můžu připojit?', 'Ty, které podporují servery MCP: Claude Code, Claude Desktop, Cursor, Codex, Windsurf, VS Code (GitHub Copilot), Gemini CLI. Claude Desktop vyžaduje, aby byl POP online přes HTTPS. Předplatné vaší AI není součástí POP. Chatovací AI v prohlížeči (ChatGPT, Gemini, Copilot na webu) zatím podporované nejsou. Po připojení v „Připojené AI“ vaše AI čte a upravuje úkoly a aktéry v UEFN, píše Verse a každá akce je zaznamenaná a vratná.'],
       ['Odkud jsou čísla v analýze?', 'Z oficiálního Fortnite API od Epicu: hráči, špička současných hráčů, herní čas a retence každé veřejné mapy za 7 dní.'],
       ['Jak získám přístup?', 'POP je v uzavřené betě. Zapište se na čekací listinu: žádosti procházíme jednu po druhé a pak vám pošleme uživatelské jméno a dočasné heslo, které při prvním přihlášení změníte.'],

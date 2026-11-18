@@ -112,8 +112,8 @@ export default function LaunchDiscover() {
 
   if (!allowed) return <section className="card locked">
     <span className="locked-ic"><Lock size={22} strokeWidth={1.5} /></span>
-    <h2>{tr("Disponible avec le plan Studio")}</h2>
-    <p className="muted">{tr("L’onglet Discover prépare votre sortie selon les règles de l’algorithme d’Epic et suit votre map pendant ses 14 jours de test. Il est compris dans les plans Studio et Studio+.")}</p>
+    <h2>{tr("Disponible avec le plan Pro")}</h2>
+    <p className="muted">{tr("L’onglet Discover prépare votre sortie selon les règles de l’algorithme d’Epic et suit votre map pendant ses 14 jours de test. Il est compris dans le plan Pro.")}</p>
   </section>
   if (!data) return null
 

@@ -27,21 +27,20 @@ const nl: Dict = {
   },
   stats: [['1 u', 'per taak, om elke dag vooruit te gaan'], ['0', 'externe AI-diensten verplicht'], ['7 dagen', 'statistieken per map, uit de API van Epic'], ['100%', 'van de UEFN-acties kan ongedaan']],
   pricing: {
-    eyebrow: 'Prijzen', h2: 'Kies je abonnement.', p: 'POP zit in privébèta: toegang via de wachtlijst. De prijzen gelden vanaf de lancering en je wordt vóór elke betaling geïnformeerd.',
+    eyebrow: 'Prijzen', h2: 'Kies je abonnement.', p: "POP zit in een besloten bèta: toegang gaat via de wachtlijst. Bij de lancering begint elk account met 7 dagen gratis Pro, zonder kaart.",
     perMonth: '/ maand', compare: 'Abonnementen vergelijken', unlimited: 'Onbeperkt', soon: 'Binnenkort',
     plans: [
-      { name: 'Creator', tag: 'Om te beginnen', desc: 'Eén map, een klein team, alle basics.', cta: 'Op de lijst' },
-      { name: 'Studio', tag: 'Het meest compleet', desc: 'Voor studio’s die als team maps uitbrengen.', cta: 'Op de lijst' },
-      { name: 'Studio+', tag: 'Binnenkort', desc: 'Alles van Studio, plus POP Forge: de desktop-app die in UEFN bouwt.', cta: 'Op de lijst' },
+      { name: 'Starter', tag: "Om te bouwen", desc: "De hele werkruimte om je maps te bouwen, alleen of in een team.", cta: 'Op de lijst' },
+      { name: 'Pro', tag: "Meest compleet", desc: "Alles van Starter, plus analyse: map-ideeën, markt, Discover-tracking.", cta: 'Op de lijst' },
     ],
-    rows: ['Organisatie', 'Taken van een uur, Kanban, afhankelijkheden', 'Ingebouwde assistent (dagoverzicht, vertraging)', 'Pagina’s, whiteboard, planning en mijlpalen', 'Maps', 'Leden', 'UEFN', 'UEFN Link: gesynchroniseerde projecten', 'Actor-organizer en bulkbewerking', 'Gekoppelde AI’s (Claude, Cursor, Codex…)', 'POP Forge: ondersteund bouwen in UEFN', 'Groei', 'Marktanalyse en maps die werken', 'Videotrends TikTok en YouTube Shorts', 'Playtest-uitwisseling en lanceerdag', 'Verdeling van inkomsten en overzichten', 'Discord, GitHub, Lore'],
+    rows: ['Organisatie', 'Taken van een uur, Kanban, afhankelijkheden', 'Ingebouwde assistent (dagoverzicht, vertraging)', 'Pagina’s, whiteboard, planning en mijlpalen', 'Maps', 'Leden', 'UEFN', 'UEFN Link: gesynchroniseerde projecten', 'Actor-organizer en bulkbewerking', 'Gekoppelde AI’s (Claude, Cursor, Codex…)', 'POP Forge: ondersteund bouwen in UEFN', 'Groei', "Map-ideeën, marktanalyse, Discover-tracking", 'Videotrends TikTok en YouTube Shorts', 'Playtest-uitwisseling en lanceerdag', 'Verdeling van inkomsten en overzichten', 'Discord, GitHub, Lore'],
   },
   faq: {
     eyebrow: 'FAQ', h2: 'Vragen die we krijgen.',
     items: [
       ['Heb ik een Windows-pc nodig?', 'Om UEFN te koppelen wel: UEFN draait alleen op Windows en UEFN Link draait op die pc. De rest van POP werkt in elke browser, ook op Mac.'],
       ['Publiceert POP mijn map?', 'Nee. POP bereidt alles voor (controle vóór publicatie, playtests, plan voor de lanceerdag), maar publiceren gebeurt altijd in het creatorportaal van Epic.'],
-      ['Werkt POP ook als ik alleen maak?', 'Ja. POP is er voor solomakers én teams: het Creator-plan is gratis voor één map, en je kunt later leden uitnodigen zonder iets te veranderen.'],
+      ['Werkt POP ook als ik alleen maak?', "Ja. POP werkt voor solo-makers én teams, vanaf het Starter-plan: je kunt later leden uitnodigen zonder iets te veranderen."],
       ['Welke AI’s kan ik koppelen?', 'AI’s die MCP-servers ondersteunen: Claude Code, Claude Desktop, Cursor, Codex, Windsurf, VS Code (GitHub Copilot), Gemini CLI. Claude Desktop vereist dat POP online staat via HTTPS. Het abonnement op je AI zit niet in POP. Chat-AI’s in de browser (ChatGPT, Gemini, Copilot op het web) worden voorlopig niet ondersteund. Eenmaal gekoppeld in ‘Gekoppelde AI’s’ leest en bewerkt je AI je taken en UEFN-actors, schrijft Verse, en elke actie wordt vastgelegd en is ongedaan te maken.'],
       ['Waar komen de cijfers van de analyse vandaan?', 'Uit de officiële Fortnite-API van Epic: spelers, piek gelijktijdige spelers, speeltijd en retentie van elke openbare map, over 7 dagen.'],
       ['Hoe krijg ik toegang?', 'POP is in besloten bèta. Meld je aan voor de wachtlijst: we bekijken de aanvragen één voor één en sturen je daarna je gebruikersnaam en een tijdelijk wachtwoord, dat je bij de eerste keer inloggen wijzigt.'],

@@ -161,9 +161,9 @@ function Sales({ F, contact }: P) {
     <p>Pendant la bêta, POP est gratuit : aucun paiement n’est demandé. Les conditions ci-dessous s’appliqueront dès l’ouverture des paiements ; vous serez prévenu avant tout paiement.</p>
     <h2>1. Offres</h2>
     <ul>
-      <li><b>Créateur</b> : gratuit.</li>
-      <li><b>Studio</b> : abonnement mensuel, prix affiché sur la page Tarifs au moment de la commande. Comprend Analyse (marché, idées de maps, suivi Discover), et ses membres en profitent dans le studio.</li>
-      <li><b>Studio+</b> : à venir.</li>
+      <li><b>Starter</b> : 12,99 € par mois. Tout l’espace de travail : tâches, pages, tableau blanc, organiseur UEFN, IA connectées, lancement, partage des gains, seul ou en équipe.</li>
+      <li><b>Pro</b> : 24,99 € par mois. Tout Starter, plus Analyse (idées de maps, marché, ça monte maintenant, tendances vidéo) et l’onglet Discover. Dans un studio, les membres profitent du Marché du studio quand son créateur a le plan Pro.</li>
+      <li><b>Essai</b> : chaque nouveau compte a 7 jours d’essai gratuit de Pro, sans carte. À la fin de l’essai, il faut choisir Starter ou Pro pour continuer ; aucun paiement n’est demandé automatiquement et vos données sont conservées.</li>
       <li><b>Crédits</b> : achat ponctuel, utilisés notamment pour la génération par l’IA de POP et l’échange de playtests.</li>
     </ul>
     <p>Les prix sont indiqués en euros, toutes taxes comprises pour les particuliers.</p>

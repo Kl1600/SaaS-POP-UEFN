@@ -12,11 +12,11 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
 
-/// Tout l'onglet suit le plan Studio : celui du compte, ou celui du créateur du studio de la map.
+/// Tout l'onglet suit le plan Pro : celui du compte, ou celui du créateur du studio de la map.
 async fn access(st: &AppState, u: &AuthUser, mid: i64) -> Result<MapCtx, AppError> {
     let ctx = map_ctx(st, u, mid).await?;
     if crate::billing::user_analyse(st, u.id).await? || crate::billing::studio_analyse(st, ctx.studio_id).await? { return Ok(ctx) }
-    Err(AppError::Guard("plan", "L’onglet Discover est compris dans le plan Studio.".into()))
+    Err(AppError::Guard("plan", "L’onglet Discover est compris dans le plan Pro.".into()))
 }
 
 fn words(s: &str) -> Vec<String> { ideas::norm(s).split_whitespace().filter(|w| w.len() >= 2 && !ideas::STOP.contains(w)).map(String::from).collect() }

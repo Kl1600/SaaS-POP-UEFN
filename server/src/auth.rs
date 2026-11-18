@@ -154,7 +154,7 @@ pub async fn register(State(st): State<AppState>, crate::security::ClientIp(ip):
         other => other,
     })?;
     let hash = hash_password(&b.password)?;
-    let id: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash, is_admin, terms_at) VALUES (?, ?, ?, ?, datetime('now')) RETURNING id")
+    let id: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash, is_admin, terms_at, plan, trial_until) VALUES (?, ?, ?, ?, datetime('now'), 'starter', datetime('now', '+7 days')) RETURNING id")
         .bind(&email)
         .bind(b.name.trim())
         .bind(hash)
@@ -255,5 +255,5 @@ pub async fn me(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
         }));
     }
     Ok(Json(json!({ "user": u, "credits": credits, "studios": out, "admin": admin, "admin_pending": pending, "username": username, "must_change_password": must_change == 1,
-        "plan": crate::billing::user_plan(&st, u.id).await?, "analyse": crate::billing::user_analyse(&st, u.id).await? })))
+        "plan": crate::billing::user_plan(&st, u.id).await?, "trial_until": crate::billing::trial_until(&st, u.id).await?, "analyse": crate::billing::user_analyse(&st, u.id).await? })))
 }

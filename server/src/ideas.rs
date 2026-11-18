@@ -470,7 +470,7 @@ async fn gen_is_some(st: &AppState, uid: i64) -> bool {
 
 /// Après chaque collecte : idées des créateurs qui ont le plan et les alertes activées.
 pub async fn refresh_all(st: &AppState) {
-    let users: Vec<i64> = sqlx::query_scalar("SELECT u.id FROM users u LEFT JOIN idea_profiles p ON p.user_id = u.id WHERE u.disabled = 0 AND u.plan IN ('studio', 'studio_plus') AND COALESCE(p.notify, 1) = 1 AND u.last_seen > datetime('now', '-30 days')")
+    let users: Vec<i64> = sqlx::query_scalar("SELECT u.id FROM users u LEFT JOIN idea_profiles p ON p.user_id = u.id WHERE u.disabled = 0 AND (u.plan = 'pro' OR u.trial_until > datetime('now')) AND COALESCE(p.notify, 1) = 1 AND u.last_seen > datetime('now', '-30 days')")
         .fetch_all(&st.db).await.unwrap_or_default();
     for uid in users { if let Err(e) = refresh_user(st, uid, false).await { tracing::warn!("idées ({uid}) : {e:?}") } }
 }

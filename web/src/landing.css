@@ -148,7 +148,7 @@
 .lstats div{border-top:1px solid var(--line2);padding-top:22px;display:flex;flex-direction:column;gap:6px}
 .lstats b{font-size:clamp(32px,4vw,46px);letter-spacing:-.04em;font-weight:700}
 .lstats span{color:var(--t2);font-size:14.5px}
-.lplans{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.lplans{display:grid;grid-template-columns:repeat(2,minmax(0,380px));justify-content:center;gap:16px}
 .lplan{border:1px solid var(--line);border-radius:22px;padding:26px;display:flex;flex-direction:column;gap:12px;background:rgba(255,255,255,.015)}
 .lplan.best{border-color:rgba(237,117,62,.55);background:linear-gradient(180deg,rgba(237,117,62,.1),rgba(255,255,255,.01));box-shadow:0 20px 60px rgba(237,117,62,.12)}
 .lplan h3{font-size:22px;letter-spacing:-.02em}

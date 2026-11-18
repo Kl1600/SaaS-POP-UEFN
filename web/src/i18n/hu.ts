@@ -27,21 +27,20 @@ const hu: Dict = {
   },
   stats: [['1 óra', 'feladatonként, hogy minden nap haladj'], ['0', 'kötelező külső MI-szolgáltatás'], ['7 nap', 'statisztika pályánként, az Epic API-jából'], ['100%', 'az UEFN-műveletek visszavonhatók']],
   pricing: {
-    eyebrow: 'Árak', h2: 'Válassz csomagot.', p: 'A POP zárt bétában van: a hozzáférés várólistán keresztül történik. Az árak az induláskor lépnek életbe, és bármilyen fizetés előtt értesítünk.',
+    eyebrow: 'Árak', h2: 'Válassz csomagot.', p: "A POP zárt bétában van: a hozzáférés várólistán keresztül történik. Induláskor minden fiók 7 napos ingyenes Pro-próbával kezd, kártya nélkül.",
     perMonth: '/ hó', compare: 'Csomagok összehasonlítása', unlimited: 'Korlátlan', soon: 'Hamarosan',
     plans: [
-      { name: 'Alkotó', tag: 'Kezdéshez', desc: 'Egy pálya, kis csapat, minden lényeges.', cta: 'Feliratkozom' },
-      { name: 'Studio', tag: 'A legteljesebb', desc: 'Csapatban pályákat kiadó stúdióknak.', cta: 'Feliratkozom' },
-      { name: 'Studio+', tag: 'Hamarosan', desc: 'Minden a Studióból, plusz POP Forge: az asztali alkalmazás, amely az UEFN-ben épít.', cta: 'Feliratkozom' },
+      { name: 'Starter', tag: "Alkotáshoz", desc: "A teljes munkaterület a pályáid elkészítéséhez, egyedül vagy csapatban.", cta: 'Feliratkozom' },
+      { name: 'Pro', tag: "A legteljesebb", desc: "Minden, ami a Starterben, plusz elemzés: pályaötletek, piac, Discover-követés.", cta: 'Feliratkozom' },
     ],
-    rows: ['Szervezés', 'Egyórás feladatok, Kanban, függőségek', 'Beépített asszisztens (napi összefoglaló, csúszások)', 'Oldalak, tábla, tervezés és mérföldkövek', 'Pályák', 'Tagok', 'UEFN', 'UEFN Link: szinkronizált projektek', 'Aktorrendező és tömeges szerkesztés', 'Bekötött MI-k (Claude, Cursor, Codex…)', 'POP Forge: segített építés az UEFN-ben', 'Növekedés', 'Piacelemzés és működő pályák', 'TikTok- és YouTube Shorts-videótrendek', 'Playtest-csere és megjelenési nap', 'Bevételmegosztás és kimutatások', 'Discord, GitHub, Lore'],
+    rows: ['Szervezés', 'Egyórás feladatok, Kanban, függőségek', 'Beépített asszisztens (napi összefoglaló, csúszások)', 'Oldalak, tábla, tervezés és mérföldkövek', 'Pályák', 'Tagok', 'UEFN', 'UEFN Link: szinkronizált projektek', 'Aktorrendező és tömeges szerkesztés', 'Bekötött MI-k (Claude, Cursor, Codex…)', 'POP Forge: segített építés az UEFN-ben', 'Növekedés', "Pályaötletek, piacelemzés, Discover-követés", 'TikTok- és YouTube Shorts-videótrendek', 'Playtest-csere és megjelenési nap', 'Bevételmegosztás és kimutatások', 'Discord, GitHub, Lore'],
   },
   faq: {
     eyebrow: 'GYIK', h2: 'Amit kérdezni szoktak.',
     items: [
       ['Kell Windowsos PC?', 'Az UEFN bekötéséhez igen: az UEFN csak Windowson fut, és az UEFN Link azon a PC-n indul. A POP többi része bármilyen böngészőben működik, Macen is.'],
       ['Közzéteszi a POP a pályámat?', 'Nem. A POP mindent előkészít (közzététel előtti ellenőrzés, playtestek, a megjelenési nap terve), de a közzététel mindig az Epic alkotói portálján történik.'],
-      ['Működik a POP, ha egyedül alkotok?', 'Igen. A POP egyéni alkotóknak és csapatoknak egyaránt szól: az Alkotó csomag egy pályára ingyenes, tagokat pedig később is meghívhatsz, semmin sem kell változtatni.'],
+      ['Működik a POP, ha egyedül alkotok?', "Igen. A POP a Starter csomagtól kezdve egyedül alkotóknak és csapatoknak is szól: később bármikor meghívhatsz tagokat, változtatás nélkül."],
       ['Milyen MI-ket köthetek be?', 'Azokat, amelyek támogatják az MCP-szervereket: Claude Code, Claude Desktop, Cursor, Codex, Windsurf, VS Code (GitHub Copilot), Gemini CLI. A Claude Desktophoz a POP-nak HTTPS-en elérhetőnek kell lennie. Az MI-előfizetésed nincs benne a POP árában. A böngészős csevegő MI-k (ChatGPT, Gemini, webes Copilot) egyelőre nem támogatottak. A „Bekötött MI-k” között bekötve az MI-d olvassa és szerkeszti a feladataidat és az UEFN-aktorokat, Verse-t ír, és minden művelet naplózva és visszavonható.'],
       ['Honnan származnak az elemzés számai?', 'Az Epic hivatalos Fortnite API-jából: játékosszám, egyidejű játékoscsúcs, játékidő és megtartás minden nyilvános pályára, 7 napra.'],
       ['Hogyan kapok hozzáférést?', 'A POP zárt bétában van. Iratkozz fel a várólistára: a kéréseket egyenként bíráljuk el, majd elküldjük a felhasználóneved és egy ideiglenes jelszót, amelyet az első belépéskor megváltoztatsz.'],
