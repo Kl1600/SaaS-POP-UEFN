@@ -409,6 +409,21 @@ def pr_checks(pr_number):
     return good, waiting, bad
 
 
+def close_issue(n):
+    """Ferme l'issue après la fusion. GitHub la ferme souvent lui-même quelques secondes après (« Closes #N ») :
+    on lui laisse le temps, et si notre fermeture est refusée parce qu'il l'a fermée entre-temps, ce n'est pas
+    une erreur."""
+    for _ in range(5):
+        if issue(n)["state"] == "closed":
+            return
+        time.sleep(2)
+    try:
+        api(f"repos/{repo()}/issues/{n}", "PATCH", {"state": "closed", "state_reason": "completed"})
+    except Refused:
+        if issue(n)["state"] != "closed":
+            raise
+
+
 def cmd_done(a):
     n = a.number
     i = issue(n)
@@ -436,9 +451,7 @@ def cmd_done(a):
     gh("pr", "merge", str(pr["number"]), "--repo", repo(), "--squash", "--delete-branch")
     for label in STATUS_LABELS:
         remove_label(n, label)
-    closed = issue(n)
-    if closed["state"] != "closed":
-        api(f"repos/{repo()}/issues/{n}", "PATCH", {"state": "closed", "state_reason": "completed"})
+    close_issue(n)
     print(f"#{n} fait · PR #{pr['number']} fusionnée")
     if git("branch", "--show-current") == branch and not git("status", "--porcelain"):
         git("switch", "main")
