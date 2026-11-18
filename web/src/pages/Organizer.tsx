@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Folder, FolderOpen, ChevronRight, ChevronDown, Eye, EyeOff, Lock, Copy, Trash2, FolderInput, Pencil, Save, Archive, RotateCcw, RefreshCw, Plus, X, Star, AlertTriangle, Link2, Cpu, Box, Shapes, Code2, Check, Ban,
+  Folder, FolderOpen, ChevronRight, ChevronDown, Eye, EyeOff, Lock, Copy, Trash2, FolderInput, Pencil, Save, Archive, RotateCcw, RefreshCw, Plus, X, Star, AlertTriangle, Link2, Cpu, Box, Shapes, Code2, Check, Ban, Play,
 } from 'lucide-react'
 import { ago, api } from '../api'
 import { useApp, useLive, useLoad } from '../state'
@@ -141,6 +141,8 @@ export default function Organizer() {
         <span className={'badge ' + (st.status === 'connected' ? 'b-g' : st.status === 'closed' ? 'b-o' : 'b-r')}>{STATUS_LABEL[st.status]}</span>
         <button className="btn" onClick={() => setShowLink(v => !v)}><Link2 size={16} />UEFN Link</button>
         <button className="btn" disabled={st.status !== 'connected'} onClick={() => act('refresh_actors', {}, 'Acteurs actualisés')}><RefreshCw size={16} />Actualiser</button>
+        {/* Envoi complet (acteurs et Verse) dans la session de test en cours (#5). */}
+        <button className="btn" disabled={readOnly} title="Envoie les modifications du niveau dans la session de test en cours" onClick={() => act('push_session', {}, 'Envoyé en session de test')}><Play size={16} />Envoyer en session</button>
       </PageHead>
       {st.status !== 'connected' && <div className="warn"><AlertTriangle size={18} /><span>{st.status === 'offline' ? 'Relais hors ligne' : 'UEFN fermé'} : lecture seule sur le dernier état connu{st.updated_at ? ` (${ago(st.updated_at)})` : ''}. Vos modifications seront mises en attente et envoyées à l’ouverture.</span></div>}
       {st.approvals.length > 0 && <div className="warn" style={{ flexWrap: 'wrap' }}><AlertTriangle size={18} /><div style={{ flex: 1 }}>{st.approvals.map((p: any) => (

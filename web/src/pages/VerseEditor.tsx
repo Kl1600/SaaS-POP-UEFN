@@ -191,7 +191,8 @@ export default function VerseEditor() {
       const r = await api.post(`/api/maps/${map!.id}/verse/send`, { files: list.map(o => ({ path: o.path, content: o.model.getValue() })), task: task || null, push: opts.push, lore: opts.lore, message: opts.message, run: id })
       if (r.queued) toast('UEFN n’est pas disponible : envoi mis en attente.')
       list.forEach(o => { o.saved = o.model.getValue(); markDirty(o.path) })
-      if (r.diagnostics) { setDiags(r.diagnostics); if (r.errors) { setPanel('help'); toast(`${r.errors} erreur(s) de compilation`, true) } else toast(r.pushed ? 'Compilé et envoyé en session' : 'Compilé sans erreur') }
+      if (r.diagnostics) { setDiags(r.diagnostics); if (r.errors) { setPanel('help'); toast(`${r.errors} erreur(s) de compilation`, true) } else if (r.push_error) toast(`Compilé, mais pas envoyé en session : ${r.push_error}`, true); else toast(r.pushed ? 'Compilé et envoyé en session' : 'Compilé sans erreur') }
+      if (r.lore_error) toast(`Archivage Lore impossible : ${r.lore_error}`, true)
       reloadFiles()
     } catch (e: any) { toast(e.message, true) }
   }
@@ -271,7 +272,7 @@ export default function VerseEditor() {
             <button className="btn" onClick={() => setPanel(panel === 'ai' ? null : 'ai')} disabled={!active}><Sparkles size={16} />Assistant</button>
             <button className="btn pri" onClick={sendToUefn} disabled={!canEdit || !active}><Send size={16} />Envoyer à UEFN</button>
           </div>
-          {run && <div className="vsteps">{STEPS.map((s, i) => { const st = run.steps[i]?.status ?? 'waiting'; const I = st === 'done' ? CheckCircle2 : st === 'running' ? Loader2 : st === 'failed' ? AlertTriangle : st === 'skipped' ? MinusCircle : Circle; return <span key={s} className={'vstep ' + st}><I size={15} className={st === 'running' ? 'spin' : ''} />{i + 1}. {s}{st === 'queued' ? ' (en attente)' : ''}</span> })}<button className="iconbtn" style={{ width: 26, height: 26, marginLeft: 'auto' }} aria-label="Fermer" onClick={() => setRun(null)}><X size={14} /></button></div>}
+          {run && <div className="vsteps">{STEPS.map((s, i) => { const st = run.steps[i]?.status ?? 'waiting'; const I = st === 'done' ? CheckCircle2 : st === 'running' ? Loader2 : st === 'failed' ? AlertTriangle : st === 'skipped' ? MinusCircle : Circle; const why = st === 'failed' && typeof run.steps[i]?.detail === 'string' ? run.steps[i].detail : ''; return <span key={s} className={'vstep ' + st} title={why}><I size={15} className={st === 'running' ? 'spin' : ''} />{i + 1}. {s}{st === 'queued' ? ' (en attente)' : ''}{why && <span className="small"> : {why}</span>}</span> })}<button className="iconbtn" style={{ width: 26, height: 26, marginLeft: 'auto' }} aria-label="Fermer" onClick={() => setRun(null)}><X size={14} /></button></div>}
           {diags.length > 0 && <div className="vproblems">
             {diags.map((d, i) => (
               <button key={i} className="vprob" onClick={() => { openFile(d.path, d.line); setPanel('help') }}>

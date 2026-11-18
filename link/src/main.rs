@@ -225,7 +225,7 @@ impl Link {
             }
             "push_session" => {
                 self.need_uefn()?;
-                self.mcp.push_session().await?;
+                self.mcp.push_session(a["verse_only"].as_bool().unwrap_or(false)).await?;
             }
             "save_level" => {
                 self.need_uefn()?;
