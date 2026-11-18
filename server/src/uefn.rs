@@ -632,7 +632,12 @@ pub async fn exec(st: &AppState, o: Origin<'_>, action: &str, mut args: Value) -
         notify(st, mid, json!({ "t": "uefn", "what": "journal" }));
         return Ok(json!({ "queued": true, "action_id": aid, "message": "UEFN n’est pas disponible : modification mise en attente, elle partira à l’ouverture." }));
     }
-    run_action(st, mid, aid, action, &args).await
+    let r = run_action(st, mid, aid, action, &args).await;
+    if matches!(&r, Ok(v) if v["retry"].as_bool() == Some(true)) {
+        let st2 = st.clone();
+        tokio::spawn(async move { flush_queue(&st2, mid).await });
+    }
+    r
 }
 
 async fn run_action(st: &AppState, mid: i64, aid: Option<i64>, action: &str, args: &Value) -> Result<Value, AppError> {
@@ -675,9 +680,27 @@ async fn run_action(st: &AppState, mid: i64, aid: Option<i64>, action: &str, arg
                 sqlx::query("UPDATE uefn_actions SET status = 'done', after = ?, undo = COALESCE(?, undo) WHERE id = ?").bind(short_data.to_string()).bind(extra_undo).bind(id).execute(&st.db).await?;
             }
         }
+        // L'archivage n'a besoin que du relais quand il passe par `lore_cmd` ; sinon il passe par UEFN. Relais
+        // en ligne mais UEFN fermé : il reste en attente et part à la réouverture, comme les autres actions (#4).
+        Err(AppError::Conflict(m)) if action == "lore_checkin" && m.contains("UEFN est fermé") => {
+            if let Some(id) = aid {
+                sqlx::query("UPDATE uefn_actions SET status = 'queued' WHERE id = ?").bind(id).execute(&st.db).await?;
+            }
+            notify(st, mid, json!({ "t": "uefn", "what": "journal" }));
+            return Ok(json!({ "queued": true, "action_id": aid, "message": "UEFN est fermé : archivage mis en attente, il partira à la réouverture d’UEFN." }));
+        }
+        // À la réouverture, le serveur MCP d'UEFN répond avant que le projet soit chargé (vérifié le 18/11/2026) :
+        // l'action reste en attente et `flush_queue` la réessaie un peu plus tard (#4).
+        Err(AppError::Conflict(m)) if m.contains("no project is currently open") || m.contains("Mcp-Session-Id") => {
+            if let Some(id) = aid {
+                sqlx::query("UPDATE uefn_actions SET status = 'queued' WHERE id = ?").bind(id).execute(&st.db).await?;
+            }
+            notify(st, mid, json!({ "t": "uefn", "what": "journal" }));
+            return Ok(json!({ "queued": true, "retry": true, "action_id": aid, "message": "UEFN ouvre encore le projet : action mise en attente, elle repartira dans quelques secondes." }));
+        }
         Err(e) => {
             if let Some(id) = aid {
-                sqlx::query("UPDATE uefn_actions SET status = 'failed', error = ? WHERE id = ?").bind(format!("{e:?}")).bind(id).execute(&st.db).await?;
+                sqlx::query("UPDATE uefn_actions SET status = 'failed', error = ? WHERE id = ?").bind(format!("{e}")).bind(id).execute(&st.db).await?;
             }
         }
     }
@@ -685,6 +708,9 @@ async fn run_action(st: &AppState, mid: i64, aid: Option<i64>, action: &str, arg
     // Le texte brut d'UEFN reste dans le journal ; l'interface reçoit un message en français (#6).
     let res = res.map_err(|e| match e {
         AppError::Conflict(m) if matches!(action, "actor_update" | "actor_update_raw") => AppError::Conflict(french_option_error(&m)),
+        AppError::Conflict(m) if action == "lore_checkin" && m.to_lowercase().contains("nothing to check in") => {
+            AppError::Conflict("Rien à archiver : aucune modification en attente dans Lore.".into())
+        }
         e => e,
     });
     res.map(|mut d| {
@@ -753,17 +779,33 @@ async fn apply_file_cache(st: &AppState, mid: i64, action: &str, args: &Value, u
 
 /// Envoie les actions en attente dès que le relais ou UEFN redevient disponible.
 pub async fn flush_queue(st: &AppState, mid: i64) {
-    let _g = st.board_lock.lock().await;
-    let rows: Vec<(i64, String, String)> = match sqlx::query_as("SELECT id, action, args FROM uefn_actions WHERE map_id = ? AND status = 'queued' ORDER BY id").bind(mid).fetch_all(&st.db).await {
-        Ok(r) => r,
-        Err(_) => return,
-    };
-    for (id, action, args) in rows {
-        if !ready(st, mid, &action) {
-            continue;
+    // UEFN peut répondre avant d'avoir chargé le projet (2 min 30 pour un petit projet, mesuré le 18/11/2026) :
+    // on réessaie toutes les 20 s, 10 minutes au plus (#4).
+    for _ in 0..30 {
+        let mut retry = false;
+        {
+            let _g = st.board_lock.lock().await;
+            let rows: Vec<(i64, String, String)> = match sqlx::query_as("SELECT id, action, args FROM uefn_actions WHERE map_id = ? AND status = 'queued' ORDER BY id").bind(mid).fetch_all(&st.db).await {
+                Ok(r) => r,
+                Err(_) => return,
+            };
+            for (id, action, args) in rows {
+                if !ready(st, mid, &action) {
+                    continue;
+                }
+                let args: Value = serde_json::from_str(&args).unwrap_or(json!({}));
+                if let Ok(v) = run_action(st, mid, Some(id), &action, &args).await {
+                    if v["retry"].as_bool() == Some(true) {
+                        retry = true;
+                        break;
+                    }
+                }
+            }
         }
-        let args: Value = serde_json::from_str(&args).unwrap_or(json!({}));
-        let _ = run_action(st, mid, Some(id), &action, &args).await;
+        if !retry {
+            return;
+        }
+        tokio::time::sleep(std::time::Duration::from_secs(20)).await;
     }
 }
 

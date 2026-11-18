@@ -156,6 +156,7 @@ pub async fn send(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64>,
         let msg = match b.task { Some(n) if !msg.contains(&format!("#{n}")) => format!("#{n} {msg}"), _ => msg };
         step(&st, mid, &run, 5, "running", json!(null));
         match exec(&st, o(), "lore_checkin", json!({ "message": msg, "paths": b.files.iter().map(|f| f.path.clone()).collect::<Vec<_>>() })).await {
+            Ok(v) if v["queued"].as_bool() == Some(true) => { step(&st, mid, &run, 5, "queued", json!("UEFN est fermé : archivage en attente.")); }
             Ok(_) => { step(&st, mid, &run, 5, "done", json!(null)); out["archived"] = json!(true); }
             Err(e) => { step(&st, mid, &run, 5, "failed", json!(format!("{e}"))); out["lore_error"] = json!(format!("{e}")); }
         }
