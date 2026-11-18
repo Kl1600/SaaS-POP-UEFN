@@ -421,7 +421,8 @@ impl Mcp {
         })
     }
 
-    pub async fn push_session(&mut self) -> Result<()> {
+    /// `verse_only` : seul le Verse a changé, UEFN saute la recuisson des assets (bien plus rapide).
+    pub async fn push_session(&mut self, verse_only: bool) -> Result<()> {
         let t = self.pick("push", &[&["session"], &["push", "update", "verse", "apply"]]).ok_or_else(|| anyhow!("Outil de session introuvable : lancez une session de test dans UEFN."))?;
         if let Some(s) = self.known("session_status") {
             let st = self.call_tool(&s, json!({})).await.unwrap_or_default();
@@ -429,7 +430,7 @@ impl Mcp {
                 bail!("Aucune session de test en cours : lancez-en une dans UEFN (Lancer la session), puis renvoyez.");
             }
         }
-        self.call_tool(&t, json!({})).await.map(|_| ())
+        self.call_tool(&t, json!({ "bVerseOnly": verse_only })).await.map(|_| ())
     }
 }
 

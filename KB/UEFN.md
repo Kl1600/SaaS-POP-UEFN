@@ -61,3 +61,18 @@ concernée ; corrigez une ligne fausse en le disant.
   depuis le Content Browser (`<projet> Content → CreativeDevices`).
 - Python renvoie `None` comme dossier d'un acteur sans dossier : l'Organiseur affiche un dossier « None »
   (à corriger dans `link/src/mcpdriver.rs`).
+
+## Session de test (testé le 18/11/2026, projet TestPopHub, #5)
+
+- `SessionToolset` : `GetSessionStatus` (`Connected` / `Disconnected`), `GetGameState` (`Running`…),
+  `PushChanges { bVerseOnly }`, `StartSession`, `StopSession`, `StartGame`, `StopGame`, et surtout
+  **`GetVerseOutput { pattern, maxResults, cursor }`** : il lit les `Print` et les erreurs Verse de la session
+  (horodatage, fichier, ligne, `runId` de la partie). Pratique pour vérifier un envoi sans regarder l'écran.
+- `PushChanges` **relance les appareils Verse dans la même partie** (même `runId`, `OnBegin` rejoué) : un `Print`
+  modifié s'affiche sans relancer la session.
+- `bVerseOnly: true` suffit quand seul le Verse a changé : **12 s** contre **78 s** pour un envoi complet (recuisson
+  des assets). L'éditeur Verse de POP l'utilise ; le bouton « Envoyer en session » de l'Organiseur fait un envoi
+  complet, nécessaire pour une modification d'acteur ou de réglage.
+- Sans session, `GetSessionStatus` répond `Disconnected` : pop-link refuse avant d'appeler `PushChanges`.
+- L'éditeur de code (Monaco) de POP ne reçoit pas la saisie quand le navigateur qui l'affiche est caché : pour un
+  test piloté, garder la page visible.

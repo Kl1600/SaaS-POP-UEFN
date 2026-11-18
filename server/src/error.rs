@@ -82,7 +82,15 @@ pub fn check_len(field: &str, v: &str, min: usize, max: usize) -> Result<(), App
 
 impl std::fmt::Display for AppError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{self:?}")
+        // Le message lisible (affiché dans le suivi d'envoi Verse, #5) ; le détail technique reste dans `{:?}`.
+        match self {
+            AppError::BadRequest(m) | AppError::Conflict(m) | AppError::TooManyMsg(m) | AppError::Guard(_, m) => f.write_str(m),
+            AppError::Unauthorized => f.write_str("Connexion requise."),
+            AppError::Forbidden => f.write_str("Action non autorisée pour votre rôle."),
+            AppError::NotFound => f.write_str("Introuvable."),
+            AppError::TooMany => f.write_str("Trop de tentatives, réessayez dans une minute."),
+            AppError::Internal(e) => write!(f, "Erreur interne : {e}"),
+        }
     }
 }
 impl std::error::Error for AppError {}
