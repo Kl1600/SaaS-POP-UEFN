@@ -49,7 +49,7 @@ const ro: Dict = {
     ],
   },
   final: { h2a: 'Următoarea ta hartă', h2b: 'începe aici.', p: 'Intră pe lista de așteptare: îți trimitem accesul imediat ce se eliberează un loc.' },
-  foot: { made: 'Făcut de creatori Fortnite, pentru creatori Fortnite.', legal: 'Fortnite și UEFN sunt mărci comerciale ale Epic Games. POP nu este afiliat cu Epic Games și nici aprobat de aceasta.', product: 'Produs', help: 'Ajutor', account: 'Cont' },
+  foot: { legalTitle: 'Informații legale', made: 'Făcut de creatori Fortnite, pentru creatori Fortnite.', legal: 'Fortnite și UEFN sunt mărci comerciale ale Epic Games. POP nu este afiliat cu Epic Games și nici aprobat de aceasta.', product: 'Produs', help: 'Ajutor', account: 'Cont' },
   mock: {
     overview: 'Prezentare', nav: ['Prezentare', 'Pagini', 'Tablă albă', 'Sarcini', 'Organizator', 'Piață'],
     hello: 'Bună, Léa, îți propun să începi cu #42.', late: '2 sarcini întârziate (cea mai veche era pe 12 nov.).', mile: 'Etapa „Beta” în 5 zile: mai sunt 9 sarcini, întârziere estimată de 1 zi.',
@@ -68,7 +68,7 @@ const ro: Dict = {
     name: 'Nume sau pseudonim', email: 'E-mail', studio: 'Studio', optional: '(opțional)', studioPh: 'Numele studioului', team: 'Mărimea echipei',
     teams: ['Singur', '2–3', '4–10', 'Peste 10'], exp: 'Experiență', exps: ['Începător în UEFN', 'Câteva hărți publicate', 'Creator experimentat', 'Studio profesionist'],
     links: 'Hărțile sau rețelele tale', linksPh: 'Coduri de insulă, TikTok, YouTube…', msg: 'Ce vrei să faci cu POP', msgPh: 'Ex.: suntem 4 pe o hartă tycoon și ne pierdem între Discord și Google Docs.',
-    send: 'Cere acces', sending: 'Se trimite…', nospam: 'Fără spam: îți scriem doar ca să-ți dăm accesul.',
+    send: 'Cere acces', sending: 'Se trimite…', nospam: 'Fără spam: îți scriem doar ca să-ți dăm accesul.', privacy: 'Politica de confidențialitate',
     okTitle: 'Am notat, mulțumim!', okText: 'Cererea ta a ajuns la echipa POP. Imediat ce se eliberează un loc, îți trimitem numele de utilizator și o parolă provizorie.',
     alreadyTitle: 'Ești deja pe listă.', approvedTitle: 'Accesul tău e deja aprobat.', approvedText: 'Contul tău e gata: echipa POP îți trimite numele de utilizator și parola provizorie. Dacă nu, scrie-ne.', close: 'Închide',
   },

@@ -49,7 +49,7 @@ const nl: Dict = {
     ],
   },
   final: { h2a: 'Je volgende map', h2b: 'begint hier.', p: 'Zet je op de wachtlijst: we sturen je toegang zodra er een plek vrijkomt.' },
-  foot: { made: 'Gemaakt door Fortnite-creators, voor Fortnite-creators.', legal: 'Fortnite en UEFN zijn merken van Epic Games. POP is niet gelieerd aan of goedgekeurd door Epic Games.', product: 'Product', help: 'Hulp', account: 'Account' },
+  foot: { legalTitle: 'Juridisch', made: 'Gemaakt door Fortnite-creators, voor Fortnite-creators.', legal: 'Fortnite en UEFN zijn merken van Epic Games. POP is niet gelieerd aan of goedgekeurd door Epic Games.', product: 'Product', help: 'Hulp', account: 'Account' },
   mock: {
     overview: 'Overzicht', nav: ['Overzicht', 'Pagina’s', 'Whiteboard', 'Taken', 'Organizer', 'Markt'],
     hello: 'Hoi Léa, ik stel voor te beginnen met #42.', late: '2 taken lopen achter (de oudste stond gepland op 12 nov.).', mile: 'Mijlpaal “Bèta” over 5 dagen: nog 9 taken, verwachte vertraging 1 dag.',
@@ -68,7 +68,7 @@ const nl: Dict = {
     name: 'Naam of bijnaam', email: 'E-mail', studio: 'Studio', optional: '(optioneel)', studioPh: 'Naam van de studio', team: 'Teamgrootte',
     teams: ['Alleen', '2 tot 3', '4 tot 10', 'Meer dan 10'], exp: 'Ervaring', exps: ['Nieuw in UEFN', 'Een paar maps gepubliceerd', 'Ervaren creator', 'Professionele studio'],
     links: 'Je maps of socials', linksPh: 'Eilandcodes, TikTok, YouTube…', msg: 'Wat je met POP wilt doen', msgPh: 'Bijv.: we zijn met z’n vieren aan een tycoon-map en raken verdwaald tussen Discord en Google Docs.',
-    send: 'Toegang aanvragen', sending: 'Verzenden…', nospam: 'Geen spam: we schrijven je alleen om je toegang te geven.',
+    send: 'Toegang aanvragen', sending: 'Verzenden…', nospam: 'Geen spam: we schrijven je alleen om je toegang te geven.', privacy: 'Privacybeleid',
     okTitle: 'Genoteerd, bedankt!', okText: 'Je aanvraag is bij het POP-team aangekomen. Zodra er een plek vrijkomt, sturen we je je gebruikersnaam en een tijdelijk wachtwoord.',
     alreadyTitle: 'Je staat al op de lijst.', approvedTitle: 'Je toegang is al goedgekeurd.', approvedText: 'Je account is klaar: het POP-team stuurt je je gebruikersnaam en tijdelijke wachtwoord. Anders kun je ons mailen.', close: 'Sluiten',
   },

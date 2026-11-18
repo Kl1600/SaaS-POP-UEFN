@@ -66,6 +66,8 @@ pub async fn change_password(State(st): State<AppState>, u: AuthUser, Json(b): J
 #[derive(Deserialize)]
 pub struct FirstPasswordIn {
     new: String,
+    #[serde(default)]
+    accept_terms: bool,
 }
 
 /// Première connexion d'un compte créé par l'administrateur : choisir son propre mot de passe.
@@ -73,10 +75,11 @@ pub struct FirstPasswordIn {
 pub async fn first_password(State(st): State<AppState>, u: AuthUser, Json(b): Json<FirstPasswordIn>) -> ApiResult<Value> {
     let must: i64 = sqlx::query_scalar("SELECT must_change_password FROM users WHERE id = ?").bind(u.id).fetch_one(&st.db).await?;
     if must == 0 { return Err(bad("Changez votre mot de passe depuis Paramètres → Compte.")) }
+    if !b.accept_terms { return Err(bad("Acceptez les conditions d’utilisation et la politique de confidentialité pour continuer.")) }
     crate::security::password_policy(&b.new, &u.email)?;
     let old: String = sqlx::query_scalar("SELECT password_hash FROM users WHERE id = ?").bind(u.id).fetch_one(&st.db).await?;
     if crate::auth::verify_password(&b.new, &old) { return Err(bad("Choisissez un mot de passe différent du mot de passe provisoire.")) }
-    sqlx::query("UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?").bind(hash_password(&b.new)?).bind(u.id).execute(&st.db).await?;
+    sqlx::query("UPDATE users SET password_hash = ?, must_change_password = 0, terms_at = datetime('now') WHERE id = ?").bind(hash_password(&b.new)?).bind(u.id).execute(&st.db).await?;
     sqlx::query("DELETE FROM sessions WHERE user_id = ? AND token_hash != ?").bind(u.id).bind(&u.sid).execute(&st.db).await?;
     crate::security::audit(&st, Some(u.id), "mot_de_passe_choisi", "première connexion", "").await;
     Ok(Json(json!({ "ok": true })))

@@ -49,7 +49,7 @@ const en: Dict = {
     ],
   },
   final: { h2a: 'Your next map', h2b: 'starts here.', p: 'Join the waitlist: we’ll send you access as soon as a spot opens.' },
-  foot: { made: 'Made by Fortnite creators, for Fortnite creators.', legal: 'Fortnite and UEFN are trademarks of Epic Games. POP is not affiliated with or endorsed by Epic Games.', product: 'Product', help: 'Help', account: 'Account' },
+  foot: { legalTitle: 'Legal', made: 'Made by Fortnite creators, for Fortnite creators.', legal: 'Fortnite and UEFN are trademarks of Epic Games. POP is not affiliated with or endorsed by Epic Games.', product: 'Product', help: 'Help', account: 'Account' },
   mock: {
     overview: 'Overview', nav: ['Overview', 'Pages', 'Whiteboard', 'Tasks', 'Organizer', 'Market'],
     hello: 'Hi Léa, I suggest starting with #42.', late: '2 tasks late (the oldest was due on Nov 12).', mile: '“Beta” milestone in 5 days: 9 tasks left, expected delay of 1 day.',
@@ -68,7 +68,7 @@ const en: Dict = {
     name: 'Name or nickname', email: 'Email', studio: 'Studio', optional: '(optional)', studioPh: 'Studio name', team: 'Team size',
     teams: ['Solo', '2 to 3', '4 to 10', 'More than 10'], exp: 'Experience', exps: ['New to UEFN', 'A few published maps', 'Experienced creator', 'Professional studio'],
     links: 'Your maps or socials', linksPh: 'Island codes, TikTok, YouTube…', msg: 'What you want to do with POP', msgPh: 'E.g. we’re 4 on a tycoon map and we get lost between Discord and Google Docs.',
-    send: 'Request access', sending: 'Sending…', nospam: 'No spam: we only write to give you access.',
+    send: 'Request access', sending: 'Sending…', nospam: 'No spam: we only write to give you access.', privacy: 'Privacy policy',
     okTitle: 'Got it, thanks!', okText: 'Your request has reached the POP team. As soon as a spot opens, we’ll send you your username and a temporary password.',
     alreadyTitle: 'You’re already on the list.', approvedTitle: 'Your access is already approved.', approvedText: 'Your account is ready: the POP team is sending you your username and temporary password. Otherwise, write to us.', close: 'Close',
   },

@@ -33,7 +33,7 @@
 .lbtn:hover{border-color:rgba(255,255,255,.35);transform:translateY(-1px)}
 .lbtn.pri{border:0;color:#160A03;background:linear-gradient(135deg,var(--o1),var(--o2));box-shadow:0 8px 30px rgba(237,117,62,.35),inset 0 1px 0 rgba(255,255,255,.35)}
 .lbtn.pri:hover{box-shadow:0 12px 40px rgba(237,117,62,.5),inset 0 1px 0 rgba(255,255,255,.35)}
-.lmicro{margin-top:22px;font-size:14px;color:var(--t3)}
+.lmicro{margin-top:22px;font-size:14px;color:var(--t2)}
 .lmicro .ldot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--o2);box-shadow:0 0 10px var(--o1);margin-right:4px;vertical-align:1px}
 .lshot{width:min(1120px,100%);margin-top:64px;position:relative}
 .lshot::before{content:'';position:absolute;inset:-1px -1px auto;height:60%;border-radius:20px;background:linear-gradient(180deg,rgba(237,117,62,.35),transparent);filter:blur(40px);opacity:.5;z-index:-1}

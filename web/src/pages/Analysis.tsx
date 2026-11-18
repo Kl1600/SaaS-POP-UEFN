@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { RefreshCw, Star, X, ExternalLink, TrendingUp, TrendingDown, Search } from 'lucide-react'
+import { Flame, RefreshCw, Star, X, ExternalLink, TrendingUp, TrendingDown, Search } from 'lucide-react'
 import { ago, api } from '../api'
 import { useApp, useLoad } from '../state'
-import { CardHead, Empty, PageHead } from '../components/ui'
+import { CardHead, Empty, PageHead, useDialog } from '../components/ui'
 import { tr, LOCALE } from '../i18n/t'
 import { useNav } from '../routes'
 
@@ -29,13 +29,14 @@ function Status() {
 
 /** Fiche d'une île : 7 jours de joueurs, CCU, rétention, et suivi. */
 export function IslandDrawer({ code, onClose }: { code: string; onClose: () => void }) {
+  const dlg = useDialog(onClose)
   const { toast } = useApp()
   const { data, reload, error } = useLoad<any>(`/api/analytics/islands/${code}`, [code])
   const series = (data?.series ?? []).filter((s: any) => s.players !== null)
   const max = Math.max(1, ...series.map((s: any) => s.players ?? 0))
   return <>
     <div className="scrim" onClick={onClose} />
-    <aside className="drawer" aria-label={tr("Fiche de l’île")}>
+    <aside ref={dlg as any} tabIndex={-1} aria-modal="true" role="dialog" className="drawer" aria-label={tr("Fiche de l’île")}>
       <div className="row" style={{ justifyContent: 'space-between' }}><h2 style={{ margin: 0, fontWeight: 500, fontSize: 20 }}>{data?.title || code}</h2><button className="iconbtn" aria-label={tr("Fermer")} onClick={onClose}><X size={18} /></button></div>
       {error && <p className="err">{String((error as any)?.message ?? error)}</p>}
       {data?.unavailable && <><p className="small muted mono" style={{ margin: '6px 0 12px' }}>{code}</p><div className="b-callout" style={{ lineHeight: 1.5 }}>{data.unavailable}</div>
@@ -76,10 +77,19 @@ export function Trending() {
   const [epic, setEpic] = useState(false)
   const { data } = useLoad<any[]>(`/api/analytics/trending?tag=${encodeURIComponent(tag)}&epic=${epic}&q=${encodeURIComponent(q)}`, [tag, epic, q])
   const { data: market } = useLoad<any>('/api/analytics/market')
+  const { data: rising } = useLoad<any>('/api/analytics/rising')
   const isl = useIsland()
   return <main className="content">
     <PageHead title={tr("Maps qui marchent")} help={tr("Les îles Fortnite qui ont le plus de joueurs en ce moment, avec leur évolution sur la veille.")} />
     <Status />
+    {rising?.items?.length > 0 && <section className="card">
+      <CardHead icon={<Flame size={18} />} title={tr("Ça monte maintenant")} sub={tr("Maps qui ont plus de joueurs ces 3 dernières heures que d’habitude à ces heures-là : le même signal que la rangée Trending d’Epic. Relevé chaque heure.")} />
+      <div className="rgrid">{rising.items.slice(0, 12).map((r: any) => <button key={r.code} className="rcard" onClick={() => isl.open(r.code)}>
+        <span className="badge b-g"><TrendingUp size={12} />×{String(r.ratio).replace('.', ',')}</span>
+        <b>{r.title || r.code}</b>
+        <span className="small muted">{tr("{0} joueurs en même temps, {1} d’habitude", [n(r.now), n(r.usual)])}</span>
+      </button>)}</div>
+    </section>}
     <section className="card">
       <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'wrap', marginBottom: 12 }}>
         <Filters q={q} setQ={setQ} tag={tag} setTag={setTag} tags={(market?.tags ?? []).map((t: any) => t.tag)} />
@@ -87,7 +97,7 @@ export function Trending() {
       </div>
       {!data ? null : data.length === 0 ? <Empty text={tr("Pas encore de données : la première collecte prend quelques minutes.")} /> :
         <div style={{ overflowX: 'auto' }}><table className="tbl"><thead><tr><th>#</th><th>{tr("Map")}</th><th>{tr("Joueurs (jour)")}</th><th>{tr("Évolution")}</th><th>{tr("Pic CCU")}</th><th>{tr("Min/joueur")}</th><th>{tr("Rétention D1")}</th><th>{tr("Genres")}</th></tr></thead>
-          <tbody>{data.map((r, i) => <tr key={r.code} className="rowlink" onClick={() => isl.open(r.code)}>
+          <tbody>{data.map((r, i) => <tr key={r.code} className="rowlink" tabIndex={0} onClick={() => isl.open(r.code)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); isl.open(r.code) } }}>
             <td className="muted">{i + 1}</td><td><b style={{ fontWeight: 500 }}>{r.title || r.code}</b><div className="small muted mono">{r.code} · {r.creator}</div></td>
             <td>{n(r.players)}</td><td>{r.growth === null ? '—' : <span className={'badge ' + (r.growth >= 0 ? 'b-g' : 'b-r')}>{r.growth >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}{r.growth > 0 ? '+' : ''}{r.growth} %</span>}</td>
             <td>{n(r.peak_ccu)}</td><td>{r.avg_minutes ? Math.round(r.avg_minutes) : '—'}</td><td>{pct(r.d1)}</td><td className="small muted">{(r.tags ?? []).slice(0, 3).join(', ')}</td>
@@ -109,7 +119,7 @@ export function Launches() {
       <div style={{ marginBottom: 12 }}><Filters tag={tag} setTag={setTag} tags={(market?.tags ?? []).map((t: any) => t.tag)} /></div>
       {!data ? null : data.length === 0 ? <Empty text={tr("Pas encore de sortie mesurée : POP repère les nouvelles îles à chaque collecte (toutes les 30 minutes).")} /> :
         <div style={{ overflowX: 'auto' }}><table className="tbl"><thead><tr><th>#</th><th>{tr("Map")}</th><th>{tr("Sortie")}</th><th>{tr("Joueurs jour 1")}</th><th>{tr("Pic CCU jour 1")}</th><th>{tr("Parties jour 1")}</th><th>{tr("Joueurs aujourd’hui")}</th><th>{tr("Rétention D1")}</th></tr></thead>
-          <tbody>{data.map((r, i) => <tr key={r.code} className="rowlink" onClick={() => isl.open(r.code)}>
+          <tbody>{data.map((r, i) => <tr key={r.code} className="rowlink" tabIndex={0} onClick={() => isl.open(r.code)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); isl.open(r.code) } }}>
             <td className="muted">{i + 1}</td><td><b style={{ fontWeight: 500 }}>{r.title || r.code}</b><div className="small muted mono">{r.code} · {(r.tags ?? []).slice(0, 2).join(', ')}</div></td>
             <td>{day(r.launch_day)}</td><td><b style={{ fontWeight: 500 }}>{n(r.launch_players)}</b></td><td>{n(r.launch_ccu)}</td><td>{n(r.launch_plays)}</td><td>{n(r.players_now)}</td><td>{pct(r.d1)}</td>
           </tr>)}</tbody></table></div>}
@@ -143,11 +153,12 @@ function Spark({ series }: { series: any[] }) {
 }
 
 function GenreDrawer({ g, onClose, openIsland }: { g: any; onClose: () => void; openIsland: (c: string) => void }) {
+  const dlg = useDialog(onClose)
   const v = VERDICT[g.verdict]
   const max = Math.max(1, ...g.series.map((s: any) => s.players ?? 0))
   return <>
     <div className="scrim" onClick={onClose} />
-    <aside className="drawer" aria-label={tr("Genre {0}", [g.tag])}>
+    <aside ref={dlg as any} tabIndex={-1} aria-modal="true" role="dialog" className="drawer" aria-label={tr("Genre {0}", [g.tag])}>
       <div className="row" style={{ justifyContent: 'space-between' }}><h2 style={{ margin: 0, fontWeight: 500, fontSize: 22 }}>{cap(g.tag)}</h2><button className="iconbtn" aria-label={tr("Fermer")} onClick={onClose}><X size={18} /></button></div>
       <div style={{ margin: '10px 0 16px' }}><span className={'badge ' + v.cls}>{v.label}</span></div>
       <p style={{ margin: '0 0 6px', lineHeight: 1.5 }}>{v.why}</p>
@@ -345,14 +356,14 @@ export function TikTok({ sid, title, bar }: { sid?: number; title?: string; bar?
       </div>
       <section className="card"><CardHead title={tr("Maps citées dans les vidéos")} sub={tr("Codes d’îles trouvés dans les descriptions, avec leurs statistiques Fortnite")} />
         {data.maps.length === 0 ? <p className="small muted">{tr("Aucun code d’île dans les vidéos collectées.")}</p> :
-          <table className="tbl"><thead><tr><th>{tr("Map")}</th><th>{tr("Vidéos")}</th><th>{tr("Vues")}</th><th /></tr></thead><tbody>{data.maps.slice(0, 20).map((m: any) => <tr key={m.code} className="rowlink" onClick={() => isl.open(m.code)}><td><b style={{ fontWeight: 500 }}>{m.title || tr("Île")}</b> <span className="small muted mono">{m.code}</span></td><td>{m.videos}</td><td>{n(m.plays)}</td><td className="small">{tr("Statistiques →")}</td></tr>)}</tbody></table>}
+          <table className="tbl"><thead><tr><th>{tr("Map")}</th><th>{tr("Vidéos")}</th><th>{tr("Vues")}</th><th /></tr></thead><tbody>{data.maps.slice(0, 20).map((m: any) => <tr key={m.code} className="rowlink" tabIndex={0} onClick={() => isl.open(m.code)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); isl.open(m.code) } }}><td><b style={{ fontWeight: 500 }}>{m.title || tr("Île")}</b> <span className="small muted mono">{m.code}</span></td><td>{m.videos}</td><td>{n(m.plays)}</td><td className="small">{tr("Statistiques →")}</td></tr>)}</tbody></table>}
       </section>
       <section className="card"><CardHead title={tr("Vidéos qui décollent (7 jours)")} sub={tr("Classées par vues par jour depuis leur publication")}>
         <div className="row" style={{ gap: 6 }}>{[['', tr("Toutes")], ['tiktok', tr("TikTok")], ['youtube', tr("YouTube")]].map(([k, l]) => <button key={k} className={'chip' + (platform === k ? ' on' : '')} style={{ height: 30 }} onClick={() => setPlatform(k)}>{l}</button>)}</div>
       </CardHead>
         {vids.length === 0 ? <p className="small muted">{tr("Aucune vidéo récente.")}</p> :
           <div className="ttgrid">{vids.map((v: any) => <a key={v.id} className="ttcard" href={v.url} target="_blank" rel="noreferrer">
-            {v.thumb && <img src={v.thumb} alt="" loading="lazy" referrerPolicy="no-referrer" className="ttthumb" onError={e => (e.currentTarget.style.display = 'none')} />}
+            {v.thumb && <img src={`/api/img?u=${encodeURIComponent(v.thumb)}`} alt="" loading="lazy" referrerPolicy="no-referrer" className="ttthumb" onError={e => (e.currentTarget.style.display = 'none')} />}
             <div className="row small" style={{ gap: 6 }}><span className={'badge ' + (v.platform === 'youtube' ? 'b-r' : 'b-v')}>{v.platform === 'youtube' ? tr("YouTube") : tr("TikTok")}</span><span className="muted">{v.author}{v.created ? ` · ${ago(v.created.replace('T', ' ').slice(0, 19))}` : ''}</span></div>
             <div className="tttext">{v.text || tr("(sans description)")}</div>
             <div className="row small" style={{ gap: 10 }}><b style={{ fontWeight: 500 }}>{n(v.plays)} vues</b><span className="muted">{tr("≈ {0}/jour · {1} j’aime", [n(v.per_day), n(v.likes)])}</span></div>

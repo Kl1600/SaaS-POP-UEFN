@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Bot, Check, Copy, Trash2, Lock, Unlock, X } from 'lucide-react'
 import { ago, api } from '../api'
 import { useApp, useLive, useLoad } from '../state'
-import { CardHead, PageHead } from '../components/ui'
+import { CardHead, Modal, PageHead } from '../components/ui'
 import { tr } from '../i18n/t'
 
 type Client = { kind: string; name: string; where: string; config: (url: string, token: string) => string; note?: string }
@@ -69,8 +69,7 @@ export default function AI() {
       </section>
 
       {open && <>
-        <div className="scrim" onClick={() => setOpen(null)} />
-        <div className="modal" role="dialog" aria-label={tr("Connecter {0}", [open.c.name])}>
+        <Modal onClose={() => setOpen(null)} label={tr("Connecter {0}", [open.c.name])}>
           <div className="row" style={{ justifyContent: 'space-between' }}><h2 style={{ margin: 0, fontWeight: 500, fontSize: 20 }}>{tr("Connecter {0}", [open.c.name])}</h2><button className="iconbtn" aria-label={tr("Fermer")} onClick={() => setOpen(null)}><X size={18} /></button></div>
           <p className="small" style={{ margin: '12px 0 6px' }}>{open.c.where}</p>
           <pre className="report mono" style={{ fontSize: 12 }}>{open.c.config(url, open.token)}</pre>
@@ -80,7 +79,7 @@ export default function AI() {
           </div>
           {open.c.note && <p className="small muted">{open.c.note}</p>}
           <p className="small muted">{tr("Redémarrez l’IA puis demandez-lui par exemple : « Liste les acteurs de ma map POP ». Cette page indiquera qu’elle est utilisée.")}</p>
-        </div>
+        </Modal>
       </>}
     </main>
   )

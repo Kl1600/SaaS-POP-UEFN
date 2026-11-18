@@ -117,14 +117,7 @@ async fn refresh_hourly(st: &AppState, mid: i64, code: &str) {
     let due: bool = sqlx::query_scalar("SELECT COALESCE((SELECT hourly_at < datetime('now', '-30 minutes') OR hourly_at IS NULL FROM map_discover WHERE map_id = ?), 1)").bind(mid).fetch_one(&st.db).await.unwrap_or(false);
     if !due || std::env::var("POP_ANALYTICS").map(|v| v == "0").unwrap_or(false) { return }
     let _ = sqlx::query("INSERT INTO map_discover (map_id, hourly_at) VALUES (?, datetime('now')) ON CONFLICT(map_id) DO UPDATE SET hourly_at = datetime('now')").bind(mid).execute(&st.db).await;
-    let url = format!("{}/islands/{code}/metrics/hour", crate::analytics::base());
-    let Ok((200, v)) = crate::analytics::get_json(st, &url).await else { return };
-    let arr = v["peakCCU"].as_array().or(v["peakCCU"]["intervals"].as_array()).cloned().unwrap_or_default();
-    for p in arr {
-        let Some(ts) = p["timestamp"].as_str() else { continue };
-        let _ = sqlx::query("INSERT INTO fn_hourly (code, ts, ccu) VALUES (?, ?, ?) ON CONFLICT(code, ts) DO UPDATE SET ccu = excluded.ccu")
-            .bind(code).bind(ts.chars().take(13).collect::<String>()).bind(p["value"].as_i64()).execute(&st.db).await;
-    }
+    let _ = crate::analytics::fetch_hourly(st, code).await;
     // Les chiffres journaliers de la map, au passage.
     let _ = crate::analytics::fetch_metrics(st, code).await;
 }
@@ -228,12 +221,17 @@ async fn track(st: &AppState, mid: i64, code: &str, matched: &[&ideas::Theme], n
         Some(json!({ "day": d, "before": b.map(|x| x.round()), "after": a.map(|x| x.round()), "change": match (b, a) { (Some(b), Some(a)) if b > 0.0 => Some(((a / b - 1.0) * 100.0).round()), _ => None } }))
     }).collect();
 
+    // Chance de percer (modèle appris sur les nouvelles maps suivies par POP), pendant les 14 jours de test.
+    let mut by_age: HashMap<i64, (Option<i64>, Option<f64>, Option<f64>)> = HashMap::new();
+    for s in &series { if let Some(a) = age_of(&s.0) { by_age.insert(a, (s.1, s.2, s.3)); } }
+    let launch = if age.map(|a| (0..=14).contains(&a)).unwrap_or(false) { crate::model::predict(st, &by_age).await } else { Value::Null };
+
     let phase = match age { None => "avant", Some(a) if first_metric.is_none() && a <= 1 => "avant", Some(a) if a <= 14 => "test", _ => "apres" };
     Ok(json!({
         "phase": phase, "age": age, "start": start,
         "series": series.iter().map(|s| json!({ "day": s.0, "age": age_of(&s.0), "players": s.1, "minutes": s.2, "d1": s.3, "d7": s.4, "ccu": s.6 })).collect::<Vec<_>>(),
         "bench": bench, "percentile": my_pct.map(|p| (p * 100.0).round()),
-        "signals": signals, "surge": surge, "trend3": trend3.map(|x| x.round()), "effects": effects,
+        "signals": signals, "surge": surge, "launch": launch, "trend3": trend3.map(|x| x.round()), "effects": effects,
     }))
 }
 

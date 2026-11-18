@@ -5,6 +5,8 @@ mod admin;
 mod analytics;
 mod billing;
 mod ideas;
+mod model;
+mod legal;
 mod discover;
 mod ai;
 mod mail;
@@ -67,6 +69,17 @@ pub struct AppState {
 /// qu'un autre site ne peut pas ajouter sans autorisation CORS (que l'on ne donne jamais).
 async fn csrf(req: Request<Body>, next: Next) -> Response {
     let m = req.method().clone();
+    // HTTPS forcé : derrière le proxy (Caddy, Nginx, Cloudflare…), une requête arrivée en http est renvoyée en https.
+    if https_mode() {
+        let proto = req.headers().get("x-forwarded-proto").and_then(|v| v.to_str().ok()).unwrap_or("");
+        if proto.eq_ignore_ascii_case("http") {
+            let host = req.headers().get("host").and_then(|v| v.to_str().ok()).unwrap_or("").to_string();
+            if !host.is_empty() && host.chars().all(|c| c.is_ascii_alphanumeric() || ".-:[]".contains(c)) {
+                let pq = req.uri().path_and_query().map(|x| x.as_str().to_string()).unwrap_or_else(|| "/".into());
+                return axum::response::Redirect::permanent(&format!("https://{host}{pq}")).into_response();
+            }
+        }
+    }
     let path = req.uri().path().to_string();
     if m != Method::GET && m != Method::HEAD && m != Method::OPTIONS && !path.starts_with("/api/hooks/") && !path.starts_with("/api/relay/") && path != "/mcp" {
         let ok = req.headers().get("x-pop").and_then(|v| v.to_str().ok()) == Some("1");
@@ -82,13 +95,18 @@ async fn csrf(req: Request<Body>, next: Next) -> Response {
     h.insert("permissions-policy", "camera=(), microphone=(), geolocation=(), payment=()".parse().unwrap());
     h.insert("cross-origin-opener-policy", "same-origin".parse().unwrap());
     // Politique de contenu : scripts uniquement de POP, aucune intégration de POP dans un autre site.
-    h.insert("content-security-policy", "default-src 'self'; script-src 'self' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' ws: wss:; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'".parse().unwrap());
-    if std::env::var("POP_SECURE_COOKIES").map(|v| v == "1").unwrap_or(false) {
-        h.insert("strict-transport-security", "max-age=31536000; includeSubDomains".parse().unwrap());
+    h.insert("content-security-policy", "default-src 'self'; script-src 'self' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' ws: wss:; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'".parse().unwrap());
+    if https_mode() {
+        h.insert("strict-transport-security", "max-age=63072000; includeSubDomains".parse().unwrap());
     }
-    // Pas de mise en cache des réponses de l'API (données personnelles).
-    if path.starts_with("/api/") { h.insert("cache-control", "no-store".parse().unwrap()); }
+    // Pas de mise en cache des réponses de l'API (données personnelles), sauf les vignettes relayées.
+    if path.starts_with("/api/") && path != "/api/img" { h.insert("cache-control", "no-store".parse().unwrap()); }
     res
+}
+
+/// Production en HTTPS : `POP_SECURE_COOKIES=1`, ou une adresse publique en `https://`.
+pub fn https_mode() -> bool {
+    std::env::var("POP_SECURE_COOKIES").map(|v| v == "1").unwrap_or(false) || mail::public_url().starts_with("https://")
 }
 
 /// Rapport du soir (texte prêt à poster sur Discord).
@@ -132,6 +150,11 @@ fn api() -> Router<AppState> {
         .route("/api/notifications/read", post(account::read_notifications))
         .route("/api/studios/{sid}/members/{uid}/reset-link", post(account::admin_reset_link))
         .route("/api/maps/{mid}/search", get(account::search))
+        .route("/api/legal", get(legal::get))
+        .route("/api/admin/legal", put(legal::save))
+        .route("/api/img", get(legal::image))
+        .route("/api/analytics/rising", get(analytics::rising_list))
+        .route("/api/admin/model", get(model::admin_status).post(model::admin_refresh))
         .route("/api/ideas", get(ideas::list))
         .route("/api/ideas/niches", get(ideas::all_niches))
         .route("/api/ideas/profile", axum::routing::put(ideas::save_settings))
@@ -297,7 +320,7 @@ async fn main() -> anyhow::Result<()> {
         hub: Arc::new(ws::Hub::default()),
         limiter: Arc::new(Mutex::new(HashMap::new())),
         board_lock: Arc::new(tokio::sync::Mutex::new(())),
-        secure_cookies: std::env::var("POP_SECURE_COOKIES").map(|v| v == "1").unwrap_or(false),
+        secure_cookies: https_mode(),
         dummy_hash: auth::hash_password("mot-de-passe-factice").map_err(|e| anyhow::anyhow!("{e:?}"))?,
         relays: Arc::new(uefn::RelayHub::default()),
         http: reqwest::Client::builder().timeout(std::time::Duration::from_secs(30)).build()?,

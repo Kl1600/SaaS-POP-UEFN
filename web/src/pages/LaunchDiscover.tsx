@@ -33,6 +33,12 @@ const SIGNAL: Record<string, [string, string]> = {
   d7: [tr("Retour à une semaine (J+7)"), tr("La map ne fidélise pas sur la semaine. Ajoutez des objectifs longs (niveaux, collection) et annoncez vos prochaines mises à jour.")],
   rec: [tr("Recommandations par joueur"), tr("Peu de joueurs recommandent la map. Demandez-le au bon moment (après une victoire) et corrigez ce qui frustre : bugs, attente, équilibre.")],
 }
+const FACTOR: Record<string, [string, string]> = {
+  players: [tr("Beaucoup de joueurs dès les premiers jours"), tr("Peu de joueurs les premiers jours : amenez-en par vos propres canaux")],
+  minutes: [tr("Les joueurs restent longtemps"), tr("Les parties sont courtes : retravaillez les premières minutes")],
+  d1: [tr("Les joueurs reviennent le lendemain"), tr("Peu de joueurs reviennent le lendemain")],
+  growth: [tr("Les joueurs augmentent de jour en jour"), tr("Les joueurs baissent depuis la sortie")],
+}
 const GRADE: Record<string, [string, string]> = { top: [tr("Au niveau des meilleures"), 'b-g'], bon: [tr("Au-dessus de la niche"), 'b-g'], moyen: [tr("Un peu en dessous"), 'b-o'], faible: [tr("Nettement en dessous"), 'b-r'], inconnu: [tr("Pas encore mesuré"), ''] }
 
 /** Analyse de la vignette dans le navigateur : rien n'est envoyé. */
@@ -193,6 +199,13 @@ export default function LaunchDiscover() {
         <input className="field mono" placeholder="1234-5678-9012" value={code} onChange={e => setCode(e.target.value)} required pattern="\d{4}-\d{4}-\d{4}" /><button className="btn pri">{tr("Relier l’île")}</button></form>
         : <p className="small muted">{tr("Un admin du studio peut relier le code de l’île.")}</p>) : <>
         {t.surge?.rising && <div className="dalert"><TrendingUp size={18} /><div><b>{tr("Ça monte plus vite que d’habitude")}</b><span>{tr("{0} joueurs en même temps ces 3 dernières heures, contre {1} d’habitude à ces heures-là. C’est le moment de pousser sur vos réseaux : c’est ce qui fait entrer dans Trending.", [num(t.surge.now), num(t.surge.usual)])}</span></div></div>}
+        {t.launch && (t.launch.ready ? <div className="dlaunch">
+          <div className="dlaunch-p"><b>{t.launch.prob} %</b><span>{tr("de chances de dépasser {0} joueurs par jour avant la fin des 14 jours de test", [num(t.launch.threshold)])}</span></div>
+          <div className="small">
+            {(t.launch.factors ?? []).map((f: any) => <p key={f.key} className="dlaunch-f"><span className={f.effect === 'plus' ? 'ok-ic' : 'bad-ic'}>{f.effect === 'plus' ? '▲' : '▼'}</span>{FACTOR[f.key]?.[f.effect === 'plus' ? 0 : 1]}</p>)}
+            <p className="muted" style={{ margin: '6px 0 0' }}>{tr("Appris sur {0} nouvelles maps suivies par POP, dont {1} ont percé. Fiabilité : {2} %.", [num(t.launch.n), num(t.launch.positives), Math.round((t.launch.auc ?? 0.5) * 100)])}</p>
+          </div>
+        </div> : <p className="small muted">{tr("La « chance de percer » s’affichera quand POP aura suivi assez de nouvelles maps ({0} pour l’instant, dont {1} ont dépassé {2} joueurs).", [num(t.launch.n ?? 0), num(t.launch.positives ?? 0), num(t.launch.threshold)])}</p>)}
         {(t.series ?? []).length > 0 ? <>
           <Chart t={t} />
           <div className="dlegend small muted"><span><i className="lg-me" />{tr("Votre map")}</span>{t.bench.length > 0 && <><span><i className="lg-med" />{tr("Nouvelle map typique de la niche")}</span><span><i className="lg-band" />{tr("La moitié des nouvelles maps de la niche")}</span></>}</div>

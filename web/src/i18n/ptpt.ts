@@ -50,7 +50,7 @@ const ptPT: Dict = {
     ],
   },
   final: { h2a: 'O seu próximo mapa', h2b: 'começa aqui.', p: 'Entre na lista de espera: enviamos o seu acesso assim que abrir uma vaga.' },
-  foot: { made: 'Feito por criadores de Fortnite, para criadores de Fortnite.', legal: 'Fortnite e UEFN são marcas da Epic Games. O POP não é afiliado nem endossado pela Epic Games.', product: 'Produto', help: 'Ajuda', account: 'Conta' },
+  foot: { legalTitle: 'Legal', made: 'Feito por criadores de Fortnite, para criadores de Fortnite.', legal: 'Fortnite e UEFN são marcas da Epic Games. O POP não é afiliado nem endossado pela Epic Games.', product: 'Produto', help: 'Ajuda', account: 'Conta' },
   mock: {
     overview: 'Visão geral', nav: ['Visão geral', 'Páginas', 'Quadro branco', 'Tarefas', 'Organizador', 'Mercado'],
     hello: 'Olá Léa, sugiro começar pela #42.', late: '2 tarefas atrasadas (a mais antiga era para 12 de nov.).', mile: 'Marco “Beta” em 5 dias: faltam 9 tarefas, atraso previsto de 1 dia.',
@@ -69,7 +69,7 @@ const ptPT: Dict = {
     name: 'Nome ou apelido', email: 'E-mail', studio: 'Estúdio', optional: '(opcional)', studioPh: 'Nome do estúdio', team: 'Tamanho da equipa',
     teams: ['Sozinho', '2 a 3', '4 a 10', 'Mais de 10'], exp: 'Experiência', exps: ['Iniciante no UEFN', 'Alguns mapas publicados', 'Criador experiente', 'Estúdio profissional'],
     links: 'Os seus mapas ou redes', linksPh: 'Códigos de ilha, TikTok, YouTube…', msg: 'O que quer fazer com o POP', msgPh: 'Ex.: somos 4 num mapa tycoon e perdemo-nos entre o Discord e os Google Docs.',
-    send: 'Pedir acesso', sending: 'A enviar…', nospam: 'Sem spam: só escrevemos para liberar o seu acesso.',
+    send: 'Pedir acesso', sending: 'A enviar…', nospam: 'Sem spam: só escrevemos para liberar o seu acesso.', privacy: 'Política de privacidade',
     okTitle: 'Anotado, obrigado!', okText: 'O seu pedido chegou à equipa do POP. Assim que houver uma vaga, enviamos o seu utilizador e uma palavra-passe provisória.',
     alreadyTitle: 'Já está na lista.', approvedTitle: 'O o seu acesso já foi aprovado.', approvedText: 'A sua conta está pronta: a equipa do POP vai enviar-lhe o utilizador e a palavra-passe provisória. Se não chegar, escreva-nos.', close: 'Fechar',
   },

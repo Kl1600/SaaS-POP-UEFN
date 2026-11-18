@@ -49,7 +49,7 @@ const it: Dict = {
     ],
   },
   final: { h2a: 'La tua prossima mappa', h2b: 'inizia qui.', p: 'Entra nella lista d’attesa: ti inviamo l’accesso appena si libera un posto.' },
-  foot: { made: 'Fatto da creator Fortnite, per creator Fortnite.', legal: 'Fortnite e UEFN sono marchi di Epic Games. POP non è affiliato né approvato da Epic Games.', product: 'Prodotto', help: 'Aiuto', account: 'Account' },
+  foot: { legalTitle: 'Note legali', made: 'Fatto da creator Fortnite, per creator Fortnite.', legal: 'Fortnite e UEFN sono marchi di Epic Games. POP non è affiliato né approvato da Epic Games.', product: 'Prodotto', help: 'Aiuto', account: 'Account' },
   mock: {
     overview: 'Panoramica', nav: ['Panoramica', 'Pagine', 'Lavagna', 'Task', 'Organizer', 'Mercato'],
     hello: 'Ciao Léa, ti propongo di iniziare dal #42.', late: '2 task in ritardo (il più vecchio era previsto per il 12 nov.).', mile: 'Milestone «Beta» tra 5 giorni: mancano 9 task, ritardo previsto di 1 giorno.',
@@ -68,7 +68,7 @@ const it: Dict = {
     name: 'Nome o nickname', email: 'E-mail', studio: 'Studio', optional: '(facoltativo)', studioPh: 'Nome dello studio', team: 'Dimensione del team',
     teams: ['Da solo', 'Da 2 a 3', 'Da 4 a 10', 'Più di 10'], exp: 'Esperienza', exps: ['Principiante UEFN', 'Alcune mappe pubblicate', 'Creator esperto', 'Studio professionale'],
     links: 'Le tue mappe o i tuoi social', linksPh: 'Codici isola, TikTok, YouTube…', msg: 'Cosa vuoi fare con POP', msgPh: 'Es.: siamo in 4 su una mappa tycoon e ci perdiamo tra Discord e i Google Docs.',
-    send: 'Richiedi l’accesso', sending: 'Invio…', nospam: 'Niente spam: ti scriviamo solo per darti l’accesso.',
+    send: 'Richiedi l’accesso', sending: 'Invio…', nospam: 'Niente spam: ti scriviamo solo per darti l’accesso.', privacy: 'Informativa sulla privacy',
     okTitle: 'Fatto, grazie!', okText: 'La tua richiesta è arrivata al team di POP. Appena si libera un posto, ti inviamo il tuo nome utente e una password provvisoria.',
     alreadyTitle: 'Sei già nella lista.', approvedTitle: 'Il tuo accesso è già approvato.', approvedText: 'Il tuo account è pronto: il team di POP ti invia nome utente e password provvisoria. Altrimenti scrivici.', close: 'Chiudi',
   },

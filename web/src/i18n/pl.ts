@@ -49,7 +49,7 @@ const pl: Dict = {
     ],
   },
   final: { h2a: 'Twoja następna mapa', h2b: 'zaczyna się tutaj.', p: 'Dołącz do listy oczekujących: wyślemy ci dostęp, gdy tylko zwolni się miejsce.' },
-  foot: { made: 'Stworzone przez twórców Fortnite, dla twórców Fortnite.', legal: 'Fortnite i UEFN są znakami towarowymi Epic Games. POP nie jest powiązany z Epic Games ani przez nie wspierany.', product: 'Produkt', help: 'Pomoc', account: 'Konto' },
+  foot: { legalTitle: 'Informacje prawne', made: 'Stworzone przez twórców Fortnite, dla twórców Fortnite.', legal: 'Fortnite i UEFN są znakami towarowymi Epic Games. POP nie jest powiązany z Epic Games ani przez nie wspierany.', product: 'Produkt', help: 'Pomoc', account: 'Konto' },
   mock: {
     overview: 'Przegląd', nav: ['Przegląd', 'Strony', 'Tablica', 'Zadania', 'Organizer', 'Rynek'],
     hello: 'Cześć Léa, proponuję zacząć od #42.', late: '2 zadania opóźnione (najstarsze miało termin 12 lis.).', mile: 'Kamień milowy „Beta” za 5 dni: zostało 9 zadań, przewidywane opóźnienie 1 dzień.',
@@ -68,7 +68,7 @@ const pl: Dict = {
     name: 'Imię lub pseudonim', email: 'E-mail', studio: 'Studio', optional: '(opcjonalnie)', studioPh: 'Nazwa studia', team: 'Wielkość zespołu',
     teams: ['Sam', '2–3', '4–10', 'Ponad 10'], exp: 'Doświadczenie', exps: ['Nowy w UEFN', 'Kilka opublikowanych map', 'Doświadczony twórca', 'Profesjonalne studio'],
     links: 'Twoje mapy lub social media', linksPh: 'Kody wysp, TikTok, YouTube…', msg: 'Co chcesz robić z POP', msgPh: 'Np. jesteśmy w 4 osoby przy mapie tycoon i gubimy się między Discordem a Google Docs.',
-    send: 'Poproś o dostęp', sending: 'Wysyłanie…', nospam: 'Bez spamu: piszemy tylko po to, by dać ci dostęp.',
+    send: 'Poproś o dostęp', sending: 'Wysyłanie…', nospam: 'Bez spamu: piszemy tylko po to, by dać ci dostęp.', privacy: 'Polityka prywatności',
     okTitle: 'Zapisane, dziękujemy!', okText: 'Twoja prośba dotarła do zespołu POP. Gdy tylko zwolni się miejsce, wyślemy ci login i tymczasowe hasło.',
     alreadyTitle: 'Jesteś już na liście.', approvedTitle: 'Twój dostęp jest już zatwierdzony.', approvedText: 'Twoje konto jest gotowe: zespół POP wyśle ci login i tymczasowe hasło. Jeśli nie dotarły, napisz do nas.', close: 'Zamknij',
   },

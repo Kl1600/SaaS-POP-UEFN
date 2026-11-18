@@ -4,7 +4,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import { Lightbulb, Heart, X, Rocket, Bell, BellOff, TrendingUp, Users, Clock, DoorOpen, Sparkles } from 'lucide-react'
 import { ago, api } from '../api'
 import { useApp, useLoad, studioName } from '../state'
-import { CardHead, Empty, PageHead, Tabs } from '../components/ui'
+import { CardHead, Empty, PageHead, Tabs, useDialog } from '../components/ui'
 import { IslandDrawer } from './Analysis'
 import { tr, LANG, LOCALE } from '../i18n/t'
 
@@ -64,7 +64,7 @@ function Spark({ series }: { series: any[] }) {
 
 function Card({ d, onOpen, onSave }: { d: any; onOpen: () => void; onSave: () => void }) {
   const hue = GENRE_HUE[d.genre] ?? 200
-  return <article className={'icard' + (d.status === 'new' ? ' fresh' : '')} onClick={onOpen} onKeyDown={e => { if (e.key === 'Enter') onOpen() }} tabIndex={0} aria-label={label(d)}>
+  return <article className={'icard' + (d.status === 'new' ? ' fresh' : '')} onClick={onOpen} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } }} tabIndex={0} aria-label={label(d)}>
     <div className="icard-top" style={{ ['--h' as any]: hue }}>
       <span className="icard-genre">{GENRE[d.genre] ?? d.genre}</span>
       {d.status === 'new' && <span className="icard-new">{tr("Nouveau")}</span>}
@@ -101,12 +101,13 @@ function Axis({ k, name, help, v }: { k: string; name: string; help: string; v: 
 }
 
 function Detail({ d, onClose, onState, onStart }: { d: any; onClose: () => void; onState: (s: string) => void; onStart: () => void }) {
+  const dlg = useDialog(onClose)
   const [isl, setIsl] = useState<string | null>(null)
   if (isl) return <IslandDrawer code={isl} onClose={() => setIsl(null)} />
   const Map = ({ m }: { m: any }) => <button className="ilink" onClick={() => setIsl(m.code)}><b>{m.title}</b><span className="small muted">{tr("{0} joueurs · {1} min · J+1 {2}", [num(m.players), num(m.minutes), pc(m.d1)])}</span></button>
   return <>
     <div className="scrim" onClick={onClose} />
-    <aside className="drawer idrawer" aria-label={tr("Fiche idée")}>
+    <aside ref={dlg as any} tabIndex={-1} aria-modal="true" role="dialog" className="drawer idrawer" aria-label={tr("Fiche idée")}>
       <div className="idrawer-head" style={{ ['--h' as any]: GENRE_HUE[d.genre] ?? 200 }}>
         <div className="row" style={{ justifyContent: 'space-between' }}>
           <span className="icard-genre">{GENRE[d.genre] ?? d.genre}</span>
@@ -167,6 +168,7 @@ function Detail({ d, onClose, onState, onStart }: { d: any; onClose: () => void;
 }
 
 function StartModal({ d, onClose }: { d: any; onClose: () => void }) {
+  const dlg = useDialog(onClose)
   const { me, toast, reload: reloadMe } = useApp()
   const navigate = useNavigate()
   const studios = (me?.studios ?? []).filter((s: any) => ['owner', 'admin'].includes(s.role))
@@ -181,7 +183,7 @@ function StartModal({ d, onClose }: { d: any; onClose: () => void }) {
     } catch (e: any) { toast(e.message, true) }
   }
   return <><div className="scrim" onClick={onClose} style={{ zIndex: 50 }} />
-    <div className="modal" role="dialog" aria-label={tr("Je me lance")} style={{ zIndex: 51 }}>
+    <div ref={dlg as any} tabIndex={-1} aria-modal="true" className="modal" role="dialog" aria-label={tr("Je me lance")} style={{ zIndex: 51 }}>
       <h2 style={{ marginTop: 0, fontWeight: 500 }}>{tr("Je me lance")}</h2>
       <p className="small muted">{tr("POP crée la map et y range la fiche de l’idée (chiffres, maps à étudier, objectifs) dans Pages.")}</p>
       <label className="label">{tr("Nom de la map")}<input className="field" maxLength={60} value={name} onChange={e => setName(e.target.value)} /></label>
@@ -197,7 +199,7 @@ function AllNiches() {
   return <section className="card">
     <CardHead title={tr("Toutes les niches")} sub={tr("{0} niches notées sur {1} maps jouées hier.", [data.niches?.length ?? 0, num(data.islands)])} />
     <div style={{ overflowX: 'auto' }}><table className="tbl"><thead><tr><th>{tr("Niche")}</th><th>{tr("Genre")}</th><th>{tr("Note")}</th>{AXES.map(([k, n]) => <th key={k}>{n}</th>)}<th>{tr("Maps")}</th><th>{tr("Joueurs")}</th><th>7 j</th></tr></thead>
-      <tbody>{(data.niches ?? []).map((n: any) => <tr key={n.key} style={{ cursor: 'pointer', opacity: n.risky ? .5 : 1 }} onClick={() => setOpen(n)}>
+      <tbody>{(data.niches ?? []).map((n: any) => <tr key={n.key} style={{ cursor: 'pointer', opacity: n.risky ? .5 : 1 }} tabIndex={0} onClick={() => setOpen(n)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(n) } }}>
         <td><b style={{ fontWeight: 500 }}>{label(n)}</b>{n.risky && <span className="small muted"> · {tr("pénalisé par Epic")}</span>}</td><td className="small">{GENRE[n.genre]}</td><td><b>{n.score}</b></td>
         {AXES.map(([k]) => <td key={k} className="small">{n.axes?.[k]}</td>)}<td>{n.islands}</td><td>{num(n.players)}</td><td className="small">{sign(n.trend)}</td></tr>)}</tbody></table></div>
     {open && <Detail d={open} onClose={() => setOpen(null)} onState={() => {}} onStart={() => {}} />}
@@ -231,6 +233,9 @@ export default function Ideas() {
       : <div className="igrid">{shown.map(d => <Card key={d.id} d={d} onOpen={() => setSp({ i: String(d.id) })} onSave={() => setState(d.id, d.status === 'saved' ? 'seen' : 'saved')} />)}</div>}
     {open && <Detail d={open} onClose={() => setSp({}, { replace: true })} onState={s => setState(open.id, s)} onStart={() => setStart(open)} />}
     {start && <StartModal d={start} onClose={() => setStart(null)} />}
+    {data.model && <p className="small muted imodel">{data.model.calibration?.samples >= 30
+      ? tr("Les poids des axes sont appris : POP a vérifié {0} fois après coup si une niche bien notée a vraiment fait percer ses nouvelles maps.", [data.model.calibration.samples])
+      : tr("Les poids des axes sont ceux de départ : ils s’ajusteront tout seuls quand POP aura assez d’historique pour vérifier ses notes après coup (environ un mois de données).")}</p>}
   </main>
 }
 

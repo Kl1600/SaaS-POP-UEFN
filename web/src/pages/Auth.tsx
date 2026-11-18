@@ -4,6 +4,7 @@ import { useApp } from '../state'
 import { WaitlistPage } from '../components/Waitlist'
 import { BlockView } from './Pages'
 import { tr } from '../i18n/t'
+import { LegalLinks } from './Legal'
 import LangPicker from '../components/LangPicker'
 
 export function Login({ invite, initial, access }: { invite?: string; initial?: 'login' | 'register'; access?: { token: string; email: string; name: string } }) {
@@ -12,6 +13,7 @@ export function Login({ invite, initial, access }: { invite?: string; initial?: 
   const [sent, setSent] = useState('')
   const [f, setF] = useState({ email: access?.email ?? '', name: access?.name ?? '', password: '' })
   const [err, setErr] = useState('')
+  const [terms, setTerms] = useState(false)
   const [busy, setBusy] = useState(false)
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setBusy(true); setErr('')
@@ -22,7 +24,7 @@ export function Login({ invite, initial, access }: { invite?: string; initial?: 
         return
       }
       if (mode === 'login') await api.post('/api/auth/login', { login: f.email.trim(), password: f.password })
-      else await api.post('/api/auth/register', { ...f, invite, access: access?.token })
+      else await api.post('/api/auth/register', { ...f, invite, access: access?.token, accept_terms: terms })
       if (invite && mode === 'login') await api.post('/api/invitations/accept', { token: invite })
       await reload()
       if (invite || access) location.href = '/'
@@ -37,6 +39,7 @@ export function Login({ invite, initial, access }: { invite?: string; initial?: 
         {mode === 'register' && <label className="label">{tr("Nom")}<input className="field" value={f.name} onChange={e => setF({ ...f, name: e.target.value })} required maxLength={80} autoComplete="name" /></label>}
         <label className="label">{mode === 'login' ? tr("Identifiant") : 'E-mail'}<input className="field" type={mode === 'login' ? 'text' : 'email'} inputMode={mode === 'login' ? 'text' : 'email'} autoCapitalize="off" autoCorrect="off" spellCheck={false} value={f.email} onChange={e => setF({ ...f, email: e.target.value })} required autoComplete={mode === 'login' ? 'username' : 'email'} readOnly={!!access && mode === 'register'} />{mode === 'login' && <span className="small muted" style={{ fontWeight: 400 }}>{tr("Celui donné par l’équipe POP (ou votre e-mail).")}</span>}</label>
         {mode !== 'forgot' && <label className="label">{tr("Mot de passe")}{mode === 'register' && <span className="small muted">{' '}{tr("(10 caractères minimum, pas un mot courant)")}</span>}<input className="field" type="password" value={f.password} onChange={e => setF({ ...f, password: e.target.value })} required minLength={mode === 'register' ? 10 : 1} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} /></label>}
+        {mode === 'register' && <Terms checked={terms} onChange={setTerms} />}
         {sent && <div className="b-callout small">{sent}</div>}
         {err && <div className="err" role="alert">{err}</div>}
         <button className="btn pri" disabled={busy}>{mode === 'login' ? tr("Se connecter") : mode === 'forgot' ? tr("Recevoir un lien") : tr("Créer mon compte")}</button>
@@ -51,21 +54,31 @@ export function Login({ invite, initial, access }: { invite?: string; initial?: 
         {!invite && <a href="/" className="small" style={{ color: 'rgba(255,255,255,.6)' }}>{tr("← Retour au site")}</a>}
         <span className="authlang"><LangPicker app /></span>
       </div>
+      <LegalLinks className="auth-legal" />
     </div>
   )
 }
 
 /** Première connexion d'un compte créé par l'administrateur : remplacer le mot de passe provisoire. */
+/** Acceptation des CGU et de la politique de confidentialité (obligatoire pour créer un compte). */
+function Terms({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return <label className="terms small">
+    <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} required />
+    <span>{tr("J’accepte les")}{' '}<a href="/cgu" target="_blank" rel="noopener">{tr("conditions d’utilisation")}</a>{' '}{tr("et la")}{' '}<a href="/confidentialite" target="_blank" rel="noopener">{tr("politique de confidentialité")}</a>. {tr("J’ai au moins 15 ans, ou entre 13 et 15 ans avec l’accord d’un parent.")}</span>
+  </label>
+}
+
 export function FirstPassword() {
   const { me, reload } = useApp()
   const [f, setF] = useState({ a: '', b: '' })
+  const [terms, setTerms] = useState(false)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setErr('')
     if (f.a !== f.b) { setErr(tr("Les deux mots de passe ne sont pas identiques.")); return }
     setBusy(true)
-    try { await api.post('/api/me/first-password', { new: f.a }); await reload() } catch (er: any) { setErr(er.message) } finally { setBusy(false) }
+    try { await api.post('/api/me/first-password', { new: f.a, accept_terms: terms }); await reload() } catch (er: any) { setErr(er.message) } finally { setBusy(false) }
   }
   return (
     <div className="auth app">
@@ -77,10 +90,12 @@ export function FirstPassword() {
         <input type="text" name="username" autoComplete="username" value={me?.username ?? me?.user.email ?? ''} readOnly hidden />
         <label className="label">{tr("Nouveau mot de passe")}<span className="small muted">{' '}{tr("(10 caractères minimum, pas un mot courant)")}</span><input className="field" type="password" autoFocus value={f.a} onChange={e => setF({ ...f, a: e.target.value })} required minLength={10} autoComplete="new-password" /></label>
         <label className="label">{tr("Encore une fois")}<input className="field" type="password" value={f.b} onChange={e => setF({ ...f, b: e.target.value })} required minLength={10} autoComplete="new-password" /></label>
+        <Terms checked={terms} onChange={setTerms} />
         {err && <div className="err" role="alert">{err}</div>}
         <button className="btn pri" disabled={busy}>{tr("Enregistrer et continuer")}</button>
         <button type="button" className="link" onClick={async () => { await api.post('/api/auth/logout'); location.href = '/connexion' }}>{tr("Me déconnecter")}</button>
       </form>
+      <LegalLinks className="auth-legal" />
     </div>
   )
 }

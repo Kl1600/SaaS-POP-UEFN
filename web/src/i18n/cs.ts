@@ -49,7 +49,7 @@ const cs: Dict = {
     ],
   },
   final: { h2a: 'Vaše další mapa', h2b: 'začíná tady.', p: 'Zapište se na čekací listinu: přístup pošleme, jakmile se uvolní místo.' },
-  foot: { made: 'Vytvořeno tvůrci Fortnite pro tvůrce Fortnite.', legal: 'Fortnite a UEFN jsou ochranné známky společnosti Epic Games. POP není s Epic Games spojen ani jí schválen.', product: 'Produkt', help: 'Nápověda', account: 'Účet' },
+  foot: { legalTitle: 'Právní informace', made: 'Vytvořeno tvůrci Fortnite pro tvůrce Fortnite.', legal: 'Fortnite a UEFN jsou ochranné známky společnosti Epic Games. POP není s Epic Games spojen ani jí schválen.', product: 'Produkt', help: 'Nápověda', account: 'Účet' },
   mock: {
     overview: 'Přehled', nav: ['Přehled', 'Stránky', 'Tabule', 'Úkoly', 'Organizér', 'Trh'],
     hello: 'Ahoj Léo, navrhuji začít úkolem #42.', late: '2 úkoly ve zpoždění (nejstarší měl termín 12. 11.).', mile: 'Milník „Beta“ za 5 dní: zbývá 9 úkolů, očekávané zpoždění 1 den.',
@@ -68,7 +68,7 @@ const cs: Dict = {
     name: 'Jméno nebo přezdívka', email: 'E-mail', studio: 'Studio', optional: '(nepovinné)', studioPh: 'Název studia', team: 'Velikost týmu',
     teams: ['Sám', '2–3', '4–10', 'Víc než 10'], exp: 'Zkušenosti', exps: ['Nováček v UEFN', 'Pár vydaných map', 'Zkušený tvůrce', 'Profesionální studio'],
     links: 'Vaše mapy nebo sítě', linksPh: 'Kódy ostrovů, TikTok, YouTube…', msg: 'Co chcete s POP dělat', msgPh: 'Např. jsme 4 na tycoon mapě a ztrácíme se mezi Discordem a Google Docs.',
-    send: 'Požádat o přístup', sending: 'Odesílání…', nospam: 'Žádný spam: píšeme jen kvůli přístupu.',
+    send: 'Požádat o přístup', sending: 'Odesílání…', nospam: 'Žádný spam: píšeme jen kvůli přístupu.', privacy: 'Zásady ochrany soukromí',
     okTitle: 'Zapsáno, díky!', okText: 'Vaše žádost dorazila týmu POP. Jakmile se uvolní místo, pošleme vám uživatelské jméno a dočasné heslo.',
     alreadyTitle: 'Už jste na seznamu.', approvedTitle: 'Váš přístup je už schválený.', approvedText: 'Váš účet je připraven: tým POP vám pošle uživatelské jméno a dočasné heslo. Pokud nedorazily, napište nám.', close: 'Zavřít',
   },

@@ -1,6 +1,14 @@
 import React, { Suspense, lazy } from 'react'
 import ReactDOM from 'react-dom/client'
-import { BrowserRouter, Route, Routes, useParams, Navigate } from 'react-router-dom'
+import { BrowserRouter, Route, Routes, useParams, Navigate, useLocation } from 'react-router-dom'
+import Legal, { isLegalPath } from './pages/Legal'
+// Polices servies par POP (pas par Google) : aucune adresse IP de visiteur n'est envoyée à un tiers.
+import '@fontsource/plus-jakarta-sans/400.css'
+import '@fontsource/plus-jakarta-sans/500.css'
+import '@fontsource/plus-jakarta-sans/600.css'
+import '@fontsource/plus-jakarta-sans/700.css'
+import '@fontsource/geist-mono/400.css'
+import '@fontsource/geist-mono/500.css'
 import './styles.css'
 import { AppProvider, useApp } from './state'
 import Layout from './components/Layout'
@@ -29,6 +37,9 @@ const L = (C: any) => <Suspense fallback={<main className="content"><p className
 
 function Gate() {
   const { me, loading } = useApp()
+  const loc = useLocation()
+  // Pages légales : lisibles avec ou sans compte, sans passer par l'application.
+  if (isLegalPath(loc.pathname)) return <Legal />
   if (loading) return <div className="auth" />
   if (!me) return <Routes>
     <Route path="/" element={<Suspense fallback={<div className="auth" />}><Landing /></Suspense>} />
@@ -36,6 +47,8 @@ function Gate() {
     <Route path="*" element={<Login />} />
   </Routes>
   if (me.must_change_password) return <FirstPassword />
+  // Connecté depuis la page de connexion : on part sur l'accueil (l'adresse ne reste pas « /connexion »).
+  if (['/connexion', '/inscription'].includes(loc.pathname)) return <Navigate to="/" replace />
   if (me.studios.length === 0) return <Onboarding />
   if (me.studios.every(s => s.maps.length === 0)) return <Welcome />
   return (

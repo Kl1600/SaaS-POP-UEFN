@@ -1,3 +1,4 @@
+import { LegalLinks } from './Legal'
 import { PageHead } from '../components/ui'
 import { tr } from '../i18n/t'
 
@@ -20,6 +21,7 @@ export default function Help() {
     </PageHead>
     <div className="grid2">
       {SECTIONS.map(([t, ps]) => <section key={t} className="card"><h3>{t}</h3>{ps.map((p, i) => <p key={i} style={{ margin: '6px 0' }}>{p}</p>)}</section>)}
+      <section className="card"><h3>{tr("Informations légales")}</h3><LegalLinks className="help-legal" /></section>
       <section className="card"><h3>{tr("Un problème ?")}</h3><p>{tr("Relais UEFN : lancez")}{' '}<span className="mono">{tr("pop-link.exe diagnostic")}</span>{' '}{tr("sur le PC et gardez le résultat. Mot de passe perdu : « Mot de passe oublié » sur la page de connexion, ou demandez un lien à un admin du studio.")}</p></section>
     </div>
   </main>

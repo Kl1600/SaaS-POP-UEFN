@@ -230,6 +230,7 @@ pub async fn backup_loop(st: AppState, db_url: String) {
         let day = chrono::Utc::now().format("%Y-%m-%d").to_string();
         let file = dir.join(format!("pop-{day}.db"));
         if !file.exists() && std::fs::create_dir_all(&dir).is_ok() {
+            crate::legal::purge(&st).await;
             match sqlx::query(&format!("VACUUM INTO '{}'", file.to_string_lossy().replace('\'', "''"))).execute(&st.db).await {
                 Ok(_) => tracing::info!("sauvegarde : {}", file.display()),
                 Err(e) => tracing::warn!("sauvegarde impossible : {e}"),

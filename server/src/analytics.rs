@@ -242,7 +242,12 @@ pub async fn crawler(st: AppState) {
     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
     loop {
         match crawl(&st).await {
-            Ok(m) => { tracing::info!("analyse Fortnite : {m}"); crate::ideas::refresh_all(&st).await }
+            Ok(m) => {
+                tracing::info!("analyse Fortnite : {m}");
+                hourly_sweep(&st).await;
+                crate::model::daily(&st).await;
+                crate::ideas::refresh_all(&st).await
+            }
             Err(e) => {
                 tracing::warn!("analyse Fortnite : {e}");
                 let _ = sqlx::query("UPDATE fn_status SET last_error = ? WHERE id = 1").bind(&e).execute(&st.db).await;
@@ -789,4 +794,85 @@ pub async fn tiktok(State(st): State<AppState>, u: AuthUser, Path(sid): Path<i64
         "total": rows.len(), "last_fetch": last, "hashtags": rank(tags, 3), "sounds": rank(sounds, 2), "maps": maps,
         "videos": videos.into_iter().take(36).map(|x| x.1).collect::<Vec<_>>(),
     })))
+}
+
+// ---------- Relevés horaires : ce qui monte en ce moment (comme la rangée Trending d'Epic) ----------
+
+/// Joueurs en même temps, heure par heure, d'une île (7 derniers jours d'Epic).
+pub async fn fetch_hourly(st: &AppState, code: &str) -> Result<usize, String> {
+    let url = format!("{}/islands/{code}/metrics/hour", base());
+    let (status, v) = get_json(st, &url).await?;
+    if status == 429 { return Err("limite".into()) }
+    if status != 200 { return Ok(0) }
+    let arr = v["peakCCU"].as_array().or(v["peakCCU"]["intervals"].as_array()).cloned().unwrap_or_default();
+    let mut n = 0;
+    for p in arr {
+        let Some(ts) = p["timestamp"].as_str() else { continue };
+        let _ = sqlx::query("INSERT INTO fn_hourly (code, ts, ccu) VALUES (?, ?, ?) ON CONFLICT(code, ts) DO UPDATE SET ccu = excluded.ccu")
+            .bind(code).bind(ts.chars().take(13).collect::<String>()).bind(p["value"].as_i64()).execute(&st.db).await;
+        n += 1;
+    }
+    Ok(n)
+}
+
+/// Une fois par heure : les ~200 maps les plus jouées et les nouvelles qui grimpent.
+pub async fn hourly_sweep(st: &AppState) {
+    let due: bool = sqlx::query_scalar("SELECT hourly_ok IS NULL OR hourly_ok < datetime('now', '-55 minutes') FROM fn_status WHERE id = 1").fetch_one(&st.db).await.unwrap_or(false);
+    if !due { return }
+    let _ = sqlx::query("UPDATE fn_status SET hourly_ok = datetime('now') WHERE id = 1").execute(&st.db).await;
+    let codes: Vec<String> = sqlx::query_scalar(
+        "SELECT code FROM (
+           SELECT m.code, m.unique_players AS p FROM fn_metrics m WHERE m.day = (SELECT MAX(day) FROM fn_metrics) AND m.code NOT LIKE 'playlist_%' ORDER BY m.unique_players DESC LIMIT 200)
+         UNION
+         SELECT code FROM (
+           SELECT m.code FROM fn_metrics m JOIN fn_islands i ON i.code = m.code
+           WHERE m.day = (SELECT MAX(day) FROM fn_metrics) AND i.seen_new = 1 AND i.first_seen > datetime('now', '-14 days') AND m.unique_players >= 50
+           ORDER BY m.unique_players DESC LIMIT 60)",
+    ).fetch_all(&st.db).await.unwrap_or_default();
+    let mut ok = 0;
+    for c in &codes {
+        match fetch_hourly(st, c).await { Ok(_) => ok += 1, Err(_) => break }
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    }
+    let _ = sqlx::query("DELETE FROM fn_hourly WHERE ts < strftime('%Y-%m-%dT%H', 'now', '-9 days')").execute(&st.db).await;
+    tracing::info!("analyse : relevé horaire de {ok} maps");
+}
+
+/// Maps qui montent : les 3 dernières heures face aux mêmes heures des jours d'avant.
+pub async fn rising(st: &AppState) -> Vec<(String, f64, f64, f64)> {
+    let rows: Vec<(String, String, Option<i64>)> = sqlx::query_as("SELECT code, ts, ccu FROM fn_hourly WHERE ts > strftime('%Y-%m-%dT%H', 'now', '-8 days') ORDER BY code, ts")
+        .fetch_all(&st.db).await.unwrap_or_default();
+    let mut by: std::collections::HashMap<String, Vec<(String, f64)>> = std::collections::HashMap::new();
+    for (c, ts, v) in rows { if let Some(v) = v { by.entry(c).or_default().push((ts, v as f64)) } }
+    let mut out = vec![];
+    for (code, h) in by {
+        if h.len() < 48 { continue }
+        let recent = &h[h.len() - 3..];
+        let now = recent.iter().map(|x| x.1).sum::<f64>() / 3.0;
+        let hours: std::collections::HashSet<String> = recent.iter().map(|x| x.0.chars().skip(11).take(2).collect()).collect();
+        let today = recent[2].0.chars().take(10).collect::<String>();
+        let past: Vec<f64> = h.iter().filter(|x| !x.0.starts_with(&today) && hours.contains(&x.0.chars().skip(11).take(2).collect::<String>())).map(|x| x.1).collect();
+        if past.len() < 3 { continue }
+        let usual = past.iter().sum::<f64>() / past.len() as f64;
+        let ratio = if usual > 0.0 { now / usual } else if now > 0.0 { 9.0 } else { 0.0 };
+        if ratio >= 1.4 && now >= 20.0 { out.push((code, now, usual, ratio)) }
+    }
+    out.sort_by(|a, b| (b.3 * b.1.ln_1p()).partial_cmp(&(a.3 * a.1.ln_1p())).unwrap());
+    out
+}
+
+pub async fn rising_codes(st: &AppState) -> std::collections::HashSet<String> { rising(st).await.into_iter().map(|r| r.0).collect() }
+
+/// Liste « Ça monte maintenant ».
+pub async fn rising_list(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
+    crate::billing::require_analyse(&st, &u).await?;
+    let r = rising(&st).await;
+    let mut out = vec![];
+    for (code, now, usual, ratio) in r.into_iter().take(30) {
+        let row: Option<(String, String, String)> = sqlx::query_as("SELECT title, creator, tags FROM fn_islands WHERE code = ?").bind(&code).fetch_optional(&st.db).await?;
+        let (title, creator, tags) = row.unwrap_or_default();
+        out.push(json!({ "code": code, "title": title, "creator": creator, "tags": serde_json::from_str::<Value>(&tags).unwrap_or(json!([])), "now": now.round(), "usual": usual.round(), "ratio": (ratio * 10.0).round() / 10.0 }));
+    }
+    let last: Option<String> = sqlx::query_scalar("SELECT hourly_ok FROM fn_status WHERE id = 1").fetch_one(&st.db).await?;
+    Ok(Json(json!({ "items": out, "checked_at": last })))
 }

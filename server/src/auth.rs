@@ -19,6 +19,12 @@ use sha2::{Digest, Sha256};
 use std::time::{Duration, Instant};
 
 pub const COOKIE: &str = "pop_session";
+/// En HTTPS, le cookie de session porte le préfixe `__Host-` : le navigateur exige alors Secure, Path=/ et aucun domaine,
+/// ce qui empêche un sous-domaine (ou un réseau non chiffré) de le poser ou de l'écraser.
+pub const SECURE_COOKIE: &str = "__Host-pop_session";
+pub fn cookie_name(secure: bool) -> &'static str { if secure { SECURE_COOKIE } else { COOKIE } }
+/// Jeton de session lu dans les cookies (nom sécurisé d'abord).
+pub fn session_token(jar: &CookieJar) -> Option<String> { jar.get(SECURE_COOKIE).or_else(|| jar.get(COOKIE)).map(|c| c.value().to_string()) }
 const SESSION_DAYS: i64 = 30;
 
 #[derive(Clone, Debug, Serialize)]
@@ -60,7 +66,7 @@ impl FromRequestParts<AppState> for AuthUser {
 
     async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, Self::Rejection> {
         let jar = CookieJar::from_headers(&parts.headers);
-        let token = jar.get(COOKIE).map(|c| c.value().to_string()).ok_or(AppError::Unauthorized)?;
+        let token = session_token(&jar).ok_or(AppError::Unauthorized)?;
         let u = user_from_token(state, &token).await?.ok_or(AppError::Unauthorized)?;
         // Dernière activité (au plus une écriture toutes les 5 minutes par session).
         let _ = sqlx::query("UPDATE sessions SET last_seen = datetime('now') WHERE token_hash = ? AND (last_seen IS NULL OR last_seen < datetime('now', '-5 minutes'))").bind(&u.sid).execute(&state.db).await;
@@ -106,7 +112,7 @@ pub async fn open_session(state: &AppState, jar: CookieJar, user_id: i64, ip: &s
         .bind(mfa as i64)
         .execute(&state.db)
         .await?;
-    let cookie = Cookie::build((COOKIE, token))
+    let cookie = Cookie::build((cookie_name(state.secure_cookies), token))
         .http_only(true)
         .same_site(SameSite::Lax)
         .secure(state.secure_cookies)
@@ -123,9 +129,12 @@ pub struct RegisterIn {
     password: String,
     invite: Option<String>,
     access: Option<String>,
+    #[serde(default)]
+    accept_terms: bool,
 }
 
 pub async fn register(State(st): State<AppState>, crate::security::ClientIp(ip): crate::security::ClientIp, headers: axum::http::HeaderMap, jar: CookieJar, Json(b): Json<RegisterIn>) -> Result<(CookieJar, Json<Value>), AppError> {
+    if !b.accept_terms { return Err(bad("Acceptez les conditions d’utilisation et la politique de confidentialité pour continuer.")) }
     rate_limit(&st, &b.email)?;
     rate_limit(&st, &format!("ip:reg:{ip}"))?;
     let email = b.email.trim().to_lowercase();
@@ -145,7 +154,7 @@ pub async fn register(State(st): State<AppState>, crate::security::ClientIp(ip):
         other => other,
     })?;
     let hash = hash_password(&b.password)?;
-    let id: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash, is_admin) VALUES (?, ?, ?, ?) RETURNING id")
+    let id: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash, is_admin, terms_at) VALUES (?, ?, ?, ?, datetime('now')) RETURNING id")
         .bind(&email)
         .bind(b.name.trim())
         .bind(hash)
@@ -212,10 +221,11 @@ pub async fn login(State(st): State<AppState>, crate::security::ClientIp(ip): cr
 }
 
 pub async fn logout(State(st): State<AppState>, jar: CookieJar) -> Result<(CookieJar, Json<Value>), AppError> {
-    if let Some(c) = jar.get(COOKIE) {
-        sqlx::query("DELETE FROM sessions WHERE token_hash = ?").bind(sha256_hex(c.value())).execute(&st.db).await?;
+    if let Some(c) = session_token(&jar) {
+        sqlx::query("DELETE FROM sessions WHERE token_hash = ?").bind(sha256_hex(&c)).execute(&st.db).await?;
     }
-    Ok((jar.remove(Cookie::build(COOKIE).path("/").build()), Json(json!({ "ok": true }))))
+    let jar = jar.remove(Cookie::build(COOKIE).path("/").build()).remove(Cookie::build(SECURE_COOKIE).path("/").secure(true).build());
+    Ok((jar, Json(json!({ "ok": true }))))
 }
 
 pub async fn me(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {

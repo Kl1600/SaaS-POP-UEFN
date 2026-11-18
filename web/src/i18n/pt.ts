@@ -50,7 +50,7 @@ const ptBR: Dict = {
     ],
   },
   final: { h2a: 'Seu próximo mapa', h2b: 'começa aqui.', p: 'Entre na lista de espera: enviamos seu acesso assim que abrir uma vaga.' },
-  foot: { made: 'Feito por criadores de Fortnite, para criadores de Fortnite.', legal: 'Fortnite e UEFN são marcas da Epic Games. O POP não é afiliado nem endossado pela Epic Games.', product: 'Produto', help: 'Ajuda', account: 'Conta' },
+  foot: { legalTitle: 'Legal', made: 'Feito por criadores de Fortnite, para criadores de Fortnite.', legal: 'Fortnite e UEFN são marcas da Epic Games. O POP não é afiliado nem endossado pela Epic Games.', product: 'Produto', help: 'Ajuda', account: 'Conta' },
   mock: {
     overview: 'Visão geral', nav: ['Visão geral', 'Páginas', 'Quadro branco', 'Tarefas', 'Organizador', 'Mercado'],
     hello: 'Oi Léa, sugiro começar pela #42.', late: '2 tarefas atrasadas (a mais antiga era para 12 de nov.).', mile: 'Marco “Beta” em 5 dias: faltam 9 tarefas, atraso previsto de 1 dia.',
@@ -69,7 +69,7 @@ const ptBR: Dict = {
     name: 'Nome ou apelido', email: 'E-mail', studio: 'Estúdio', optional: '(opcional)', studioPh: 'Nome do estúdio', team: 'Tamanho da equipe',
     teams: ['Sozinho', '2 a 3', '4 a 10', 'Mais de 10'], exp: 'Experiência', exps: ['Iniciante no UEFN', 'Alguns mapas publicados', 'Criador experiente', 'Estúdio profissional'],
     links: 'Seus mapas ou redes', linksPh: 'Códigos de ilha, TikTok, YouTube…', msg: 'O que você quer fazer com o POP', msgPh: 'Ex.: somos 4 num mapa tycoon e nos perdemos entre o Discord e os Google Docs.',
-    send: 'Pedir acesso', sending: 'Enviando…', nospam: 'Sem spam: só escrevemos para liberar seu acesso.',
+    send: 'Pedir acesso', sending: 'Enviando…', nospam: 'Sem spam: só escrevemos para liberar seu acesso.', privacy: 'Política de privacidade',
     okTitle: 'Anotado, obrigado!', okText: 'Seu pedido chegou à equipe do POP. Assim que abrir uma vaga, enviamos seu usuário e uma senha provisória.',
     alreadyTitle: 'Você já está na lista.', approvedTitle: 'Seu acesso já foi aprovado.', approvedText: 'Sua conta está pronta: a equipe do POP vai enviar seu usuário e sua senha provisória. Se não chegar, escreva para nós.', close: 'Fechar',
   },

@@ -41,7 +41,7 @@ export function WaitlistForm({ onDone }: { onDone?: () => void }) {
     <label><span>{w.msg} {opt()}</span><textarea value={f.message} onChange={up('message')} maxLength={1480} rows={3} placeholder={w.msgPh} /></label>
     {err && <p className="lwerr" role="alert">{err}</p>}
     <button className="lbtn pri" disabled={busy}>{busy ? w.sending : <>{w.send} <ArrowRight size={18} /></>}</button>
-    <p className="lwsmall">{w.nospam}</p>
+    <p className="lwsmall">{w.nospam} <a href="/confidentialite" target="_blank" rel="noopener">{w.privacy}</a></p>
   </form>
 }
 

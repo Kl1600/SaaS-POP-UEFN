@@ -1,4 +1,5 @@
 // Site vitrine de POP (visiteurs non connectés). Sombre, accent orange, maquettes de l'app en HTML.
+import { LEGAL_PAGES } from './Legal'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -262,6 +263,7 @@ export default function Landing() {
       <div className="lfcols">
         <div><h4>{t.foot.product}</h4><a href="#fonctionnalites" onClick={go('fonctionnalites')}>{t.nav.features}</a><a href="#tarifs" onClick={go('tarifs')}>{t.nav.pricing}</a></div>
         <div><h4>{t.foot.help}</h4><a href="#faq" onClick={go('faq')}>{t.nav.faq}</a></div>
+        <div><h4>{t.foot.legalTitle}</h4>{LEGAL_PAGES.map(([p, l]) => <a key={p} href={p} onClick={e => { e.preventDefault(); nav(p) }}>{l}</a>)}</div>
         <div><h4>{t.foot.account}</h4><a href="/connexion" onClick={e => { e.preventDefault(); nav('/connexion') }}>{t.nav.login}</a><a href="#beta" onClick={e => { e.preventDefault(); signup() }}>{t.nav.join}</a></div>
       </div>
     </footer>

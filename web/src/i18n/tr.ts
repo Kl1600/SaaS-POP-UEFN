@@ -49,7 +49,7 @@ const tr: Dict = {
     ],
   },
   final: { h2a: 'Bir sonraki haritanız', h2b: 'burada başlıyor.', p: 'Bekleme listesine katılın: bir yer açılır açılmaz erişiminizi gönderelim.' },
-  foot: { made: 'Fortnite üreticileri tarafından, Fortnite üreticileri için yapıldı.', legal: 'Fortnite ve UEFN, Epic Games’in ticari markalarıdır. POP, Epic Games ile bağlantılı değildir ve onun tarafından onaylanmamıştır.', product: 'Ürün', help: 'Yardım', account: 'Hesap' },
+  foot: { legalTitle: 'Yasal', made: 'Fortnite üreticileri tarafından, Fortnite üreticileri için yapıldı.', legal: 'Fortnite ve UEFN, Epic Games’in ticari markalarıdır. POP, Epic Games ile bağlantılı değildir ve onun tarafından onaylanmamıştır.', product: 'Ürün', help: 'Yardım', account: 'Hesap' },
   mock: {
     overview: 'Genel bakış', nav: ['Genel bakış', 'Sayfalar', 'Beyaz tahta', 'Görevler', 'Düzenleyici', 'Pazar'],
     hello: 'Merhaba Léa, #42 ile başlamanızı öneririm.', late: '2 görev gecikmede (en eskisi 12 Kasım’a planlanmıştı).', mile: '“Beta” kilometre taşına 5 gün: 9 görev kaldı, beklenen gecikme 1 gün.',
@@ -68,7 +68,7 @@ const tr: Dict = {
     name: 'Ad veya takma ad', email: 'E-posta', studio: 'Stüdyo', optional: '(isteğe bağlı)', studioPh: 'Stüdyo adı', team: 'Ekip büyüklüğü',
     teams: ['Tek başıma', '2–3', '4–10', '10’dan fazla'], exp: 'Deneyim', exps: ['UEFN’de yeni', 'Birkaç yayımlanmış harita', 'Deneyimli üretici', 'Profesyonel stüdyo'],
     links: 'Haritalarınız veya sosyal medyanız', linksPh: 'Ada kodları, TikTok, YouTube…', msg: 'POP ile ne yapmak istiyorsunuz', msgPh: 'Örn. bir tycoon haritasında 4 kişiyiz ve Discord ile Google Docs arasında kayboluyoruz.',
-    send: 'Erişim iste', sending: 'Gönderiliyor…', nospam: 'Spam yok: yalnızca erişim vermek için yazarız.',
+    send: 'Erişim iste', sending: 'Gönderiliyor…', nospam: 'Spam yok: yalnızca erişim vermek için yazarız.', privacy: 'Gizlilik politikası',
     okTitle: 'Kaydedildi, teşekkürler!', okText: 'Talebiniz POP ekibine ulaştı. Bir yer açılır açılmaz kullanıcı adınızı ve geçici bir şifre göndereceğiz.',
     alreadyTitle: 'Zaten listedesiniz.', approvedTitle: 'Erişiminiz zaten onaylandı.', approvedText: 'Hesabınız hazır: POP ekibi kullanıcı adınızı ve geçici şifrenizi gönderiyor. Gelmediyse bize yazın.', close: 'Kapat',
   },

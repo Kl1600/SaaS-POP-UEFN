@@ -102,6 +102,20 @@ pub fn norm(s: &str) -> String {
     out.split_whitespace().fold(String::from(" "), |mut a, w| { a.push_str(w); a.push(' '); a })
 }
 
+/// Évolution d'un groupe de maps : moyenne des 2 derniers jours face aux 2 premiers, sur les mêmes maps
+/// (une map apparue en cours de route ne fausse pas la comparaison, un pic d'un seul jour pèse moitié moins).
+fn trend_of(ids: &[usize], isl: &[Isl], days: &[String]) -> Option<f64> {
+    if days.len() < 4 { return None }
+    let (early, late) = (&days[..2], &days[days.len() - 2..]);
+    let (mut f, mut l) = (0f64, 0f64);
+    for &i in ids {
+        let e: Vec<i64> = early.iter().filter_map(|d| isl[i].by_day.get(d).copied()).collect();
+        let t: Vec<i64> = late.iter().filter_map(|d| isl[i].by_day.get(d).copied()).collect();
+        if e.len() == 2 && t.len() == 2 { f += e.iter().sum::<i64>() as f64 / 2.0; l += t.iter().sum::<i64>() as f64 / 2.0 }
+    }
+    (f > 0.0).then(|| l / f - 1.0)
+}
+
 struct Isl { code: String, title: String, text: String, is_new: bool, by_day: HashMap<String, i64>, best: i64, mins: Option<f64>, d1: Option<f64>, d7: Option<f64>, rec: Option<f64> }
 
 /// Valeurs d'une niche avant notation.
@@ -118,6 +132,23 @@ pub fn pct(vals: &[f64], x: f64) -> f64 {
     let below = vals.iter().filter(|v| **v < x).count() as f64;
     let eq = vals.iter().filter(|v| **v == x).count() as f64;
     (below + eq / 2.0) / vals.len() as f64
+}
+
+/// Part des maps actives de la niche (au moins 20 joueurs) qui montent en ce moment plus vite que d'habitude.
+fn rising_share(ids: &[usize], isl: &[Isl], rising: &HashSet<String>) -> Option<f64> {
+    if rising.is_empty() { return None }
+    let active: Vec<&Isl> = ids.iter().map(|&i| &isl[i]).filter(|it| it.best >= 20).collect();
+    if active.len() < 3 { return None }
+    Some(active.iter().filter(|it| rising.contains(&it.code)).count() as f64 / active.len() as f64)
+}
+
+/// Poids des 5 axes (demande, fidélité, porte ouverte, place à prendre, élan) : appris par la vérification
+/// après coup quand il y a assez d'historique, sinon les poids de départ.
+pub const DEFAULT_WEIGHTS: [f64; 5] = [0.22, 0.22, 0.28, 0.14, 0.14];
+async fn weights(st: &AppState) -> [f64; 5] {
+    let w: Option<String> = sqlx::query_scalar("SELECT weights FROM idea_model WHERE id = 1").fetch_optional(&st.db).await.ok().flatten().flatten();
+    let v: Vec<f64> = w.and_then(|w| serde_json::from_str(&w).ok()).unwrap_or_default();
+    if v.len() == 5 && (v.iter().sum::<f64>() - 1.0).abs() < 0.01 { [v[0], v[1], v[2], v[3], v[4]] } else { DEFAULT_WEIGHTS }
 }
 
 /// Résultat du calcul, gardé en mémoire tant que les données n'ont pas changé.
@@ -177,9 +208,16 @@ async fn compute(st: &AppState) -> Result<Value, AppError> {
         let mut words: HashMap<String, (Vec<usize>, i64, i64, i64)> = HashMap::new();
         for &i in &alive {
             let mut seen = HashSet::new();
-            for w in norm(&isl[i].title).split_whitespace() {
-                if w.len() < 4 || w.chars().all(|c| c.is_ascii_digit()) || STOP.contains(&w) || known.contains(w) || !seen.insert(w.to_string()) { continue }
-                let e = words.entry(w.to_string()).or_default();
+            let toks: Vec<String> = norm(&isl[i].title).split_whitespace().map(String::from).collect();
+            // Mots seuls, et expressions de 2 mots (« 99 nights », « steal brainrot »…).
+            let mut grams: Vec<String> = toks.iter().filter(|w| w.len() >= 4 && !w.chars().all(|c| c.is_ascii_digit()) && !STOP.contains(&w.as_str()) && !known.contains(w.as_str())).cloned().collect();
+            for p in toks.windows(2) {
+                let ok = |w: &String| w.len() >= 2 && !STOP.contains(&w.as_str());
+                if ok(&p[0]) && ok(&p[1]) && !(known.contains(&p[0]) && known.contains(&p[1])) { grams.push(format!("{} {}", p[0], p[1])) }
+            }
+            for w in grams {
+                if !seen.insert(w.clone()) { continue }
+                let e = words.entry(w).or_default();
                 e.0.push(i); e.1 += last(&isl[i]);
                 if let (Some(f), Some(l)) = (isl[i].by_day.get(&first_day), isl[i].by_day.get(&last_day)) { e.2 += f; e.3 += l }
             }
@@ -190,7 +228,13 @@ async fn compute(st: &AppState) -> Result<Value, AppError> {
             (is.len() >= 4 && creators.len() >= 4 && p >= 1000 && trend >= 0.2).then_some((w, trend, p))
         }).collect();
         cand.sort_by(|a, b| (b.1 * (b.2 as f64).ln()).partial_cmp(&(a.1 * (a.2 as f64).ln())).unwrap());
-        for (w, _, _) in cand.into_iter().take(8) {
+        // Une expression couvre ses mots : on ne garde pas « nights » si « 99 nights » est déjà retenu avec les mêmes maps.
+        let mut kept: Vec<String> = vec![];
+        let cand: Vec<(String, f64, i64)> = cand.into_iter().filter(|(w, _, _)| {
+            if kept.iter().any(|k| k.contains(w.as_str()) || w.contains(k.as_str())) { return false }
+            kept.push(w.clone()); true
+        }).collect();
+        for (w, _, _) in cand.into_iter().take(10) {
             let label = { let mut c = w.chars(); c.next().map(|f| f.to_uppercase().collect::<String>() + c.as_str()).unwrap_or_default() };
             th.push(Theme { key: format!("w:{w}"), fr: label.clone(), en: label, genre: "", complexity: 2, skills: vec!["verse", "build"], flag: "", pats: vec![format!(" {w} ")], emerging: true });
         }
@@ -243,9 +287,7 @@ async fn compute(st: &AppState) -> Result<Value, AppError> {
         if players <= 0 { continue }
         let mut ups: Vec<i64> = a.islands.iter().map(|&i| last(&isl[i])).collect(); ups.sort();
         let typical = ups[ups.len() / 2] as f64;
-        let (mut f, mut l) = (0i64, 0i64);
-        for &i in &a.islands { if let (Some(x), Some(y)) = (isl[i].by_day.get(&first_day), isl[i].by_day.get(&last_day)) { f += x; l += y } }
-        let trend = (f > 0 && first_day != last_day).then(|| l as f64 / f as f64 - 1.0);
+        let trend = trend_of(&a.islands, &isl, &days);
         let old = hist.iter().filter(|h| h.0 == th[t].key && h.1 <= ago14).max_by(|a, b| a.1.cmp(&b.1)).map(|h| h.2);
         let trend14 = old.filter(|o| *o > 0).map(|o| players as f64 / o as f64 - 1.0);
         let w = |g: fn(&Isl) -> Option<f64>| wmean(&a.islands.iter().filter_map(|&i| g(&isl[i]).map(|v| (v, last(&isl[i]) as f64))).collect::<Vec<_>>());
@@ -273,11 +315,20 @@ async fn compute(st: &AppState) -> Result<Value, AppError> {
 
     // Notation en centiles.
     let col = |f: &dyn Fn(&N) -> Option<f64>| ns.iter().filter_map(|n| f(n)).collect::<Vec<f64>>();
+    let wt = weights(st).await;
+    let rising: HashSet<String> = crate::analytics::rising_codes(st).await;
     let c_players = col(&|n| Some((n.players as f64).ln_1p()));
     let c_typ = col(&|n| Some(n.typical.ln_1p()));
     let c_mins = col(&|n| n.mins); let c_d1 = col(&|n| n.d1); let c_d7 = col(&|n| n.d7); let c_rec = col(&|n| n.rec);
-    let c_s100 = col(&|n| (n.new_n >= 3).then(|| n.s100 as f64 / n.new_n as f64));
-    let c_s1000 = col(&|n| (n.new_n >= 3).then(|| n.s1000 as f64 / n.new_n as f64));
+    // Taux de réussite lissés : avec peu de nouvelles maps, on reste proche de la moyenne de toutes les niches.
+    let (tn, t100, t1000) = ns.iter().fold((0usize, 0usize, 0usize), |a, n| (a.0 + n.new_n, a.1 + n.s100, a.2 + n.s1000));
+    let p100 = if tn > 0 { t100 as f64 / tn as f64 } else { 0.3 };
+    let p1000 = if tn > 0 { t1000 as f64 / tn as f64 } else { 0.05 };
+    const K: f64 = 6.0;
+    let r100 = |n: &N| (n.s100 as f64 + p100 * K) / (n.new_n as f64 + K);
+    let r1000 = |n: &N| (n.s1000 as f64 + p1000 * K) / (n.new_n as f64 + K);
+    let c_s100 = col(&|n| Some(r100(n)));
+    let c_s1000 = col(&|n| Some(r1000(n)));
     let c_trend = col(&|n| n.trend);
     let c_vid = col(&|n| (n.v7 + n.vprev >= 3).then(|| (n.v7 as f64 + 1.0) / (n.vprev as f64 + 1.0)));
     let c_lead = col(&|n| n.lead_q);
@@ -294,14 +345,13 @@ async fn compute(st: &AppState) -> Result<Value, AppError> {
         let theme = &th[n.t];
         let demand = avg(vec![Some(pct(&c_players, (n.players as f64).ln_1p())), Some(pct(&c_typ, n.typical.ln_1p()))]);
         let fidelity = avg(vec![n.mins.map(|x| pct(&c_mins, x)), n.d1.map(|x| pct(&c_d1, x)), n.d7.map(|x| pct(&c_d7, x)), n.rec.map(|x| pct(&c_rec, x))]);
-        let open = if n.new_n >= 3 {
-            0.5 * pct(&c_s100, n.s100 as f64 / n.new_n as f64) + 0.2 * pct(&c_s1000, n.s1000 as f64 / n.new_n as f64) + 0.3 * (1.0 - n.top3)
-        } else { 0.6 * (1.0 - n.top3) + 0.2 };
+        let open = 0.5 * pct(&c_s100, r100(n)) + 0.2 * pct(&c_s1000, r1000(n)) + 0.3 * (1.0 - n.top3);
         let lead_pct = n.lead_q.map(|q| pct(&c_lead, q)).unwrap_or(0.5);
         let gap = demand * (1.0 - lead_pct);
         let vid = (n.v7 + n.vprev >= 3).then(|| pct(&c_vid, (n.v7 as f64 + 1.0) / (n.vprev as f64 + 1.0)));
-        let momentum = avg(vec![n.trend.map(|x| pct(&c_trend, x)), vid, n.trend14.map(|x| (0.5 + x).clamp(0.0, 1.0))]);
-        let mut score = 100.0 * (0.22 * demand + 0.22 * fidelity + 0.28 * open + 0.14 * gap + 0.14 * momentum);
+        let hourly = rising_share(&aggs[n.t].islands, &isl, &rising);
+        let momentum = avg(vec![n.trend.map(|x| pct(&c_trend, x)), vid, n.trend14.map(|x| (0.5 + x).clamp(0.0, 1.0)), hourly.map(|h| (0.5 + h * 2.0).min(1.0))]);
+        let mut score = 100.0 * (wt[0] * demand + wt[1] * fidelity + wt[2] * open + wt[3] * gap + wt[4] * momentum);
         // Vague qui naît : ça monte fort et il y a encore peu de maps. C'est là qu'on arrive avant les autres.
         let crowd = pct(&c_count, aggs[n.t].islands.len() as f64);
         let wave = momentum >= 0.7 && crowd <= 0.5;
@@ -336,6 +386,8 @@ async fn compute(st: &AppState) -> Result<Value, AppError> {
         let series: Vec<Value> = days.iter().map(|d| json!({ "day": d, "players": aggs[n.t].islands.iter().filter_map(|&i| isl[i].by_day.get(d)).sum::<i64>() })).collect();
 
         opp_by_t.insert(n.t, score);
+        let _ = sqlx::query("UPDATE fn_niches SET score = ?, axes = ? WHERE day = ? AND niche = ?")
+            .bind(score).bind(json!([demand, fidelity, open, gap, momentum]).to_string()).bind(&last_day).bind(&theme.key).execute(&st.db).await;
         scored.push((score, json!({
             "key": theme.key, "generated_day": last_day, "fr": theme.fr, "en": theme.en, "genre": theme.genre, "complexity": theme.complexity, "skills": theme.skills,
             "emerging": theme.emerging, "season": season_now(theme.flag), "risky": theme.flag == "risque",
@@ -435,6 +487,7 @@ pub async fn list(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
     Ok(Json(json!({
         "notify": notify,
         "generated_at": gen, "ready": all["ready"], "last_day": all["last_day"], "islands": all["islands"], "niches_count": all["niches"].as_array().map(|a| a.len()).unwrap_or(0),
+        "model": crate::model::status(&st).await,
         "ideas": rows.into_iter().map(|r| { let mut d: Value = serde_json::from_str(&r.4).unwrap_or(json!({})); d["id"] = json!(r.0); d["status"] = json!(r.5); d["map_id"] = json!(r.6); d["created_at"] = json!(r.7); d["active"] = json!(r.8 == 1); d }).collect::<Vec<_>>(),
     })))
 }

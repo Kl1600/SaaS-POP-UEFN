@@ -50,7 +50,7 @@ const fr = {
     ] as [string, string][],
   },
   final: { h2a: 'Votre prochaine map', h2b: 'commence ici.', p: 'Rejoignez la liste d’attente : on vous envoie votre accès dès qu’une place se libère.' },
-  foot: { made: 'Fait par des créateurs Fortnite, pour des créateurs Fortnite.', legal: 'Fortnite et UEFN sont des marques d’Epic Games. POP n’est ni affilié à Epic Games ni approuvé par Epic Games.', product: 'Produit', help: 'Aide', account: 'Compte' },
+  foot: { legalTitle: 'Légal', made: 'Fait par des créateurs Fortnite, pour des créateurs Fortnite.', legal: 'Fortnite et UEFN sont des marques d’Epic Games. POP n’est ni affilié à Epic Games ni approuvé par Epic Games.', product: 'Produit', help: 'Aide', account: 'Compte' },
   mock: {
     overview: 'Vue d’ensemble', nav: ['Vue d’ensemble', 'Pages', 'Tableau blanc', 'Tâches', 'Organiseur', 'Marché'],
     hello: 'Bonjour Léa, je vous propose de commencer par #42.', late: '2 tâches en retard (la plus ancienne était prévue le 12 nov.).', mile: 'Jalon « Bêta » dans 5 jours : 9 tâches à finir, retard prévu de 1 jour.',
@@ -69,7 +69,7 @@ const fr = {
     name: 'Nom ou pseudo', email: 'E-mail', studio: 'Studio', optional: '(facultatif)', studioPh: 'Nom du studio', team: 'Taille de l’équipe',
     teams: ['Seul', '2 à 3', '4 à 10', 'Plus de 10'], exp: 'Expérience', exps: ['Débutant UEFN', 'Quelques maps publiées', 'Créateur confirmé', 'Studio professionnel'],
     links: 'Vos maps ou réseaux', linksPh: 'Codes d’îles, TikTok, YouTube…', msg: 'Ce que vous voulez faire avec POP', msgPh: 'Ex. : on est 4 sur une map tycoon et on se perd entre Discord et les Google Docs.',
-    send: 'Demander mon accès', sending: 'Envoi…', nospam: 'Pas de spam : on vous écrit seulement pour vous donner votre accès.',
+    send: 'Demander mon accès', sending: 'Envoi…', nospam: 'Pas de spam : on vous écrit seulement pour vous donner votre accès.', privacy: 'Politique de confidentialité',
     okTitle: 'C’est noté, merci !', okText: 'Votre demande est arrivée chez l’équipe POP. Dès qu’une place se libère, on vous envoie votre identifiant et un mot de passe provisoire.',
     alreadyTitle: 'Vous êtes déjà sur la liste.', approvedTitle: 'Votre accès est déjà validé.', approvedText: 'Votre compte est prêt : l’équipe POP vous envoie votre identifiant et votre mot de passe provisoire. Sinon, écrivez-nous.', close: 'Fermer',
   },

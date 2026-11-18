@@ -49,7 +49,7 @@ const hu: Dict = {
     ],
   },
   final: { h2a: 'A következő pályád', h2b: 'itt kezdődik.', p: 'Iratkozz fel a várólistára: amint felszabadul egy hely, küldjük a hozzáférést.' },
-  foot: { made: 'Fortnite-alkotók készítették, Fortnite-alkotóknak.', legal: 'A Fortnite és az UEFN az Epic Games védjegyei. A POP nem áll kapcsolatban az Epic Games-szel, és az nem hagyta jóvá.', product: 'Termék', help: 'Súgó', account: 'Fiók' },
+  foot: { legalTitle: 'Jogi információk', made: 'Fortnite-alkotók készítették, Fortnite-alkotóknak.', legal: 'A Fortnite és az UEFN az Epic Games védjegyei. A POP nem áll kapcsolatban az Epic Games-szel, és az nem hagyta jóvá.', product: 'Termék', help: 'Súgó', account: 'Fiók' },
   mock: {
     overview: 'Áttekintés', nav: ['Áttekintés', 'Oldalak', 'Tábla', 'Feladatok', 'Rendező', 'Piac'],
     hello: 'Szia Léa, javaslom, hogy a #42-vel kezdj.', late: '2 feladat késésben (a legrégebbi határideje nov. 12. volt).', mile: '„Béta” mérföldkő 5 nap múlva: 9 feladat van hátra, várható csúszás 1 nap.',
@@ -68,7 +68,7 @@ const hu: Dict = {
     name: 'Név vagy becenév', email: 'E-mail', studio: 'Stúdió', optional: '(nem kötelező)', studioPh: 'A stúdió neve', team: 'Csapatméret',
     teams: ['Egyedül', '2–3', '4–10', 'Több mint 10'], exp: 'Tapasztalat', exps: ['Új az UEFN-ben', 'Néhány kiadott pálya', 'Tapasztalt alkotó', 'Profi stúdió'],
     links: 'A pályáid vagy közösségi oldalaid', linksPh: 'Szigetkódok, TikTok, YouTube…', msg: 'Mit szeretnél csinálni a POP-pal', msgPh: 'Pl. négyen dolgozunk egy tycoon pályán, és elveszünk a Discord és a Google Docs között.',
-    send: 'Hozzáférés kérése', sending: 'Küldés…', nospam: 'Nincs spam: csak a hozzáférés miatt írunk.',
+    send: 'Hozzáférés kérése', sending: 'Küldés…', nospam: 'Nincs spam: csak a hozzáférés miatt írunk.', privacy: 'Adatvédelmi irányelvek',
     okTitle: 'Megkaptuk, köszönjük!', okText: 'A kérésed megérkezett a POP csapatához. Amint felszabadul egy hely, elküldjük a felhasználóneved és egy ideiglenes jelszót.',
     alreadyTitle: 'Már rajta vagy a listán.', approvedTitle: 'A hozzáférésed már jóvá van hagyva.', approvedText: 'A fiókod kész: a POP csapata elküldi a felhasználóneved és az ideiglenes jelszavad. Ha nem érkezett meg, írj nekünk.', close: 'Bezárás',
   },

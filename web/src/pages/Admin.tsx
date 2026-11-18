@@ -198,7 +198,7 @@ function Gate({ code, msg, onOk }: { code: string; msg: string; onOk: () => void
 
 export default function Admin() {
   const { me } = useApp()
-  const [tab, setTab] = useState<'overview' | 'waitlist' | 'create' | 'users' | 'audit'>(me?.admin_pending ? 'waitlist' : 'overview')
+  const [tab, setTab] = useState<'overview' | 'waitlist' | 'create' | 'users' | 'audit' | 'legal'>(me?.admin_pending ? 'waitlist' : 'overview')
   const [gate, setGate] = useState<{ code: string; msg: string } | null | 'ok'>(null)
   const check = () => api.get('/api/admin/overview').then(() => setGate('ok')).catch((e: any) => setGate({ code: e.code ?? 'forbidden', msg: e.message }))
   useEffect(() => { if (me?.admin) check() }, [me?.admin])
@@ -209,13 +209,49 @@ export default function Admin() {
     </PageHead>
     {gate === null ? null : gate !== 'ok' ? <Gate code={gate.code} msg={gate.msg} onOk={() => { setGate(null); check() }} /> : <>
       <div className="tabs" role="tablist" style={{ alignSelf: 'flex-start' }}>
-        {([['overview', tr("Vue générale")], ['waitlist', tr("Liste d’attente{0}", [me.admin_pending ? ` (${me.admin_pending})` : ''])], ['create', tr("Créer un compte")], ['users', tr("Utilisateurs")], ['audit', tr("Sécurité")]] as const).map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}
+        {([['overview', tr("Vue générale")], ['waitlist', tr("Liste d’attente{0}", [me.admin_pending ? ` (${me.admin_pending})` : ''])], ['create', tr("Créer un compte")], ['users', tr("Utilisateurs")], ['audit', tr("Sécurité")], ['legal', tr("Infos légales")]] as const).map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}
       </div>
       {tab === 'overview' && <Overview />}
       {tab === 'waitlist' && <Waitlist />}
       {tab === 'create' && <CreateAccount />}
       {tab === 'users' && <Users />}
       {tab === 'audit' && <Audit />}
+      {tab === 'legal' && <LegalInfo />}
     </>}
   </main>
+}
+
+const LEGAL_FIELDS: [string, string, string][] = [
+  ['editor_name', tr("Nom ou raison sociale de l’éditeur"), tr("Ex. POP SAS, ou votre nom si micro-entreprise")],
+  ['editor_form', tr("Forme juridique"), tr("Ex. SAS, SASU, micro-entreprise")],
+  ['capital', tr("Capital social"), tr("Ex. 1 000 € (rien pour une micro-entreprise)")],
+  ['address', tr("Adresse du siège"), ''],
+  ['siren', tr("SIREN / RCS"), tr("Ex. 123 456 789 RCS Paris")],
+  ['vat', tr("TVA intracommunautaire"), tr("Ou « non applicable, art. 293 B du CGI »")],
+  ['publisher', tr("Directeur de la publication"), tr("Le représentant légal, en général")],
+  ['email', tr("E-mail de contact"), ''],
+  ['phone', tr("Téléphone"), ''],
+  ['host_name', tr("Hébergeur"), tr("Ex. OVH SAS, Scaleway SAS, Hetzner Online GmbH")],
+  ['host_address', tr("Adresse de l’hébergeur"), ''],
+  ['host_phone', tr("Téléphone de l’hébergeur"), ''],
+  ['mediator_name', tr("Médiateur de la consommation"), tr("Obligatoire avant d’ouvrir les paiements aux particuliers")],
+  ['mediator_url', tr("Site du médiateur"), ''],
+  ['updated', tr("Date de mise à jour affichée"), tr("Ex. 17 novembre 2026")],
+]
+
+/** Informations de l'éditeur, reprises dans les mentions légales, la confidentialité, les CGU et les CGV. */
+function LegalInfo() {
+  const { toast } = useApp()
+  const { data } = useLoad<any>('/api/legal')
+  const [f, setF] = useState<Record<string, string> | null>(null)
+  useEffect(() => { if (data && !f) setF(Object.fromEntries(LEGAL_FIELDS.map(([k]) => [k, data[k] ?? '']))) }, [data])
+  if (!f) return null
+  const missing = LEGAL_FIELDS.filter(([k]) => !['capital', 'phone', 'host_phone', 'updated', 'vat'].includes(k) && !f[k]).length
+  return <section className="card">
+    <CardHead title={tr("Informations légales")} sub={missing ? tr("{0} champ(s) importants encore vides : ils apparaissent « à compléter » sur les pages légales.", [missing]) : tr("Tout est rempli.")} />
+    <form className="stack" onSubmit={async e => { e.preventDefault(); try { await api.put('/api/admin/legal', f); toast(tr("Informations légales enregistrées")) } catch (er: any) { toast(er.message, true) } }}>
+      <div className="grid2">{LEGAL_FIELDS.map(([k, l, ph]) => <label key={k} className="label">{l}<input className="field" value={f[k]} placeholder={ph} maxLength={400} onChange={e => setF({ ...f, [k]: e.target.value })} /></label>)}</div>
+      <div className="row" style={{ gap: 8 }}><button className="btn pri">{tr("Enregistrer")}</button><a className="btn" href="/mentions-legales" target="_blank" rel="noopener">{tr("Voir les pages légales")}</a></div>
+    </form>
+  </section>
 }

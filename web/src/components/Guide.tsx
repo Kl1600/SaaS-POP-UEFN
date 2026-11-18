@@ -7,6 +7,7 @@ import { api } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { tr, LANG } from '../i18n/t'
 import { useNav } from '../routes'
+import { useDialog } from './ui'
 
 const TONE: Record<string, [any, string]> = {
   bad: [AlertCircle, 'var(--tr)'], warn: [AlertTriangle, 'var(--to)'], good: [CheckCircle2, 'var(--tg)'], info: [Info, 'var(--text3)'],
@@ -127,10 +128,11 @@ export function AskBar() {
 }
 
 export function GuideDrawer({ onClose, ask: initial }: { onClose: () => void; ask?: string }) {
+  const dlg = useDialog(onClose)
   const [tab, setTab] = useState<'day' | 'ask'>(initial !== undefined ? 'ask' : 'day')
   return <>
     <div className="scrim" onClick={onClose} />
-    <aside className="drawer gdrawer" role="dialog" aria-label={tr("Boussole")}>
+    <aside ref={dlg as any} tabIndex={-1} aria-modal="true" className="drawer gdrawer" role="dialog" aria-label={tr("Boussole")}>
       <div className="row" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
         <div className="seg" role="tablist">
           <button role="tab" aria-selected={tab === 'day'} className={tab === 'day' ? 'on' : ''} onClick={() => setTab('day')}>{tr("Mon jour")}</button>

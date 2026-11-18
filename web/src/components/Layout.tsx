@@ -78,6 +78,7 @@ export default function Layout() {
 
   return (
     <div className={'app' + (collapsed ? ' collapsed' : '') + (app.dark ? ' dark' : '')}>
+      <a href="#contenu" className="skip">{tr("Aller au contenu")}</a>
       <aside className="side">
         <div className="brand"><img src="/logo.png" alt="POP" /></div>
         <nav className="nav" aria-label={tr("Accueil")}>
@@ -139,7 +140,7 @@ export default function Layout() {
             )}
           </div>
         </header>
-        <div className="scroll"><Outlet /></div>
+        <div className="scroll" id="contenu" tabIndex={-1}><Outlet /></div>
       </div>
       {guide && <GuideDrawer key={guide.ask ?? 'day'} ask={guide.ask} onClose={() => setGuide(false)} />}
       {newTask && <NewTaskModal onClose={() => setNewTask(false)} />}

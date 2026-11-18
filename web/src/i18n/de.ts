@@ -49,7 +49,7 @@ const de: Dict = {
     ],
   },
   final: { h2a: 'Deine nächste Map', h2b: 'beginnt hier.', p: 'Trag dich in die Warteliste ein: Wir schicken dir den Zugang, sobald ein Platz frei wird.' },
-  foot: { made: 'Von Fortnite-Creatorn für Fortnite-Creator gemacht.', legal: 'Fortnite und UEFN sind Marken von Epic Games. POP ist weder mit Epic Games verbunden noch von Epic Games unterstützt.', product: 'Produkt', help: 'Hilfe', account: 'Konto' },
+  foot: { legalTitle: 'Rechtliches', made: 'Von Fortnite-Creatorn für Fortnite-Creator gemacht.', legal: 'Fortnite und UEFN sind Marken von Epic Games. POP ist weder mit Epic Games verbunden noch von Epic Games unterstützt.', product: 'Produkt', help: 'Hilfe', account: 'Konto' },
   mock: {
     overview: 'Übersicht', nav: ['Übersicht', 'Seiten', 'Whiteboard', 'Aufgaben', 'Organizer', 'Markt'],
     hello: 'Hallo Léa, ich schlage vor, mit #42 anzufangen.', late: '2 Aufgaben im Verzug (die älteste war für den 12. Nov. geplant).', mile: 'Meilenstein „Beta“ in 5 Tagen: noch 9 Aufgaben, erwarteter Verzug 1 Tag.',
@@ -68,7 +68,7 @@ const de: Dict = {
     name: 'Name oder Nickname', email: 'E-Mail', studio: 'Studio', optional: '(optional)', studioPh: 'Name des Studios', team: 'Teamgröße',
     teams: ['Allein', '2 bis 3', '4 bis 10', 'Mehr als 10'], exp: 'Erfahrung', exps: ['UEFN-Einsteiger', 'Einige veröffentlichte Maps', 'Erfahrener Creator', 'Professionelles Studio'],
     links: 'Deine Maps oder Kanäle', linksPh: 'Insel-Codes, TikTok, YouTube…', msg: 'Was du mit POP vorhast', msgPh: 'Z. B.: Wir sind zu viert an einer Tycoon-Map und verlieren uns zwischen Discord und Google Docs.',
-    send: 'Zugang anfragen', sending: 'Wird gesendet…', nospam: 'Kein Spam: Wir schreiben dir nur, um dir Zugang zu geben.',
+    send: 'Zugang anfragen', sending: 'Wird gesendet…', nospam: 'Kein Spam: Wir schreiben dir nur, um dir Zugang zu geben.', privacy: 'Datenschutzerklärung',
     okTitle: 'Notiert, danke!', okText: 'Deine Anfrage ist beim POP-Team angekommen. Sobald ein Platz frei wird, schicken wir dir deinen Benutzernamen und ein vorläufiges Passwort.',
     alreadyTitle: 'Du stehst schon auf der Liste.', approvedTitle: 'Dein Zugang ist schon freigegeben.', approvedText: 'Dein Konto ist bereit: Das POP-Team schickt dir deinen Benutzernamen und dein vorläufiges Passwort. Sonst schreib uns.', close: 'Schließen',
   },
