@@ -1,0 +1,74 @@
+# POP en production sur un seul serveur (voir deploy/README.md).
+#   pop        : l'image publiée par .github/workflows/publier-image.yml (jamais compilée sur le serveur)
+#   caddy      : HTTPS automatique (Let's Encrypt) devant POP, WebSocket compris
+#   litestream : copie continue de la base SQLite vers un stockage S3 (activé par COMPOSE_PROFILES=sauvegarde)
+# Les valeurs viennent du fichier .env posé à côté (modèle : env.exemple). Aucun secret dans ce fichier.
+
+services:
+  pop:
+    image: ${POP_IMAGE:-ghcr.io/kl1600/saas-pop-uefn:latest}
+    restart: unless-stopped
+    environment:
+      POP_PUBLIC_URL: https://${POP_DOMAIN:?POP_DOMAIN manquant dans .env}
+      # Caddy remplace X-Forwarded-For par l'adresse réelle du visiteur : POP lit le dernier élément.
+      POP_TRUST_PROXY: "1"
+      POP_ADMIN_EMAILS: ${POP_ADMIN_EMAILS:-}
+      POP_OPEN_SIGNUP: ${POP_OPEN_SIGNUP:-0}
+      POP_ANALYTICS: ${POP_ANALYTICS:-1}
+      POP_SMTP_HOST: ${POP_SMTP_HOST:-}
+      POP_SMTP_PORT: ${POP_SMTP_PORT:-587}
+      POP_SMTP_USER: ${POP_SMTP_USER:-}
+      POP_SMTP_PASS: ${POP_SMTP_PASS:-}
+      POP_SMTP_FROM: ${POP_SMTP_FROM:-}
+    volumes:
+      - pop-data:/data
+    # Aucun port publié : seul Caddy joint POP, par le réseau interne de compose.
+    expose:
+      - "8080"
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  caddy:
+    image: caddy:2.8.4
+    restart: unless-stopped
+    depends_on: [pop]
+    environment:
+      POP_DOMAIN: ${POP_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  litestream:
+    image: litestream/litestream:0.3.13
+    profiles: [sauvegarde]
+    restart: unless-stopped
+    depends_on: [pop]
+    # Même utilisateur que POP (uid 10001) : les fichiers créés à côté de la base restent à « pop ».
+    user: "10001:10001"
+    command: replicate
+    environment:
+      LITESTREAM_ACCESS_KEY_ID: ${LITESTREAM_ACCESS_KEY_ID:-}
+      LITESTREAM_SECRET_ACCESS_KEY: ${LITESTREAM_SECRET_ACCESS_KEY:-}
+      LITESTREAM_BUCKET: ${LITESTREAM_BUCKET:-}
+      LITESTREAM_ENDPOINT: ${LITESTREAM_ENDPOINT:-}
+      LITESTREAM_REGION: ${LITESTREAM_REGION:-auto}
+    volumes:
+      - pop-data:/data
+      - ./litestream.yml:/etc/litestream.yml:ro
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+volumes:
+  pop-data:
+  caddy-data:
+  caddy-config:

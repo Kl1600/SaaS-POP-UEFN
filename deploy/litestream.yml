@@ -1,0 +1,14 @@
+# Copie continue de la base de POP vers un stockage compatible S3 (Cloudflare R2, Backblaze B2…).
+# Les identifiants viennent des variables LITESTREAM_* du fichier .env (jamais écrits ici).
+# Restaurer : voir deploy/README.md, « Restaurer la base ».
+dbs:
+  - path: /data/pop.db
+    replicas:
+      - type: s3
+        bucket: ${LITESTREAM_BUCKET}
+        path: pop
+        endpoint: ${LITESTREAM_ENDPOINT}
+        region: ${LITESTREAM_REGION}
+        # Une copie complète par jour, 7 jours d'historique restaurable à la seconde près.
+        snapshot-interval: 24h
+        retention: 168h

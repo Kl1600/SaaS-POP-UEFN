@@ -1,0 +1,11 @@
+# HTTPS automatique pour POP. Le domaine vient de POP_DOMAIN (fichier .env).
+# Le DNS du domaine doit pointer vers le serveur AVANT le premier démarrage, sinon Let's Encrypt échoue.
+{$POP_DOMAIN} {
+	encode zstd gzip
+	# Les WebSocket (temps réel, Yjs) passent sans réglage particulier.
+	reverse_proxy pop:8080
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+}
