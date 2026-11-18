@@ -115,7 +115,7 @@ pub async fn mcp(State(st): State<AppState>, headers: HeaderMap, axum::extract::
     let token = headers.get("authorization").and_then(|v| v.to_str().ok()).and_then(|v| v.strip_prefix("Bearer ")).map(String::from).or(q.token).unwrap_or_default();
     let token = token.as_str();
     let row: Option<(i64, i64, String, String, String)> = match sqlx::query_as(
-        "SELECT t.user_id, t.map_id, u.email, u.name, t.scope FROM api_tokens t JOIN users u ON u.id = t.user_id WHERE t.token_hash = ?",
+        "SELECT t.user_id, t.map_id, u.email, u.name, t.scope FROM api_tokens t JOIN users u ON u.id = t.user_id WHERE t.token_hash = ? AND u.disabled = 0",
     ).bind(sha256_hex(token)).fetch_optional(&st.db).await {
         Ok(r) => r,
         Err(_) => return rpc_err(id, -32603, "Erreur interne"),
