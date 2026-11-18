@@ -82,17 +82,19 @@ pub async fn user_from_token(state: &AppState, token: &str) -> Result<Option<Aut
 
 /// Limite simple : 10 tentatives par minute et par adresse e-mail.
 pub fn rate_limit(state: &AppState, key: &str) -> Result<(), AppError> {
+    if hit(state, key, 10, Duration::from_secs(60)) { Ok(()) } else { Err(AppError::TooMany) }
+}
+
+/// Compte une tentative pour `key` : `false` au-delà de `max` tentatives dans la fenêtre `window`.
+pub fn hit(state: &AppState, key: &str, max: u32, window: Duration) -> bool {
     let mut m = state.limiter.lock().unwrap();
     let now = Instant::now();
     let e = m.entry(key.to_lowercase()).or_insert((0, now));
-    if now.duration_since(e.1) > Duration::from_secs(60) {
+    if now.duration_since(e.1) > window {
         *e = (0, now);
     }
     e.0 += 1;
-    if e.0 > 10 {
-        return Err(AppError::TooMany);
-    }
-    Ok(())
+    e.0 <= max
 }
 
 pub async fn open_session(state: &AppState, jar: CookieJar, user_id: i64, ip: &str, ua: &str, mfa: bool) -> Result<CookieJar, AppError> {

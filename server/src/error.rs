@@ -14,6 +14,8 @@ pub enum AppError {
     NotFound,
     Conflict(String),
     TooMany,
+    /// Trop de demandes, avec un message qui dit quand réessayer.
+    TooManyMsg(String),
     /// Refus avec un code que l'interface sait traiter (ex. double authentification requise).
     Guard(&'static str, String),
     Internal(anyhow::Error),
@@ -31,6 +33,7 @@ impl IntoResponse for AppError {
             AppError::NotFound => (StatusCode::NOT_FOUND, "Introuvable.".into()),
             AppError::Conflict(m) => (StatusCode::CONFLICT, m),
             AppError::TooMany => (StatusCode::TOO_MANY_REQUESTS, "Trop de tentatives, réessayez dans une minute.".into()),
+            AppError::TooManyMsg(m) => (StatusCode::TOO_MANY_REQUESTS, m),
             AppError::Guard(_, m) => (StatusCode::FORBIDDEN, m),
             AppError::Internal(e) => {
                 tracing::error!("erreur interne : {e:?}");

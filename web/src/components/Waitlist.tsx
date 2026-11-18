@@ -5,7 +5,7 @@ import { api } from '../api'
 import '../landing.css'
 
 export function WaitlistForm({ onDone }: { onDone?: () => void }) {
-  const [f, setF] = useState({ name: '', email: '', studio: '', team: 'Seul', experience: 'Débutant UEFN', links: '', message: '' })
+  const [f, setF] = useState({ name: '', email: '', studio: '', team: 'Seul', experience: 'Débutant UEFN', links: '', message: '', pop_hp: '' })
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [done, setDone] = useState<null | { already?: boolean; status?: string }>(null)
@@ -31,6 +31,8 @@ export function WaitlistForm({ onDone }: { onDone?: () => void }) {
     <label>Expérience<select value={f.experience} onChange={up('experience')}>{['Débutant UEFN', 'Quelques maps publiées', 'Créateur confirmé', 'Studio professionnel'].map(x => <option key={x}>{x}</option>)}</select></label>
     <label><span>Vos maps ou réseaux <small>(facultatif)</small></span><input value={f.links} onChange={up('links')} maxLength={400} placeholder="Codes d’îles, TikTok, YouTube…" /></label>
     <label><span>Ce que vous voulez faire avec POP <small>(facultatif)</small></span><textarea value={f.message} onChange={up('message')} maxLength={1500} rows={3} placeholder="Ex. : on est 4 sur une map tycoon et on se perd entre Discord et les Google Docs." /></label>
+    {/* Champ piège : invisible et hors du parcours clavier, seuls les robots le remplissent. */}
+    <input name="pop_hp" value={f.pop_hp} onChange={up('pop_hp')} tabIndex={-1} autoComplete="off" aria-hidden="true" style={{ position: 'absolute', left: '-10000px', width: 1, height: 1, opacity: 0 }} />
     {err && <p className="lwerr" role="alert">{err}</p>}
     <button className="lbtn pri" disabled={busy}>{busy ? 'Envoi…' : <>Demander mon accès <ArrowRight size={18} /></>}</button>
     <p className="lwsmall">Pas de spam : on vous écrit seulement pour vous donner votre accès.</p>
