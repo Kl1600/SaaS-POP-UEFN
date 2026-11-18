@@ -93,3 +93,14 @@ concernée ; corrigez une ligne fausse en le disant.
   toutes les 20 s pendant 10 minutes.
 - Une session MCP ne survit pas au redémarrage d'UEFN (`Missing required Mcp-Session-Id header`) ; `ping` passe
   pourtant sans session. pop-link refait donc une connexion complète (initialize) au lieu de se fier au `ping`.
+
+## Parcours complet de l'éditeur Verse (testé le 18/11/2026, projet TestPopHub, #7)
+
+- `BuildAll` donne l'étendue exacte d'une erreur (`span.startLine/startCharacter/endLine/endCharacter`, à partir de
+  0) : `Printt` ligne 20 → `startLine 19, startCharacter 8, endCharacter 14`. POP souligne maintenant cette étendue
+  (avant : toujours 40 caractères).
+- « Envoyer à UEFN » avec session et Lore cochés : écriture, compilation, session (Verse seul) et archivage en
+  **38 s** ; le `Print` modifié arrive en jeu et la révision porte le message `#N …`.
+- « Revenir à cette version » réécrit le fichier sur le disque puis recompile dans UEFN.
+- Deux comptes dans le même fichier (onglets `127.0.0.1` et `localhost`, cookies séparés) : chacun voit la saisie de
+  l'autre et sa présence dans l'onglet du fichier.

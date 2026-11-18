@@ -12,7 +12,7 @@ import { diffLines, applyChoices, type Op } from '../diff'
 import { useUefnStatus, STATUS_LABEL } from '../uefnState'
 
 type FileInfo = { path: string; sha: string; updated_at: string; size: number; locked_by: string | null; pending: boolean }
-type Diag = { path: string; line: number; col: number; severity: string; code: string; message: string }
+type Diag = { path: string; line: number; col: number; end_line?: number; end_col?: number; severity: string; code: string; message: string }
 type Open = { path: string; model: monaco.editor.ITextModel; doc: Y.Doc; base: string; saved: string; binding?: MonacoBinding }
 
 const b64 = (u: Uint8Array) => { let s = ''; u.forEach(c => (s += String.fromCharCode(c))); return btoa(s) }
@@ -165,13 +165,18 @@ export default function VerseEditor() {
     decos.current?.set(list.map(r => ({ range: new monaco.Range(r.line, r.col, r.line, r.col), options: { className: 'rcursor', after: { content: ' ' + r.name.split(' ')[0], inlineClassName: 'rcursor-name' }, stickiness: 1 } })))
   }, [remote, active])
 
-  // Marqueurs d'erreurs à la bonne ligne
+  // Marqueurs d'erreurs à la bonne ligne, sur l'étendue exacte donnée par UEFN (#7) ; sans fin connue, le mot.
   useEffect(() => {
     opened.current.forEach(o => {
-      monaco.editor.setModelMarkers(o.model, 'uefn', diags.filter(d => d.path === o.path).map(d => ({
-        startLineNumber: d.line, startColumn: d.col, endLineNumber: d.line, endColumn: d.col + 40, message: `${d.code ? d.code + ' · ' : ''}${d.message}`,
+      monaco.editor.setModelMarkers(o.model, 'uefn', diags.filter(d => d.path === o.path).map(d => {
+        const endLine = d.end_line ?? d.line
+        const endCol = d.end_col ?? 0
+        const exact = endCol > 0 && (endLine > d.line || endCol > d.col)
+        const word = o.model.getWordAtPosition({ lineNumber: d.line, column: d.col })
+        return {
+        startLineNumber: d.line, startColumn: d.col, endLineNumber: exact ? endLine : d.line, endColumn: exact ? endCol : (word?.endColumn ?? d.col + 1), message: `${d.code ? d.code + ' · ' : ''}${d.message}`,
         severity: d.severity === 'error' ? monaco.MarkerSeverity.Error : monaco.MarkerSeverity.Warning,
-      })))
+      }}))
     })
   }, [diags, tabs])
 
