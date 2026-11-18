@@ -41,3 +41,23 @@ concernée ; corrigez une ligne fausse en le disant.
   (`get_editor_world().get_path_name()`) contient le nom de la map.
 - Projet de test : VaultRush, Lore actif (`GetRevisionControlStatus`), 1 175 acteurs, un seul appareil Verse, sans
   réglage `@editable`.
+
+## Réglages @editable d'un appareil Verse (testé le 18/11/2026, projet TestPopHub, #6)
+
+- Appareil de test `pop_test_device` : `@editable` `Nombre : int`, `Actif : logic`, `Texte : string`,
+  `Bouton : button_device`.
+- `ListDeviceProperties { device: { refPath } }` renvoie un schéma JSON dont les **noms sont en minuscules**
+  (`nombre`, `actif`, `texte`, `bouton`) : `int` → `"type": "integer"`, `logic` → `"boolean"`, `string` → `{}` (aucun
+  type), référence → `"type": "object"` avec `refPath`.
+- `GetDeviceProperties` exige `propertyNames` (liste) et renvoie un objet `{ "nombre": 3, "actif": true,
+  "texte": "bonjour", "bouton": null }` ; une référence vide vaut `null`.
+- `SetDeviceProperty { device, propertyName, value }` : `value` est du **JSON dans une chaîne** (`"7"`, `"false"`,
+  `"\"salut\""`, `{"refPath": "…"}`).
+- **UEFN arrondit sans prévenir** : `2.5` envoyé à un `int` devient `2`. POP refuse donc lui-même une valeur qui
+  change de type (`check_prop_type` dans `server/src/uefn.rs`).
+- Une référence invalide est refusée par UEFN (texte anglais) ; POP l'affiche en français et garde le texte brut
+  dans le journal.
+- Un appareil Verse ne se pose pas par Python (`spawn_actor_from_class` refuse une `VerseClass`) : il se glisse
+  depuis le Content Browser (`<projet> Content → CreativeDevices`).
+- Python renvoie `None` comme dossier d'un acteur sans dossier : l'Organiseur affiche un dossier « None »
+  (à corriger dans `link/src/mcpdriver.rs`).
