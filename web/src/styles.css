@@ -798,3 +798,30 @@ body.wb-fs .side,body.wb-fs .top{visibility:hidden}
   @media (max-width: 700px) { .dlaunch { grid-template-columns: 1fr; } }
 }
 @layer app { .acct-plan { padding: 4px 12px 8px; color: var(--text2); } }
+
+/* ---------- Abonnement, crédits, IA POP, chiffres privés ---------- */
+@layer app {
+  .bplans { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  .bplan { border: 1px solid var(--border); border-radius: 16px; padding: 16px; display: grid; gap: 10px; align-content: start; background: var(--surface); }
+  .bplan.best { border-color: #f07a3a; }
+  .bplan.current { background: var(--hover); }
+  .bplan ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; }
+  .bplan li { display: flex; gap: 8px; align-items: center; } .bplan li svg { color: var(--tg); flex: none; }
+  .bprice { font-size: 28px; font-weight: 600; } .bprice span { font-size: 14px; font-weight: 400; color: var(--text2); margin-left: 4px; }
+  .bpacks { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+  .bpack { display: grid; gap: 4px; padding: 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text); font: inherit; cursor: pointer; text-align: left; }
+  .bpack:hover { border-color: #f07a3a; } .bpack b { font-size: 16px; } .bpack span { color: var(--text2); }
+  .paywall-box h1 { margin: 6px 0 0; font-weight: 600; } .paywall-box p { color: var(--text2); margin: 0; }
+  .aiplan-list { max-height: 52vh; overflow: auto; border: 1px solid var(--border); border-radius: 12px; padding: 4px 12px 12px; }
+  .aiplan-item { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .aiplan-item span:last-child { display: grid; gap: 2px; } .aiplan-item small { color: var(--text2); }
+  .aiplan-item input { margin-top: 3px; }
+  .privgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+  .privcell { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; display: grid; gap: 2px; }
+  .privcell b { font-size: 20px; font-weight: 600; }
+}
+
+.app.paywall{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;height:auto;min-height:100vh;overflow:auto;padding:32px 16px}
+.paywall-logo{height:48px}
+.app .paywall-box{width:min(780px,100%);text-align:center;display:grid;gap:12px;border-radius:22px}
+.app .paywall-box .bplans{text-align:left;margin-top:8px}

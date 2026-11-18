@@ -68,6 +68,10 @@ impl FromRequestParts<AppState> for AuthUser {
         let jar = CookieJar::from_headers(&parts.headers);
         let token = session_token(&jar).ok_or(AppError::Unauthorized)?;
         let u = user_from_token(state, &token).await?.ok_or(AppError::Unauthorized)?;
+        // Essai terminé sans abonnement : seuls le choix d'un abonnement, l'export et la déconnexion restent ouverts.
+        if crate::stripe::configured() && !crate::stripe::allowed_when_expired(parts.uri.path()) && crate::stripe::access_state(state, u.id).await? == "expired" {
+            return Err(AppError::Guard("abonnement", "Votre essai est terminé : choisissez Starter ou Pro pour continuer.".into()));
+        }
         // Dernière activité (au plus une écriture toutes les 5 minutes par session).
         let _ = sqlx::query("UPDATE sessions SET last_seen = datetime('now') WHERE token_hash = ? AND (last_seen IS NULL OR last_seen < datetime('now', '-5 minutes'))").bind(&u.sid).execute(&state.db).await;
         Ok(u)
@@ -154,7 +158,7 @@ pub async fn register(State(st): State<AppState>, crate::security::ClientIp(ip):
         other => other,
     })?;
     let hash = hash_password(&b.password)?;
-    let id: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash, is_admin, terms_at, plan, trial_until) VALUES (?, ?, ?, ?, datetime('now'), 'starter', datetime('now', '+7 days')) RETURNING id")
+    let id: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash, is_admin, terms_at, plan, plan_source, trial_until) VALUES (?, ?, ?, ?, datetime('now'), 'starter', 'trial', datetime('now', '+7 days')) RETURNING id")
         .bind(&email)
         .bind(b.name.trim())
         .bind(hash)
@@ -255,5 +259,5 @@ pub async fn me(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
         }));
     }
     Ok(Json(json!({ "user": u, "credits": credits, "studios": out, "admin": admin, "admin_pending": pending, "username": username, "must_change_password": must_change == 1,
-        "plan": crate::billing::user_plan(&st, u.id).await?, "trial_until": crate::billing::trial_until(&st, u.id).await?, "analyse": crate::billing::user_analyse(&st, u.id).await? })))
+        "plan": crate::billing::user_plan(&st, u.id).await?, "trial_until": crate::billing::trial_until(&st, u.id).await?, "billing_state": crate::stripe::access_state(&st, u.id).await?, "ai_credits": sqlx::query_scalar::<_, i64>("SELECT ai_credits FROM users WHERE id = ?").bind(u.id).fetch_one(&st.db).await?, "analyse": crate::billing::user_analyse(&st, u.id).await? })))
 }

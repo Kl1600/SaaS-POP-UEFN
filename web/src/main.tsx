@@ -28,6 +28,7 @@ import Help from './pages/Help'
 import AI from './pages/AI'
 import { Market, Trending, Launches } from './pages/Analysis'
 import Ideas from './pages/Ideas'
+import { BillingSettings, Paywall } from './components/Billing'
 import { AnalyseGate, AnalyseVideos, StudioMarket } from './components/Access'
 import { tr } from './i18n/t'
 const Landing = lazy(() => import('./pages/Landing'))
@@ -47,6 +48,7 @@ function Gate() {
     <Route path="*" element={<Login />} />
   </Routes>
   if (me.must_change_password) return <FirstPassword />
+  if (me.billing_state === 'expired') return <Paywall />
   // Connecté depuis la page de connexion : on part sur l'accueil (l'adresse ne reste pas « /connexion »).
   if (['/connexion', '/inscription'].includes(loc.pathname)) return <Navigate to="/" replace />
   if (me.studios.length === 0) return <Onboarding />
@@ -79,7 +81,7 @@ function Gate() {
         </Route>
         <Route path="aide" element={<Help />} />
         <Route path="admin" element={L(Admin)} />
-        <Route path="parametres" element={<main className="content"><PageHead title={tr("Paramètres")} help={tr("Votre compte : nom, mot de passe, données personnelles.")} /><Account /></main>} />
+        <Route path="parametres" element={<main className="content"><PageHead title={tr("Paramètres")} help={tr("Votre compte : nom, mot de passe, abonnement, données personnelles.")} /><BillingSettings /><Account /></main>} />
         <Route path="analyse/idees" element={<AnalyseGate title={tr("Idées de maps")}><Ideas /></AnalyseGate>} />
         <Route path="analyse/marche" element={<AnalyseGate title={tr("Analyse du marché")}><Market /></AnalyseGate>} />
         <Route path="analyse/tendances" element={<AnalyseGate title={tr("Maps qui marchent")}><Trending /></AnalyseGate>} />

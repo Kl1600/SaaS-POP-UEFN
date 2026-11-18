@@ -5,6 +5,10 @@ mod admin;
 mod analytics;
 mod billing;
 mod ideas;
+mod stripe;
+mod aipop;
+mod aiplan;
+mod privstats;
 mod model;
 mod legal;
 mod discover;
@@ -150,6 +154,14 @@ fn api() -> Router<AppState> {
         .route("/api/notifications/read", post(account::read_notifications))
         .route("/api/studios/{sid}/members/{uid}/reset-link", post(account::admin_reset_link))
         .route("/api/maps/{mid}/search", get(account::search))
+        .route("/api/billing", get(stripe::status))
+        .route("/api/billing/checkout", post(stripe::checkout))
+        .route("/api/billing/portal", post(stripe::portal))
+        .route("/api/admin/ai", get(aipop::admin_report))
+        .route("/api/admin/users/{id}/credits", post(aipop::admin_grant))
+        .route("/api/maps/{mid}/ai/plan", post(aiplan::propose))
+        .route("/api/maps/{mid}/ai/plan/apply", post(aiplan::apply))
+        .route("/api/maps/{mid}/private-stats", get(privstats::get).post(privstats::import))
         .route("/api/legal", get(legal::get))
         .route("/api/admin/legal", put(legal::save))
         .route("/api/img", get(legal::image))
@@ -191,6 +203,7 @@ fn api() -> Router<AppState> {
         .route("/api/studios/{sid}/integrations", get(studio::integrations))
         .route("/api/studios/{sid}/integrations/{kind}", put(studio::set_integration))
         .route("/api/hooks/lore/{sid}", post(studio::lore_hook))
+        .route("/api/hooks/stripe", post(stripe::webhook))
         .route("/api/hooks/discord/{sid}", post(integrations::discord_hook))
         .route("/api/hooks/github/{sid}", post(integrations::github_hook))
         .route("/api/studios/{sid}/discord/send", post(integrations::discord_send))

@@ -8,7 +8,7 @@ use crate::{auth::AuthUser, error::AppError, AppState};
 /// Deux abonnements : Starter (espace de travail) et Pro (+ Analyse et onglet Discover).
 pub const PLANS: &[&str] = &["starter", "pro"];
 /// Condition SQL « le compte a Analyse » (plan Pro ou essai en cours), sur la table users aliasée `u`.
-pub const SQL_PRO: &str = "(u.plan = 'pro' OR u.trial_until > datetime('now'))";
+pub const SQL_PRO: &str = "((u.plan = 'pro' AND (u.plan_source <> 'stripe' OR u.sub_status IN ('active', 'trialing', 'past_due'))) OR u.trial_until > datetime('now'))";
 
 pub async fn user_plan(st: &AppState, uid: i64) -> Result<String, AppError> {
     Ok(sqlx::query_scalar("SELECT plan FROM users WHERE id = ?").bind(uid).fetch_optional(&st.db).await?.unwrap_or_else(|| "starter".into()))

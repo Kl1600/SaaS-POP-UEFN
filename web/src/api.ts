@@ -24,6 +24,8 @@ async function req<T>(method: string, url: string, body?: unknown): Promise<T> {
   const text = await res.text()
   let data: any = null
   try { data = text ? JSON.parse(text) : null } catch { data = text }
+  // Essai terminé pendant la session : on recharge pour afficher l'écran de choix d'abonnement.
+  if (res.status === 403 && data?.code === 'abonnement' && !url.startsWith('/api/billing')) { location.reload() }
   if (!res.ok) throw new ApiError(res.status, (data && data.error ? tx(data.error) : '') || tr("Erreur {0}", [res.status]), data?.code)
   return data as T
 }

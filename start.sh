@@ -19,4 +19,6 @@ if [ "$1" = "--reseau" ]; then
   echo ""
 fi
 export POP_DEV_ACCOUNT=1
+# Clés privées (Stripe, Anthropic…) : fichier .env à la racine, jamais envoyé sur GitHub.
+[ -f .env ] && { set -a; . ./.env; set +a; }
 cd server && cargo run --release

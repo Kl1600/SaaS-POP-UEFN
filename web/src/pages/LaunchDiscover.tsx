@@ -226,6 +226,8 @@ export default function LaunchDiscover() {
       </>}
     </section>
 
+    <PrivateStats mid={map!.id} canEdit={canEdit} />
+
     <section className="card">
       <CardHead icon={<RefreshCw size={18} />} title={tr("Mises à jour")} sub={tr("Notez chaque mise à jour publiée pour voir son effet sur les joueurs.")} />
       {canEdit && <div className="row" style={{ gap: 8 }}><input className="field" type="date" value={upd} onChange={e => setUpd(e.target.value)} aria-label={tr("Date de la mise à jour")} /><button className="btn" onClick={() => save({ update_day: upd }, tr("Mise à jour notée"))}>{tr("J’ai publié une mise à jour")}</button></div>}
@@ -236,3 +238,43 @@ export default function LaunchDiscover() {
   </>
 }
 
+
+const PRIV: Record<string, [string, 'pct' | 'num' | 'min']> = {
+  bounce: [tr("Taux de rebond"), 'pct'], new_players: [tr("Nouveaux joueurs"), 'num'], returning: [tr("Joueurs revenus"), 'num'],
+  unique_players: [tr("Joueurs uniques"), 'num'], plays: [tr("Parties"), 'num'], avg_minutes: [tr("Minutes par joueur"), 'min'],
+  minutes: [tr("Minutes jouées"), 'num'], d1: [tr("Retour à J+1"), 'pct'], d7: [tr("Retour à J+7"), 'pct'], peak_ccu: [tr("Pic de joueurs simultanés"), 'num'],
+  impressions: [tr("Impressions"), 'num'], clicks: [tr("Clics"), 'num'], ctr: [tr("Taux de clic"), 'pct'], favorites: [tr("Favoris"), 'num'],
+  recommends: [tr("Recommandations"), 'num'], queue: [tr("Attente"), 'num'],
+}
+
+/** Chiffres privés importés du Creator Portal (CSV d'analytics) : rebond, nouveaux joueurs, impressions… */
+export function PrivateStats({ mid, canEdit }: { mid: number; canEdit: boolean }) {
+  const { toast } = useApp()
+  const { data, reload } = useLoad<any>(`/api/maps/${mid}/private-stats`, [mid])
+  const ref = useRef<HTMLInputElement>(null)
+  const upload = async (f?: File | null) => {
+    if (!f) return
+    try {
+      const r = await api.post(`/api/maps/${mid}/private-stats`, { csv: await f.text(), filename: f.name })
+      toast(tr("{0} chiffres importés sur {1} jour(s)", [r.values, r.days]) + (r.ignored?.length ? ' · ' + tr("colonnes ignorées : {0}", [r.ignored.slice(0, 4).join(', ')]) : ''))
+      reload()
+    } catch (e: any) { toast(e.message, true) }
+  }
+  const series: Record<string, any[]> = data?.series ?? {}
+  const keys = Object.keys(PRIV).filter(k => series[k]?.length)
+  const fmt = (k: string, v: number) => PRIV[k][1] === 'pct' ? `${Math.round(v * 1000) / 10} %` : PRIV[k][1] === 'min' ? `${Math.round(v * 10) / 10} min` : num(v)
+  const bounce = series.bounce?.[series.bounce.length - 1]?.value
+  return <section className="card">
+    <CardHead icon={<Upload size={18} />} title={tr("Chiffres privés du Creator Portal")} sub={data?.imported_at ? tr("Dernier import : {0}", [data.filename || data.imported_at]) : tr("Le rebond, les nouveaux joueurs ou les impressions ne sont pas publics. Exportez le CSV d’analytics de votre map dans le Creator Portal (Projects → votre projet → Analytics) et déposez-le ici.")}>
+      {canEdit && <><button className="btn" onClick={() => ref.current?.click()}><Upload size={16} />{tr("Importer un CSV")}</button>
+        <input ref={ref} type="file" accept=".csv,text/csv" hidden onChange={e => { upload(e.target.files?.[0]); e.target.value = '' }} /></>}
+    </CardHead>
+    {keys.length > 0 && <div className="privgrid">{keys.map(k => { const s = series[k]; const last = s[s.length - 1]; const prev = s.length > 1 ? s[s.length - 2].value : null
+      return <div key={k} className="privcell"><span className="small muted">{PRIV[k][0]}</span><b>{fmt(k, last.value)}</b>
+        {prev !== null && prev !== 0 && <span className="small muted">{tr("veille : {0}", [fmt(k, prev)])}</span>}</div> })}</div>}
+    {bounce !== undefined && <div className={'dalert' + (bounce > 0.4 ? ' warn' : '')} style={{ marginTop: 12 }}>{bounce > 0.4 ? <AlertTriangle size={18} /> : <CheckCircle2 size={18} />}<div>
+      <b>{tr("Rebond : {0}", [`${Math.round(bounce * 100)} %`])}</b>
+      <span>{bounce > 0.4 ? tr("Beaucoup de joueurs repartent avant 5 minutes, et Epic compte ce signal pour Discover. Montrez l’objectif tout de suite, réduisez l’attente et donnez une première récompense rapide.") : tr("La plupart des joueurs restent au-delà des premières minutes : c’est un bon signal pour Discover.")}</span>
+    </div></div>}
+  </section>
+}
