@@ -137,6 +137,7 @@ pub async fn send(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64>,
     let mut out = json!({ "diagnostics": diags, "errors": errors, "pushed": false, "archived": false });
     if errors > 0 {
         step(&st, mid, &run, 4, "skipped", json!("Corrigez les erreurs pour envoyer en session."));
+        step(&st, mid, &run, 5, "skipped", json!("Corrigez les erreurs pour archiver."));
         return Ok(Json(out));
     }
     // 4. Session de test.
