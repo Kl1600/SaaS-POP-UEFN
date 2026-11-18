@@ -69,7 +69,7 @@ Le dépôt contient un `Dockerfile` (interface + serveur, base SQLite dans `/dat
 - monter un volume persistant sur **/data** ;
 - servir en **HTTPS** (fourni par l'hébergeur). `POP_SECURE_COOKIES=1` est déjà activé dans l'image.
 
-Sur un VPS : `docker build -t pop . && docker run -d -p 8080:8080 -v pop-data:/data pop`, derrière un proxy HTTPS (Caddy, Nginx). Le relais UEFN se connecte alors à `https://votre-domaine`.
+Sur un VPS : suivre **[deploy/README.md](deploy/README.md)** (Hetzner CPX02 : image publiée par GitHub Actions, Caddy pour le HTTPS, Litestream pour sauvegarder la base hors du serveur). Le relais UEFN se connecte alors à `https://votre-domaine`.
 
 - **L'image tourne sans root** : utilisateur `pop` (uid 10001), seul propriétaire de `/data`. Un volume créé avec une
   image plus ancienne (fichiers à root) doit être confié à cet utilisateur une fois, conteneur arrêté :
