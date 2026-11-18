@@ -87,6 +87,13 @@ async fn csrf(req: Request<Body>, next: Next) -> Response {
     }
     // Pas de mise en cache des réponses de l'API (données personnelles).
     if path.starts_with("/api/") { h.insert("cache-control", "no-store".parse().unwrap()); }
+    // Fichiers de l'interface : ceux de /assets/ portent leur empreinte dans leur nom et ne changent jamais ; tout
+    // le reste (index.html, pages, téléchargements) est revalidé à chaque visite. Sans cela, après une mise à jour,
+    // un navigateur garde l'ancien index.html qui réclame des fichiers supprimés : page blanche.
+    else if !h.contains_key("cache-control") {
+        let v = if path.starts_with("/assets/") { "public, max-age=31536000, immutable" } else { "no-cache" };
+        h.insert("cache-control", v.parse().unwrap());
+    }
     res
 }
 
