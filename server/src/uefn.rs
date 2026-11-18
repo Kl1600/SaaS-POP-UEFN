@@ -512,6 +512,9 @@ async fn prepare(st: &AppState, o: &Origin<'_>, action: &str, args: &mut Value) 
                     if let Some(m) = ch[field].as_object() {
                         let mut prev = json!({});
                         for (k, v) in m {
+                            if field == "props" {
+                                check_prop_type(k, &a[field][k], v)?;
+                            }
                             prev[k] = a[field][k].clone();
                             lines.push(format!("{name} · {label} {k} : {} → {}", short(&a[field][k]), short(v)));
                         }
@@ -679,6 +682,11 @@ async fn run_action(st: &AppState, mid: i64, aid: Option<i64>, action: &str, arg
         }
     }
     notify(st, mid, json!({ "t": "uefn", "what": "journal" }));
+    // Le texte brut d'UEFN reste dans le journal ; l'interface reçoit un message en français (#6).
+    let res = res.map_err(|e| match e {
+        AppError::Conflict(m) if matches!(action, "actor_update" | "actor_update_raw") => AppError::Conflict(french_option_error(&m)),
+        e => e,
+    });
     res.map(|mut d| {
         if let Some(o) = d.as_object_mut() {
             o.remove("actors");
@@ -686,6 +694,36 @@ async fn run_action(st: &AppState, mid: i64, aid: Option<i64>, action: &str, arg
         }
         d
     })
+}
+
+/// Un réglage @editable garde son type : un entier reste entier, un booléen reste un booléen, un texte reste un
+/// texte. UEFN arrondirait 2,5 en 2 sans rien dire (vérifié le 18/11/2026) : POP refuse avant d'envoyer.
+/// Une valeur actuelle inconnue (null, référence) ne bloque rien : UEFN tranche.
+fn check_prop_type(k: &str, cur: &Value, new: &Value) -> Result<(), AppError> {
+    let int = |v: &Value| v.is_i64() || v.is_u64();
+    let expected = if int(cur) { Some(("un nombre entier", int(new))) }
+        else if cur.is_f64() { Some(("un nombre", new.is_number())) }
+        else if cur.is_boolean() { Some(("oui ou non", new.is_boolean())) }
+        else if cur.is_string() { Some(("un texte", new.is_string())) }
+        else { None };
+    match expected {
+        Some((what, false)) => Err(bad(format!("« {k} » attend {what} : la valeur {} est refusée, rien n’a changé.", short(new)))),
+        _ => Ok(()),
+    }
+}
+
+/// Traduit un refus d'UEFN sur une option ou un réglage (« option bouton : Reference to a device… ») en français.
+fn french_option_error(m: &str) -> String {
+    let Some(rest) = m.strip_prefix("option ") else { return m.to_string() };
+    let key = rest.split(" : ").next().unwrap_or("").trim();
+    let why = if m.contains("Reference to a device") {
+        "il faut une référence à un appareil ou à un accessoire posé dans le niveau"
+    } else if m.contains("AllowedValues") || m.contains("not accept") || m.contains("rejecting") {
+        "cette valeur ne fait pas partie des valeurs acceptées"
+    } else {
+        "valeur invalide"
+    };
+    format!("UEFN a refusé la valeur de « {key} » : {why}. Rien n’a changé (détail dans le journal).")
 }
 
 async fn apply_file_cache(st: &AppState, mid: i64, action: &str, args: &Value, uid: i64, task: Option<i64>, note: &str) -> Result<(), AppError> {
@@ -774,8 +812,18 @@ pub async fn undo(State(st): State<AppState>, u: AuthUser, Path(id): Path<i64>) 
     if status != "done" {
         return Err(bad("Seule une action réussie s’annule."));
     }
-    let r = exec(&st, Origin { ctx: &ctx, source: "undo", task: None }, u2["action"].as_str().unwrap_or(""), u2["args"].clone()).await?;
-    sqlx::query("UPDATE uefn_actions SET status = 'undone' WHERE id = ?").bind(id).execute(&st.db).await?;
+    // Réserve l'annulation avant de l'envoyer : deux Ctrl+Z rapprochés n'annulent pas deux fois la même action (#6).
+    let claimed = sqlx::query("UPDATE uefn_actions SET status = 'undone' WHERE id = ? AND status = 'done'").bind(id).execute(&st.db).await?.rows_affected();
+    if claimed == 0 {
+        return Err(bad("Cette action vient déjà d’être annulée."));
+    }
+    let r = match exec(&st, Origin { ctx: &ctx, source: "undo", task: None }, u2["action"].as_str().unwrap_or(""), u2["args"].clone()).await {
+        Ok(r) => r,
+        Err(e) => {
+            sqlx::query("UPDATE uefn_actions SET status = 'done' WHERE id = ?").bind(id).execute(&st.db).await?;
+            return Err(e);
+        }
+    };
     notify(&st, mid, json!({ "t": "uefn", "what": "journal" }));
     Ok(Json(r))
 }
@@ -823,4 +871,31 @@ pub async fn delete_filter(State(st): State<AppState>, u: AuthUser, Path(id): Pa
     map_ctx(&st, &u, mid).await?.require(Role::Freelance)?;
     sqlx::query("DELETE FROM saved_filters WHERE id = ?").bind(id).execute(&st.db).await?;
     Ok(Json(json!({ "ok": true })))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn un_reglage_garde_son_type() {
+        assert!(check_prop_type("nombre", &json!(3), &json!(7)).is_ok());
+        assert!(check_prop_type("nombre", &json!(3), &json!(2.5)).is_err());
+        assert!(check_prop_type("nombre", &json!(3), &json!("abc")).is_err());
+        assert!(check_prop_type("vitesse", &json!(1.5), &json!(2)).is_ok());
+        assert!(check_prop_type("actif", &json!(true), &json!(false)).is_ok());
+        assert!(check_prop_type("actif", &json!(true), &json!("oui")).is_err());
+        assert!(check_prop_type("texte", &json!("a"), &json!("b")).is_ok());
+        assert!(check_prop_type("texte", &json!("a"), &json!(3)).is_err());
+        // Valeur actuelle inconnue (référence vide) : UEFN tranche.
+        assert!(check_prop_type("bouton", &Value::Null, &json!("x")).is_ok());
+    }
+
+    #[test]
+    fn refus_uefn_en_francais() {
+        let m = "option bouton : Reference to a device or prop placed in the level: {\"refPath\": \"<actor path>\"}, or null to clear. Got: \"x\" ; Device '/a' has no option named 'bouton'.";
+        let f = french_option_error(m);
+        assert!(f.starts_with("UEFN a refusé la valeur de « bouton » : il faut une référence"), "{f}");
+        assert_eq!(french_option_error("Relais hors ligne."), "Relais hors ligne.");
+    }
 }
