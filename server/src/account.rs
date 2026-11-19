@@ -266,8 +266,17 @@ pub async fn reset(State(st): State<AppState>, Json(b): Json<ResetIn>) -> ApiRes
         .bind(uid)
         .execute(&st.db)
         .await?;
-    // Le lien de réinitialisation est arrivé à cette adresse : elle est donc vérifiée.
+    // Le lien de réinitialisation est arrivé à cette adresse : elle est donc vérifiée, et un compte pas encore
+    // activé (#42) l'est par ce mot de passe choisi.
     crate::verify::mark_verified(&st, uid).await?;
+    sqlx::query("UPDATE users SET activation_pending = 0 WHERE id = ?")
+        .bind(uid)
+        .execute(&st.db)
+        .await?;
+    sqlx::query("DELETE FROM account_activations WHERE user_id = ?")
+        .bind(uid)
+        .execute(&st.db)
+        .await?;
     Ok(Json(json!({ "ok": true, "tokens_revoked": tokens })))
 }
 

@@ -197,6 +197,41 @@ export function VerifyEmail({ token }: { token: string }) {
   )
 }
 
+/** /activer?token=… : compte créé par l'administrateur, la personne choisit son mot de passe (#42). */
+export function Activate() {
+  const token = new URLSearchParams(location.search).get('token') ?? ''
+  const [acc, setAcc] = useState<{ username?: string; email: string; name: string } | null>(null)
+  const [err, setErr] = useState('')
+  const [pw, setPw] = useState('')
+  const [terms, setTerms] = useState(false)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => { api.get(`/api/activation?token=${encodeURIComponent(token)}`).then(setAcc).catch((e: any) => setErr(e.message)) }, [token])
+  return (
+    <div className="auth app">
+      <form className="card stack" style={{ gap: 16 }} onSubmit={async e => {
+        e.preventDefault(); setBusy(true)
+        try { await api.post('/api/activation', { token, password: pw, accept_terms: terms }); location.href = '/' } catch (er: any) { setErr(er.message); setBusy(false) }
+      }}>
+        <img src="/logo.png" alt="POP" style={{ filter: 'invert(1)' }} />
+        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 400 }}>{tr("Activer votre compte")}</h1>
+        {!acc && !err && <p className="muted">{tr("Vérification du lien…")}</p>}
+        {acc && <>
+          <p className="muted" style={{ margin: 0 }}>{tr("Bonjour {0}, choisissez votre mot de passe pour ouvrir POP.", [acc.name.split(' ')[0]])}</p>
+          <div className="b-callout small" style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 14px' }}>
+            <span className="muted">{tr("Identifiant")}</span><span className="mono">{acc.username ?? acc.email}</span>
+            <span className="muted">E-mail</span><span>{acc.email}</span>
+          </div>
+          <label className="label">{tr("Mot de passe (10 caractères minimum)")}<input className="field" type="password" value={pw} onChange={e => setPw(e.target.value)} minLength={10} required autoFocus autoComplete="new-password" /></label>
+          <Terms checked={terms} onChange={setTerms} />
+        </>}
+        {err && <div className="err" role="alert">{err}</div>}
+        {acc && <button className="btn pri" disabled={busy}>{tr("Activer et ouvrir POP")}</button>}
+        {!acc && err && <a className="btn" href="/">{tr("Ouvrir POP")}</a>}
+      </form>
+    </div>
+  )
+}
+
 /** Premier écran : relier UEFN pour importer ses projets (une map par projet), ou commencer sans. */
 export function Welcome() {
   const { me, reload } = useApp()

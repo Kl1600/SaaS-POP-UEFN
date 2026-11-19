@@ -1,5 +1,6 @@
 mod access;
 mod account;
+mod activation;
 mod admin;
 mod aiplan;
 mod aipop;
@@ -364,6 +365,10 @@ fn api() -> Router<AppState> {
         .route("/api/waitlist", post(admin::join))
         .route("/api/waitlist/access", get(admin::check_access))
         .route("/api/auth/verify-email", post(verify::verify))
+        .route(
+            "/api/activation",
+            get(activation::check).post(activation::activate),
+        )
         .route("/api/me/verify-email/resend", post(verify::resend))
         .route("/api/me/security", get(security::overview))
         .route("/api/me/first-password", post(account::first_password))
@@ -398,6 +403,7 @@ fn api() -> Router<AppState> {
             "/api/admin/users/{id}/reset-link",
             post(admin::user_reset_link),
         )
+        .route("/api/admin/users/{id}/activation", post(activation::resend))
         .route("/api/admin/users/{id}/unlock", post(admin::unlock_user))
         .route(
             "/api/admin/users/{id}/deletion",

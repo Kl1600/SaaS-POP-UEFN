@@ -12,7 +12,7 @@ import '@fontsource/geist-mono/500.css'
 import './styles.css'
 import { AppProvider, useApp } from './state'
 import Layout from './components/Layout'
-import { Login, Signup, Onboarding, InviteAccept, PublicPage, ResetPassword, VerifyEmail, Welcome, FirstPassword } from './pages/Auth'
+import { Login, Signup, Onboarding, InviteAccept, PublicPage, ResetPassword, VerifyEmail, Activate, Welcome, FirstPassword } from './pages/Auth'
 import Overview from './pages/Overview'
 import Home from './pages/Home'
 import { MapScope, StudioScope, Legacy } from './components/Scopes'
@@ -120,6 +120,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <Route path="/lien/:token" element={<LinkRoute />} />
           <Route path="/reinitialiser/:token" element={<ResetRoute />} />
           <Route path="/verifier-email/:token" element={<VerifyRoute />} />
+          <Route path="/activer" element={<Activate />} />
           <Route path="/*" element={<Gate />} />
         </Routes>
       </AppProvider>
