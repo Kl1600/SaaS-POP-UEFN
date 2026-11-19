@@ -11,6 +11,7 @@ const ACTIONS: Record<string, string> = {
   session_fermée: tr("Appareil déconnecté"), sessions_fermées: tr("Autres appareils déconnectés"), compte_créé: tr("Compte créé"),
   admin_déverrouillé: tr("Administration déverrouillée"), admin_confirmation_échouée: tr("Confirmation admin refusée"),
   mot_de_passe_choisi: tr("Mot de passe choisi"), admin_compte_créé: tr("Admin : compte créé"), admin_mot_de_passe_réinitialisé: tr("Admin : mot de passe réinitialisé"),
+  admin_lien_mot_de_passe: tr("Admin : lien de nouveau mot de passe"), admin_compte_débloqué: tr("Admin : compte débloqué"), admin_compte_supprimé: tr("Admin : compte supprimé"),
 }
 export const actionLabel = (a: string) => ACTIONS[a] ?? a.replace(/_/g, ' ').replace(/^admin /, tr("Admin : "))
 

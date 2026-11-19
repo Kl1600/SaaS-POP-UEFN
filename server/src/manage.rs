@@ -244,6 +244,60 @@ pub async fn export_me(State(st): State<AppState>, u: AuthUser) -> Result<Respon
     Ok(download("pop-mes-donnees.json", &Value::Object(out)))
 }
 
+/// Ce que devient chaque studio dont un compte est propriétaire, si on supprime ce compte.
+pub struct DeletionPlan {
+    /// Studios sans autre membre : supprimés avec le compte (id, nom).
+    pub delete: Vec<(i64, String)>,
+    /// Studios partagés : propriété transférée (id du studio, nom, id du nouveau propriétaire, son nom).
+    pub transfer: Vec<(i64, String, i64, String)>,
+}
+
+/// Prépare la suppression d'un compte : un studio partagé passe au membre le plus haut placé (un admin du studio
+/// d'abord, un compte actif avant un compte désactivé, le plus ancien membre à égalité).
+pub async fn deletion_plan(db: &sqlx::SqlitePool, uid: i64) -> Result<DeletionPlan, AppError> {
+    let owned: Vec<(i64, String)> = sqlx::query_as("SELECT s.id, s.name FROM memberships m JOIN studios s ON s.id = m.studio_id WHERE m.user_id = ? AND m.role = 'owner' ORDER BY s.id")
+        .bind(uid)
+        .fetch_all(db)
+        .await?;
+    let mut plan = DeletionPlan { delete: vec![], transfer: vec![] };
+    for (sid, name) in owned {
+        let next: Option<(i64, String)> = sqlx::query_as(
+            "SELECT m.user_id, u.name FROM memberships m JOIN users u ON u.id = m.user_id WHERE m.studio_id = ? AND m.user_id != ?
+             ORDER BY u.disabled, CASE m.role WHEN 'admin' THEN 0 WHEN 'member' THEN 1 WHEN 'freelance' THEN 2 ELSE 3 END, m.rowid LIMIT 1",
+        )
+        .bind(sid)
+        .bind(uid)
+        .fetch_optional(db)
+        .await?;
+        match next {
+            Some((to, to_name)) => plan.transfer.push((sid, name, to, to_name)),
+            None => plan.delete.push((sid, name)),
+        }
+    }
+    Ok(plan)
+}
+
+/// Supprime un compte en appliquant le plan (transferts, studios supprimés) dans une seule transaction.
+/// Les sessions, jetons et adhésions du compte partent avec lui (clés étrangères).
+pub async fn remove_account(st: &AppState, uid: i64, plan: &DeletionPlan) -> Result<(), AppError> {
+    let mut tx = st.db.begin().await?;
+    for (sid, _, to, _) in &plan.transfer {
+        sqlx::query("UPDATE memberships SET role = 'owner' WHERE studio_id = ? AND user_id = ?").bind(sid).bind(to).execute(&mut *tx).await?;
+    }
+    for (sid, _) in &plan.delete {
+        sqlx::query("DELETE FROM studios WHERE id = ?").bind(sid).execute(&mut *tx).await?;
+    }
+    sqlx::query("DELETE FROM users WHERE id = ?").bind(uid).execute(&mut *tx).await?;
+    tx.commit().await?;
+    for (sid, name, to, _) in &plan.transfer {
+        let first_map: Option<i64> = sqlx::query_scalar("SELECT id FROM maps WHERE studio_id = ? ORDER BY id LIMIT 1").bind(sid).fetch_optional(&st.db).await?;
+        if let Some(m) = first_map {
+            crate::account::notify_user(st, *to, m, &format!("Vous êtes maintenant propriétaire du studio {name} (le compte de l’ancien propriétaire a été supprimé)"), "/equipe").await;
+        }
+    }
+    Ok(())
+}
+
 #[derive(Deserialize)]
 pub struct DeleteMeIn {
     password: String,
@@ -256,22 +310,12 @@ pub async fn delete_me(State(st): State<AppState>, u: AuthUser, Json(b): Json<De
     if !crate::auth::verify_password(&b.password, &hash) {
         return Err(bad("Mot de passe incorrect."));
     }
-    let owned: Vec<(i64, String, i64)> = sqlx::query_as(
-        "SELECT s.id, s.name, (SELECT COUNT(*) FROM memberships x WHERE x.studio_id = s.id) FROM memberships m JOIN studios s ON s.id = m.studio_id WHERE m.user_id = ? AND m.role = 'owner'",
-    )
-    .bind(u.id)
-    .fetch_all(&st.db)
-    .await?;
-    let shared: Vec<String> = owned.iter().filter(|o| o.2 > 1).map(|o| o.1.clone()).collect();
-    if !shared.is_empty() {
+    let plan = deletion_plan(&st.db, u.id).await?;
+    if !plan.transfer.is_empty() {
+        let shared: Vec<String> = plan.transfer.iter().map(|t| t.1.clone()).collect();
         return Err(bad(format!("Transférez d’abord la propriété de : {} (Équipe et intégrations → Membres).", shared.join(", "))));
     }
-    let mut tx = st.db.begin().await?;
-    for (sid, _, _) in &owned {
-        sqlx::query("DELETE FROM studios WHERE id = ?").bind(sid).execute(&mut *tx).await?;
-    }
-    sqlx::query("DELETE FROM users WHERE id = ?").bind(u.id).execute(&mut *tx).await?;
-    tx.commit().await?;
+    remove_account(&st, u.id, &plan).await?;
     Ok(Json(json!({ "ok": true })))
 }
 

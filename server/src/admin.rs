@@ -264,13 +264,18 @@ pub async fn invite(State(st): State<AppState>, u: AuthUser, Json(b): Json<Invit
 
 pub async fn users(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
     require(&st, &u).await?;
-    let rows: Vec<(i64, String, String, String, Option<String>, i64, i64, i64, i64, Option<String>, i64, String)> = sqlx::query_as(
+    #[allow(clippy::type_complexity)]
+    let rows: Vec<(i64, String, String, String, Option<String>, i64, i64, i64, i64, Option<String>, i64, String, Option<String>)> = sqlx::query_as(
         "SELECT u.id, u.email, u.name, u.created_at, u.last_seen, u.is_admin, u.disabled,
                 (SELECT COUNT(*) FROM memberships m WHERE m.user_id = u.id),
-                (SELECT COUNT(*) FROM tasks t WHERE t.assignee_id = u.id AND t.status = 'done'), u.username, u.must_change_password, u.plan
+                (SELECT COUNT(*) FROM tasks t WHERE t.assignee_id = u.id AND t.status = 'done'), u.username, u.must_change_password, u.plan,
+                CASE WHEN u.locked_until > datetime('now') THEN u.locked_until END
          FROM users u ORDER BY u.created_at DESC LIMIT 2000",
     ).fetch_all(&st.db).await?;
-    Ok(Json(json!(rows.into_iter().map(|r| json!({ "id": r.0, "email": r.1, "name": r.2, "created_at": r.3, "last_seen": r.4, "is_admin": r.5 == 1, "disabled": r.6 == 1, "studios": r.7, "tasks_done": r.8, "username": r.9, "must_change": r.10 == 1, "plan": r.11, "me": r.0 == u.id })).collect::<Vec<_>>())))
+    Ok(Json(json!(rows.into_iter().map(|r| json!({
+        "id": r.0, "email": r.1, "name": r.2, "created_at": r.3, "last_seen": r.4, "is_admin": r.5 == 1, "disabled": r.6 == 1, "studios": r.7, "tasks_done": r.8,
+        "username": r.9, "must_change": r.10 == 1, "plan": r.11, "locked_until": r.12, "me": r.0 == u.id,
+    })).collect::<Vec<_>>())))
 }
 
 #[derive(Deserialize)]
@@ -379,6 +384,75 @@ pub async fn reset_password(State(st): State<AppState>, u: AuthUser, Path(id): P
     Ok(Json(json!({ "username": username.unwrap_or(email), "password": password, "url": crate::mail::public_url() + "/connexion" })))
 }
 
+// ---------- Dépannage d'un compte (#38) ----------
+
+/// Compte visé par une action de dépannage : verrou admin, jamais son propre compte. Renvoie (e-mail, nom).
+async fn target(st: &AppState, u: &AuthUser, id: i64) -> Result<(String, String), AppError> {
+    require(st, u).await?;
+    if id == u.id { return Err(bad("Vous ne pouvez pas faire cette action sur votre propre compte.")) }
+    sqlx::query_as("SELECT email, name FROM users WHERE id = ?").bind(id).fetch_optional(&st.db).await?.ok_or(AppError::NotFound)
+}
+
+/// Lien de nouveau mot de passe pour n'importe quel compte (2 heures, une seule fois) : envoyé par e-mail si le
+/// SMTP est configuré, toujours renvoyé pour être copié.
+pub async fn user_reset_link(State(st): State<AppState>, u: AuthUser, Path(id): Path<i64>) -> ApiResult<Value> {
+    let (email, name) = target(&st, &u, id).await?;
+    let link = format!("{}{}", crate::mail::public_url(), crate::account::new_reset(&st, id).await?);
+    log(&st, &u, "admin_lien_mot_de_passe", &email).await;
+    let mut mailed = false;
+    if crate::mail::configured() {
+        let first = name.split_whitespace().next().unwrap_or(&name);
+        let body = format!("Bonjour {first},\n\nUn administrateur de POP vous envoie un lien pour choisir un nouveau mot de passe (valable 2 heures, une seule fois) :\n\n{link}\n\nSi vous n’avez rien demandé, ignorez ce message.\n\nL’équipe POP");
+        mailed = crate::mail::send(&email, "POP · choisir un nouveau mot de passe", &body).await.is_ok();
+    }
+    Ok(Json(json!({ "link": link, "mailed": mailed, "email": email })))
+}
+
+/// Lève le blocage après trop de mots de passe faux.
+pub async fn unlock_user(State(st): State<AppState>, u: AuthUser, Path(id): Path<i64>) -> ApiResult<Value> {
+    let (email, _) = target(&st, &u, id).await?;
+    sqlx::query("UPDATE users SET failed_logins = 0, locked_until = NULL WHERE id = ?").bind(id).execute(&st.db).await?;
+    log(&st, &u, "admin_compte_débloqué", &email).await;
+    Ok(Json(json!({ "ok": true })))
+}
+
+fn plan_json(p: &crate::manage::DeletionPlan) -> Value {
+    json!({
+        "delete": p.delete.iter().map(|d| d.1.clone()).collect::<Vec<_>>(),
+        "transfer": p.transfer.iter().map(|t| json!({ "studio": t.1, "to": t.3 })).collect::<Vec<_>>(),
+    })
+}
+
+/// Ce que deviendront les studios du compte s'il est supprimé (affiché avant la confirmation).
+pub async fn deletion_preview(State(st): State<AppState>, u: AuthUser, Path(id): Path<i64>) -> ApiResult<Value> {
+    let (email, name) = target(&st, &u, id).await?;
+    let plan = crate::manage::deletion_plan(&st.db, id).await?;
+    let mut v = plan_json(&plan);
+    v["email"] = json!(email);
+    v["name"] = json!(name);
+    Ok(Json(v))
+}
+
+#[derive(Deserialize)]
+pub struct DeleteUserIn { confirm: String }
+
+/// Supprime un compte : l'administrateur retape l'adresse e-mail. Les studios partagés dont il était seul
+/// propriétaire sont transférés, les autres supprimés (même logique que la suppression par la personne).
+pub async fn delete_user(State(st): State<AppState>, u: AuthUser, Path(id): Path<i64>, Json(b): Json<DeleteUserIn>) -> ApiResult<Value> {
+    let (email, _) = target(&st, &u, id).await?;
+    if !b.confirm.trim().eq_ignore_ascii_case(&email) { return Err(bad("L’adresse tapée ne correspond pas à celle du compte.")) }
+    let plan = crate::manage::deletion_plan(&st.db, id).await?;
+    let names = |v: Vec<String>| if v.is_empty() { "aucun".to_string() } else { v.join(", ") };
+    let detail = format!(
+        "{email} · studios supprimés : {} · transférés : {}",
+        names(plan.delete.iter().map(|d| d.1.clone()).collect()),
+        names(plan.transfer.iter().map(|t| format!("{} à {}", t.1, t.3)).collect()),
+    );
+    crate::manage::remove_account(&st, id, &plan).await?;
+    log(&st, &u, "admin_compte_supprimé", &detail).await;
+    Ok(Json(plan_json(&plan)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::take_digest;
@@ -402,5 +476,124 @@ mod tests {
         assert!(take_digest(&db).await.unwrap().is_empty(), "rien n'est signalé deux fois");
         ask(&db, 99, "-1 minutes").await;
         assert!(take_digest(&db).await.unwrap().is_empty(), "la demande suivante attend le prochain résumé");
+    }
+}
+
+#[cfg(test)]
+mod depannage_tests {
+    use super::*;
+    use crate::{auth::hash_password, error::AppError};
+    use axum::{extract::{Path, State}, http::HeaderMap, Json};
+    use axum_extra::extract::cookie::CookieJar;
+
+    const PW: &str = "Ancien-secret-du-compte-42";
+    const NEW_PW: &str = "Nouveau-secret-tout-neuf-77";
+
+    async fn user(st: &AppState, email: &str, admin: bool) -> AuthUser {
+        let id: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash, is_admin) VALUES (?, ?, ?, ?) RETURNING id")
+            .bind(email).bind(email.split('@').next().unwrap()).bind(hash_password(PW).unwrap()).bind(admin as i64)
+            .fetch_one(&st.db).await.unwrap();
+        let sid = format!("session-{id}");
+        // Session d'admin déverrouillée (mot de passe confirmé il y a moins de 30 minutes).
+        sqlx::query("INSERT INTO sessions (token_hash, user_id, expires_at, sudo_until) VALUES (?, ?, datetime('now', '+1 day'), datetime('now', '+10 minutes'))")
+            .bind(&sid).bind(id).execute(&st.db).await.unwrap();
+        AuthUser { id, email: email.into(), name: email.into(), sid }
+    }
+    async fn login(st: &AppState, email: &str, pw: &str) -> Result<Value, AppError> {
+        let b = serde_json::from_value(json!({ "email": email, "password": pw })).unwrap();
+        crate::auth::login(State(st.clone()), crate::security::ClientIp("203.0.113.9".into()), HeaderMap::new(), CookieJar::new(), Json(b)).await.map(|(_, Json(v))| v)
+    }
+    async fn audited(st: &AppState, action: &str, by: i64) -> bool {
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM audit_log WHERE action = ? AND user_id = ?").bind(action).bind(by).fetch_one(&st.db).await.unwrap() > 0
+    }
+    /// Les quatre actions de dépannage, sur le compte `id`, par `u`.
+    async fn all(st: &AppState, u: &AuthUser, id: i64) -> Vec<Result<Value, AppError>> {
+        let s = || State(st.clone());
+        vec![
+            user_reset_link(s(), u.clone(), Path(id)).await.map(|j| j.0),
+            unlock_user(s(), u.clone(), Path(id)).await.map(|j| j.0),
+            deletion_preview(s(), u.clone(), Path(id)).await.map(|j| j.0),
+            delete_user(s(), u.clone(), Path(id), Json(DeleteUserIn { confirm: "x@exemple.com".into() })).await.map(|j| j.0),
+        ]
+    }
+
+    #[tokio::test]
+    async fn droits_et_propre_compte() {
+        let st = crate::test_state().await;
+        let admin = user(&st, "admin@exemple.com", true).await;
+        let member = user(&st, "x@exemple.com", false).await;
+        for r in all(&st, &member, admin.id).await { assert!(matches!(r, Err(AppError::Forbidden)), "un non-admin est refusé : {r:?}") }
+        // Admin sans le verrou (confirmation récente expirée).
+        sqlx::query("UPDATE sessions SET sudo_until = NULL WHERE token_hash = ?").bind(&admin.sid).execute(&st.db).await.unwrap();
+        for r in all(&st, &admin, member.id).await { assert!(matches!(r, Err(AppError::Guard("sudo", _))), "le verrou admin est exigé : {r:?}") }
+        sqlx::query("UPDATE sessions SET sudo_until = datetime('now', '+10 minutes') WHERE token_hash = ?").bind(&admin.sid).execute(&st.db).await.unwrap();
+        for r in all(&st, &admin, admin.id).await { assert!(matches!(r, Err(AppError::BadRequest(_))), "son propre compte est refusé : {r:?}") }
+        assert!(matches!(unlock_user(State(st.clone()), admin.clone(), Path(9999)).await, Err(AppError::NotFound)));
+        let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users").fetch_one(&st.db).await.unwrap();
+        assert_eq!(n, 2, "rien n'a été supprimé");
+    }
+
+    #[tokio::test]
+    async fn lien_de_nouveau_mot_de_passe_hors_studio_et_blocage_leve() {
+        let st = crate::test_state().await;
+        let admin = user(&st, "admin@exemple.com", true).await;
+        let m = user(&st, "membre@exemple.com", false).await;
+        // Le membre est dans un studio dont l'admin ne fait pas partie, et il est bloqué.
+        sqlx::query("INSERT INTO studios (id, name) VALUES (1, 'Studio du membre')").execute(&st.db).await.unwrap();
+        sqlx::query("INSERT INTO memberships (studio_id, user_id, role) VALUES (1, ?, 'owner')").bind(m.id).execute(&st.db).await.unwrap();
+        sqlx::query("UPDATE users SET locked_until = datetime('now', '+15 minutes') WHERE id = ?").bind(m.id).execute(&st.db).await.unwrap();
+        assert!(matches!(login(&st, "membre@exemple.com", PW).await, Err(AppError::Conflict(_))), "compte bloqué");
+        let r = user_reset_link(State(st.clone()), admin.clone(), Path(m.id)).await.unwrap().0;
+        let link = r["link"].as_str().unwrap();
+        assert!(link.contains("/reinitialiser/"));
+        assert!(audited(&st, "admin_lien_mot_de_passe", admin.id).await);
+        let token = link.rsplit('/').next().unwrap();
+        let b = serde_json::from_value(json!({ "token": token, "password": NEW_PW })).unwrap();
+        let _ = crate::account::reset(State(st.clone()), Json(b)).await.unwrap();
+        // Le blocage est levé : connexion immédiate avec le nouveau mot de passe.
+        login(&st, "membre@exemple.com", NEW_PW).await.unwrap();
+        // Le lien ne sert qu'une fois.
+        let b = serde_json::from_value(json!({ "token": token, "password": "Encore-un-autre-secret-88" })).unwrap();
+        assert!(crate::account::reset(State(st.clone()), Json(b)).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn debloquer_apres_cinq_essais() {
+        let st = crate::test_state().await;
+        let admin = user(&st, "admin@exemple.com", true).await;
+        let m = user(&st, "membre@exemple.com", false).await;
+        for _ in 0..5 { let _ = login(&st, "membre@exemple.com", "Mauvais-secret-000").await; }
+        assert!(matches!(login(&st, "membre@exemple.com", PW).await, Err(AppError::Conflict(_))), "bloqué après 5 essais");
+        let list = users(State(st.clone()), admin.clone()).await.unwrap().0;
+        let row = list.as_array().unwrap().iter().find(|r| r["id"] == m.id).unwrap().clone();
+        assert!(row["locked_until"].is_string(), "la liste affiche le blocage");
+        let _ = unlock_user(State(st.clone()), admin.clone(), Path(m.id)).await.unwrap();
+        assert!(audited(&st, "admin_compte_débloqué", admin.id).await);
+        login(&st, "membre@exemple.com", PW).await.unwrap();
+        let list = users(State(st.clone()), admin.clone()).await.unwrap().0;
+        assert!(list.as_array().unwrap().iter().find(|r| r["id"] == m.id).unwrap()["locked_until"].is_null());
+    }
+
+    #[tokio::test]
+    async fn supprimer_un_compte_transfere_ou_supprime_ses_studios() {
+        let st = crate::test_state().await;
+        let admin = user(&st, "admin@exemple.com", true).await;
+        let m = user(&st, "membre@exemple.com", false).await;
+        let other = user(&st, "autre@exemple.com", false).await;
+        sqlx::query("INSERT INTO studios (id, name) VALUES (1, 'Seul'), (2, 'Partagé')").execute(&st.db).await.unwrap();
+        sqlx::query("INSERT INTO memberships (studio_id, user_id, role) VALUES (1, ?, 'owner'), (2, ?, 'owner'), (2, ?, 'member')")
+            .bind(m.id).bind(m.id).bind(other.id).execute(&st.db).await.unwrap();
+        let p = deletion_preview(State(st.clone()), admin.clone(), Path(m.id)).await.unwrap().0;
+        assert_eq!(p["delete"], json!(["Seul"]));
+        assert_eq!(p["transfer"], json!([{ "studio": "Partagé", "to": "autre" }]));
+        let wrong = delete_user(State(st.clone()), admin.clone(), Path(m.id), Json(DeleteUserIn { confirm: "autre@exemple.com".into() })).await;
+        assert!(matches!(wrong, Err(AppError::BadRequest(_))), "adresse à retaper");
+        let _ = delete_user(State(st.clone()), admin.clone(), Path(m.id), Json(DeleteUserIn { confirm: " Membre@Exemple.com ".into() })).await.unwrap();
+        assert!(matches!(login(&st, "membre@exemple.com", PW).await, Err(AppError::BadRequest(_))), "plus de connexion possible");
+        let studios: Vec<String> = sqlx::query_scalar("SELECT name FROM studios ORDER BY id").fetch_all(&st.db).await.unwrap();
+        assert_eq!(studios, vec!["Partagé".to_string()]);
+        let role: String = sqlx::query_scalar("SELECT role FROM memberships WHERE studio_id = 2 AND user_id = ?").bind(other.id).fetch_one(&st.db).await.unwrap();
+        assert_eq!(role, "owner");
+        assert!(audited(&st, "admin_compte_supprimé", admin.id).await);
     }
 }

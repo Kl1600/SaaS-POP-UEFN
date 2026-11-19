@@ -1,10 +1,10 @@
 // Panel administrateur de la plateforme POP : liste d'attente, création des comptes bêta, utilisateurs, vue générale.
 import { useEffect, useState } from 'react'
-import { Check, X, RotateCcw, Trash2, Copy, ShieldCheck, Ban, UserPlus, Lock, KeyRound } from 'lucide-react'
+import { Check, X, RotateCcw, Trash2, Copy, Mail, ShieldCheck, Ban, UserPlus, Lock, KeyRound, Link2, LockOpen } from 'lucide-react'
 import { actionLabel } from '../components/Security'
 import { ago, api, frDate } from '../api'
 import { useApp, useLoad } from '../state'
-import { CardHead, Empty, PageHead } from '../components/ui'
+import { CardHead, Empty, Modal, PageHead } from '../components/ui'
 import { tr, LOCALE } from '../i18n/t'
 
 const n = (v?: number) => (v ?? 0).toLocaleString(LOCALE)
@@ -147,29 +147,75 @@ function CreateAccount() {
   </section>
 }
 
+/** Heure locale d'une date SQLite en UTC (« 2026-11-19 14:05:00 » → « 15:05 »). */
+const hhmm = (d: string) => new Date(d.replace(' ', 'T') + 'Z').toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' })
+
+/** Lien de nouveau mot de passe (2 heures, une seule fois) à transmettre à la personne. */
+function ResetLinkBox({ r, onClose }: { r: { link: string; mailed: boolean; email: string }; onClose: () => void }) {
+  const { toast } = useApp()
+  return <div className="b-callout small" style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
+    <div className="row" style={{ justifyContent: 'space-between', gap: 8 }}>
+      <span>{r.mailed ? <><Mail size={14} style={{ verticalAlign: -2 }} /> {tr("E-mail envoyé à {0}. Le lien est aussi ici (valable 2 heures, une seule fois) :", [r.email])}</> : tr("L’envoi d’e-mails n’est pas configuré : envoyez ce lien à {0} (valable 2 heures, une seule fois).", [r.email])}</span>
+      <button className="iconbtn" aria-label={tr("Fermer")} onClick={onClose}><X size={16} /></button>
+    </div>
+    <div className="row" style={{ gap: 8 }}><input className="field mono" readOnly value={r.link} style={{ flex: 1, height: 34, fontSize: 12.5 }} onFocus={e => e.target.select()} />
+      <button className="btn" style={{ height: 34 }} onClick={() => { navigator.clipboard?.writeText(r.link); toast(tr("Lien copié")) }}><Copy size={14} />{tr("Copier")}</button></div>
+  </div>
+}
+
+/** Suppression d'un compte : ce que deviennent ses studios, puis l'adresse e-mail à retaper. */
+function DeleteUser({ u, onClose, onDone }: { u: any; onClose: () => void; onDone: () => void }) {
+  const { toast } = useApp()
+  const { data: plan } = useLoad<any>(`/api/admin/users/${u.id}/deletion`)
+  const [confirm, setConfirm] = useState('')
+  const ok = confirm.trim().toLowerCase() === u.email.toLowerCase()
+  return <Modal onClose={onClose} label={tr("Supprimer le compte de {0}", [u.name])}>
+    <div className="row" style={{ justifyContent: 'space-between' }}><h2 style={{ margin: 0, fontWeight: 500, fontSize: 20 }}>{tr("Supprimer le compte de {0}", [u.name])}</h2><button className="iconbtn" aria-label={tr("Fermer")} onClick={onClose}><X size={18} /></button></div>
+    <p className="small" style={{ margin: '12px 0' }}>{tr("La suppression est définitive : la personne est déconnectée et ne pourra plus se connecter avec {0}.", [u.email])}</p>
+    {plan && <div className="b-callout small" style={{ display: 'grid', gap: 6 }}>
+      {plan.delete.length === 0 && plan.transfer.length === 0 && <span>{tr("Ce compte n’est propriétaire d’aucun studio.")}</span>}
+      {plan.delete.length > 0 && <span>{tr("Studios supprimés avec le compte (aucun autre membre) : {0}", [plan.delete.join(', ')])}</span>}
+      {plan.transfer.map((t: any) => <span key={t.studio}>{tr("Le studio {0} est transféré à {1}, qui en devient propriétaire.", [t.studio, t.to])}</span>)}
+    </div>}
+    <form className="stack" style={{ marginTop: 14 }} onSubmit={async e => { e.preventDefault(); if (!ok) return; try { await api.del(`/api/admin/users/${u.id}`, { confirm }); toast(tr("Compte supprimé")); onDone() } catch (er: any) { toast(er.message, true) } }}>
+      <label className="label">{tr("Tapez l’adresse e-mail du compte pour confirmer")}<input className="field" autoFocus autoComplete="off" placeholder={u.email} value={confirm} onChange={e => setConfirm(e.target.value)} /></label>
+      <button className="btn danger" disabled={!ok || !plan}><Trash2 size={15} />{tr("Supprimer définitivement")}</button>
+    </form>
+  </Modal>
+}
+
 function Users() {
   const { toast } = useApp()
   const { data, reload } = useLoad<any[]>('/api/admin/users')
   const [q, setQ] = useState('')
   const [cred, setCred] = useState<Cred | null>(null)
+  const [link, setLink] = useState<any>(null)
+  const [del, setDel] = useState<any>(null)
+  const run = async (fn: () => Promise<any>, msg: string) => { try { await fn(); toast(msg); reload() } catch (e: any) { toast(e.message, true) } }
   const set = async (id: number, patch: any, msg: string) => { try { await api.post(`/api/admin/users/${id}`, patch); toast(msg); reload() } catch (e: any) { toast(e.message, true) } }
   const list = (data ?? []).filter(u => !q || (u.name + ' ' + u.email + ' ' + (u.username ?? '')).toLowerCase().includes(q.toLowerCase()))
   return <section className="card">
     <CardHead title={tr("Utilisateurs")} sub={data ? `${data.length} comptes` : ''}><input className="field" style={{ height: 34, width: 220 }} placeholder={tr("Chercher")} value={q} onChange={e => setQ(e.target.value)} /></CardHead>
     {cred && <CredBox c={cred} onClose={() => setCred(null)} />}
+    {link && <ResetLinkBox r={link} onClose={() => setLink(null)} />}
     <div style={{ overflowX: 'auto' }}><table className="tbl"><thead><tr><th>{tr("Nom")}</th><th>{tr("Identifiant")}</th><th>E-mail</th><th>{tr("Inscrit")}</th><th>Vu</th><th>{tr("Studios")}</th><th>{tr("Tâches faites")}</th><th>{tr("Plan")}</th><th>{tr("Rôle")}</th><th /></tr></thead>
       <tbody>{list.map(u => <tr key={u.id} style={{ opacity: u.disabled ? 0.5 : 1 }}>
         <td><b style={{ fontWeight: 500 }}>{u.name}</b>{u.me && <span className="small muted"> {tr("(vous)")}</span>}{u.must_change && <span className="badge b-o" style={{ marginLeft: 6 }} title={tr("N’a pas encore choisi son mot de passe")}>{tr("Mot de passe provisoire")}</span>}</td><td className="small mono">{u.username ?? '—'}</td><td className="small">{u.email}</td>
         <td className="small muted">{frDate(u.created_at)}</td><td className="small muted">{u.last_seen ? ago(u.last_seen) : '—'}</td>
         <td>{u.studios}</td><td>{u.tasks_done}</td>
         <td><PlanSelect value={u.plan ?? 'starter'} onChange={async e => { try { await api.post(`/api/admin/users/${u.id}/plan`, { plan: e.target.value }); toast(tr("Plan mis à jour")); reload() } catch (er: any) { toast(er.message, true) } }} /></td>
-        <td>{u.disabled ? <span className="badge b-r">{tr("Désactivé")}</span> : u.is_admin ? <span className="badge b-v">{tr("Admin")}</span> : <span className="badge">{tr("Utilisateur")}</span>}</td>
+        <td><div className="row" style={{ gap: 4, flexWrap: 'wrap' }}>{u.disabled ? <span className="badge b-r">{tr("Désactivé")}</span> : u.is_admin ? <span className="badge b-v">{tr("Admin")}</span> : <span className="badge">{tr("Utilisateur")}</span>}
+          {u.locked_until && <span className="badge b-o" title={tr("Trop de mots de passe faux")}>{tr("Bloqué jusqu’à {0}", [hhmm(u.locked_until)])}</span>}</div></td>
         <td>{!u.me && <div className="row" style={{ gap: 4, justifyContent: 'flex-end' }}>
+          {u.locked_until && <button className="iconbtn" title={tr("Débloquer")} aria-label={tr("Débloquer")} onClick={() => run(() => api.post(`/api/admin/users/${u.id}/unlock`), tr("Compte débloqué"))}><LockOpen size={16} /></button>}
+          <button className="iconbtn" title={tr("Lien de nouveau mot de passe")} aria-label={tr("Lien de nouveau mot de passe")} onClick={async () => { try { const r = await api.post(`/api/admin/users/${u.id}/reset-link`); setLink(r); toast(r.mailed ? tr("Lien envoyé par e-mail") : tr("Lien créé : copiez-le")) } catch (e: any) { toast(e.message, true) } }}><Link2 size={16} /></button>
           <button className="iconbtn" title={tr("Nouveau mot de passe provisoire")} aria-label={tr("Réinitialiser le mot de passe")} onClick={async () => { if (!confirm(tr("Donner un nouveau mot de passe provisoire à {0} ? Son mot de passe actuel ne marchera plus et il sera déconnecté.", [u.name]))) return; try { const r = await api.post(`/api/admin/users/${u.id}/password`); setCred({ ...r, name: u.name }); reload() } catch (e: any) { toast(e.message, true) } }}><KeyRound size={16} /></button>
           <button className="iconbtn" title={u.is_admin ? tr("Retirer les droits admin") : tr("Rendre admin")} aria-label={tr("Droits admin")} onClick={() => { if (confirm(u.is_admin ? tr("Retirer les droits admin de {0} ?", [u.name]) : tr("Donner les droits admin à {0} ? Il pourra gérer la liste d’attente et les comptes.", [u.name]))) set(u.id, { is_admin: !u.is_admin }, tr("Droits mis à jour")) }}><ShieldCheck size={16} /></button>
           <button className="iconbtn" title={u.disabled ? tr("Réactiver") : tr("Désactiver le compte")} aria-label={tr("Désactiver")} onClick={() => { if (confirm(u.disabled ? tr("Réactiver le compte de {0} ?", [u.name]) : tr("Désactiver le compte de {0} ? Il sera déconnecté et ne pourra plus se connecter.", [u.name]))) set(u.id, { disabled: !u.disabled }, u.disabled ? tr("Compte réactivé") : tr("Compte désactivé")) }}><Ban size={16} /></button>
+          <button className="iconbtn" title={tr("Supprimer le compte")} aria-label={tr("Supprimer le compte")} onClick={() => setDel(u)}><Trash2 size={16} /></button>
         </div>}</td>
       </tr>)}</tbody></table></div>
+    {del && <DeleteUser u={del} onClose={() => setDel(null)} onDone={() => { setDel(null); reload() }} />}
   </section>
 }
 
@@ -178,7 +224,7 @@ function Audit() {
   return <section className="card"><CardHead title={tr("Journal de sécurité")} sub={tr("Connexions, échecs, blocages et actions d’administration (300 derniers événements).")} />
     {!data ? null : data.length === 0 ? <Empty text={tr("Rien pour l’instant.")} /> :
       <div style={{ overflowX: 'auto' }}><table className="tbl"><thead><tr><th>{tr("Quand")}</th><th>{tr("Qui")}</th><th>{tr("Événement")}</th><th>{tr("Détail")}</th><th>{tr("Adresse IP")}</th></tr></thead>
-        <tbody>{data.map((e, i) => <tr key={i}><td className="small muted">{ago(e.at)}</td><td>{e.who ?? '—'}</td><td className={/échou|faux|bloqué|refus/.test(e.action) ? 'err' : ''}>{actionLabel(e.action)}</td><td className="small">{e.detail}</td><td className="small mono">{e.ip || '—'}</td></tr>)}</tbody></table></div>}
+        <tbody>{data.map((e, i) => <tr key={i}><td className="small muted">{ago(e.at)}</td><td>{e.who ?? '—'}</td><td className={/échou|faux|(?<!dé)bloqué|refus/.test(e.action) ? 'err' : ''}>{actionLabel(e.action)}</td><td className="small">{e.detail}</td><td className="small mono">{e.ip || '—'}</td></tr>)}</tbody></table></div>}
   </section>
 }
 
