@@ -18,10 +18,13 @@
 Statuts (étiquettes) : à faire = ouverte sans étiquette de statut ; « en cours » ; « en revue » ;
 « bloqué » en plus d'« en cours » ; fait = fermée par la fusion de sa PR.
 Dépendances : le lien natif « Blocked by » de GitHub. Il faut Python 3.9+ et gh connecté.
+Seulement l'API REST de GitHub (gh api …), jamais GraphQL (gh pr …, gh repo view) : les sessions Claude Code
+n'ont accès qu'à REST. Le dépôt se lit dans la variable GH_REPO, sinon dans l'adresse du remote origin.
 Si gh ou git échoue, rien n'est marqué : on ne dit pas que c'est fait (AGENTS.md, règle 0).
 """
 import argparse
 import json
+import os
 import pathlib
 import re
 import secrets
@@ -109,9 +112,28 @@ _cache = {}
 
 
 def repo():
+    """propriétaire/dépôt, sans GraphQL : GH_REPO, sinon l'adresse du remote origin (https, ssh ou proxy)."""
     if "repo" not in _cache:
-        _cache["repo"] = gh("repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner")
+        source = os.environ.get("GH_REPO", "").strip() or git("remote", "get-url", "origin")
+        found = re.search(r"([^/:]+)/([^/:]+?)(?:\.git)?/?$", source)
+        if not found:
+            raise Refused(f"impossible de lire le dépôt dans « {source} » : définissez GH_REPO=propriétaire/dépôt")
+        _cache["repo"] = f"{found.group(1)}/{found.group(2)}"
     return _cache["repo"]
+
+
+def all_prs(limit=300):
+    """Les PR du dépôt, les plus récentes d'abord, au format de « gh pr list » (state OPEN, MERGED ou CLOSED)."""
+    prs = []
+    for page in range(1, limit // 100 + 1):
+        rows = api(f"repos/{repo()}/pulls?state=all&sort=created&direction=desc&per_page=100&page={page}") or []
+        for p in rows:
+            prs.append({"number": p["number"], "url": p["html_url"], "title": p["title"],
+                        "state": "MERGED" if p.get("merged_at") else p["state"].upper(),
+                        "headRefName": p["head"]["ref"], "headSha": p["head"]["sha"], "isDraft": p.get("draft", False)})
+        if len(rows) < 100:
+            break
+    return prs
 
 
 def me():
@@ -216,9 +238,7 @@ def issue_branch(number):
 
 def pr_for(number):
     """PR ouverte (ou fusionnée) dont la branche est issue/N-…"""
-    prs = gh("pr", "list", "--repo", repo(), "--state", "all", "--limit", "300",
-             "--json", "number,url,state,headRefName,isDraft")
-    prs = [p for p in prs or [] if p["headRefName"].startswith(f"issue/{number}-")]
+    prs = [p for p in all_prs() if p["headRefName"].startswith(f"issue/{number}-")]
     prs.sort(key=lambda p: (p["state"] != "OPEN", -p["number"]))
     return prs[0] if prs else None
 
@@ -446,9 +466,9 @@ def cmd_review(a):
         body += f"\n## Branche plus grosse que la limite\n{too_big}.\nRaison : {a.gros}\n"
     pr = pr_for(n)
     if pr and pr["state"] == "OPEN":
-        gh("pr", "edit", str(pr["number"]), "--repo", repo(), "--body", body)
+        api(f"repos/{repo()}/pulls/{pr['number']}", "PATCH", {"body": body})
     else:
-        gh("pr", "create", "--repo", repo(), "--base", "main", "--head", branch, "--title", f"#{n} : {i['title']}", "--body", body)
+        api(f"repos/{repo()}/pulls", "POST", {"base": "main", "head": branch, "title": f"#{n} : {i['title']}", "body": body})
         pr = pr_for(n)
     remove_label(n, DOING)
     remove_label(n, BLOCKED)
@@ -472,14 +492,32 @@ def cmd_rework(a):
 
 
 def pr_checks(pr_number):
-    """(bons, en attente, en échec) des contrôles CI de la PR."""
-    rows = gh("pr", "checks", str(pr_number), "--repo", repo(), "--json", "name,bucket", check=False)
-    if not isinstance(rows, list):
-        return [], [], []
-    good = [r["name"] for r in rows if r["bucket"] in ("pass", "skipping")]
-    waiting = [r["name"] for r in rows if r["bucket"] == "pending"]
-    bad = [r["name"] for r in rows if r["bucket"] in ("fail", "cancel")]
+    """(bons, en attente, en échec) des contrôles CI du dernier commit de la PR (check-runs et statuts, en REST)."""
+    sha = api(f"repos/{repo()}/pulls/{pr_number}")["head"]["sha"]
+    runs = api(f"repos/{repo()}/commits/{sha}/check-runs?per_page=100").get("check_runs", [])
+    latest = {}
+    for r in runs:   # un contrôle relancé apparaît plusieurs fois : on garde le plus récent
+        if r["name"] not in latest or r["id"] > latest[r["name"]]["id"]:
+            latest[r["name"]] = r
+    good, waiting, bad = [], [], []
+    for name, r in latest.items():
+        if r["status"] != "completed":
+            waiting.append(name)
+        elif r["conclusion"] in ("success", "skipped", "neutral"):
+            good.append(name)
+        else:   # failure, cancelled, timed_out, action_required, stale
+            bad.append(name)
+    for s in api(f"repos/{repo()}/commits/{sha}/status").get("statuses", []):
+        {"success": good, "pending": waiting}.get(s["state"], bad).append(s["context"])
     return good, waiting, bad
+
+
+def merge_pr(pr):
+    """Fusion en squash de la PR (titre « … (#N) » comme sur le site), puis suppression de sa branche distante.
+    `sha` : GitHub refuse si la branche a bougé depuis la vérification du CI."""
+    api(f"repos/{repo()}/pulls/{pr['number']}/merge", "PUT",
+        {"merge_method": "squash", "commit_title": f"{pr['title']} (#{pr['number']})", "sha": pr["headSha"]})
+    gh("api", "-X", "DELETE", f"repos/{repo()}/git/refs/heads/{urllib.parse.quote(pr['headRefName'])}", check=False)
 
 
 def close_issue(n):
@@ -521,7 +559,7 @@ def cmd_done(a):
     if not good:
         raise Refused("aucun contrôle CI sur la PR : attendez que le CI démarre")
     comment(n, f"{VALIDATED_PREFIX} {a.valide_par}" + (f"\nNote : {a.note}" if a.note else ""))
-    gh("pr", "merge", str(pr["number"]), "--repo", repo(), "--squash", "--delete-branch")
+    merge_pr(pr)
     for label in STATUS_LABELS:
         remove_label(n, label)
     close_issue(n)
@@ -536,7 +574,10 @@ def cmd_done(a):
         else:
             git("switch", "main")
             git("pull", "--ff-only", "-q")
+            git("branch", "-D", branch, check=False)
             print("retour sur main à jour")
+    elif git("rev-parse", "--verify", "-q", f"refs/heads/{branch}", check=False):
+        git("branch", "-D", branch, check=False)   # échoue sans gêne si un autre worktree l'a ouverte
     return 0
 
 
@@ -602,8 +643,7 @@ def cmd_check(a):
 def branch_problems():
     """Branches distantes hors règle (AGENTS.md §4.5)."""
     git("fetch", "-q", "--prune", "origin")
-    prs = gh("pr", "list", "--repo", repo(), "--state", "all", "--limit", "300",
-             "--json", "headRefName,state") or []
+    prs = all_prs()
     open_heads = {p["headRefName"] for p in prs if p["state"] == "OPEN"}
     merged_heads = {p["headRefName"] for p in prs if p["state"] == "MERGED"}
     problems = []
