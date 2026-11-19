@@ -6,14 +6,14 @@
     python tools/task.py show 12                     une tâche, ses dépendances, sa PR
     python tools/task.py start 12 --who "Claude Code, pour Yassine"
                                                      prend la tâche et crée la branche issue/12-…
-    python tools/task.py review 12 --note "..." --plan "1. ... 2. ..."
+    python tools/task.py review 12 --note "..." --plan "1. ... 2. ..." [--gros "raison"]
                                                      pousse la branche, ouvre la PR, passe « en revue »
     python tools/task.py rework 12 --note "..."      la validation humaine a échoué : retour « en cours »
     python tools/task.py done 12 --valide-par "Yassine : ce qu'il a vérifié"
                                                      après la validation humaine et un CI vert : fusionne la PR
     python tools/task.py block 12 --raison "..."     dit pourquoi une tâche commencée est coincée
     python tools/task.py release 12 --note "..."     rend la tâche (fait, reste, branche)
-    python tools/task.py check                       audit du tableau (code de sortie 1 s'il y a un problème)
+    python tools/task.py check                       audit du tableau et des branches (code 1 s'il y a un problème)
 
 Statuts (étiquettes) : à faire = ouverte sans étiquette de statut ; « en cours » ; « en revue » ;
 « bloqué » en plus d'« en cours » ; fait = fermée par la fusion de sa PR.
@@ -45,6 +45,12 @@ STALE_HOURS = 48
 # Étiquettes et jalons que l'outil suppose (créés une fois, voir KB/README.md).
 REQUIRED_LABELS = list(STATUS_LABELS) + [PRIORITY_PREFIX + p for p in PRIORITIES]
 NETWORK_ERRORS = ("dial tcp", "connectex", "i/o timeout", "connection reset", "TLS handshake")
+# Branches (AGENTS.md §4.5) : petites, courtes, à jour, bien nommées.
+BRANCH_RE = re.compile(r"^(issue/[0-9]+-[a-z0-9-]+|outillage/[a-z0-9][a-z0-9-]*)$")
+MAX_LINES, MAX_FILES, MAX_BRANCH_DAYS, MAX_BEHIND = 500, 20, 2, 10
+# Fichiers générés, hors du compte de taille d'une branche.
+GENERATED = (":!web/dist", ":!web/public/downloads", ":!*.lock", ":!*package-lock.json", ":!*.tsbuildinfo")
+HOOKS_DIR = "tools/hooks"
 
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -254,6 +260,51 @@ def unpushed(branch):
     return int(git("rev-list", "--count", f"origin/{branch}..{branch}") or 0)
 
 
+def branch_size(ref):
+    """(lignes changées, fichiers changés) de la branche par rapport à main, hors fichiers générés."""
+    base = git("merge-base", "origin/main", ref)
+    out = git("diff", "--numstat", base, ref, "--", ".", *GENERATED)
+    lines = files = 0
+    for row in out.splitlines():
+        added, removed, _ = row.split("\t", 2)
+        files += 1
+        lines += (int(added) if added.isdigit() else 0) + (int(removed) if removed.isdigit() else 0)
+    return lines, files
+
+
+def branch_behind(ref):
+    return int(git("rev-list", "--count", f"{ref}..origin/main") or 0)
+
+
+def branch_age_days(ref):
+    """Jours depuis le premier commit de la branche qui n'est pas dans main (0 si aucun)."""
+    first = git("log", "--reverse", "--format=%ct", f"origin/main..{ref}").splitlines()
+    if not first:
+        return 0
+    return (time.time() - int(first[0])) / 86400
+
+
+def size_problem(lines, files):
+    if lines > MAX_LINES or files > MAX_FILES:
+        return (f"{lines} lignes et {files} fichiers changés (limite {MAX_LINES} lignes, {MAX_FILES} fichiers, "
+                "hors fichiers générés)")
+    return None
+
+
+def ensure_hooks():
+    """Active le hook pre-push du dépôt ; renvoie un problème, ou None."""
+    if not (ROOT / HOOKS_DIR / "pre-push").exists():
+        return f"{HOOKS_DIR}/pre-push est absent : git pull --rebase sur main"
+    current = git("config", "--get", "core.hooksPath", check=False)
+    if current == HOOKS_DIR:
+        return None
+    if current:
+        return f"core.hooksPath vaut déjà « {current} » : le hook pre-push de POP n'est pas actif (demandez à votre humain)"
+    git("config", "core.hooksPath", HOOKS_DIR)
+    print(f"hook pre-push activé (git config core.hooksPath {HOOKS_DIR})")
+    return None
+
+
 # ---------------------------------------------------------------- commandes
 
 def cmd_whoami(a):
@@ -270,6 +321,9 @@ def cmd_whoami(a):
     print("jalons ouverts : " + (", ".join(milestones) or "aucun"))
     if not milestones:
         problems.append("aucun jalon ouvert")
+    hook = ensure_hooks()
+    if hook:
+        problems.append(hook)
     if problems:
         for p in problems:
             print("MANQUE : " + p)
@@ -367,10 +421,22 @@ def cmd_review(a):
     if not branch.startswith(f"issue/{n}-"):
         raise Refused(f"vous êtes sur « {branch} », pas sur la branche de #{n} (issue/{n}-…)")
     require_clean_tree()
+    git("fetch", "-q", "origin")
     if not int(git("rev-list", "--count", f"origin/main..{branch}") or 0):
         raise Refused(f"la branche {branch} n'a aucun commit par rapport à main")
-    git("push", "-u", "origin", branch)
+    behind = branch_behind(branch)
+    if behind:
+        raise Refused(f"la branche {branch} a {behind} commit(s) de retard sur main : "
+                      "git rebase origin/main, recompilez et retestez, puis relancez « review » (AGENTS.md §4.5)")
+    too_big = size_problem(*branch_size(branch))
+    if too_big and not (a.gros or "").strip():
+        raise Refused(f"branche trop grosse : {too_big}. Proposez à votre humain de couper la tâche ; s'il accepte "
+                      "de la garder entière, relancez avec --gros \"raison\" (AGENTS.md §4.5)")
+    # Après un rebase, la branche distante a l'ancien historique : on la remplace, sans écraser le travail d'un autre.
+    git("push", "--force-with-lease", "-u", "origin", branch)
     body = f"Closes #{n}\n\n## Ce qui a été fait\n{a.note}\n\n## Plan de test manuel\n{a.plan}\n"
+    if too_big:
+        body += f"\n## Branche plus grosse que la limite\n{too_big}.\nRaison : {a.gros}\n"
     pr = pr_for(n)
     if pr and pr["state"] == "OPEN":
         gh("pr", "edit", str(pr["number"]), "--repo", repo(), "--body", body)
@@ -512,10 +578,42 @@ def cmd_check(a):
     for i in all_issues("closed")[:100]:
         if labels_of(i) & set(STATUS_LABELS):
             problems.append(f"#{i['number']} fermée mais garde une étiquette de statut")
+    problems += branch_problems()
     for p in problems:
         print("PROBLÈME : " + p)
     print("tableau cohérent" if not problems else f"{len(problems)} problème(s) : prévenez votre humain (AGENTS.md §6)")
     return 1 if problems else 0
+
+
+def branch_problems():
+    """Branches distantes hors règle (AGENTS.md §4.5)."""
+    git("fetch", "-q", "--prune", "origin")
+    prs = gh("pr", "list", "--repo", repo(), "--state", "all", "--limit", "300",
+             "--json", "headRefName,state") or []
+    open_heads = {p["headRefName"] for p in prs if p["state"] == "OPEN"}
+    merged_heads = {p["headRefName"] for p in prs if p["state"] == "MERGED"}
+    problems = []
+    for ref in git("for-each-ref", "--format=%(refname:short)", "refs/remotes/origin").splitlines():
+        name = ref.removeprefix("origin/")
+        if name in ("HEAD", "main", "origin") or ref == "origin":
+            continue
+        who = git("log", "-1", "--format=%an", ref)
+        ahead = int(git("rev-list", "--count", f"origin/main..{ref}") or 0)
+        if not ahead or (name in merged_heads and name not in open_heads):
+            problems.append(f"branche {name} ({who}) déjà fusionnée : à supprimer par son auteur")
+            continue
+        if not BRANCH_RE.match(name):
+            problems.append(f"branche {name} ({who}) : nom hors règle (issue/N-… ou outillage/…)")
+        age = branch_age_days(ref)
+        if age > MAX_BRANCH_DAYS:
+            problems.append(f"branche {name} ({who}) ouverte depuis {age:.0f} jours (limite {MAX_BRANCH_DAYS})")
+        behind = branch_behind(ref)
+        if behind > MAX_BEHIND:
+            problems.append(f"branche {name} ({who}) en retard de {behind} commits sur main : git rebase origin/main")
+        too_big = size_problem(*branch_size(ref))
+        if too_big:
+            problems.append(f"branche {name} ({who}) trop grosse : {too_big}")
+    return problems
 
 
 def main():
@@ -530,6 +628,7 @@ def main():
     x.set_defaults(fn=cmd_start)
     x = s.add_parser("review"); x.add_argument("number", type=int); x.add_argument("--note", required=True)
     x.add_argument("--plan", required=True, help="plan de test manuel, une étape numérotée par critère")
+    x.add_argument("--gros", help="raison, acceptée par l'humain, de dépasser la taille limite d'une branche")
     x.set_defaults(fn=cmd_review)
     x = s.add_parser("rework"); x.add_argument("number", type=int); x.add_argument("--note", required=True); x.set_defaults(fn=cmd_rework)
     x = s.add_parser("done"); x.add_argument("number", type=int); x.add_argument("--valide-par", required=True)

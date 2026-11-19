@@ -1,0 +1,55 @@
+# Rien n'arrive sur main sans PR (AGENTS.md §4.5). Le dépôt est privé sans GitHub Pro : GitHub ne peut pas
+# protéger main, donc on vérifie après coup. Chaque commit poussé sur main doit venir d'une PR fusionnée ;
+# sinon cette action échoue et ouvre une issue d'alerte (sans jalon ni priorité : « task.py check » la signale
+# tant qu'un humain ne l'a pas traitée).
+name: garde de main
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: write
+
+jobs:
+  verifier:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const { before, after, pusher, forced } = context.payload;
+            const commits = context.payload.commits || [];
+            const direct = [];
+            for (const c of commits) {
+              const prs = await github.request('GET /repos/{owner}/{repo}/commits/{commit_sha}/pulls',
+                { owner, repo, commit_sha: c.id });
+              if (!prs.data.some(p => p.merged_at && p.base.ref === 'main')) direct.push(c);
+            }
+            if (!direct.length && !forced) {
+              core.info(`${commits.length} commit(s), tous issus d'une PR fusionnée`);
+              return;
+            }
+            const cmp = before && !/^0+$/.test(before)
+              ? await github.rest.repos.compareCommitsWithBasehead({ owner, repo, basehead: `${before}...${after}` })
+              : null;
+            const files = cmp ? (cmp.data.files || []).length : '?';
+            const list = direct.slice(0, 30)
+              .map(c => `- \`${c.id.slice(0, 7)}\` ${c.author.name} : ${c.message.split('\n')[0]}`).join('\n');
+            const body = [
+              `Push sur \`main\` par **${pusher.name}**${forced ? ' **en force** (historique réécrit)' : ''}, sans passer par une PR.`,
+              '',
+              `Commits hors PR : ${direct.length}${direct.length > 30 ? ' (30 premiers)' : ''} · fichiers touchés par le push : ${files}`,
+              list,
+              '',
+              `Comparer : https://github.com/${owner}/${repo}/compare/${before.slice(0, 12)}...${after.slice(0, 12)}`,
+              '',
+              'Règle : AGENTS.md §4.5, rien n\'arrive sur main sans PR. À faire par un humain : relire ces commits, '
+                + 'décider s\'ils restent, rattacher le travail à des issues, puis fermer cette alerte en « Not planned ».',
+            ].join('\n');
+            const issue = await github.rest.issues.create({
+              owner, repo, title: `⚠️ Push direct sur main (${after.slice(0, 7)}, ${pusher.name})`, body });
+            core.setFailed(`push direct sur main : ${direct.length} commit(s) hors PR, alerte #${issue.data.number}`);
