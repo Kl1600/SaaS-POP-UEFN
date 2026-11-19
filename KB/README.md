@@ -37,3 +37,4 @@ en FAIT. Au-delà de 15 entrées, déplacez vos FAIT les plus anciens dans `ARCH
 
 Les étiquettes et les jalons que `tools/task.py` suppose ont été créés le 17/11/2026. `python tools/task.py whoami`
 dit ce qui manque, s'il manque quelque chose.
+
