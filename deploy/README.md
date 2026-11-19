@@ -20,6 +20,21 @@ le CPX02 (1 Go + 2 Go de swap) suffit pour la bêta. Passer au CPX12 (2 Go) depu
 | `deployer.sh` | met POP à jour sur le serveur (lancé par l'action GitHub « déployer » ou à la main) |
 | `activer-deploiement.sh` | autorise la clé de GitHub à lancer `deployer.sh`, et rien d'autre |
 
+## Le serveur en ligne aujourd'hui
+
+À tenir à jour à chaque changement de serveur ou de domaine (les agents lisent ici, pas leur mémoire locale).
+
+| Quoi | Valeur |
+|---|---|
+| Adresse du site | **https://2-29-177-96.sslip.io** (pas encore de vrai domaine) |
+| Serveur | Hetzner CPX02 `pop-prod`, IP `2.29.177.96`, en ligne depuis le 19/11/2026 |
+| Fichiers | `/opt/pop` (`.env`, `docker-compose.yml`) |
+| Connexion SSH | `ssh pop-admin@2.29.177.96` (connexion `root` refusée) |
+| Administrateurs | adresses de `POP_ADMIN_EMAILS` dans `/opt/pop/.env` |
+| Journal des connexions | site → Administration → Journal de sécurité (mot de passe redemandé, valable 30 min) |
+
+Le jeton GitHub `pop-serveur` (lecture de l'image) expire le 16/02/2027 : après, `docker compose pull` échoue.
+
 ## 1. Avant de commencer
 
 1. **Le serveur** : Hetzner Cloud, CPX02, Ubuntu 24.04, **avec votre clé SSH**, option Backups conseillée.
