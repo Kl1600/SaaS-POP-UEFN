@@ -31,6 +31,7 @@ mod pages;
 mod plan;
 mod studio;
 mod tasks;
+mod verify;
 mod ws;
 
 use axum::{
@@ -237,6 +238,8 @@ fn api() -> Router<AppState> {
         .route("/api/maps/{mid}/overview", get(plan::overview))
         .route("/api/waitlist", post(admin::join))
         .route("/api/waitlist/access", get(admin::check_access))
+        .route("/api/auth/verify-email", post(verify::verify))
+        .route("/api/me/verify-email/resend", post(verify::resend))
         .route("/api/me/security", get(security::overview))
         .route("/api/me/first-password", post(account::first_password))
         .route("/api/me/sessions/{id}", delete(security::revoke_session))
@@ -364,6 +367,10 @@ async fn admin_cli(db: &sqlx::SqlitePool, args: &[String]) -> anyhow::Result<()>
                 .execute(db)
                 .await?;
             println!("{email} {} administrateur de la plateforme.", if flag == 1 { "est maintenant" } else { "n'est plus" });
+            let verified: Option<String> = sqlx::query_scalar("SELECT email_verified_at FROM users WHERE email = ?").bind(&email).fetch_one(db).await?;
+            if flag == 1 && verified.is_none() {
+                println!("Attention : ce compte n'a pas encore confirmé son adresse e-mail. Il aura les droits d'administration après avoir ouvert le lien reçu.");
+            }
             if flag == 1 {
                 println!("Pour ouvrir l'administration, ce compte doit activer la double authentification (Paramètres → Sécurité).");
             }
@@ -418,7 +425,7 @@ async fn main() -> anyhow::Result<()> {
             let h = auth::hash_password("kl").map_err(|e| anyhow::anyhow!("{e:?}"))?;
             sqlx::query("INSERT INTO users (email, name, password_hash, is_admin, plan) VALUES ('kl', 'KL', ?, 1, 'pro')").bind(h).execute(&st.db).await?;
         }
-        sqlx::query("UPDATE users SET is_admin = 1 WHERE email = 'kl'").execute(&st.db).await?;
+        sqlx::query("UPDATE users SET is_admin = 1, email_verified_at = COALESCE(email_verified_at, datetime('now')) WHERE email = 'kl'").execute(&st.db).await?;
         println!("Compte de test : identifiant « kl », mot de passe « kl »");
     }
     tokio::spawn(integrations::scheduler(st.clone()));

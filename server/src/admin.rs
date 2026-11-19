@@ -13,9 +13,12 @@ use axum::{
 use serde::Deserialize;
 use serde_json::{json, Value};
 
+/// Administrateur de la plateforme : nommé (`is_admin`) ou listé dans POP_ADMIN_EMAILS, et **adresse vérifiée** (#11) :
+/// sans cela, n'importe qui pourrait s'inscrire avec l'adresse d'un administrateur.
 pub async fn is_admin(st: &AppState, uid: i64) -> Result<bool, AppError> {
-    let a: Option<(i64, String)> = sqlx::query_as("SELECT is_admin, email FROM users WHERE id = ?").bind(uid).fetch_optional(&st.db).await?;
-    let Some((flag, email)) = a else { return Ok(false) };
+    let a: Option<(i64, String, i64)> = sqlx::query_as("SELECT is_admin, email, email_verified_at IS NOT NULL FROM users WHERE id = ?").bind(uid).fetch_optional(&st.db).await?;
+    let Some((flag, email, verified)) = a else { return Ok(false) };
+    if verified == 0 { return Ok(false) }
     let env = std::env::var("POP_ADMIN_EMAILS").unwrap_or_default();
     Ok(flag == 1 || env.split(',').map(|e| e.trim().to_lowercase()).any(|e| !e.is_empty() && e == email.to_lowercase()))
 }
@@ -359,6 +362,8 @@ pub async fn create_account(State(st): State<AppState>, u: AuthUser, Json(b): Js
     if !crate::billing::PLANS.contains(&plan) { return Err(bad("Plan inconnu.")) }
     let id: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash, username, must_change_password, plan) VALUES (?, ?, ?, ?, 1, ?) RETURNING id")
         .bind(&email).bind(&name).bind(crate::auth::hash_password(&password)?).bind(&username).bind(plan).fetch_one(&st.db).await?;
+    // L'adresse saisie par l'admin n'est pas vérifiée (#11) : lien de vérification envoyé, ou vérifiée d'office sans SMTP.
+    crate::verify::start(&st, id, &email).await?;
     // Relie la demande de la liste d'attente (celle choisie, sinon celle de la même adresse).
     let wid: Option<i64> = match b.waitlist_id {
         Some(w) => Some(w),
@@ -490,7 +495,8 @@ mod depannage_tests {
     const NEW_PW: &str = "Nouveau-secret-tout-neuf-77";
 
     async fn user(st: &AppState, email: &str, admin: bool) -> AuthUser {
-        let id: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash, is_admin) VALUES (?, ?, ?, ?) RETURNING id")
+        // Adresse vérifiée : sans elle, un admin n'a pas ses droits (#11).
+        let id: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash, is_admin, email_verified_at) VALUES (?, ?, ?, ?, datetime('now')) RETURNING id")
             .bind(email).bind(email.split('@').next().unwrap()).bind(hash_password(PW).unwrap()).bind(admin as i64)
             .fetch_one(&st.db).await.unwrap();
         let sid = format!("session-{id}");

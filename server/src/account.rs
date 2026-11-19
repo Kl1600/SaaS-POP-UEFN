@@ -155,6 +155,8 @@ pub async fn reset(State(st): State<AppState>, Json(b): Json<ResetIn>) -> ApiRes
     sqlx::query("UPDATE password_resets SET used_at = datetime('now') WHERE token_hash = ?").bind(sha256_hex(&b.token)).execute(&st.db).await?;
     // Un nouveau mot de passe choisi par lien lève le blocage après trop d'essais (#38).
     sqlx::query("UPDATE users SET failed_logins = 0, locked_until = NULL WHERE id = ?").bind(uid).execute(&st.db).await?;
+    // Le lien de réinitialisation est arrivé à cette adresse : elle est donc vérifiée.
+    crate::verify::mark_verified(&st, uid).await?;
     Ok(Json(json!({ "ok": true, "tokens_revoked": tokens })))
 }
 
