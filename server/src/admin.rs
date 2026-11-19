@@ -333,13 +333,14 @@ pub async fn waitlist(
 ) -> ApiResult<Value> {
     require(&st, &u).await?;
     let status = q.status.unwrap_or_else(|| "pending".into());
-    let rows: Vec<(i64, String, String, String, String, String, String, String, String, String, String, Option<String>, Option<String>)> = sqlx::query_as(
-        "SELECT w.id, w.email, w.name, w.studio, w.team, w.experience, w.links, w.message, w.status, w.note, w.created_at, w.decided_at, d.name
+    let rows: Vec<(i64, String, String, String, String, String, String, String, String, String, String, Option<String>, Option<String>, i64)> = sqlx::query_as(
+        "SELECT w.id, w.email, w.name, w.studio, w.team, w.experience, w.links, w.message, w.status, w.note, w.created_at, w.decided_at, d.name,
+                EXISTS (SELECT 1 FROM account_activations a JOIN users au ON au.id = a.user_id WHERE a.waitlist_id = w.id AND au.activation_pending = 1)
          FROM waitlist w LEFT JOIN users d ON d.id = w.decided_by WHERE (? = 'all' OR w.status = ?) ORDER BY w.created_at DESC LIMIT 500",
     ).bind(&status).bind(&status).fetch_all(&st.db).await?;
     Ok(Json(json!(rows.into_iter().map(|r| json!({
         "id": r.0, "email": r.1, "name": r.2, "studio": r.3, "team": r.4, "experience": r.5, "links": r.6, "message": r.7, "status": r.8, "note": r.9,
-        "created_at": r.10, "decided_at": r.11, "decided_by": r.12,
+        "created_at": r.10, "decided_at": r.11, "decided_by": r.12, "activation_pending": r.13 == 1,
     })).collect::<Vec<_>>())))
 }
 
@@ -466,16 +467,18 @@ pub async fn invite(
 pub async fn users(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
     require(&st, &u).await?;
     #[allow(clippy::type_complexity)]
-    let rows: Vec<(i64, String, String, String, Option<String>, i64, i64, i64, i64, Option<String>, i64, String, Option<String>)> = sqlx::query_as(
+    let rows: Vec<(i64, String, String, String, Option<String>, i64, i64, i64, i64, Option<String>, i64, String, Option<String>, i64, Option<String>)> = sqlx::query_as(
         "SELECT u.id, u.email, u.name, u.created_at, u.last_seen, u.is_admin, u.disabled,
                 (SELECT COUNT(*) FROM memberships m WHERE m.user_id = u.id),
                 (SELECT COUNT(*) FROM tasks t WHERE t.assignee_id = u.id AND t.status = 'done'), u.username, u.must_change_password, u.plan,
-                CASE WHEN u.locked_until > datetime('now') THEN u.locked_until END
+                CASE WHEN u.locked_until > datetime('now') THEN u.locked_until END,
+                u.activation_pending, (SELECT MAX(a.created_at) FROM account_activations a WHERE a.user_id = u.id)
          FROM users u ORDER BY u.created_at DESC LIMIT 2000",
     ).fetch_all(&st.db).await?;
     Ok(Json(json!(rows.into_iter().map(|r| json!({
         "id": r.0, "email": r.1, "name": r.2, "created_at": r.3, "last_seen": r.4, "is_admin": r.5 == 1, "disabled": r.6 == 1, "studios": r.7, "tasks_done": r.8,
         "username": r.9, "must_change": r.10 == 1, "plan": r.11, "locked_until": r.12, "me": r.0 == u.id,
+        "activation_pending": r.13 == 1, "activation_sent_at": r.14,
     })).collect::<Vec<_>>())))
 }
 
@@ -604,13 +607,12 @@ pub struct AccountIn {
     username: String,
     name: String,
     email: String,
-    password: Option<String>,
     waitlist_id: Option<i64>,
     plan: Option<String>,
 }
 
-/// Crée le compte d'un bêta-testeur. Le mot de passe (provisoire) n'est montré qu'une fois ;
-/// la personne devra le changer à sa première connexion.
+/// Crée le compte d'un bêta-testeur, sans mot de passe (#42) : la personne reçoit un lien d'activation par e-mail
+/// et choisit elle-même son mot de passe. Sans SMTP, l'admin reçoit le lien à copier.
 pub async fn create_account(
     State(st): State<AppState>,
     u: AuthUser,
@@ -644,26 +646,13 @@ pub async fn create_account(
             "Un compte existe déjà avec cette adresse e-mail.".into(),
         ));
     }
-    let password = match b
-        .password
-        .as_deref()
-        .map(str::trim)
-        .filter(|p| !p.is_empty())
-    {
-        Some(p) => {
-            crate::security::password_policy(p, &email)?;
-            p.to_string()
-        }
-        None => temp_password(),
-    };
     let plan = b.plan.as_deref().unwrap_or("pro");
     if !crate::billing::PLANS.contains(&plan) {
         return Err(bad("Plan inconnu."));
     }
-    let id: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash, username, must_change_password, plan) VALUES (?, ?, ?, ?, 1, ?) RETURNING id")
-        .bind(&email).bind(&name).bind(crate::auth::hash_password(&password)?).bind(&username).bind(plan).fetch_one(&st.db).await?;
-    // L'adresse saisie par l'admin n'est pas vérifiée (#11) : lien de vérification envoyé, ou vérifiée d'office sans SMTP.
-    crate::verify::start(&st, id, &email).await?;
+    // Mot de passe inconnu de tous (aléatoire) : le compte ne s'ouvre qu'avec le lien d'activation.
+    let id: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash, username, must_change_password, activation_pending, plan) VALUES (?, ?, ?, ?, 0, 1, ?) RETURNING id")
+        .bind(&email).bind(&name).bind(crate::auth::hash_password(&crate::auth::random_token())?).bind(&username).bind(plan).fetch_one(&st.db).await?;
     // Relie la demande de la liste d'attente (celle choisie, sinon celle de la même adresse).
     let wid: Option<i64> = match b.waitlist_id {
         Some(w) => Some(w),
@@ -675,9 +664,10 @@ pub async fn create_account(
         }
     };
     if let Some(w) = wid {
-        sqlx::query("UPDATE waitlist SET decided_at = COALESCE(decided_at, datetime('now')), decided_by = COALESCE(decided_by, ?) WHERE id = ?").bind(u.id).bind(w).execute(&st.db).await?;
-        mark_registered(&st, w, id).await;
+        // Demande acceptée ; elle passe à « inscrit » à l'activation, pas à la création.
+        sqlx::query("UPDATE waitlist SET status = 'approved', token_hash = NULL, decided_at = COALESCE(decided_at, datetime('now')), decided_by = COALESCE(decided_by, ?) WHERE id = ?").bind(u.id).bind(w).execute(&st.db).await?;
     }
+    let sent = crate::activation::issue(&st, id, wid).await?;
     log(
         &st,
         &u,
@@ -686,7 +676,7 @@ pub async fn create_account(
     )
     .await;
     Ok(Json(
-        json!({ "id": id, "username": username, "name": name, "email": email, "password": password, "url": crate::mail::public_url() + "/connexion" }),
+        json!({ "id": id, "username": username, "name": name, "email": email, "mailed": sent["mailed"], "link": sent.get("link") }),
     ))
 }
 

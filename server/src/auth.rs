@@ -262,17 +262,22 @@ pub async fn login(
     if email == "kl" && !crate::security::is_loopback(&ip) {
         return Err(bad("Identifiant ou mot de passe incorrect."));
     }
-    let row: Option<(i64, String, String, i64)> = sqlx::query_as(
-        "SELECT id, name, password_hash, COALESCE(locked_until > datetime('now'), 0) FROM users WHERE (email = ?1 OR username = ?1) AND disabled = 0",
+    let row: Option<(i64, String, String, i64, i64)> = sqlx::query_as(
+        "SELECT id, name, password_hash, COALESCE(locked_until > datetime('now'), 0), activation_pending FROM users WHERE (email = ?1 OR username = ?1) AND disabled = 0",
     ).bind(&email).fetch_optional(&st.db).await?;
     // Même message et même coût que l'adresse existe ou non.
-    let (id, name, hash, locked) = match row {
+    let (id, name, hash, locked, pending) = match row {
         Some(r) => r,
         None => {
             let _ = verify_password(&b.password, &st.dummy_hash);
             return Err(bad("Identifiant ou mot de passe incorrect."));
         }
     };
+    // Compte créé par l'admin, pas encore activé : il n'a pas de mot de passe connu (#42).
+    if pending == 1 {
+        let _ = verify_password(&b.password, &st.dummy_hash);
+        return Err(AppError::Conflict(crate::activation::PENDING_MSG.into()));
+    }
     if locked == 1 {
         let _ = verify_password(&b.password, &st.dummy_hash);
         return Err(AppError::Conflict("Trop d’essais : ce compte est bloqué 15 minutes. Utilisez « Mot de passe oublié » si besoin.".into()));

@@ -3,11 +3,19 @@
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
 ```
-EN COURS | #8 Formater le code Rust avec rustfmt et le vérifier dans le CI | 19/11 13:45
+EN COURS | #42 Administration : créer un compte qui s'active par e-mail (la personne choisit son mot de passe) | 19/11 14:55
+Owner : benybens | Sur la tâche : Claude Code, pour Yassine
+Fait : migration 0025, activation.rs (lien 7 j, renvoi), connexion refusée avant activation, page /activer, Administration
+Reste : validation humaine
+Bloque : rien
+```
+
+```
+FAIT | #8 Formater le code Rust avec rustfmt et le vérifier dans le CI | 19/11 14:10
 Owner : benybens | Sur la tâche : Claude Code, pour Yassine
 Fait : cargo fmt (server/, link/), cargo fmt --check dans ci.yml (serveur, relais)
-Reste : validation humaine (PR de test mal formatée)
-Bloque : #9 clippy
+Reste : rien (CI testé avec un commit mal formaté)
+Bloque : rien
 ```
 
 ```

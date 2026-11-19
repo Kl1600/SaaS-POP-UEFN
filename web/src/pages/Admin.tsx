@@ -37,6 +37,24 @@ function CredBox({ c, onClose }: { c: Cred; onClose?: () => void }) {
   </div>
 }
 
+type Sent = { username?: string; name?: string; email: string; mailed: boolean; link?: string }
+/** Lien d'activation (#42) : envoyé par e-mail, ou à copier quand l'envoi d'e-mails n'est pas configuré. */
+function ActivationBox({ s, onClose }: { s: Sent; onClose?: () => void }) {
+  const { toast } = useApp()
+  return <div className="b-callout" style={{ display: 'grid', gap: 10, marginTop: 10 }}>
+    {s.mailed
+      ? <span><Mail size={15} style={{ verticalAlign: -2 }} /> {tr("E-mail d’activation envoyé à {0}. La personne choisit son mot de passe avec le lien (valable 7 jours, une seule fois).", [s.email])}</span>
+      : <>
+        <b style={{ fontWeight: 500 }}>{tr("L’envoi d’e-mails n’est pas configuré : envoyez ce lien d’activation à {0} (valable 7 jours, une seule fois).", [s.email])}</b>
+        <div className="row" style={{ gap: 8 }}><input className="field mono" readOnly value={s.link ?? ''} style={{ flex: 1, height: 34, fontSize: 12.5 }} onFocus={e => e.target.select()} />
+          <button className="btn" style={{ height: 34 }} onClick={() => { navigator.clipboard?.writeText(s.link ?? ''); toast(tr("Lien copié")) }}><Copy size={14} />{tr("Copier")}</button></div>
+        <span className="small muted">{tr("Avec ce lien, la personne choisit son mot de passe : ne le transmettez qu’à elle, en message privé.")}</span>
+      </>}
+    {s.username && <span className="small muted">{tr("Identifiant : {0}", [s.username])}</span>}
+    {onClose && <div><button className="btn" onClick={onClose}>{tr("Fermer")}</button></div>}
+  </div>
+}
+
 /** Formulaire de création d'un compte bêta (depuis une demande ou à la main). */
 const PLANS: [string, string][] = [['starter', 'Starter (12,99 €)'], ['pro', 'Pro (24,99 €)']]
 /** Plan d'un compte. Analyse est comprise dans le plan Pro. */
@@ -44,9 +62,9 @@ function PlanSelect({ value, onChange }: { value: string; onChange: (e: React.Ch
   return <select className="field" value={value} onChange={onChange} title={tr("Analyse est comprise dans le plan Pro")}>{PLANS.map(([v, l]) => <option key={v} value={v}>{tr(l)}</option>)}</select>
 }
 
-function AccountForm({ init, waitlistId, onCreated, onCancel }: { init?: { name: string; email: string }; waitlistId?: number; onCreated: (c: Cred) => void; onCancel?: () => void }) {
+function AccountForm({ init, waitlistId, onCreated, onCancel }: { init?: { name: string; email: string }; waitlistId?: number; onCreated: (s: Sent) => void; onCancel?: () => void }) {
   const { toast } = useApp()
-  const [f, setF] = useState({ name: init?.name ?? '', email: init?.email ?? '', username: suggestUsername(init?.name ?? '', init?.email ?? ''), password: '', plan: 'pro' })
+  const [f, setF] = useState({ name: init?.name ?? '', email: init?.email ?? '', username: suggestUsername(init?.name ?? '', init?.email ?? ''), plan: 'pro' })
   const [touched, setTouched] = useState(false)
   const [busy, setBusy] = useState(false)
   const up = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -57,7 +75,7 @@ function AccountForm({ init, waitlistId, onCreated, onCancel }: { init?: { name:
   }
   return <form className="stack" style={{ marginTop: 10 }} onSubmit={async e => {
     e.preventDefault(); setBusy(true)
-    try { const r = await api.post('/api/admin/accounts', { ...f, waitlist_id: waitlistId }); onCreated({ ...r, name: r.name }); toast(tr("Compte créé")) } catch (er: any) { toast(er.message, true) } finally { setBusy(false) }
+    try { const r = await api.post('/api/admin/accounts', { ...f, waitlist_id: waitlistId }); onCreated(r); toast(r.mailed ? tr("Compte créé : e-mail d’activation envoyé") : tr("Compte créé : copiez le lien d’activation")) } catch (er: any) { toast(er.message, true) } finally { setBusy(false) }
   }}>
     <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
       <label className="label" style={{ flex: '1 1 180px' }}>{tr("Nom affiché")}<input className="field" required maxLength={80} value={f.name} onChange={up('name')} /></label>
@@ -65,7 +83,6 @@ function AccountForm({ init, waitlistId, onCreated, onCancel }: { init?: { name:
     </div>
     <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
       <label className="label" style={{ flex: '1 1 180px' }}>{tr("Identifiant")}<input className="field mono" required minLength={3} maxLength={32} pattern="[a-zA-Z0-9._\-]+" title={tr("Lettres sans accent, chiffres, points, tirets")} autoCapitalize="off" spellCheck={false} value={f.username} onChange={up('username')} /></label>
-      <label className="label" style={{ flex: '1 1 220px' }}>{tr("Mot de passe provisoire")}<input className="field mono" placeholder={tr("Généré automatiquement si vide")} value={f.password} onChange={up('password')} autoComplete="off" /></label>
       <label className="label" style={{ flex: '1 1 160px' }}>{tr("Plan")}<PlanSelect value={f.plan} onChange={up('plan')} /></label>
     </div>
     <div className="row" style={{ gap: 8 }}>
@@ -108,7 +125,7 @@ function Waitlist() {
   const [status, setStatus] = useState('pending')
   const { data, reload } = useLoad<any[]>(`/api/admin/waitlist?status=${status}`, [status])
   const [open, setOpen] = useState<number | null>(null)
-  const [creds, setCreds] = useState<Record<number, Cred>>({})
+  const [creds, setCreds] = useState<Record<number, Sent>>({})
   const act = async (fn: () => Promise<any>, msg: string) => { try { await fn(); toast(msg); reload(); reloadMe() } catch (e: any) { toast(e.message, true) } }
   return <section className="card">
     <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
@@ -118,11 +135,11 @@ function Waitlist() {
       <div style={{ display: 'grid', gap: 10 }}>{data.map(w => <div key={w.id} className="adm-req">
         <div className="row" style={{ justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
           <div style={{ minWidth: 0 }}>
-            <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}><b style={{ fontWeight: 500, fontSize: 16 }}>{w.name}</b><span className="small muted">{w.email}</span><span className={'badge ' + STATUS[w.status][1]}>{STATUS[w.status][0]}</span></div>
+            <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}><b style={{ fontWeight: 500, fontSize: 16 }}>{w.name}</b><span className="small muted">{w.email}</span>{w.activation_pending ? <span className="badge b-o">{tr("En attente d’activation")}</span> : <span className={'badge ' + STATUS[w.status][1]}>{STATUS[w.status][0]}</span>}</div>
             <div className="small muted" style={{ marginTop: 2 }}>{tr("{0} · demandé {1}{2}", [[w.studio && tr("Studio {0}", [w.studio]), w.team && tr("Équipe : {0}", [w.team]), w.experience].filter(Boolean).join(' · '), ago(w.created_at), w.decided_by ? tr(" · traité par {0}", [w.decided_by]) : ''])}</div>
           </div>
           <div className="row" style={{ gap: 6 }}>
-            {w.status !== 'registered' && !creds[w.id] && <button className="btn pri" style={{ height: 34 }} onClick={() => setOpen(open === w.id ? null : w.id)}><Check size={15} />{tr("Accepter et créer le compte")}</button>}
+            {w.status !== 'registered' && !w.activation_pending && !creds[w.id] && <button className="btn pri" style={{ height: 34 }} onClick={() => setOpen(open === w.id ? null : w.id)}><Check size={15} />{tr("Accepter et créer le compte")}</button>}
             {w.status === 'pending' && <button className="btn" style={{ height: 34 }} onClick={() => act(() => api.post(`/api/admin/waitlist/${w.id}/refuse`), tr("Demande refusée"))}><X size={15} />{tr("Refuser")}</button>}
             {(w.status === 'refused' || w.status === 'approved') && <button className="iconbtn" title={tr("Remettre en attente")} aria-label={tr("Remettre en attente")} onClick={() => act(() => api.post(`/api/admin/waitlist/${w.id}/reopen`), tr("Remise en attente"))}><RotateCcw size={16} /></button>}
             <button className="iconbtn" title={tr("Supprimer la demande")} aria-label={tr("Supprimer la demande")} onClick={() => { if (confirm(tr("Supprimer la demande de {0} ?", [w.name]))) act(() => api.del(`/api/admin/waitlist/${w.id}`), tr("Demande supprimée")) }}><Trash2 size={16} /></button>
@@ -132,18 +149,18 @@ function Waitlist() {
         {w.message && <p style={{ margin: '8px 0 0', whiteSpace: 'pre-wrap' }}>{w.message}</p>}
         <input className="field small" style={{ marginTop: 10, height: 32, width: '100%' }} placeholder={tr("Note interne (visible seulement par les admins)")} defaultValue={w.note}
           onBlur={e => { if (e.target.value !== w.note) api.post(`/api/admin/waitlist/${w.id}/note`, { note: e.target.value }).then(() => toast(tr("Note enregistrée"))).catch(er => toast(er.message, true)) }} />
-        {open === w.id && !creds[w.id] && <AccountForm init={{ name: w.name, email: w.email }} waitlistId={w.id} onCancel={() => setOpen(null)} onCreated={c => { w.status = 'registered'; setCreds(x => ({ ...x, [w.id]: c })); setOpen(null); reloadMe() }} />}
-        {creds[w.id] && <CredBox c={creds[w.id]} onClose={() => { setCreds(x => { const y = { ...x }; delete y[w.id]; return y }); reload() }} />}
+        {open === w.id && !creds[w.id] && <AccountForm init={{ name: w.name, email: w.email }} waitlistId={w.id} onCancel={() => setOpen(null)} onCreated={c => { w.activation_pending = true; setCreds(x => ({ ...x, [w.id]: c })); setOpen(null); reloadMe() }} />}
+        {creds[w.id] && <ActivationBox s={creds[w.id]} onClose={() => { setCreds(x => { const y = { ...x }; delete y[w.id]; return y }); reload() }} />}
       </div>)}</div>}
   </section>
 }
 
 function CreateAccount() {
-  const [res, setRes] = useState<Cred | null>(null)
+  const [res, setRes] = useState<Sent | null>(null)
   const [k, setK] = useState(0)
   return <section className="card">
-    <CardHead title={tr("Créer un compte bêta")} sub={tr("Pour donner un accès sans demande sur la liste d’attente. Vous transmettez l’identifiant et le mot de passe provisoire ; la personne choisit son mot de passe à la première connexion.")} />
-    {res ? <CredBox c={res} onClose={() => { setRes(null); setK(k + 1) }} /> : <AccountForm key={k} onCreated={setRes} />}
+    <CardHead title={tr("Créer un compte bêta")} sub={tr("Pour donner un accès sans demande sur la liste d’attente. La personne reçoit un e-mail d’activation et choisit elle-même son mot de passe.")} />
+    {res ? <ActivationBox s={res} onClose={() => { setRes(null); setK(k + 1) }} /> : <AccountForm key={k} onCreated={setRes} />}
   </section>
 }
 
@@ -190,6 +207,7 @@ function Users() {
   const [q, setQ] = useState('')
   const [cred, setCred] = useState<Cred | null>(null)
   const [link, setLink] = useState<any>(null)
+  const [sent, setSent] = useState<Sent | null>(null)
   const [del, setDel] = useState<any>(null)
   const run = async (fn: () => Promise<any>, msg: string) => { try { await fn(); toast(msg); reload() } catch (e: any) { toast(e.message, true) } }
   const set = async (id: number, patch: any, msg: string) => { try { await api.post(`/api/admin/users/${id}`, patch); toast(msg); reload() } catch (e: any) { toast(e.message, true) } }
@@ -198,18 +216,20 @@ function Users() {
     <CardHead title={tr("Utilisateurs")} sub={data ? `${data.length} comptes` : ''}><input className="field" style={{ height: 34, width: 220 }} placeholder={tr("Chercher")} value={q} onChange={e => setQ(e.target.value)} /></CardHead>
     {cred && <CredBox c={cred} onClose={() => setCred(null)} />}
     {link && <ResetLinkBox r={link} onClose={() => setLink(null)} />}
+    {sent && <ActivationBox s={sent} onClose={() => setSent(null)} />}
     <div style={{ overflowX: 'auto' }}><table className="tbl"><thead><tr><th>{tr("Nom")}</th><th>{tr("Identifiant")}</th><th>E-mail</th><th>{tr("Inscrit")}</th><th>Vu</th><th>{tr("Studios")}</th><th>{tr("Tâches faites")}</th><th>{tr("Plan")}</th><th>{tr("Rôle")}</th><th /></tr></thead>
       <tbody>{list.map(u => <tr key={u.id} style={{ opacity: u.disabled ? 0.5 : 1 }}>
-        <td><b style={{ fontWeight: 500 }}>{u.name}</b>{u.me && <span className="small muted"> {tr("(vous)")}</span>}{u.must_change && <span className="badge b-o" style={{ marginLeft: 6 }} title={tr("N’a pas encore choisi son mot de passe")}>{tr("Mot de passe provisoire")}</span>}</td><td className="small mono">{u.username ?? '—'}</td><td className="small">{u.email}</td>
+        <td><b style={{ fontWeight: 500 }}>{u.name}</b>{u.me && <span className="small muted"> {tr("(vous)")}</span>}{u.must_change && <span className="badge b-o" style={{ marginLeft: 6 }} title={tr("N’a pas encore choisi son mot de passe")}>{tr("Mot de passe provisoire")}</span>}{u.activation_pending && <span className="badge b-o" style={{ marginLeft: 6 }} title={u.activation_sent_at ? tr("Lien envoyé le {0}", [frDate(u.activation_sent_at)]) : undefined}>{tr("En attente d’activation")}</span>}{u.activation_pending && u.activation_sent_at && <div className="small muted">{tr("Lien envoyé {0}", [ago(u.activation_sent_at)])}</div>}</td><td className="small mono">{u.username ?? '—'}</td><td className="small">{u.email}</td>
         <td className="small muted">{frDate(u.created_at)}</td><td className="small muted">{u.last_seen ? ago(u.last_seen) : '—'}</td>
         <td>{u.studios}</td><td>{u.tasks_done}</td>
         <td><PlanSelect value={u.plan ?? 'starter'} onChange={async e => { try { await api.post(`/api/admin/users/${u.id}/plan`, { plan: e.target.value }); toast(tr("Plan mis à jour")); reload() } catch (er: any) { toast(er.message, true) } }} /></td>
         <td><div className="row" style={{ gap: 4, flexWrap: 'wrap' }}>{u.disabled ? <span className="badge b-r">{tr("Désactivé")}</span> : u.is_admin ? <span className="badge b-v">{tr("Admin")}</span> : <span className="badge">{tr("Utilisateur")}</span>}
           {u.locked_until && <span className="badge b-o" title={tr("Trop de mots de passe faux")}>{tr("Bloqué jusqu’à {0}", [hhmm(u.locked_until)])}</span>}</div></td>
         <td>{!u.me && <div className="row" style={{ gap: 4, justifyContent: 'flex-end' }}>
+          {u.activation_pending && <button className="btn" style={{ height: 32 }} title={tr("Nouveau lien d’activation : l’ancien ne marchera plus")} onClick={async () => { try { const r = await api.post(`/api/admin/users/${u.id}/activation`); setSent({ ...r, username: u.username }); toast(r.mailed ? tr("Lien renvoyé par e-mail") : tr("Lien créé : copiez-le")); reload() } catch (e: any) { toast(e.message, true) } }}><Mail size={15} />{tr("Renvoyer le lien")}</button>}
           {u.locked_until && <button className="iconbtn" title={tr("Débloquer")} aria-label={tr("Débloquer")} onClick={() => run(() => api.post(`/api/admin/users/${u.id}/unlock`), tr("Compte débloqué"))}><LockOpen size={16} /></button>}
           <button className="iconbtn" title={tr("Lien de nouveau mot de passe")} aria-label={tr("Lien de nouveau mot de passe")} onClick={async () => { try { const r = await api.post(`/api/admin/users/${u.id}/reset-link`); setLink(r); toast(r.mailed ? tr("Lien envoyé par e-mail") : tr("Lien créé : copiez-le")) } catch (e: any) { toast(e.message, true) } }}><Link2 size={16} /></button>
-          <button className="iconbtn" title={tr("Nouveau mot de passe provisoire")} aria-label={tr("Réinitialiser le mot de passe")} onClick={async () => { if (!confirm(tr("Donner un nouveau mot de passe provisoire à {0} ? Son mot de passe actuel ne marchera plus et il sera déconnecté.", [u.name]))) return; try { const r = await api.post(`/api/admin/users/${u.id}/password`); setCred({ ...r, name: u.name }); reload() } catch (e: any) { toast(e.message, true) } }}><KeyRound size={16} /></button>
+          {!u.activation_pending && <button className="iconbtn" title={tr("Nouveau mot de passe provisoire")} aria-label={tr("Réinitialiser le mot de passe")} onClick={async () => { if (!confirm(tr("Donner un nouveau mot de passe provisoire à {0} ? Son mot de passe actuel ne marchera plus et il sera déconnecté.", [u.name]))) return; try { const r = await api.post(`/api/admin/users/${u.id}/password`); setCred({ ...r, name: u.name }); reload() } catch (e: any) { toast(e.message, true) } }}><KeyRound size={16} /></button>}
           <button className="iconbtn" title={u.is_admin ? tr("Retirer les droits admin") : tr("Rendre admin")} aria-label={tr("Droits admin")} onClick={() => { if (confirm(u.is_admin ? tr("Retirer les droits admin de {0} ?", [u.name]) : tr("Donner les droits admin à {0} ? Il pourra gérer la liste d’attente et les comptes.", [u.name]))) set(u.id, { is_admin: !u.is_admin }, tr("Droits mis à jour")) }}><ShieldCheck size={16} /></button>
           <button className="iconbtn" title={u.disabled ? tr("Réactiver") : tr("Désactiver le compte")} aria-label={tr("Désactiver")} onClick={() => { if (confirm(u.disabled ? tr("Réactiver le compte de {0} ?", [u.name]) : tr("Désactiver le compte de {0} ? Il sera déconnecté et ne pourra plus se connecter.", [u.name]))) set(u.id, { disabled: !u.disabled }, u.disabled ? tr("Compte réactivé") : tr("Compte désactivé")) }}><Ban size={16} /></button>
           <button className="iconbtn" title={tr("Supprimer le compte")} aria-label={tr("Supprimer le compte")} onClick={() => setDel(u)}><Trash2 size={16} /></button>
