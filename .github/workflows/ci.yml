@@ -23,9 +23,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: server
+      # Format unique du code Rust (#8) : en cas d'échec, lancez « cargo fmt » dans server/ et commitez.
+      - run: cargo fmt --check
+        working-directory: server
       - run: cargo build --locked
         working-directory: server
       - run: cargo test --locked
@@ -37,9 +42,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: link
+      # Format unique du code Rust (#8) : en cas d'échec, lancez « cargo fmt » dans link/ et commitez.
+      - run: cargo fmt --check
+        working-directory: link
       - run: cargo build --locked
         working-directory: link
       - run: cargo test --locked
