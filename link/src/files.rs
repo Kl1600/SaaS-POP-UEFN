@@ -6,10 +6,20 @@ use std::{
     time::SystemTime,
 };
 
-const SKIP: [&str; 7] = ["Intermediate", "Saved", "Binaries", "DerivedDataCache", ".urc", ".git", "node_modules"];
+const SKIP: [&str; 7] = [
+    "Intermediate",
+    "Saved",
+    "Binaries",
+    "DerivedDataCache",
+    ".urc",
+    ".git",
+    "node_modules",
+];
 
 fn walk(root: &Path, dir: &Path, out: &mut Vec<PathBuf>, digests: bool) {
-    let Ok(rd) = std::fs::read_dir(dir) else { return };
+    let Ok(rd) = std::fs::read_dir(dir) else {
+        return;
+    };
     for e in rd.flatten() {
         let p = e.path();
         let name = e.file_name().to_string_lossy().to_string();
@@ -18,7 +28,8 @@ fn walk(root: &Path, dir: &Path, out: &mut Vec<PathBuf>, digests: bool) {
             continue;
         }
         if ft.is_dir() {
-            if !SKIP.contains(&name.as_str()) && !name.starts_with("__External") && out.len() < 5000 {
+            if !SKIP.contains(&name.as_str()) && !name.starts_with("__External") && out.len() < 5000
+            {
                 walk(root, &p, out, digests);
             }
         } else if name.ends_with(".verse") && (name.ends_with(".digest.verse") == digests) {
@@ -28,12 +39,22 @@ fn walk(root: &Path, dir: &Path, out: &mut Vec<PathBuf>, digests: bool) {
 }
 
 pub fn rel(root: &Path, p: &Path) -> String {
-    p.strip_prefix(root).unwrap_or(p).components().map(|c| c.as_os_str().to_string_lossy().to_string()).collect::<Vec<_>>().join("/")
+    p.strip_prefix(root)
+        .unwrap_or(p)
+        .components()
+        .map(|c| c.as_os_str().to_string_lossy().to_string())
+        .collect::<Vec<_>>()
+        .join("/")
 }
 
 /// Résout un chemin relatif venant de POP en refusant toute sortie du projet.
 pub fn resolve(root: &Path, relp: &str) -> Result<PathBuf> {
-    if relp.is_empty() || relp.contains('\\') || relp.contains(':') || !relp.ends_with(".verse") || relp.ends_with(".digest.verse") {
+    if relp.is_empty()
+        || relp.contains('\\')
+        || relp.contains(':')
+        || !relp.ends_with(".verse")
+        || relp.ends_with(".digest.verse")
+    {
         bail!("chemin refusé : {relp}");
     }
     let p = Path::new(relp);
@@ -43,9 +64,15 @@ pub fn resolve(root: &Path, relp: &str) -> Result<PathBuf> {
     let full = root.join(p);
     // Le dossier parent existant le plus proche doit rester dans le projet (pas de lien symbolique qui sort).
     let root_c = root.canonicalize()?;
-    let mut probe = full.parent().map(Path::to_path_buf).ok_or_else(|| anyhow!("chemin invalide"))?;
+    let mut probe = full
+        .parent()
+        .map(Path::to_path_buf)
+        .ok_or_else(|| anyhow!("chemin invalide"))?;
     while !probe.exists() {
-        probe = probe.parent().map(Path::to_path_buf).ok_or_else(|| anyhow!("chemin invalide"))?;
+        probe = probe
+            .parent()
+            .map(Path::to_path_buf)
+            .ok_or_else(|| anyhow!("chemin invalide"))?;
     }
     if !probe.canonicalize()?.starts_with(&root_c) {
         bail!("chemin hors du projet : {relp}");
@@ -61,7 +88,11 @@ pub struct Scanner {
 
 impl Scanner {
     pub fn new(root: PathBuf) -> Self {
-        Self { root, seen: HashMap::new(), digest_seen: HashMap::new() }
+        Self {
+            root,
+            seen: HashMap::new(),
+            digest_seen: HashMap::new(),
+        }
     }
 
     /// Fichiers .verse modifiés depuis le dernier passage (ou tous si `full`).
@@ -71,7 +102,9 @@ impl Scanner {
         let mut out = vec![];
         let mut now = HashMap::new();
         for p in list {
-            let Ok(md) = std::fs::metadata(&p) else { continue };
+            let Ok(md) = std::fs::metadata(&p) else {
+                continue;
+            };
             if md.len() > 2_000_000 {
                 continue;
             }
@@ -107,14 +140,31 @@ impl Scanner {
         let mut now = HashMap::new();
         for p in &list {
             if let Ok(md) = std::fs::metadata(p) {
-                now.insert(p.to_string_lossy().to_string(), (md.modified().unwrap_or(SystemTime::UNIX_EPOCH), md.len()));
+                now.insert(
+                    p.to_string_lossy().to_string(),
+                    (md.modified().unwrap_or(SystemTime::UNIX_EPOCH), md.len()),
+                );
             }
         }
         if now == self.digest_seen {
             return None;
         }
         self.digest_seen = now;
-        Some(list.iter().filter_map(|p| std::fs::read_to_string(p).ok().map(|c| (p.file_name().unwrap_or_default().to_string_lossy().to_string(), c))).collect())
+        Some(
+            list.iter()
+                .filter_map(|p| {
+                    std::fs::read_to_string(p).ok().map(|c| {
+                        (
+                            p.file_name()
+                                .unwrap_or_default()
+                                .to_string_lossy()
+                                .to_string(),
+                            c,
+                        )
+                    })
+                })
+                .collect(),
+        )
     }
 
     pub fn write(&mut self, relp: &str, content: &str) -> Result<()> {
@@ -151,7 +201,13 @@ impl Scanner {
     pub fn read_all(&self) -> Vec<(String, String)> {
         let mut list = vec![];
         walk(&self.root, &self.root, &mut list, false);
-        list.iter().filter_map(|p| std::fs::read_to_string(p).ok().map(|c| (rel(&self.root, p), c))).collect()
+        list.iter()
+            .filter_map(|p| {
+                std::fs::read_to_string(p)
+                    .ok()
+                    .map(|c| (rel(&self.root, p), c))
+            })
+            .collect()
     }
 }
 

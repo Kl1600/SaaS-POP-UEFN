@@ -52,15 +52,31 @@ async fn deps_of(st: &AppState, task_id: i64) -> Result<Vec<(i64, String)>, AppE
         .await?)
 }
 
-pub async fn task_ctx(st: &AppState, u: &AuthUser, task_id: i64) -> Result<(MapCtx, TaskRow), AppError> {
-    let t: TaskRow = sqlx::query_as(&format!("{TASK_SELECT} WHERE t.id = ?")).bind(task_id).fetch_one(&st.db).await?;
+pub async fn task_ctx(
+    st: &AppState,
+    u: &AuthUser,
+    task_id: i64,
+) -> Result<(MapCtx, TaskRow), AppError> {
+    let t: TaskRow = sqlx::query_as(&format!("{TASK_SELECT} WHERE t.id = ?"))
+        .bind(task_id)
+        .fetch_one(&st.db)
+        .await?;
     let ctx = map_ctx(st, u, t.map_id).await?;
     Ok((ctx, t))
 }
 
-pub async fn list(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64>) -> ApiResult<Value> {
+pub async fn list(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(mid): Path<i64>,
+) -> ApiResult<Value> {
     map_ctx(&st, &u, mid).await?;
-    let tasks: Vec<TaskRow> = sqlx::query_as(&format!("{TASK_SELECT} WHERE t.map_id = ? ORDER BY t.number")).bind(mid).fetch_all(&st.db).await?;
+    let tasks: Vec<TaskRow> = sqlx::query_as(&format!(
+        "{TASK_SELECT} WHERE t.map_id = ? ORDER BY t.number"
+    ))
+    .bind(mid)
+    .fetch_all(&st.db)
+    .await?;
     let deps: Vec<(i64, i64)> = sqlx::query_as("SELECT t.number, d.number FROM task_deps x JOIN tasks t ON t.id = x.task_id JOIN tasks d ON d.id = x.depends_on WHERE t.map_id = ?")
         .bind(mid)
         .fetch_all(&st.db)
@@ -70,9 +86,21 @@ pub async fn list(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64>)
     let out: Vec<Value> = tasks
         .into_iter()
         .map(|t| {
-            let d: Vec<i64> = deps.iter().filter(|(n, _)| *n == t.number).map(|(_, d)| *d).collect();
-            let c = cm.iter().find(|(k, _)| *k == format!("task:{}", t.id)).map(|x| x.1).unwrap_or(0);
-            let s = subs.iter().find(|x| x.0 == t.id).map(|x| (x.1, x.2)).unwrap_or((0, 0));
+            let d: Vec<i64> = deps
+                .iter()
+                .filter(|(n, _)| *n == t.number)
+                .map(|(_, d)| *d)
+                .collect();
+            let c = cm
+                .iter()
+                .find(|(k, _)| *k == format!("task:{}", t.id))
+                .map(|x| x.1)
+                .unwrap_or(0);
+            let s = subs
+                .iter()
+                .find(|x| x.0 == t.id)
+                .map(|x| (x.1, x.2))
+                .unwrap_or((0, 0));
             let mut v = serde_json::to_value(&t).unwrap();
             v["deps"] = json!(d);
             v["comments"] = json!(c);
@@ -99,16 +127,34 @@ pub struct NewTask {
 
 async fn check_assignee(st: &AppState, ctx: &MapCtx, a: Option<i64>) -> Result<(), AppError> {
     if let Some(uid) = a {
-        let ok: Option<(i64,)> = sqlx::query_as("SELECT user_id FROM memberships WHERE studio_id = ? AND user_id = ?").bind(ctx.studio_id).bind(uid).fetch_optional(&st.db).await?;
+        let ok: Option<(i64,)> =
+            sqlx::query_as("SELECT user_id FROM memberships WHERE studio_id = ? AND user_id = ?")
+                .bind(ctx.studio_id)
+                .bind(uid)
+                .fetch_optional(&st.db)
+                .await?;
         ok.ok_or_else(|| bad("La personne assignée n’est pas membre du studio."))?;
     }
     Ok(())
 }
 
-async fn set_deps(st: &AppState, map_id: i64, task_id: i64, numbers: &[i64]) -> Result<(), AppError> {
-    sqlx::query("DELETE FROM task_deps WHERE task_id = ?").bind(task_id).execute(&st.db).await?;
+async fn set_deps(
+    st: &AppState,
+    map_id: i64,
+    task_id: i64,
+    numbers: &[i64],
+) -> Result<(), AppError> {
+    sqlx::query("DELETE FROM task_deps WHERE task_id = ?")
+        .bind(task_id)
+        .execute(&st.db)
+        .await?;
     for n in numbers {
-        let d: Option<(i64,)> = sqlx::query_as("SELECT id FROM tasks WHERE map_id = ? AND number = ?").bind(map_id).bind(n).fetch_optional(&st.db).await?;
+        let d: Option<(i64,)> =
+            sqlx::query_as("SELECT id FROM tasks WHERE map_id = ? AND number = ?")
+                .bind(map_id)
+                .bind(n)
+                .fetch_optional(&st.db)
+                .await?;
         let (did,) = d.ok_or_else(|| bad(format!("La tâche #{n} n’existe pas.")))?;
         if did == task_id {
             return Err(bad("Une tâche ne peut pas dépendre d’elle-même."));
@@ -122,9 +168,15 @@ async fn set_deps(st: &AppState, map_id: i64, task_id: i64, numbers: &[i64]) -> 
         .fetch_one(&st.db)
         .await?;
         if cyc > 0 {
-            return Err(bad(format!("#{n} dépend déjà de cette tâche : boucle de dépendances.")));
+            return Err(bad(format!(
+                "#{n} dépend déjà de cette tâche : boucle de dépendances."
+            )));
         }
-        sqlx::query("INSERT OR IGNORE INTO task_deps (task_id, depends_on) VALUES (?, ?)").bind(task_id).bind(did).execute(&st.db).await?;
+        sqlx::query("INSERT OR IGNORE INTO task_deps (task_id, depends_on) VALUES (?, ?)")
+            .bind(task_id)
+            .bind(did)
+            .execute(&st.db)
+            .await?;
     }
     Ok(())
 }
@@ -140,7 +192,11 @@ pub async fn insert_task(st: &AppState, ctx: &MapCtx, b: &NewTask) -> Result<(i6
         return Err(bad("Statut inconnu."));
     }
     check_assignee(st, ctx, b.assignee_id).await?;
-    let number: i64 = sqlx::query_scalar("SELECT COALESCE(MAX(number), 0) + 1 FROM tasks WHERE map_id = ?").bind(ctx.map_id).fetch_one(&st.db).await?;
+    let number: i64 =
+        sqlx::query_scalar("SELECT COALESCE(MAX(number), 0) + 1 FROM tasks WHERE map_id = ?")
+            .bind(ctx.map_id)
+            .fetch_one(&st.db)
+            .await?;
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO tasks (map_id, number, title, description, tag, status, assignee_id, planned_day, lot, ai, origin, done_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CASE WHEN ? = 'done' THEN datetime('now') END) RETURNING id",
     )
@@ -165,29 +221,58 @@ pub async fn insert_task(st: &AppState, ctx: &MapCtx, b: &NewTask) -> Result<(i6
         .bind(id)
         .bind(ctx.user.id)
         .bind("Tâche créée")
-        .bind(if b.origin.as_deref().unwrap_or("").starts_with("board") { "Tableau blanc" } else { "Bouton" })
+        .bind(if b.origin.as_deref().unwrap_or("").starts_with("board") {
+            "Tableau blanc"
+        } else {
+            "Bouton"
+        })
         .execute(&st.db)
         .await?;
     Ok((id, number))
 }
 
-pub async fn create(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64>, Json(b): Json<NewTask>) -> ApiResult<Value> {
+pub async fn create(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(mid): Path<i64>,
+    Json(b): Json<NewTask>,
+) -> ApiResult<Value> {
     let ctx = map_ctx(&st, &u, mid).await?;
     ctx.require(Role::Member)?;
     // Anti-doublon : même titre créé par la même personne dans les 10 dernières secondes (double-clic, Entrée répétée).
     let dup: Option<(i64, i64)> = sqlx::query_as("SELECT t.id, t.number FROM tasks t WHERE t.map_id = ? AND t.title = ? AND t.created_at > datetime('now', '-10 seconds') AND EXISTS (SELECT 1 FROM task_events e WHERE e.task_id = t.id AND e.user_id = ?) ORDER BY t.id DESC LIMIT 1")
         .bind(mid).bind(b.title.trim()).bind(u.id).fetch_optional(&st.db).await.unwrap_or(None);
-    if let Some((id, number)) = dup { return Ok(Json(json!({ "id": id, "number": number, "duplicate": true }))) }
+    if let Some((id, number)) = dup {
+        return Ok(Json(
+            json!({ "id": id, "number": number, "duplicate": true }),
+        ));
+    }
     let (id, number) = insert_task(&st, &ctx, &b).await?;
-    log_activity(&st, mid, Some(u.id), "task", "Tâche créée", &format!("#{number} {}", b.title.trim())).await?;
+    log_activity(
+        &st,
+        mid,
+        Some(u.id),
+        "task",
+        "Tâche créée",
+        &format!("#{number} {}", b.title.trim()),
+    )
+    .await?;
     notify(&st, mid, json!({ "t": "refresh", "what": "tasks" }));
     Ok(Json(json!({ "id": id, "number": number })))
 }
 
-pub async fn detail(State(st): State<AppState>, u: AuthUser, Path(tid): Path<i64>) -> ApiResult<Value> {
+pub async fn detail(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(tid): Path<i64>,
+) -> ApiResult<Value> {
     let (_ctx, t) = task_ctx(&st, &u, tid).await?;
     let deps = deps_of(&st, tid).await?;
-    let subtasks: Vec<(i64, String, i64)> = sqlx::query_as("SELECT id, title, done FROM subtasks WHERE task_id = ? ORDER BY id").bind(tid).fetch_all(&st.db).await?;
+    let subtasks: Vec<(i64, String, i64)> =
+        sqlx::query_as("SELECT id, title, done FROM subtasks WHERE task_id = ? ORDER BY id")
+            .bind(tid)
+            .fetch_all(&st.db)
+            .await?;
     let comments: Vec<(i64, Option<String>, String, i64, String)> = sqlx::query_as(
         "SELECT c.id, u.name, c.body, c.resolved, c.at FROM comments c LEFT JOIN users u ON u.id = c.user_id WHERE c.map_id = ? AND c.target = ? ORDER BY c.id",
     )
@@ -201,7 +286,12 @@ pub async fn detail(State(st): State<AppState>, u: AuthUser, Path(tid): Path<i64
     .bind(tid)
     .fetch_all(&st.db)
     .await?;
-    let locks: Vec<(String,)> = sqlx::query_as("SELECT path FROM file_locks WHERE map_id = ? AND task_number = ?").bind(t.map_id).bind(t.number).fetch_all(&st.db).await?;
+    let locks: Vec<(String,)> =
+        sqlx::query_as("SELECT path FROM file_locks WHERE map_id = ? AND task_number = ?")
+            .bind(t.map_id)
+            .bind(t.number)
+            .fetch_all(&st.db)
+            .await?;
     Ok(Json(json!({
         "task": t,
         "deps": deps.into_iter().map(|(n, s)| json!({"number": n, "status": s})).collect::<Vec<_>>(),
@@ -222,7 +312,12 @@ pub struct TaskPatch {
     deps: Option<Vec<i64>>,
 }
 
-pub async fn update(State(st): State<AppState>, u: AuthUser, Path(tid): Path<i64>, Json(b): Json<TaskPatch>) -> ApiResult<Value> {
+pub async fn update(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(tid): Path<i64>,
+    Json(b): Json<TaskPatch>,
+) -> ApiResult<Value> {
     let (ctx, t) = task_ctx(&st, &u, tid).await?;
     ctx.can_edit()?;
     if ctx.role == Role::Freelance && t.assignee_id != Some(u.id) {
@@ -230,27 +325,54 @@ pub async fn update(State(st): State<AppState>, u: AuthUser, Path(tid): Path<i64
     }
     if let Some(x) = &b.title {
         check_len("Titre", x, 1, 140)?;
-        sqlx::query("UPDATE tasks SET title = ? WHERE id = ?").bind(x.trim()).bind(tid).execute(&st.db).await?;
+        sqlx::query("UPDATE tasks SET title = ? WHERE id = ?")
+            .bind(x.trim())
+            .bind(tid)
+            .execute(&st.db)
+            .await?;
     }
     if let Some(x) = &b.description {
         check_len("Description", x, 0, 20000)?;
-        sqlx::query("UPDATE tasks SET description = ? WHERE id = ?").bind(x).bind(tid).execute(&st.db).await?;
+        sqlx::query("UPDATE tasks SET description = ? WHERE id = ?")
+            .bind(x)
+            .bind(tid)
+            .execute(&st.db)
+            .await?;
     }
     if let Some(x) = &b.tag {
         if !TAGS.contains(&x.as_str()) {
             return Err(bad("Étiquette inconnue."));
         }
-        sqlx::query("UPDATE tasks SET tag = ? WHERE id = ?").bind(x).bind(tid).execute(&st.db).await?;
+        sqlx::query("UPDATE tasks SET tag = ? WHERE id = ?")
+            .bind(x)
+            .bind(tid)
+            .execute(&st.db)
+            .await?;
     }
     if let Some(a) = b.assignee_id {
         check_assignee(&st, &ctx, a).await?;
-        sqlx::query("UPDATE tasks SET assignee_id = ? WHERE id = ?").bind(a).bind(tid).execute(&st.db).await?;
+        sqlx::query("UPDATE tasks SET assignee_id = ? WHERE id = ?")
+            .bind(a)
+            .bind(tid)
+            .execute(&st.db)
+            .await?;
         if let Some(a) = a.filter(|a| *a != u.id) {
-            crate::account::notify_user(&st, a, t.map_id, &format!("{} vous a assigné #{} {}", u.name, t.number, t.title), &format!("/taches?t={tid}")).await;
+            crate::account::notify_user(
+                &st,
+                a,
+                t.map_id,
+                &format!("{} vous a assigné #{} {}", u.name, t.number, t.title),
+                &format!("/taches?t={tid}"),
+            )
+            .await;
         }
     }
     if let Some(d) = &b.planned_day {
-        sqlx::query("UPDATE tasks SET planned_day = ? WHERE id = ?").bind(d).bind(tid).execute(&st.db).await?;
+        sqlx::query("UPDATE tasks SET planned_day = ? WHERE id = ?")
+            .bind(d)
+            .bind(tid)
+            .execute(&st.db)
+            .await?;
     }
     if let Some(d) = &b.deps {
         set_deps(&st, t.map_id, tid, d).await?;
@@ -260,19 +382,40 @@ pub async fn update(State(st): State<AppState>, u: AuthUser, Path(tid): Path<i64
 }
 
 /// Change le statut d'une tâche en appliquant la règle : « En cours » seulement si les dépendances sont faites.
-pub async fn set_status_internal(st: &AppState, map_id: i64, tid: i64, uid: i64, status: &str, via: &str) -> Result<(), AppError> {
+pub async fn set_status_internal(
+    st: &AppState,
+    map_id: i64,
+    tid: i64,
+    uid: i64,
+    status: &str,
+    via: &str,
+) -> Result<(), AppError> {
     if !STATUSES.contains(&status) {
         return Err(bad("Statut inconnu."));
     }
-    let (number, title, old): (i64, String, String) = sqlx::query_as("SELECT number, title, status FROM tasks WHERE id = ?").bind(tid).fetch_one(&st.db).await?;
+    let (number, title, old): (i64, String, String) =
+        sqlx::query_as("SELECT number, title, status FROM tasks WHERE id = ?")
+            .bind(tid)
+            .fetch_one(&st.db)
+            .await?;
     if old == status {
         return Ok(());
     }
     if status == "doing" {
-        let pending: Vec<(i64, String)> = deps_of(st, tid).await?.into_iter().filter(|(_, s)| s != "done").collect();
+        let pending: Vec<(i64, String)> = deps_of(st, tid)
+            .await?
+            .into_iter()
+            .filter(|(_, s)| s != "done")
+            .collect();
         if !pending.is_empty() {
-            let list = pending.iter().map(|(n, _)| format!("#{n}")).collect::<Vec<_>>().join(", ");
-            return Err(AppError::Conflict(format!("#{number} ne peut pas passer « En cours » : {list} n’est pas encore fait.")));
+            let list = pending
+                .iter()
+                .map(|(n, _)| format!("#{n}"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            return Err(AppError::Conflict(format!(
+                "#{number} ne peut pas passer « En cours » : {list} n’est pas encore fait."
+            )));
         }
     }
     sqlx::query("UPDATE tasks SET status = ?, done_at = CASE WHEN ? = 'done' THEN datetime('now') ELSE NULL END WHERE id = ?")
@@ -293,7 +436,15 @@ pub async fn set_status_internal(st: &AppState, map_id: i64, tid: i64, uid: i64,
         "blocked" => "blocked",
         _ => "task",
     };
-    log_activity(st, map_id, Some(uid), kind, &format!("#{number} {}", status_label(status)), &title).await?;
+    log_activity(
+        st,
+        map_id,
+        Some(uid),
+        kind,
+        &format!("#{number} {}", status_label(status)),
+        &title,
+    )
+    .await?;
     if status == "done" {
         // Débloque automatiquement les tâches dont toutes les dépendances sont maintenant faites.
         let freed: Vec<(i64, i64)> = sqlx::query_as(
@@ -304,17 +455,39 @@ pub async fn set_status_internal(st: &AppState, map_id: i64, tid: i64, uid: i64,
         .fetch_all(&st.db)
         .await?;
         for (fid, fnum) in freed {
-            sqlx::query("UPDATE tasks SET status = 'todo' WHERE id = ?").bind(fid).execute(&st.db).await?;
-            let who: Option<(Option<i64>, String)> = sqlx::query_as("SELECT assignee_id, title FROM tasks WHERE id = ?").bind(fid).fetch_optional(&st.db).await?;
+            sqlx::query("UPDATE tasks SET status = 'todo' WHERE id = ?")
+                .bind(fid)
+                .execute(&st.db)
+                .await?;
+            let who: Option<(Option<i64>, String)> =
+                sqlx::query_as("SELECT assignee_id, title FROM tasks WHERE id = ?")
+                    .bind(fid)
+                    .fetch_optional(&st.db)
+                    .await?;
             if let Some((Some(a), ftitle)) = who {
-                crate::account::notify_user(st, a, map_id, &format!("#{fnum} {ftitle} est débloquée : vous pouvez commencer"), &format!("/taches?t={fid}")).await;
+                crate::account::notify_user(
+                    st,
+                    a,
+                    map_id,
+                    &format!("#{fnum} {ftitle} est débloquée : vous pouvez commencer"),
+                    &format!("/taches?t={fid}"),
+                )
+                .await;
             }
             sqlx::query("INSERT INTO task_events (task_id, user_id, what, via) VALUES (?, NULL, ?, 'Automatique')")
                 .bind(fid)
                 .bind(format!("Débloquée : #{number} est fait"))
                 .execute(&st.db)
                 .await?;
-            log_activity(st, map_id, None, "task", &format!("#{fnum} débloquée"), &format!("#{number} est fait")).await?;
+            log_activity(
+                st,
+                map_id,
+                None,
+                "task",
+                &format!("#{fnum} débloquée"),
+                &format!("#{number} est fait"),
+            )
+            .await?;
         }
     }
     notify(st, map_id, json!({ "t": "refresh", "what": "tasks" }));
@@ -326,7 +499,12 @@ pub struct StatusIn {
     status: String,
 }
 
-pub async fn set_status(State(st): State<AppState>, u: AuthUser, Path(tid): Path<i64>, Json(b): Json<StatusIn>) -> ApiResult<Value> {
+pub async fn set_status(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(tid): Path<i64>,
+    Json(b): Json<StatusIn>,
+) -> ApiResult<Value> {
     let (ctx, t) = task_ctx(&st, &u, tid).await?;
     ctx.can_edit()?;
     if ctx.role == Role::Freelance && t.assignee_id != Some(u.id) {
@@ -336,10 +514,17 @@ pub async fn set_status(State(st): State<AppState>, u: AuthUser, Path(tid): Path
     Ok(Json(json!({ "ok": true })))
 }
 
-pub async fn delete(State(st): State<AppState>, u: AuthUser, Path(tid): Path<i64>) -> ApiResult<Value> {
+pub async fn delete(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(tid): Path<i64>,
+) -> ApiResult<Value> {
     let (ctx, t) = task_ctx(&st, &u, tid).await?;
     ctx.require(Role::Admin)?;
-    sqlx::query("DELETE FROM tasks WHERE id = ?").bind(tid).execute(&st.db).await?;
+    sqlx::query("DELETE FROM tasks WHERE id = ?")
+        .bind(tid)
+        .execute(&st.db)
+        .await?;
     notify(&st, t.map_id, json!({ "t": "refresh", "what": "tasks" }));
     Ok(Json(json!({ "ok": true })))
 }
@@ -349,11 +534,21 @@ pub struct TitleIn {
     title: String,
 }
 
-pub async fn add_subtask(State(st): State<AppState>, u: AuthUser, Path(tid): Path<i64>, Json(b): Json<TitleIn>) -> ApiResult<Value> {
+pub async fn add_subtask(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(tid): Path<i64>,
+    Json(b): Json<TitleIn>,
+) -> ApiResult<Value> {
     let (ctx, _) = task_ctx(&st, &u, tid).await?;
     ctx.can_edit()?;
     check_len("Sous-tâche", &b.title, 1, 140)?;
-    let id: i64 = sqlx::query_scalar("INSERT INTO subtasks (task_id, title) VALUES (?, ?) RETURNING id").bind(tid).bind(b.title.trim()).fetch_one(&st.db).await?;
+    let id: i64 =
+        sqlx::query_scalar("INSERT INTO subtasks (task_id, title) VALUES (?, ?) RETURNING id")
+            .bind(tid)
+            .bind(b.title.trim())
+            .fetch_one(&st.db)
+            .await?;
     Ok(Json(json!({ "id": id })))
 }
 
@@ -362,11 +557,23 @@ pub struct SubPatch {
     done: bool,
 }
 
-pub async fn toggle_subtask(State(st): State<AppState>, u: AuthUser, Path(sid): Path<i64>, Json(b): Json<SubPatch>) -> ApiResult<Value> {
-    let (tid,): (i64,) = sqlx::query_as("SELECT task_id FROM subtasks WHERE id = ?").bind(sid).fetch_one(&st.db).await?;
+pub async fn toggle_subtask(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(sid): Path<i64>,
+    Json(b): Json<SubPatch>,
+) -> ApiResult<Value> {
+    let (tid,): (i64,) = sqlx::query_as("SELECT task_id FROM subtasks WHERE id = ?")
+        .bind(sid)
+        .fetch_one(&st.db)
+        .await?;
     let (ctx, _) = task_ctx(&st, &u, tid).await?;
     ctx.can_edit()?;
-    sqlx::query("UPDATE subtasks SET done = ? WHERE id = ?").bind(b.done as i64).bind(sid).execute(&st.db).await?;
+    sqlx::query("UPDATE subtasks SET done = ? WHERE id = ?")
+        .bind(b.done as i64)
+        .bind(sid)
+        .execute(&st.db)
+        .await?;
     Ok(Json(json!({ "ok": true })))
 }
 
@@ -375,7 +582,12 @@ pub struct CommentIn {
     pub body: String,
 }
 
-pub async fn comment(State(st): State<AppState>, u: AuthUser, Path(tid): Path<i64>, Json(b): Json<CommentIn>) -> ApiResult<Value> {
+pub async fn comment(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(tid): Path<i64>,
+    Json(b): Json<CommentIn>,
+) -> ApiResult<Value> {
     let (ctx, t) = task_ctx(&st, &u, tid).await?;
     ctx.require(Role::Freelance)?;
     check_len("Commentaire", &b.body, 1, 4000)?;
@@ -386,17 +598,44 @@ pub async fn comment(State(st): State<AppState>, u: AuthUser, Path(tid): Path<i6
         .bind(b.body.trim())
         .execute(&st.db)
         .await?;
-    log_activity(&st, t.map_id, Some(u.id), "comment", &format!("Commentaire sur #{}", t.number), &b.body.chars().take(120).collect::<String>()).await?;
+    log_activity(
+        &st,
+        t.map_id,
+        Some(u.id),
+        "comment",
+        &format!("Commentaire sur #{}", t.number),
+        &b.body.chars().take(120).collect::<String>(),
+    )
+    .await?;
     let mut to = crate::account::mentioned(&st, t.map_id, &b.body).await;
-    if let Some(a) = t.assignee_id { to.push(a) }
-    to.sort(); to.dedup();
+    if let Some(a) = t.assignee_id {
+        to.push(a)
+    }
+    to.sort();
+    to.dedup();
     for uid in to.into_iter().filter(|x| *x != u.id) {
-        crate::account::notify_user(&st, uid, t.map_id, &format!("{} sur #{} : {}", u.name, t.number, b.body.chars().take(100).collect::<String>()), &format!("/taches?t={tid}")).await;
+        crate::account::notify_user(
+            &st,
+            uid,
+            t.map_id,
+            &format!(
+                "{} sur #{} : {}",
+                u.name,
+                t.number,
+                b.body.chars().take(100).collect::<String>()
+            ),
+            &format!("/taches?t={tid}"),
+        )
+        .await;
     }
     Ok(Json(json!({ "ok": true })))
 }
 
-pub async fn locks(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64>) -> ApiResult<Value> {
+pub async fn locks(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(mid): Path<i64>,
+) -> ApiResult<Value> {
     map_ctx(&st, &u, mid).await?;
     let rows: Vec<(String, Option<String>, Option<i64>, String, f64)> = sqlx::query_as(
         "SELECT l.path, u.name, l.task_number, l.since, (julianday('now') - julianday(l.since)) * 24 FROM file_locks l LEFT JOIN users u ON u.id = l.user_id WHERE l.map_id = ? ORDER BY l.since",
@@ -408,7 +647,11 @@ pub async fn locks(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64>
 }
 
 /// Vue par personne et chaînes « qui bloque qui ».
-pub async fn people(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64>) -> ApiResult<Value> {
+pub async fn people(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(mid): Path<i64>,
+) -> ApiResult<Value> {
     let ctx = map_ctx(&st, &u, mid).await?;
     let members: Vec<(i64, String, String, String, i64)> = sqlx::query_as(
         "SELECT u.id, u.name, m.role, m.specialty, m.hours_per_week FROM memberships m JOIN users u ON u.id = m.user_id WHERE m.studio_id = ? ORDER BY u.name",
@@ -432,7 +675,16 @@ pub async fn people(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64
         people.push(json!({ "id": uid, "name": name, "role": role, "specialty": spec, "hours_per_week": hpw,
             "wip": wip, "planned_h": planned / 60, "done_h": done / 60, "late": late, "overload": planned / 60 > hpw }));
     }
-    let chains: Vec<(i64, String, Option<String>, String, i64, String, Option<String>, String)> = sqlx::query_as(
+    let chains: Vec<(
+        i64,
+        String,
+        Option<String>,
+        String,
+        i64,
+        String,
+        Option<String>,
+        String,
+    )> = sqlx::query_as(
         "SELECT d.number, d.title, du.name, d.status, t.number, t.title, tu.name, t.status
          FROM task_deps x JOIN tasks t ON t.id = x.task_id JOIN tasks d ON d.id = x.depends_on
          LEFT JOIN users du ON du.id = d.assignee_id LEFT JOIN users tu ON tu.id = t.assignee_id

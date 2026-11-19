@@ -1,10 +1,23 @@
 //! Lecture des digests Verse (API Fortnite, Verse, UnrealEngine, assets du projet) pour l'autocomplétion.
 use serde_json::{json, Value};
 
-const EFFECTS: [&str; 10] = ["decides", "transacts", "suspends", "varies", "computes", "reads", "writes", "allocates", "converges", "no_rollback"];
+const EFFECTS: [&str; 10] = [
+    "decides",
+    "transacts",
+    "suspends",
+    "varies",
+    "computes",
+    "reads",
+    "writes",
+    "allocates",
+    "converges",
+    "no_rollback",
+];
 
 fn ident(s: &str) -> Option<&str> {
-    let end = s.find(|c: char| !(c.is_alphanumeric() || c == '_')).unwrap_or(s.len());
+    let end = s
+        .find(|c: char| !(c.is_alphanumeric() || c == '_'))
+        .unwrap_or(s.len());
     (end > 0 && !s.chars().next().unwrap().is_ascii_digit()).then(|| &s[..end])
 }
 
@@ -35,21 +48,47 @@ pub fn parse(source: &str, file: &str, out: &mut Vec<Value>) {
             doc.clear();
             continue;
         }
-        let Some(name) = ident(line) else { doc.clear(); continue };
+        let Some(name) = ident(line) else {
+            doc.clear();
+            continue;
+        };
         let rest = &line[name.len()..];
-        if !rest.starts_with('<') && !rest.starts_with('(') && !rest.starts_with(':') && !rest.trim_start().starts_with(":=") {
+        if !rest.starts_with('<')
+            && !rest.starts_with('(')
+            && !rest.starts_with(':')
+            && !rest.trim_start().starts_with(":=")
+        {
             doc.clear();
             continue;
         }
-        if rest.starts_with('<') && !rest.starts_with("<public>") && !rest.starts_with("<native><public>") && !rest.contains("<public>") {
+        if rest.starts_with('<')
+            && !rest.starts_with("<public>")
+            && !rest.starts_with("<native><public>")
+            && !rest.contains("<public>")
+        {
             doc.clear();
             continue;
         }
-        let sig = line.trim_end_matches(" = external {}").trim_end_matches(':').to_string();
+        let sig = line
+            .trim_end_matches(" = external {}")
+            .trim_end_matches(':')
+            .to_string();
         let kind = if rest.contains(":= module") || rest.contains(":=module") {
             "module"
-        } else if rest.contains(":= class") || rest.contains(":= interface") || rest.contains(":= struct") || rest.contains(":= enum") {
-            if rest.contains(":= enum") { "enum" } else if rest.contains(":= struct") { "struct" } else if rest.contains(":= interface") { "interface" } else { "class" }
+        } else if rest.contains(":= class")
+            || rest.contains(":= interface")
+            || rest.contains(":= struct")
+            || rest.contains(":= enum")
+        {
+            if rest.contains(":= enum") {
+                "enum"
+            } else if rest.contains(":= struct") {
+                "struct"
+            } else if rest.contains(":= interface") {
+                "interface"
+            } else {
+                "class"
+            }
         } else if rest.contains("listenable(") || name.ends_with("Event") {
             "event"
         } else if rest.contains('(') && rest.find('(') < rest.find(':') {
@@ -57,7 +96,11 @@ pub fn parse(source: &str, file: &str, out: &mut Vec<Value>) {
         } else {
             "field"
         };
-        let effects: Vec<&str> = EFFECTS.iter().copied().filter(|e| line.contains(&format!("<{e}>"))).collect();
+        let effects: Vec<&str> = EFFECTS
+            .iter()
+            .copied()
+            .filter(|e| line.contains(&format!("<{e}>")))
+            .collect();
         let container = stack.last().map(|(_, c)| c.clone()).unwrap_or_default();
         out.push(json!({
             "name": name, "kind": kind, "signature": sig, "effects": effects, "doc": doc.join(" "),
@@ -164,12 +207,22 @@ mod t {
     fn sample() {
         let mut v = vec![];
         parse(SAMPLE, "Fortnite.digest.verse", &mut v);
-        let b = v.iter().find(|s| s["name"] == "InteractedWithEvent").unwrap();
+        let b = v
+            .iter()
+            .find(|s| s["name"] == "InteractedWithEvent")
+            .unwrap();
         assert_eq!(b["container"], "button_device");
         assert_eq!(b["kind"], "event");
         let g = v.iter().find(|s| s["name"] == "GetFortCharacter").unwrap();
-        assert!(g["effects"].as_array().unwrap().iter().any(|e| e == "decides"));
+        assert!(g["effects"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|e| e == "decides"));
         assert_eq!(g["module"], "/Fortnite.com/Characters");
-        assert_eq!(tags(&[("a".into(), "vault_plate := class(tag){}".into())]), vec!["vault_plate"]);
+        assert_eq!(
+            tags(&[("a".into(), "vault_plate := class(tag){}".into())]),
+            vec!["vault_plate"]
+        );
     }
 }

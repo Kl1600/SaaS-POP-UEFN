@@ -22,9 +22,19 @@ pub const COOKIE: &str = "pop_session";
 /// En HTTPS, le cookie de session porte le préfixe `__Host-` : le navigateur exige alors Secure, Path=/ et aucun domaine,
 /// ce qui empêche un sous-domaine (ou un réseau non chiffré) de le poser ou de l'écraser.
 pub const SECURE_COOKIE: &str = "__Host-pop_session";
-pub fn cookie_name(secure: bool) -> &'static str { if secure { SECURE_COOKIE } else { COOKIE } }
+pub fn cookie_name(secure: bool) -> &'static str {
+    if secure {
+        SECURE_COOKIE
+    } else {
+        COOKIE
+    }
+}
 /// Jeton de session lu dans les cookies (nom sécurisé d'abord).
-pub fn session_token(jar: &CookieJar) -> Option<String> { jar.get(SECURE_COOKIE).or_else(|| jar.get(COOKIE)).map(|c| c.value().to_string()) }
+pub fn session_token(jar: &CookieJar) -> Option<String> {
+    jar.get(SECURE_COOKIE)
+        .or_else(|| jar.get(COOKIE))
+        .map(|c| c.value().to_string())
+}
 const SESSION_DAYS: i64 = 30;
 
 #[derive(Clone, Debug, Serialize)]
@@ -64,13 +74,24 @@ pub fn verify_password(pw: &str, hash: &str) -> bool {
 impl FromRequestParts<AppState> for AuthUser {
     type Rejection = AppError;
 
-    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
         let jar = CookieJar::from_headers(&parts.headers);
         let token = session_token(&jar).ok_or(AppError::Unauthorized)?;
-        let u = user_from_token(state, &token).await?.ok_or(AppError::Unauthorized)?;
+        let u = user_from_token(state, &token)
+            .await?
+            .ok_or(AppError::Unauthorized)?;
         // Essai terminé sans abonnement : seuls le choix d'un abonnement, l'export et la déconnexion restent ouverts.
-        if crate::stripe::configured() && !crate::stripe::allowed_when_expired(parts.uri.path()) && crate::stripe::access_state(state, u.id).await? == "expired" {
-            return Err(AppError::Guard("abonnement", "Votre essai est terminé : choisissez Starter ou Pro pour continuer.".into()));
+        if crate::stripe::configured()
+            && !crate::stripe::allowed_when_expired(parts.uri.path())
+            && crate::stripe::access_state(state, u.id).await? == "expired"
+        {
+            return Err(AppError::Guard(
+                "abonnement",
+                "Votre essai est terminé : choisissez Starter ou Pro pour continuer.".into(),
+            ));
         }
         // Dernière activité (au plus une écriture toutes les 5 minutes par session).
         let _ = sqlx::query("UPDATE sessions SET last_seen = datetime('now') WHERE token_hash = ? AND (last_seen IS NULL OR last_seen < datetime('now', '-5 minutes'))").bind(&u.sid).execute(&state.db).await;
@@ -87,12 +108,21 @@ pub async fn user_from_token(state: &AppState, token: &str) -> Result<Option<Aut
     .bind(sha256_hex(token))
     .fetch_optional(&state.db)
     .await?;
-    Ok(row.map(|(id, email, name)| AuthUser { id, email, name, sid: sha256_hex(token) }))
+    Ok(row.map(|(id, email, name)| AuthUser {
+        id,
+        email,
+        name,
+        sid: sha256_hex(token),
+    }))
 }
 
 /// Limite simple : 10 tentatives par minute et par adresse e-mail.
 pub fn rate_limit(state: &AppState, key: &str) -> Result<(), AppError> {
-    if hit(state, key, 10, Duration::from_secs(60)) { Ok(()) } else { Err(AppError::TooMany) }
+    if hit(state, key, 10, Duration::from_secs(60)) {
+        Ok(())
+    } else {
+        Err(AppError::TooMany)
+    }
 }
 
 /// Compte une tentative pour `key` : `false` au-delà de `max` tentatives dans la fenêtre `window`.
@@ -107,7 +137,14 @@ pub fn hit(state: &AppState, key: &str, max: u32, window: Duration) -> bool {
     e.0 <= max
 }
 
-pub async fn open_session(state: &AppState, jar: CookieJar, user_id: i64, ip: &str, ua: &str, mfa: bool) -> Result<CookieJar, AppError> {
+pub async fn open_session(
+    state: &AppState,
+    jar: CookieJar,
+    user_id: i64,
+    ip: &str,
+    ua: &str,
+    mfa: bool,
+) -> Result<CookieJar, AppError> {
     let token = random_token();
     sqlx::query("INSERT INTO sessions (token_hash, user_id, expires_at, ip, user_agent, created_at, last_seen, mfa) VALUES (?, ?, datetime('now', ?), ?, ?, datetime('now'), datetime('now'), ?)")
         .bind(sha256_hex(&token))
@@ -139,8 +176,16 @@ pub struct RegisterIn {
     accept_terms: bool,
 }
 
-pub async fn register(State(st): State<AppState>, crate::security::ClientIp(ip): crate::security::ClientIp, headers: axum::http::HeaderMap, jar: CookieJar, Json(b): Json<RegisterIn>) -> Result<(CookieJar, Json<Value>), AppError> {
-    if !b.accept_terms { return Err(bad("Acceptez les conditions d’utilisation et la politique de confidentialité pour continuer.")) }
+pub async fn register(
+    State(st): State<AppState>,
+    crate::security::ClientIp(ip): crate::security::ClientIp,
+    headers: axum::http::HeaderMap,
+    jar: CookieJar,
+    Json(b): Json<RegisterIn>,
+) -> Result<(CookieJar, Json<Value>), AppError> {
+    if !b.accept_terms {
+        return Err(bad("Acceptez les conditions d’utilisation et la politique de confidentialité pour continuer."));
+    }
     rate_limit(&st, &b.email)?;
     rate_limit(&st, &format!("ip:reg:{ip}"))?;
     let email = b.email.trim().to_lowercase();
@@ -149,9 +194,14 @@ pub async fn register(State(st): State<AppState>, crate::security::ClientIp(ip):
     }
     check_len("Nom", &b.name, 1, 80)?;
     crate::security::password_policy(&b.password, &email)?;
-    let exists: Option<(i64,)> = sqlx::query_as("SELECT id FROM users WHERE email = ?").bind(&email).fetch_optional(&st.db).await?;
+    let exists: Option<(i64,)> = sqlx::query_as("SELECT id FROM users WHERE email = ?")
+        .bind(&email)
+        .fetch_optional(&st.db)
+        .await?;
     if exists.is_some() {
-        return Err(AppError::Conflict("Un compte existe déjà avec cette adresse.".into()));
+        return Err(AppError::Conflict(
+            "Un compte existe déjà avec cette adresse.".into(),
+        ));
     }
     // Inscriptions sur liste d'attente : il faut une invitation de studio ou un lien d'accès validé.
     let wid = crate::admin::signup_allowed(&st, &email, &ip, b.invite.as_deref(), b.access.as_deref()).await.map_err(|e| match e {
@@ -167,16 +217,26 @@ pub async fn register(State(st): State<AppState>, crate::security::ClientIp(ip):
         .bind(hash)
         .fetch_one(&st.db)
         .await?;
-    if let Some(w) = wid { crate::admin::mark_registered(&st, w, id).await; }
+    if let Some(w) = wid {
+        crate::admin::mark_registered(&st, w, id).await;
+    }
     if let Some(tok) = b.invite.filter(|t| !t.is_empty()) {
         crate::studio::accept_invite_for(&st, id, &tok).await?;
     }
     crate::security::audit(&st, Some(id), "compte_créé", &email, &ip).await;
     // Lien de vérification de l'adresse (sans SMTP : compte vérifié d'office, voir verify.rs).
     let mailed = crate::verify::start(&st, id, &email).await?;
-    let ua = headers.get("user-agent").and_then(|v| v.to_str().ok()).unwrap_or("");
+    let ua = headers
+        .get("user-agent")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
     let jar = open_session(&st, jar, id, &ip, ua, false).await?;
-    Ok((jar, Json(json!({ "id": id, "email": email, "name": b.name.trim(), "email_verified": !mailed, "verification_sent": mailed }))))
+    Ok((
+        jar,
+        Json(
+            json!({ "id": id, "email": email, "name": b.name.trim(), "email_verified": !mailed, "verification_sent": mailed }),
+        ),
+    ))
 }
 
 #[derive(Deserialize)]
@@ -189,7 +249,13 @@ pub struct LoginIn {
 
 /// Connexion par identifiant (ou e-mail) et mot de passe. Verrouillage 15 minutes après 5 échecs,
 /// limite par adresse IP, compte de test réservé à cet ordinateur.
-pub async fn login(State(st): State<AppState>, crate::security::ClientIp(ip): crate::security::ClientIp, headers: axum::http::HeaderMap, jar: CookieJar, Json(b): Json<LoginIn>) -> Result<(CookieJar, Json<Value>), AppError> {
+pub async fn login(
+    State(st): State<AppState>,
+    crate::security::ClientIp(ip): crate::security::ClientIp,
+    headers: axum::http::HeaderMap,
+    jar: CookieJar,
+    Json(b): Json<LoginIn>,
+) -> Result<(CookieJar, Json<Value>), AppError> {
     rate_limit(&st, &b.email)?;
     rate_limit(&st, &format!("ip:{ip}"))?;
     let email = b.email.trim().to_lowercase();
@@ -215,34 +281,63 @@ pub async fn login(State(st): State<AppState>, crate::security::ClientIp(ip): cr
         let n: i64 = sqlx::query_scalar("UPDATE users SET failed_logins = failed_logins + 1 WHERE id = ? RETURNING failed_logins").bind(id).fetch_one(&st.db).await?;
         if n >= 5 {
             sqlx::query("UPDATE users SET failed_logins = 0, locked_until = datetime('now', '+15 minutes') WHERE id = ?").bind(id).execute(&st.db).await?;
-            crate::security::audit(&st, Some(id), "compte_bloqué", "5 mots de passe faux", &ip).await;
+            crate::security::audit(&st, Some(id), "compte_bloqué", "5 mots de passe faux", &ip)
+                .await;
         } else {
             crate::security::audit(&st, Some(id), "connexion_échouée", "", &ip).await;
         }
         return Err(bad("Identifiant ou mot de passe incorrect."));
     }
-    sqlx::query("UPDATE users SET failed_logins = 0, locked_until = NULL WHERE id = ?").bind(id).execute(&st.db).await?;
-    let ua = headers.get("user-agent").and_then(|v| v.to_str().ok()).unwrap_or("").to_string();
+    sqlx::query("UPDATE users SET failed_logins = 0, locked_until = NULL WHERE id = ?")
+        .bind(id)
+        .execute(&st.db)
+        .await?;
+    let ua = headers
+        .get("user-agent")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
     crate::security::audit(&st, Some(id), "connexion", "", &ip).await;
     let jar = open_session(&st, jar, id, &ip, &ua, false).await?;
     Ok((jar, Json(json!({ "id": id, "name": name }))))
 }
 
-pub async fn logout(State(st): State<AppState>, jar: CookieJar) -> Result<(CookieJar, Json<Value>), AppError> {
+pub async fn logout(
+    State(st): State<AppState>,
+    jar: CookieJar,
+) -> Result<(CookieJar, Json<Value>), AppError> {
     if let Some(c) = session_token(&jar) {
-        sqlx::query("DELETE FROM sessions WHERE token_hash = ?").bind(sha256_hex(&c)).execute(&st.db).await?;
+        sqlx::query("DELETE FROM sessions WHERE token_hash = ?")
+            .bind(sha256_hex(&c))
+            .execute(&st.db)
+            .await?;
     }
-    let jar = jar.remove(Cookie::build(COOKIE).path("/").build()).remove(Cookie::build(SECURE_COOKIE).path("/").secure(true).build());
+    let jar = jar
+        .remove(Cookie::build(COOKIE).path("/").build())
+        .remove(Cookie::build(SECURE_COOKIE).path("/").secure(true).build());
     Ok((jar, Json(json!({ "ok": true }))))
 }
 
 pub async fn me(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
     // Chaque compte a d'office son espace perso (maps faites seul) : pas de formulaire à l'arrivée.
     crate::studio::ensure_personal(&st, u.id).await?;
-    let (credits, username, must_change): (i64, Option<String>, i64) = sqlx::query_as("SELECT credits, username, must_change_password FROM users WHERE id = ?").bind(u.id).fetch_one(&st.db).await?;
-    let _ = sqlx::query("UPDATE users SET last_seen = datetime('now') WHERE id = ?").bind(u.id).execute(&st.db).await;
+    let (credits, username, must_change): (i64, Option<String>, i64) =
+        sqlx::query_as("SELECT credits, username, must_change_password FROM users WHERE id = ?")
+            .bind(u.id)
+            .fetch_one(&st.db)
+            .await?;
+    let _ = sqlx::query("UPDATE users SET last_seen = datetime('now') WHERE id = ?")
+        .bind(u.id)
+        .execute(&st.db)
+        .await;
     let admin = crate::admin::is_admin(&st, u.id).await?;
-    let pending: i64 = if admin { sqlx::query_scalar("SELECT COUNT(*) FROM waitlist WHERE status = 'pending'").fetch_one(&st.db).await? } else { 0 };
+    let pending: i64 = if admin {
+        sqlx::query_scalar("SELECT COUNT(*) FROM waitlist WHERE status = 'pending'")
+            .fetch_one(&st.db)
+            .await?
+    } else {
+        0
+    };
     let studios: Vec<(i64, String, String, i64)> = sqlx::query_as(
         "SELECT s.id, s.name, m.role, s.personal FROM memberships m JOIN studios s ON s.id = m.studio_id WHERE m.user_id = ? ORDER BY s.personal DESC, s.id",
     )
@@ -263,6 +358,8 @@ pub async fn me(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
         }));
     }
     let email_verified = crate::verify::is_verified(&st, u.id).await?;
-    Ok(Json(json!({ "user": u, "credits": credits, "studios": out, "admin": admin, "admin_pending": pending, "username": username, "must_change_password": must_change == 1, "email_verified": email_verified,
-        "plan": crate::billing::user_plan(&st, u.id).await?, "trial_until": crate::billing::trial_until(&st, u.id).await?, "billing_state": crate::stripe::access_state(&st, u.id).await?, "ai_credits": sqlx::query_scalar::<_, i64>("SELECT ai_credits FROM users WHERE id = ?").bind(u.id).fetch_one(&st.db).await?, "analyse": crate::billing::user_analyse(&st, u.id).await? })))
+    Ok(Json(
+        json!({ "user": u, "credits": credits, "studios": out, "admin": admin, "admin_pending": pending, "username": username, "must_change_password": must_change == 1, "email_verified": email_verified,
+        "plan": crate::billing::user_plan(&st, u.id).await?, "trial_until": crate::billing::trial_until(&st, u.id).await?, "billing_state": crate::stripe::access_state(&st, u.id).await?, "ai_credits": sqlx::query_scalar::<_, i64>("SELECT ai_credits FROM users WHERE id = ?").bind(u.id).fetch_one(&st.db).await?, "analyse": crate::billing::user_analyse(&st, u.id).await? }),
+    ))
 }

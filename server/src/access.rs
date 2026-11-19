@@ -63,29 +63,47 @@ pub async fn map_ctx(st: &AppState, user: &AuthUser, map_id: i64) -> Result<MapC
     .fetch_optional(&st.db)
     .await?;
     let (studio_id, role) = row.ok_or(AppError::NotFound)?;
-    Ok(MapCtx { map_id, studio_id, role: Role::parse(&role).unwrap_or(Role::Viewer), user: user.clone() })
+    Ok(MapCtx {
+        map_id,
+        studio_id,
+        role: Role::parse(&role).unwrap_or(Role::Viewer),
+        user: user.clone(),
+    })
 }
 
 pub async fn studio_role(st: &AppState, user: &AuthUser, studio_id: i64) -> Result<Role, AppError> {
-    let r: Option<(String,)> = sqlx::query_as("SELECT role FROM memberships WHERE studio_id = ? AND user_id = ?")
-        .bind(studio_id)
-        .bind(user.id)
-        .fetch_optional(&st.db)
-        .await?;
+    let r: Option<(String,)> =
+        sqlx::query_as("SELECT role FROM memberships WHERE studio_id = ? AND user_id = ?")
+            .bind(studio_id)
+            .bind(user.id)
+            .fetch_optional(&st.db)
+            .await?;
     r.and_then(|(r,)| Role::parse(&r)).ok_or(AppError::NotFound)
 }
 
 /// Ajoute une ligne au fil d'activité et prévient les membres connectés.
-pub async fn log_activity(st: &AppState, map_id: i64, user_id: Option<i64>, kind: &str, title: &str, detail: &str) -> Result<(), AppError> {
-    sqlx::query("INSERT INTO activity (map_id, user_id, kind, title, detail) VALUES (?, ?, ?, ?, ?)")
-        .bind(map_id)
-        .bind(user_id)
-        .bind(kind)
-        .bind(title)
-        .bind(detail)
-        .execute(&st.db)
-        .await?;
-    st.hub.send(map_id, json!({ "t": "activity", "kind": kind, "title": title, "detail": detail }));
+pub async fn log_activity(
+    st: &AppState,
+    map_id: i64,
+    user_id: Option<i64>,
+    kind: &str,
+    title: &str,
+    detail: &str,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "INSERT INTO activity (map_id, user_id, kind, title, detail) VALUES (?, ?, ?, ?, ?)",
+    )
+    .bind(map_id)
+    .bind(user_id)
+    .bind(kind)
+    .bind(title)
+    .bind(detail)
+    .execute(&st.db)
+    .await?;
+    st.hub.send(
+        map_id,
+        json!({ "t": "activity", "kind": kind, "title": title, "detail": detail }),
+    );
     Ok(())
 }
 

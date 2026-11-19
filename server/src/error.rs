@@ -24,15 +24,25 @@ pub enum AppError {
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         if let AppError::Guard(c, m) = &self {
-            return (StatusCode::FORBIDDEN, Json(json!({ "error": m, "code": c }))).into_response();
+            return (
+                StatusCode::FORBIDDEN,
+                Json(json!({ "error": m, "code": c })),
+            )
+                .into_response();
         }
         let (code, msg) = match self {
             AppError::BadRequest(m) => (StatusCode::BAD_REQUEST, m),
             AppError::Unauthorized => (StatusCode::UNAUTHORIZED, "Connexion requise.".into()),
-            AppError::Forbidden => (StatusCode::FORBIDDEN, "Action non autorisée pour votre rôle.".into()),
+            AppError::Forbidden => (
+                StatusCode::FORBIDDEN,
+                "Action non autorisée pour votre rôle.".into(),
+            ),
             AppError::NotFound => (StatusCode::NOT_FOUND, "Introuvable.".into()),
             AppError::Conflict(m) => (StatusCode::CONFLICT, m),
-            AppError::TooMany => (StatusCode::TOO_MANY_REQUESTS, "Trop de tentatives, réessayez dans une minute.".into()),
+            AppError::TooMany => (
+                StatusCode::TOO_MANY_REQUESTS,
+                "Trop de tentatives, réessayez dans une minute.".into(),
+            ),
             AppError::TooManyMsg(m) => (StatusCode::TOO_MANY_REQUESTS, m),
             AppError::Guard(_, m) => (StatusCode::FORBIDDEN, m),
             AppError::Internal(e) => {
@@ -75,7 +85,9 @@ pub fn bad(msg: impl Into<String>) -> AppError {
 pub fn check_len(field: &str, v: &str, min: usize, max: usize) -> Result<(), AppError> {
     let n = v.trim().chars().count();
     if n < min || n > max {
-        return Err(bad(format!("« {field} » doit faire entre {min} et {max} caractères.")));
+        return Err(bad(format!(
+            "« {field} » doit faire entre {min} et {max} caractères."
+        )));
     }
     Ok(())
 }
@@ -84,7 +96,10 @@ impl std::fmt::Display for AppError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Le message lisible (affiché dans le suivi d'envoi Verse, #5) ; le détail technique reste dans `{:?}`.
         match self {
-            AppError::BadRequest(m) | AppError::Conflict(m) | AppError::TooManyMsg(m) | AppError::Guard(_, m) => f.write_str(m),
+            AppError::BadRequest(m)
+            | AppError::Conflict(m)
+            | AppError::TooManyMsg(m)
+            | AppError::Guard(_, m) => f.write_str(m),
             AppError::Unauthorized => f.write_str("Connexion requise."),
             AppError::Forbidden => f.write_str("Action non autorisée pour votre rôle."),
             AppError::NotFound => f.write_str("Introuvable."),

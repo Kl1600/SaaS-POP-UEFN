@@ -1,37 +1,37 @@
 mod access;
 mod account;
-mod security;
 mod admin;
-mod analytics;
-mod billing;
-mod ideas;
-mod stripe;
-mod aipop;
 mod aiplan;
-mod privstats;
-mod model;
-mod legal;
+mod aipop;
+mod analytics;
+mod auth;
+mod billing;
+mod boards;
+mod catalog;
 mod discover;
+mod engine;
+mod error;
+mod guide;
+mod ideas;
+mod integrations;
+mod launch;
+mod legal;
+mod link;
 mod mail;
 mod manage;
-mod engine;
-mod guide;
-mod integrations;
-mod link;
-mod catalog;
 mod mcp;
-mod uefn;
-mod verse;
-mod auth;
-mod boards;
-mod error;
-mod launch;
+mod model;
 mod money;
 mod pages;
 mod plan;
+mod privstats;
+mod security;
+mod stripe;
 mod studio;
 mod tasks;
+mod uefn;
 mod verify;
+mod verse;
 mod ws;
 
 use axum::{
@@ -72,7 +72,15 @@ pub struct AppState {
 /// État d'application pour les tests de routes : base SQLite en mémoire, migrations appliquées.
 #[cfg(test)]
 pub async fn test_state() -> AppState {
-    let db = SqlitePoolOptions::new().max_connections(1).connect_with(SqliteConnectOptions::from_str("sqlite::memory:").unwrap().foreign_keys(true)).await.unwrap();
+    let db = SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect_with(
+            SqliteConnectOptions::from_str("sqlite::memory:")
+                .unwrap()
+                .foreign_keys(true),
+        )
+        .await
+        .unwrap();
     sqlx::migrate!("./migrations").run(&db).await.unwrap();
     AppState {
         db,
@@ -92,20 +100,48 @@ async fn csrf(req: Request<Body>, next: Next) -> Response {
     let m = req.method().clone();
     // HTTPS forcé : derrière le proxy (Caddy, Nginx, Cloudflare…), une requête arrivée en http est renvoyée en https.
     if https_mode() {
-        let proto = req.headers().get("x-forwarded-proto").and_then(|v| v.to_str().ok()).unwrap_or("");
+        let proto = req
+            .headers()
+            .get("x-forwarded-proto")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
         if proto.eq_ignore_ascii_case("http") {
-            let host = req.headers().get("host").and_then(|v| v.to_str().ok()).unwrap_or("").to_string();
-            if !host.is_empty() && host.chars().all(|c| c.is_ascii_alphanumeric() || ".-:[]".contains(c)) {
-                let pq = req.uri().path_and_query().map(|x| x.as_str().to_string()).unwrap_or_else(|| "/".into());
-                return axum::response::Redirect::permanent(&format!("https://{host}{pq}")).into_response();
+            let host = req
+                .headers()
+                .get("host")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("")
+                .to_string();
+            if !host.is_empty()
+                && host
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || ".-:[]".contains(c))
+            {
+                let pq = req
+                    .uri()
+                    .path_and_query()
+                    .map(|x| x.as_str().to_string())
+                    .unwrap_or_else(|| "/".into());
+                return axum::response::Redirect::permanent(&format!("https://{host}{pq}"))
+                    .into_response();
             }
         }
     }
     let path = req.uri().path().to_string();
-    if m != Method::GET && m != Method::HEAD && m != Method::OPTIONS && !path.starts_with("/api/hooks/") && !path.starts_with("/api/relay/") && path != "/mcp" {
+    if m != Method::GET
+        && m != Method::HEAD
+        && m != Method::OPTIONS
+        && !path.starts_with("/api/hooks/")
+        && !path.starts_with("/api/relay/")
+        && path != "/mcp"
+    {
         let ok = req.headers().get("x-pop").and_then(|v| v.to_str().ok()) == Some("1");
         if !ok {
-            return (StatusCode::FORBIDDEN, Json(json!({ "error": "Requête refusée (CSRF)." }))).into_response();
+            return (
+                StatusCode::FORBIDDEN,
+                Json(json!({ "error": "Requête refusée (CSRF)." })),
+            )
+                .into_response();
         }
     }
     let mut res = next.run(req).await;
@@ -113,20 +149,34 @@ async fn csrf(req: Request<Body>, next: Next) -> Response {
     h.insert("x-content-type-options", "nosniff".parse().unwrap());
     h.insert("x-frame-options", "DENY".parse().unwrap());
     h.insert("referrer-policy", "same-origin".parse().unwrap());
-    h.insert("permissions-policy", "camera=(), microphone=(), geolocation=(), payment=()".parse().unwrap());
+    h.insert(
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=()"
+            .parse()
+            .unwrap(),
+    );
     h.insert("cross-origin-opener-policy", "same-origin".parse().unwrap());
     // Politique de contenu : scripts uniquement de POP, aucune intégration de POP dans un autre site.
     h.insert("content-security-policy", "default-src 'self'; script-src 'self' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' ws: wss:; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'".parse().unwrap());
     if https_mode() {
-        h.insert("strict-transport-security", "max-age=63072000; includeSubDomains".parse().unwrap());
+        h.insert(
+            "strict-transport-security",
+            "max-age=63072000; includeSubDomains".parse().unwrap(),
+        );
     }
     // Pas de mise en cache des réponses de l'API (données personnelles), sauf les vignettes relayées.
-    if path.starts_with("/api/") && path != "/api/img" { h.insert("cache-control", "no-store".parse().unwrap()); }
+    if path.starts_with("/api/") && path != "/api/img" {
+        h.insert("cache-control", "no-store".parse().unwrap());
+    }
     // Fichiers de l'interface : ceux de /assets/ portent leur empreinte dans leur nom et ne changent jamais ; tout
     // le reste (index.html, pages, téléchargements) est revalidé à chaque visite. Sans cela, après une mise à jour,
     // un navigateur garde l'ancien index.html qui réclame des fichiers supprimés : page blanche.
     else if !h.contains_key("cache-control") {
-        let v = if path.starts_with("/assets/") { "public, max-age=31536000, immutable" } else { "no-cache" };
+        let v = if path.starts_with("/assets/") {
+            "public, max-age=31536000, immutable"
+        } else {
+            "no-cache"
+        };
         h.insert("cache-control", v.parse().unwrap());
     }
     res
@@ -134,18 +184,28 @@ async fn csrf(req: Request<Body>, next: Next) -> Response {
 
 /// Production en HTTPS : `POP_SECURE_COOKIES=1`, ou une adresse publique en `https://`.
 pub fn https_mode() -> bool {
-    std::env::var("POP_SECURE_COOKIES").map(|v| v == "1").unwrap_or(false) || mail::public_url().starts_with("https://")
+    std::env::var("POP_SECURE_COOKIES")
+        .map(|v| v == "1")
+        .unwrap_or(false)
+        || mail::public_url().starts_with("https://")
 }
 
 /// Rapport du soir (texte prêt à poster sur Discord).
-async fn report(State(st): State<AppState>, u: auth::AuthUser, Path(mid): Path<i64>) -> Result<Json<Value>, error::AppError> {
+async fn report(
+    State(st): State<AppState>,
+    u: auth::AuthUser,
+    Path(mid): Path<i64>,
+) -> Result<Json<Value>, error::AppError> {
     access::map_ctx(&st, &u, mid).await?;
     Ok(Json(json!({ "text": report_text(&st, mid).await? })))
 }
 
 pub async fn report_text(st: &AppState, mid: i64) -> Result<String, error::AppError> {
     let st = st.clone();
-    let (name,): (String,) = sqlx::query_as("SELECT name FROM maps WHERE id = ?").bind(mid).fetch_one(&st.db).await?;
+    let (name,): (String,) = sqlx::query_as("SELECT name FROM maps WHERE id = ?")
+        .bind(mid)
+        .fetch_one(&st.db)
+        .await?;
     let done: Vec<(i64, String)> = sqlx::query_as("SELECT number, title FROM tasks WHERE map_id = ? AND status = 'done' AND done_at >= date('now') ORDER BY number").bind(mid).fetch_all(&st.db).await?;
     let (doing, blocked): (i64, i64) = sqlx::query_as("SELECT COALESCE(SUM(status = 'doing'), 0), COALESCE(SUM(status = 'blocked'), 0) FROM tasks WHERE map_id = ?").bind(mid).fetch_one(&st.db).await?;
     let next: Vec<(i64, String, Option<String>)> = sqlx::query_as(
@@ -156,9 +216,26 @@ pub async fn report_text(st: &AppState, mid: i64) -> Result<String, error::AppEr
     .await?;
     let ms: Option<(String, String)> = sqlx::query_as("SELECT title, date FROM milestones WHERE map_id = ? AND date >= date('now') ORDER BY date LIMIT 1").bind(mid).fetch_optional(&st.db).await?;
     let mut t = format!("**Rapport du soir · {name}**\n");
-    t.push_str(&format!("Fait aujourd'hui ({}) : {}\n", done.len(), if done.is_empty() { "rien".into() } else { done.iter().map(|(n, x)| format!("#{n} {x}")).collect::<Vec<_>>().join(" · ") }));
+    t.push_str(&format!(
+        "Fait aujourd'hui ({}) : {}\n",
+        done.len(),
+        if done.is_empty() {
+            "rien".into()
+        } else {
+            done.iter()
+                .map(|(n, x)| format!("#{n} {x}"))
+                .collect::<Vec<_>>()
+                .join(" · ")
+        }
+    ));
     t.push_str(&format!("En cours : {doing} · Bloqué : {blocked}\n"));
-    t.push_str(&format!("Demain : {}\n", next.iter().map(|(n, x, w)| format!("#{n} {x} ({})", w.clone().unwrap_or_default())).collect::<Vec<_>>().join(" · ")));
+    t.push_str(&format!(
+        "Demain : {}\n",
+        next.iter()
+            .map(|(n, x, w)| format!("#{n} {x} ({})", w.clone().unwrap_or_default()))
+            .collect::<Vec<_>>()
+            .join(" · ")
+    ));
     if let Some((title, date)) = ms {
         t.push_str(&format!("Prochain jalon : {title}, {date}\n"));
     }
@@ -176,7 +253,10 @@ fn api() -> Router<AppState> {
         .route("/api/me/password", post(account::change_password))
         .route("/api/notifications", get(account::notifications))
         .route("/api/notifications/read", post(account::read_notifications))
-        .route("/api/studios/{sid}/members/{uid}/reset-link", post(account::admin_reset_link))
+        .route(
+            "/api/studios/{sid}/members/{uid}/reset-link",
+            post(account::admin_reset_link),
+        )
         .route("/api/maps/{mid}/search", get(account::search))
         .route("/api/billing", get(stripe::status))
         .route("/api/billing/checkout", post(stripe::checkout))
@@ -185,15 +265,24 @@ fn api() -> Router<AppState> {
         .route("/api/admin/users/{id}/credits", post(aipop::admin_grant))
         .route("/api/maps/{mid}/ai/plan", post(aiplan::propose))
         .route("/api/maps/{mid}/ai/plan/apply", post(aiplan::apply))
-        .route("/api/maps/{mid}/private-stats", get(privstats::get).post(privstats::import))
+        .route(
+            "/api/maps/{mid}/private-stats",
+            get(privstats::get).post(privstats::import),
+        )
         .route("/api/legal", get(legal::get))
         .route("/api/admin/legal", put(legal::save))
         .route("/api/img", get(legal::image))
         .route("/api/analytics/rising", get(analytics::rising_list))
-        .route("/api/admin/model", get(model::admin_status).post(model::admin_refresh))
+        .route(
+            "/api/admin/model",
+            get(model::admin_status).post(model::admin_refresh),
+        )
         .route("/api/ideas", get(ideas::list))
         .route("/api/ideas/niches", get(ideas::all_niches))
-        .route("/api/ideas/profile", axum::routing::put(ideas::save_settings))
+        .route(
+            "/api/ideas/profile",
+            axum::routing::put(ideas::save_settings),
+        )
         .route("/api/ideas/{id}/state", post(ideas::set_state))
         .route("/api/ideas/{id}/start", post(ideas::start))
         .route("/api/analytics/status", get(analytics::status))
@@ -202,13 +291,25 @@ fn api() -> Router<AppState> {
         .route("/api/analytics/launches", get(analytics::launches))
         .route("/api/analytics/market", get(analytics::market))
         .route("/api/analytics/islands/{code}", get(analytics::island))
-        .route("/api/analytics/watch", get(analytics::watched).post(analytics::watch))
-        .route("/api/maps/{mid}/island", get(analytics::map_island).put(analytics::set_map_island))
+        .route(
+            "/api/analytics/watch",
+            get(analytics::watched).post(analytics::watch),
+        )
+        .route(
+            "/api/maps/{mid}/island",
+            get(analytics::map_island).put(analytics::set_map_island),
+        )
         .route("/api/studios/{sid}/tiktok", get(analytics::tiktok))
-        .route("/api/studios/{sid}/tiktok/refresh", post(analytics::tiktok_refresh))
+        .route(
+            "/api/studios/{sid}/tiktok/refresh",
+            post(analytics::tiktok_refresh),
+        )
         .route("/api/me", get(auth::me).delete(manage::delete_me))
         .route("/api/me/export", get(manage::export_me))
-        .route("/api/studios/{sid}", patch(manage::rename_studio).delete(manage::delete_studio))
+        .route(
+            "/api/studios/{sid}",
+            patch(manage::rename_studio).delete(manage::delete_studio),
+        )
         .route("/api/studios/{sid}/transfer", post(manage::transfer))
         .route("/api/studios/{sid}/relay/download", get(link::download))
         .route("/api/studios/{sid}/link-status", get(link::studio_status))
@@ -216,24 +317,48 @@ fn api() -> Router<AppState> {
         .route("/api/relay/pair-studio", post(link::pair_studio))
         .route("/api/studios/{sid}/leave", post(manage::leave))
         .route("/api/studios/{sid}/export", get(manage::export_studio))
-        .route("/api/invitations/{id}", axum::routing::delete(manage::cancel_invite))
+        .route(
+            "/api/invitations/{id}",
+            axum::routing::delete(manage::cancel_invite),
+        )
         .route("/api/studios", post(studio::create_studio))
-        .route("/api/studios/{sid}/maps", post(studio::create_map).get(studio::maps_summary))
+        .route(
+            "/api/studios/{sid}/maps",
+            post(studio::create_map).get(studio::maps_summary),
+        )
         .route("/api/maps/{mid}/move", post(studio::move_map))
         .route("/api/studios/{sid}/members", get(studio::members))
-        .route("/api/studios/{sid}/members/{uid}", patch(studio::update_member).delete(studio::remove_member))
+        .route(
+            "/api/studios/{sid}/members/{uid}",
+            patch(studio::update_member).delete(studio::remove_member),
+        )
         .route("/api/studios/{sid}/invitations", post(studio::invite))
         .route("/api/invitations/accept", post(studio::accept_invite))
         .route("/api/studios/{sid}/integrations", get(studio::integrations))
-        .route("/api/studios/{sid}/integrations/{kind}", put(studio::set_integration))
+        .route(
+            "/api/studios/{sid}/integrations/{kind}",
+            put(studio::set_integration),
+        )
         .route("/api/hooks/lore/{sid}", post(studio::lore_hook))
         .route("/api/hooks/stripe", post(stripe::webhook))
         .route("/api/hooks/discord/{sid}", post(integrations::discord_hook))
         .route("/api/hooks/github/{sid}", post(integrations::github_hook))
-        .route("/api/studios/{sid}/discord/send", post(integrations::discord_send))
-        .route("/api/studios/{sid}/discord/register", post(integrations::discord_register))
-        .route("/api/studios/{sid}/github/sync", post(integrations::github_sync))
-        .route("/api/maps/{mid}", patch(studio::update_map).delete(manage::delete_map))
+        .route(
+            "/api/studios/{sid}/discord/send",
+            post(integrations::discord_send),
+        )
+        .route(
+            "/api/studios/{sid}/discord/register",
+            post(integrations::discord_register),
+        )
+        .route(
+            "/api/studios/{sid}/github/sync",
+            post(integrations::github_sync),
+        )
+        .route(
+            "/api/maps/{mid}",
+            patch(studio::update_map).delete(manage::delete_map),
+        )
         .route("/api/maps/{mid}/ws", get(ws::ws_handler))
         .route("/api/maps/{mid}/overview", get(plan::overview))
         .route("/api/waitlist", post(admin::join))
@@ -243,7 +368,10 @@ fn api() -> Router<AppState> {
         .route("/api/me/security", get(security::overview))
         .route("/api/me/first-password", post(account::first_password))
         .route("/api/me/sessions/{id}", delete(security::revoke_session))
-        .route("/api/me/sessions/close-others", post(security::revoke_others))
+        .route(
+            "/api/me/sessions/close-others",
+            post(security::revoke_others),
+        )
         .route("/api/admin/unlock", post(security::unlock_admin))
         .route("/api/admin/lock", post(security::lock_admin))
         .route("/api/admin/audit", get(security::admin_audit))
@@ -256,45 +384,88 @@ fn api() -> Router<AppState> {
         .route("/api/admin/waitlist/{id}", delete(admin::remove))
         .route("/api/admin/invite", post(admin::invite))
         .route("/api/admin/users", get(admin::users))
-        .route("/api/admin/users/{id}", post(admin::update_user).delete(admin::delete_user))
+        .route(
+            "/api/admin/users/{id}",
+            post(admin::update_user).delete(admin::delete_user),
+        )
         .route("/api/admin/accounts", post(admin::create_account))
         .route("/api/admin/users/{id}/plan", post(admin::set_plan))
-        .route("/api/admin/users/{id}/password", post(admin::reset_password))
-        .route("/api/admin/users/{id}/reset-link", post(admin::user_reset_link))
+        .route(
+            "/api/admin/users/{id}/password",
+            post(admin::reset_password),
+        )
+        .route(
+            "/api/admin/users/{id}/reset-link",
+            post(admin::user_reset_link),
+        )
         .route("/api/admin/users/{id}/unlock", post(admin::unlock_user))
-        .route("/api/admin/users/{id}/deletion", get(admin::deletion_preview))
+        .route(
+            "/api/admin/users/{id}/deletion",
+            get(admin::deletion_preview),
+        )
         .route("/api/maps/{mid}/guide", get(guide::guide))
         .route("/api/maps/{mid}/guide/ask", get(guide::ask))
         .route("/api/maps/{mid}/report", get(report))
         // Tâches
-        .route("/api/maps/{mid}/tasks", get(tasks::list).post(tasks::create))
+        .route(
+            "/api/maps/{mid}/tasks",
+            get(tasks::list).post(tasks::create),
+        )
         .route("/api/maps/{mid}/people", get(tasks::people))
         .route("/api/maps/{mid}/locks", get(tasks::locks))
-        .route("/api/tasks/{tid}", get(tasks::detail).patch(tasks::update).delete(tasks::delete))
+        .route(
+            "/api/tasks/{tid}",
+            get(tasks::detail)
+                .patch(tasks::update)
+                .delete(tasks::delete),
+        )
         .route("/api/tasks/{tid}/status", post(tasks::set_status))
         .route("/api/tasks/{tid}/subtasks", post(tasks::add_subtask))
         .route("/api/tasks/{tid}/comments", post(tasks::comment))
         .route("/api/subtasks/{id}", patch(tasks::toggle_subtask))
         // Pages
         .route("/api/page-templates", get(pages::templates))
-        .route("/api/maps/{mid}/pages", get(pages::tree).post(pages::create))
-        .route("/api/pages/{pid}", get(pages::get).patch(pages::update).delete(pages::delete))
+        .route(
+            "/api/maps/{mid}/pages",
+            get(pages::tree).post(pages::create),
+        )
+        .route(
+            "/api/pages/{pid}",
+            get(pages::get).patch(pages::update).delete(pages::delete),
+        )
         .route("/api/pages/{pid}/versions", get(pages::versions))
-        .route("/api/pages/{pid}/versions/{vid}/restore", post(pages::restore))
+        .route(
+            "/api/pages/{pid}/versions/{vid}/restore",
+            post(pages::restore),
+        )
         .route("/api/pages/{pid}/proof", get(pages::proof))
         .route("/api/pages/{pid}/export.md", get(pages::export_md))
-        .route("/api/pages/{pid}/comments", get(pages::page_comments).post(pages::add_page_comment))
+        .route(
+            "/api/pages/{pid}/comments",
+            get(pages::page_comments).post(pages::add_page_comment),
+        )
         .route("/api/comments/{cid}/resolve", post(pages::resolve_comment))
         .route("/api/public/pages/{token}", get(pages::public_page))
         // Tableau blanc
-        .route("/api/maps/{mid}/boards", get(boards::list).post(boards::create))
-        .route("/api/boards/{bid}", get(boards::get).patch(boards::update).delete(boards::delete))
+        .route(
+            "/api/maps/{mid}/boards",
+            get(boards::list).post(boards::create),
+        )
+        .route(
+            "/api/boards/{bid}",
+            get(boards::get)
+                .patch(boards::update)
+                .delete(boards::delete),
+        )
         .route("/api/boards/{bid}/duplicate", post(boards::duplicate))
         .route("/api/maps/{mid}/trash", get(pages::trash))
         .route("/api/pages/{pid}/restore", post(pages::restore_page))
         .route("/api/pages/{pid}/duplicate", post(pages::duplicate))
         .route("/api/boards/{bid}/convert", post(boards::convert))
-        .route("/api/boards/{bid}/frame-to-page", post(boards::frame_to_page))
+        .route(
+            "/api/boards/{bid}/frame-to-page",
+            post(boards::frame_to_page),
+        )
         // Planifier
         .route("/api/maps/{mid}/milestones", post(plan::add_milestone))
         .route("/api/milestones/{id}", delete(plan::delete_milestone))
@@ -305,20 +476,38 @@ fn api() -> Router<AppState> {
         .route("/api/maps/{mid}/plan/recalc", post(plan::recalc))
         .route("/api/maps/{mid}/seasons", get(plan::seasons))
         // Lancer et suivre
-        .route("/api/maps/{mid}/discover", get(discover::get).post(discover::save))
+        .route(
+            "/api/maps/{mid}/discover",
+            get(discover::get).post(discover::save),
+        )
         .route("/api/maps/{mid}/checks", get(launch::checks))
         .route("/api/maps/{mid}/checks/{key}", put(launch::set_check))
-        .route("/api/maps/{mid}/launch-steps", get(launch::steps).post(launch::add_step))
+        .route(
+            "/api/maps/{mid}/launch-steps",
+            get(launch::steps).post(launch::add_step),
+        )
         .route("/api/launch-steps/{id}", patch(launch::toggle_step))
-        .route("/api/maps/{mid}/playtests", get(launch::exchange).post(launch::create_listing))
+        .route(
+            "/api/maps/{mid}/playtests",
+            get(launch::exchange).post(launch::create_listing),
+        )
         .route("/api/playtests/{lid}/feedback", post(launch::give_feedback))
         .route("/api/maps/{mid}/churn", get(launch::churn))
         // Rémunérer
-        .route("/api/maps/{mid}/revenues", get(money::revenues).put(money::set_revenue))
+        .route(
+            "/api/maps/{mid}/revenues",
+            get(money::revenues).put(money::set_revenue),
+        )
         .route("/api/maps/{mid}/revenues/csv", post(money::import_csv))
-        .route("/api/maps/{mid}/share-rules", get(money::rules).put(money::set_rules))
+        .route(
+            "/api/maps/{mid}/share-rules",
+            get(money::rules).put(money::set_rules),
+        )
         .route("/api/maps/{mid}/statements", get(money::statements))
-        .route("/api/maps/{mid}/offers", get(money::offers).post(money::add_offer))
+        .route(
+            "/api/maps/{mid}/offers",
+            get(money::offers).post(money::add_offer),
+        )
         .route("/api/offers/{oid}/sales", put(money::set_sales))
         // UEFN Link : relais, Organiseur, éditeur Verse, IA, MCP
         .route("/api/maps/{mid}/relay/pair", post(uefn::pair_code))
@@ -333,7 +522,10 @@ fn api() -> Router<AppState> {
         .route("/api/maps/{mid}/uefn/journal", get(uefn::journal))
         .route("/api/uefn-actions/{id}/undo", post(uefn::undo))
         .route("/api/approvals/{id}/{verdict}", post(uefn::decide))
-        .route("/api/maps/{mid}/filters", get(uefn::filters).post(uefn::add_filter))
+        .route(
+            "/api/maps/{mid}/filters",
+            get(uefn::filters).post(uefn::add_filter),
+        )
         .route("/api/filters/{id}", delete(uefn::delete_filter))
         .route("/api/maps/{mid}/verse/files", get(verse::files))
         .route("/api/maps/{mid}/verse/file", get(verse::file))
@@ -343,7 +535,10 @@ fn api() -> Router<AppState> {
         .route("/api/verse-versions/{id}/revert", post(verse::revert))
         .route("/api/maps/{mid}/verse/symbols", get(verse::symbols))
         .route("/api/maps/{mid}/verse/send", post(verse::send))
-        .route("/api/maps/{mid}/tokens", get(mcp::tokens).post(mcp::create_token))
+        .route(
+            "/api/maps/{mid}/tokens",
+            get(mcp::tokens).post(mcp::create_token),
+        )
         .route("/api/tokens/{id}/scope", post(mcp::set_scope))
         .route("/api/tokens/{id}", delete(mcp::delete_token))
         .route("/mcp", post(mcp::mcp))
@@ -357,7 +552,12 @@ async fn admin_cli(db: &sqlx::SqlitePool, args: &[String]) -> anyhow::Result<()>
         (Some(action @ ("ajouter" | "retirer")), Some(email)) => {
             let email = email.trim().to_lowercase();
             let flag = (action == "ajouter") as i64;
-            let n = sqlx::query("UPDATE users SET is_admin = ? WHERE email = ?").bind(flag).bind(&email).execute(db).await?.rows_affected();
+            let n = sqlx::query("UPDATE users SET is_admin = ? WHERE email = ?")
+                .bind(flag)
+                .bind(&email)
+                .execute(db)
+                .await?
+                .rows_affected();
             if n == 0 {
                 anyhow::bail!("Aucun compte avec l'adresse « {email} » : créez d'abord le compte dans POP, puis relancez.");
             }
@@ -366,8 +566,19 @@ async fn admin_cli(db: &sqlx::SqlitePool, args: &[String]) -> anyhow::Result<()>
                 .bind(&email)
                 .execute(db)
                 .await?;
-            println!("{email} {} administrateur de la plateforme.", if flag == 1 { "est maintenant" } else { "n'est plus" });
-            let verified: Option<String> = sqlx::query_scalar("SELECT email_verified_at FROM users WHERE email = ?").bind(&email).fetch_one(db).await?;
+            println!(
+                "{email} {} administrateur de la plateforme.",
+                if flag == 1 {
+                    "est maintenant"
+                } else {
+                    "n'est plus"
+                }
+            );
+            let verified: Option<String> =
+                sqlx::query_scalar("SELECT email_verified_at FROM users WHERE email = ?")
+                    .bind(&email)
+                    .fetch_one(db)
+                    .await?;
             if flag == 1 && verified.is_none() {
                 println!("Attention : ce compte n'a pas encore confirmé son adresse e-mail. Il aura les droits d'administration après avoir ouvert le lien reçu.");
             }
@@ -376,7 +587,10 @@ async fn admin_cli(db: &sqlx::SqlitePool, args: &[String]) -> anyhow::Result<()>
             }
         }
         (Some("liste"), _) => {
-            let rows: Vec<(String, String)> = sqlx::query_as("SELECT email, name FROM users WHERE is_admin = 1 ORDER BY email").fetch_all(db).await?;
+            let rows: Vec<(String, String)> =
+                sqlx::query_as("SELECT email, name FROM users WHERE is_admin = 1 ORDER BY email")
+                    .fetch_all(db)
+                    .await?;
             if rows.is_empty() {
                 println!("Aucun administrateur nommé (hors POP_ADMIN_EMAILS).");
             }
@@ -391,10 +605,18 @@ async fn admin_cli(db: &sqlx::SqlitePool, args: &[String]) -> anyhow::Result<()>
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt().with_env_filter(std::env::var("RUST_LOG").unwrap_or_else(|_| "pop_server=info".into())).init();
+    tracing_subscriber::fmt()
+        .with_env_filter(std::env::var("RUST_LOG").unwrap_or_else(|_| "pop_server=info".into()))
+        .init();
     let db_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite://pop-data.db".into());
-    let opts = SqliteConnectOptions::from_str(&db_url)?.create_if_missing(true).journal_mode(SqliteJournalMode::Wal).foreign_keys(true);
-    let db = SqlitePoolOptions::new().max_connections(8).connect_with(opts).await?;
+    let opts = SqliteConnectOptions::from_str(&db_url)?
+        .create_if_missing(true)
+        .journal_mode(SqliteJournalMode::Wal)
+        .foreign_keys(true);
+    let db = SqlitePoolOptions::new()
+        .max_connections(8)
+        .connect_with(opts)
+        .await?;
     renumber_old_migrations(&db).await?;
     sqlx::migrate!("./migrations").run(&db).await?;
     // `pop-server admin …` : gérer les administrateurs depuis la machine du serveur, puis s'arrêter.
@@ -408,19 +630,35 @@ async fn main() -> anyhow::Result<()> {
         limiter: Arc::new(Mutex::new(HashMap::new())),
         board_lock: Arc::new(tokio::sync::Mutex::new(())),
         secure_cookies: https_mode(),
-        dummy_hash: auth::hash_password("mot-de-passe-factice").map_err(|e| anyhow::anyhow!("{e:?}"))?,
+        dummy_hash: auth::hash_password("mot-de-passe-factice")
+            .map_err(|e| anyhow::anyhow!("{e:?}"))?,
         relays: Arc::new(uefn::RelayHub::default()),
-        http: reqwest::Client::builder().timeout(std::time::Duration::from_secs(30)).build()?,
+        http: reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(30))
+            .build()?,
     };
     // Compte de test local « kl » / « kl » (activé par start.sh et Lancer POP.bat, jamais dans l'image Docker).
     // En ligne (HTTPS), le compte « kl » n'est jamais créé, et s'il existe déjà dans la base il est bloqué :
     // sinon n'importe qui pourrait se connecter en administrateur avec « kl » / « kl ».
     if https_mode() {
-        sqlx::query("UPDATE users SET password_hash = '!', is_admin = 0 WHERE email = 'kl'").execute(&st.db).await?;
-        sqlx::query("DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE email = 'kl')").execute(&st.db).await.ok();
+        sqlx::query("UPDATE users SET password_hash = '!', is_admin = 0 WHERE email = 'kl'")
+            .execute(&st.db)
+            .await?;
+        sqlx::query(
+            "DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE email = 'kl')",
+        )
+        .execute(&st.db)
+        .await
+        .ok();
     }
-    if !https_mode() && std::env::var("POP_DEV_ACCOUNT").map(|v| v == "1").unwrap_or(false) {
-        let exists: Option<i64> = sqlx::query_scalar("SELECT id FROM users WHERE email = 'kl'").fetch_optional(&st.db).await?;
+    if !https_mode()
+        && std::env::var("POP_DEV_ACCOUNT")
+            .map(|v| v == "1")
+            .unwrap_or(false)
+    {
+        let exists: Option<i64> = sqlx::query_scalar("SELECT id FROM users WHERE email = 'kl'")
+            .fetch_optional(&st.db)
+            .await?;
         if exists.is_none() {
             let h = auth::hash_password("kl").map_err(|e| anyhow::anyhow!("{e:?}"))?;
             sqlx::query("INSERT INTO users (email, name, password_hash, is_admin, plan) VALUES ('kl', 'KL', ?, 1, 'pro')").bind(h).execute(&st.db).await?;
@@ -444,13 +682,23 @@ async fn main() -> anyhow::Result<()> {
             (axum::http::StatusCode::INTERNAL_SERVER_ERROR, [(axum::http::header::CONTENT_TYPE, "application/json")], r#"{"error":"Erreur interne du serveur POP. Réessayez ; si ça continue, regardez le terminal."}"#).into_response()
         }))
         .with_state(st);
-    let port: u16 = std::env::var("PORT").ok().and_then(|p| p.parse().ok()).unwrap_or(8080);
+    let port: u16 = std::env::var("PORT")
+        .ok()
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(8080);
     // 127.0.0.1 par défaut ; POP_BIND=0.0.0.0 pour le réseau local ou un hébergement.
-    let ip: std::net::IpAddr = std::env::var("POP_BIND").ok().and_then(|b| b.parse().ok()).unwrap_or([127, 0, 0, 1].into());
+    let ip: std::net::IpAddr = std::env::var("POP_BIND")
+        .ok()
+        .and_then(|b| b.parse().ok())
+        .unwrap_or([127, 0, 0, 1].into());
     let addr = SocketAddr::new(ip, port);
     println!("POP écoute sur http://{addr}");
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).await?;
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await?;
     Ok(())
 }
 
@@ -460,14 +708,34 @@ async fn main() -> anyhow::Result<()> {
 /// fois : on reconnaît l'ancienne numérotation à la migration 13 « personal ». Les bases de production ne sont pas
 /// concernées (rien ne se passe si ce cas n'existe pas).
 async fn renumber_old_migrations(db: &sqlx::SqlitePool) -> Result<(), sqlx::Error> {
-    let table: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = '_sqlx_migrations'").fetch_one(db).await?;
-    if table == 0 { return Ok(()) }
-    let old: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM _sqlx_migrations WHERE version = 13 AND description = 'personal'").fetch_one(db).await?;
-    if old == 0 { return Ok(()) }
+    let table: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = '_sqlx_migrations'",
+    )
+    .fetch_one(db)
+    .await?;
+    if table == 0 {
+        return Ok(());
+    }
+    let old: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM _sqlx_migrations WHERE version = 13 AND description = 'personal'",
+    )
+    .fetch_one(db)
+    .await?;
+    if old == 0 {
+        return Ok(());
+    }
     let mut tx = db.begin().await?;
     // En deux temps pour ne jamais avoir deux lignes avec le même numéro.
-    sqlx::query("UPDATE _sqlx_migrations SET version = version + 1000 WHERE version BETWEEN 12 AND 20").execute(&mut *tx).await?;
-    sqlx::query("UPDATE _sqlx_migrations SET version = version - 997 WHERE version BETWEEN 1012 AND 1020").execute(&mut *tx).await?;
+    sqlx::query(
+        "UPDATE _sqlx_migrations SET version = version + 1000 WHERE version BETWEEN 12 AND 20",
+    )
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query(
+        "UPDATE _sqlx_migrations SET version = version - 997 WHERE version BETWEEN 1012 AND 1020",
+    )
+    .execute(&mut *tx)
+    .await?;
     tx.commit().await?;
     tracing::info!("Migrations locales renumérotées (12-20 → 15-23).");
     Ok(())

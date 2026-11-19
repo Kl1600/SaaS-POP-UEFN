@@ -36,7 +36,9 @@ pub struct Hub {
 impl Hub {
     fn chan(&self, map_id: i64) -> broadcast::Sender<String> {
         let mut c = self.chans.lock().unwrap();
-        c.entry(map_id).or_insert_with(|| broadcast::channel(256).0).clone()
+        c.entry(map_id)
+            .or_insert_with(|| broadcast::channel(256).0)
+            .clone()
     }
     pub fn send(&self, map_id: i64, msg: Value) {
         let _ = self.chan(map_id).send(msg.to_string());
@@ -46,7 +48,10 @@ impl Hub {
         let mut seen = HashMap::new();
         if let Some(m) = p.get(&map_id) {
             for e in m.values() {
-                seen.insert(e.uid, json!({ "uid": e.uid, "name": e.name, "place": e.place }));
+                seen.insert(
+                    e.uid,
+                    json!({ "uid": e.uid, "name": e.name, "place": e.place }),
+                );
             }
         }
         json!({ "t": "presence", "users": seen.into_values().collect::<Vec<_>>() })
@@ -71,7 +76,9 @@ fn same_origin(h: &HeaderMap) -> bool {
     match h.get("origin").and_then(|v| v.to_str().ok()) {
         None => true,
         Some(o) => {
-            let o = o.trim_start_matches("http://").trim_start_matches("https://");
+            let o = o
+                .trim_start_matches("http://")
+                .trim_start_matches("https://");
             o == host || o.starts_with("localhost:") || o.starts_with("127.0.0.1:")
         }
     }
@@ -96,7 +103,15 @@ async fn run(st: AppState, user: AuthUser, map_id: i64, can_edit: bool, socket: 
     let conn = st.hub.next.fetch_add(1, Ordering::Relaxed);
     let mut rx = st.hub.chan(map_id).subscribe();
     let (mut tx, mut inbound) = socket.split();
-    st.hub.set_presence(map_id, conn, Some(Presence { uid: user.id, name: user.name.clone(), place: String::new() }));
+    st.hub.set_presence(
+        map_id,
+        conn,
+        Some(Presence {
+            uid: user.id,
+            name: user.name.clone(),
+            place: String::new(),
+        }),
+    );
     st.hub.send(map_id, st.hub.presence_list(map_id));
 
     loop {
@@ -125,15 +140,26 @@ async fn handle(st: &AppState, user: &AuthUser, map_id: i64, conn: u64, can_edit
     match v["t"].as_str().unwrap_or("") {
         "place" => {
             let place: String = v["place"].as_str().unwrap_or("").chars().take(80).collect();
-            st.hub.set_presence(map_id, conn, Some(Presence { uid: user.id, name: user.name.clone(), place }));
+            st.hub.set_presence(
+                map_id,
+                conn,
+                Some(Presence {
+                    uid: user.id,
+                    name: user.name.clone(),
+                    place,
+                }),
+            );
             st.hub.send(map_id, st.hub.presence_list(map_id));
         }
         "cursor" => {
             let place: String = v["place"].as_str().unwrap_or("").chars().take(80).collect();
-            st.hub.send(map_id, json!({
-                "t": "cursor", "uid": user.id, "name": user.name, "place": place,
-                "x": v["x"].as_f64().unwrap_or(0.0), "y": v["y"].as_f64().unwrap_or(0.0)
-            }));
+            st.hub.send(
+                map_id,
+                json!({
+                    "t": "cursor", "uid": user.id, "name": user.name, "place": place,
+                    "x": v["x"].as_f64().unwrap_or(0.0), "y": v["y"].as_f64().unwrap_or(0.0)
+                }),
+            );
         }
         // Édition à plusieurs dans l'éditeur Verse : mises à jour Yjs relayées telles quelles.
         "yjs" if can_edit => {
