@@ -85,7 +85,30 @@ python tools/task.py check                        audit du tableau
   (simplifier, reporter, couper).
 - Une dépendance découverte en route : ne l'ajoutez pas en silence, signalez-la (§6).
 - Commits petits, message `#N : ce qui change`. Jamais sur `main` pour une tâche ; les changements d'outillage ou
-  de documentation demandés par l'humain peuvent passer par une PR à eux.
+  de documentation demandés par l'humain passent par une branche `outillage/…` et une PR à eux (§4.5).
+
+### 4.5 Branches et PR (obligatoire)
+Une branche longue qui mélange plusieurs sujets ne se relit pas, ne se teste pas et casse le travail des autres
+à la fusion. Donc :
+- **Rien n'arrive sur `main` sans PR.** On ne pousse jamais sur `main`, on n'y fusionne jamais sa branche soi-même
+  (`git merge` puis `git push origin main`) : c'est `task.py done` qui fusionne, après la validation de l'humain.
+  Un push direct sur `main` ouvre automatiquement une issue d'alerte (action `garde de main`).
+- **Une branche = une issue = un sujet.** Nom `issue/N-…` (créée par `start`) ou `outillage/…` (outillage ou
+  documentation demandés par l'humain). Pas de branche `claude`, `fix`, `wip`, au nom d'un agent ou d'un humain.
+  Pas de travail sans issue : si votre humain demande autre chose, demandez-lui de créer l'issue d'abord
+  (ou proposez-la, §6), puis prenez-la.
+- **Petite et courte.** Visez moins de 500 lignes changées et 20 fichiers (hors `web/dist`, fichiers de verrou,
+  `web/public/downloads`) et moins de 2 jours entre le premier commit et la PR. Au-delà, arrêtez-vous et proposez
+  à votre humain de couper la tâche en plusieurs issues. `review` refuse une branche plus grosse sauf avec
+  `--gros "raison"`, que la PR affiche.
+- **À jour.** `git fetch origin && git rebase origin/main` au moins une fois par jour et avant `review` (qui refuse
+  une branche en retard sur `main`). On rebase sa propre branche ; on ne fusionne pas `main` dedans.
+- **Le hook `pre-push`** (`tools/hooks/pre-push`, activé par `task.py whoami`) refuse un push vers `main` et un nom
+  de branche hors règle. On ne le contourne jamais (`--no-verify` interdit) : s'il bloque, demandez à votre humain.
+- **Rien de temporaire dans un commit** : dossiers de travail, sauvegardes, bases locales, `.env`. Regardez
+  `git status` avant chaque commit.
+- Une branche fusionnée se supprime (`done` le fait). `task.py check` signale les branches trop vieilles, trop
+  grosses, en retard ou au nom hors règle : prévenez votre humain (§6), ne supprimez pas la branche d'un autre.
 
 ### 4.4 Finir
 - **Vérifiez chaque critère d'acceptation vous-même** et dites quel genre de preuve vous avez : *compilé*,
@@ -155,5 +178,7 @@ l'accord de votre humain.
 - Fermer une issue dont un critère n'est pas vérifié, ou qu'aucun humain n'a validée.
 - Supprimer ou réécrire des issues, jalons ou étiquettes ; changer le périmètre d'une autre issue.
 - Changer une décision de `KB/DECISIONS.md`, ou éditer l'entrée d'un autre dans la KB.
-- Réécrire l'historique publié (`main`), pousser en force sur `main`.
+- Réécrire l'historique publié (`main`), pousser sur `main` (en force ou non), fusionner sa branche dans `main`
+  sans PR, contourner le hook `pre-push` (`--no-verify`).
+- Travailler sans issue, ou mélanger plusieurs issues ou domaines dans une même branche.
 - Mettre un jeton, un mot de passe ou une clé dans un fichier, une issue ou un commit.
