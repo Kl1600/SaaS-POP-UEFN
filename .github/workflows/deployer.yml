@@ -134,4 +134,9 @@ jobs:
           IMAGE: ${{ needs.resoudre.outputs.image }}
         run: |
           docker buildx imagetools create -t "${IMAGE%:*}:latest" "$IMAGE"
-          echo "::notice::En ligne : $IMAGE ; latest désigne maintenant cette image."
+          empreinte() { docker buildx imagetools inspect "$1" --format '{{json .Manifest}}' | jq -r .digest; }
+          a=$(empreinte "$IMAGE"); b=$(empreinte "${IMAGE%:*}:latest")
+          if [ "$a" != "$b" ]; then
+            echo "::error::latest ($b) ne désigne pas l'image déployée $IMAGE ($a)."; exit 1
+          fi
+          echo "::notice::En ligne : $IMAGE ; latest désigne maintenant cette image ($a)."
