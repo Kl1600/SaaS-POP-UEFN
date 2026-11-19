@@ -172,9 +172,11 @@ pub async fn register(State(st): State<AppState>, crate::security::ClientIp(ip):
         crate::studio::accept_invite_for(&st, id, &tok).await?;
     }
     crate::security::audit(&st, Some(id), "compte_créé", &email, &ip).await;
+    // Lien de vérification de l'adresse (sans SMTP : compte vérifié d'office, voir verify.rs).
+    let mailed = crate::verify::start(&st, id, &email).await?;
     let ua = headers.get("user-agent").and_then(|v| v.to_str().ok()).unwrap_or("");
     let jar = open_session(&st, jar, id, &ip, ua, false).await?;
-    Ok((jar, Json(json!({ "id": id, "email": email, "name": b.name.trim() }))))
+    Ok((jar, Json(json!({ "id": id, "email": email, "name": b.name.trim(), "email_verified": !mailed, "verification_sent": mailed }))))
 }
 
 #[derive(Deserialize)]
@@ -260,6 +262,7 @@ pub async fn me(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
             "maps": maps.into_iter().map(|(id, name, genre, rd, status)| json!({"id": id, "name": name, "genre": genre, "release_date": rd, "status": status})).collect::<Vec<_>>()
         }));
     }
-    Ok(Json(json!({ "user": u, "credits": credits, "studios": out, "admin": admin, "admin_pending": pending, "username": username, "must_change_password": must_change == 1,
+    let email_verified = crate::verify::is_verified(&st, u.id).await?;
+    Ok(Json(json!({ "user": u, "credits": credits, "studios": out, "admin": admin, "admin_pending": pending, "username": username, "must_change_password": must_change == 1, "email_verified": email_verified,
         "plan": crate::billing::user_plan(&st, u.id).await?, "trial_until": crate::billing::trial_until(&st, u.id).await?, "billing_state": crate::stripe::access_state(&st, u.id).await?, "ai_credits": sqlx::query_scalar::<_, i64>("SELECT ai_credits FROM users WHERE id = ?").bind(u.id).fetch_one(&st.db).await?, "analyse": crate::billing::user_analyse(&st, u.id).await? })))
 }

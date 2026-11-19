@@ -9,7 +9,7 @@ import { ago, api } from '../api'
 import { Avatar } from './ui'
 import { NewTaskModal } from '../pages/Tasks'
 import { GuideDrawer } from './Guide'
-import { Compass, ShieldCheck } from 'lucide-react'
+import { Compass, MailCheck, ShieldCheck } from 'lucide-react'
 import { useUefnStatus, STATUS_LABEL } from '../uefnState'
 import { tr, tx, LOCALE } from '../i18n/t'
 import LangPicker from './LangPicker'
@@ -141,7 +141,7 @@ export default function Layout() {
             )}
           </div>
         </header>
-        <div className="scroll" id="contenu" tabIndex={-1}><Outlet /></div>
+        <div className="scroll" id="contenu" tabIndex={-1}>{app.me?.email_verified === false && <VerifyBanner email={app.me.user.email} />}<Outlet /></div>
       </div>
       {guide && <GuideDrawer key={guide.ask ?? 'day'} ask={guide.ask} onClose={() => setGuide(false)} />}
       {newTask && <NewTaskModal onClose={() => setNewTask(false)} />}
@@ -152,6 +152,25 @@ export default function Layout() {
 }
 
 /** Ferme un menu quand on clique ailleurs ou qu'on appuie sur Échap. */
+/** Adresse e-mail pas encore confirmée (#11) : le compte n'a pas accès à l'administration tant que le lien n'est pas ouvert. */
+function VerifyBanner({ email }: { email: string }) {
+  const [msg, setMsg] = useState('')
+  const [busy, setBusy] = useState(false)
+  return (
+    <div className="warn" role="status" style={{ margin: '16px 24px 0' }}>
+      <MailCheck size={18} />
+      <span style={{ flex: 1 }}>
+        <b>Confirmez votre adresse e-mail.</b> Nous avons envoyé un lien à {email}. Tant qu’elle n’est pas confirmée, l’administration de la plateforme reste fermée.
+        {msg && <> {msg}</>}
+      </span>
+      <button className="btn" disabled={busy} onClick={async () => {
+        setBusy(true)
+        try { await api.post('/api/me/verify-email/resend'); setMsg('Nouveau lien envoyé.') } catch (e: any) { setMsg(e.message) } finally { setBusy(false) }
+      }}>Renvoyer le lien</button>
+    </div>
+  )
+}
+
 function useOutside(open: boolean, close: () => void) {
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {

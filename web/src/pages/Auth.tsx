@@ -173,6 +173,30 @@ export function ResetPassword({ token }: { token: string }) {
   )
 }
 
+/** /verifier-email/:token : lien reçu par e-mail pour confirmer l'adresse (#11). */
+export function VerifyEmail({ token }: { token: string }) {
+  const [state, setState] = useState<{ ok?: boolean; email?: string; msg?: string }>({})
+  useEffect(() => {
+    let done = false
+    api.post('/api/auth/verify-email', { token })
+      .then((r: any) => { if (!done) setState({ ok: true, email: r.email }) })
+      .catch((er: any) => { if (!done) setState({ ok: false, msg: er.message }) })
+    return () => { done = true }
+  }, [token])
+  return (
+    <div className="auth app">
+      <div className="card stack" style={{ gap: 16 }}>
+        <img src="/logo.png" alt="POP" style={{ filter: 'invert(1)' }} />
+        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 400 }}>Adresse e-mail</h1>
+        {state.ok === undefined && <p className="muted">Vérification en cours…</p>}
+        {state.ok === true && <p>C’est confirmé : <b>{state.email}</b> est bien votre adresse.</p>}
+        {state.ok === false && <div className="err" role="alert">{state.msg}</div>}
+        {state.ok !== undefined && <a className="btn pri" href="/">Ouvrir POP</a>}
+      </div>
+    </div>
+  )
+}
+
 /** Premier écran : relier UEFN pour importer ses projets (une map par projet), ou commencer sans. */
 export function Welcome() {
   const { me, reload } = useApp()

@@ -122,10 +122,10 @@ Chaque action est journalisée et annulable ; droits par rôle (invité en lectu
 | --- | --- | --- |
 | `DATABASE_URL` | `sqlite://pop-data.db` | Base SQLite |
 | `POP_PUBLIC_URL` | `http://127.0.0.1:8080` | Adresse publique utilisée dans les e-mails |
-| `POP_ADMIN_EMAILS` | — | E-mails des administrateurs de la plateforme (séparés par des virgules). Sinon : `pop-server admin ajouter <e-mail>` sur la machine du serveur. |
+| `POP_ADMIN_EMAILS` | — | E-mails des administrateurs de la plateforme (séparés par des virgules), effectifs une fois l'adresse vérifiée. Sinon : `pop-server admin ajouter <e-mail>` sur la machine du serveur. |
 | `POP_OPEN_SIGNUP` | `0` | `1` = inscriptions ouvertes à tous (sinon : liste d’attente + lien d’accès validé dans Administration) |
 | `POP_TRUST_PROXY` | vide | `1` derrière Caddy ou Nginx (dernier élément de `X-Forwarded-For`), `cloudflare` derrière Cloudflare seul (`cf-connecting-ip`). Vide sans proxy |
-| `POP_SMTP_HOST`, `POP_SMTP_PORT`, `POP_SMTP_USER`, `POP_SMTP_PASS`, `POP_SMTP_FROM` | — | Envoi d'e-mails (invitations, mot de passe oublié). Sans eux, les liens s'affichent à copier |
+| `POP_SMTP_HOST`, `POP_SMTP_PORT`, `POP_SMTP_USER`, `POP_SMTP_PASS`, `POP_SMTP_FROM` | — | Envoi d'e-mails (vérification d'adresse, invitations, mot de passe oublié). Sans eux, les liens s'affichent à copier et les adresses sont considérées comme vérifiées : **obligatoires en production** |
 | `POP_BIND` | `127.0.0.1` | `0.0.0.0` pour le réseau local ou l'hébergement |
 | `PORT` | `8080` | Port (écoute sur 127.0.0.1) |
 | `POP_WEB_DIR` | `../web/dist` | Interface construite |
@@ -142,4 +142,5 @@ Chaque action est journalisée et annulable ; droits par rôle (invité en lectu
 - **Journal de sécurité** : connexions, échecs, blocages, changements de sécurité, actions d’administration (Administration → Sécurité).
 - **En-têtes** : CSP stricte, interdiction d’intégrer POP dans un autre site, HSTS en production, pas de cache sur l’API.
 - **Compte de test « kl »** : utilisable seulement depuis l’ordinateur qui fait tourner POP. Une installation vide n’accepte son premier compte que depuis cet ordinateur, ou pour une adresse de `POP_ADMIN_EMAILS`.
-- **Administrateurs** : jamais accordés selon l'adresse IP ; nommés par `POP_ADMIN_EMAILS` ou par `pop-server admin ajouter <e-mail>` sur la machine du serveur.
+- **Administrateurs** : jamais accordés selon l'adresse IP ; nommés par `POP_ADMIN_EMAILS` ou par `pop-server admin ajouter <e-mail>` sur la machine du serveur, et seulement pour une adresse vérifiée.
+- **Vérification de l'adresse e-mail** : à l'inscription, un lien (24 h, à usage unique) est envoyé ; tant qu'il n'est pas ouvert, un bandeau le rappelle et l'administration reste fermée. Le lien de réinitialisation du mot de passe vérifie aussi l'adresse. Sans SMTP (POP en local), les adresses sont vérifiées d'office.

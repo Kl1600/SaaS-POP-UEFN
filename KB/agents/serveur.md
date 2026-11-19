@@ -11,6 +11,14 @@ Bloque : rien
 ```
 
 ```
+EN COURS | #11 Sécurité : vérifier l'adresse e-mail avant d'activer un compte et de donner le rôle admin | 17/11 16:00
+Owner : benybens | Sur la tâche : Claude Code, pour Yassine
+Fait : migration 0024 (ex-0012, renumérotée au rebase du 19/11), verify.rs, is_admin exige une adresse vérifiée, page /verifier-email et bandeau
+Reste : validation humaine ; envoi SMTP réel non testé (pas de SMTP de test)
+Bloque : rien
+```
+
+```
 EN COURS | #12 Sécurité : lire l'adresse IP du client de façon sûre et ne plus donner de droits selon l'IP | 17/11 15:10
 Owner : benybens | Sur la tâche : Claude Code, pour Yassine
 Fait : client_ip (security.rs) selon POP_TRUST_PROXY, plus d'admin selon l'IP, commande pop-server admin
