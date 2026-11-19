@@ -1,18 +1,18 @@
 // Panel administrateur de la plateforme POP : liste d'attente, invitations, utilisateurs, vue générale.
 import { useEffect, useState } from 'react'
-import { Check, X, RotateCcw, Trash2, Copy, Mail, ShieldCheck, Ban, UserPlus, Lock } from 'lucide-react'
+import { Check, X, RotateCcw, Trash2, Copy, Mail, ShieldCheck, ShieldOff, Ban, UserPlus, Lock, KeyRound, LockOpen } from 'lucide-react'
 import { actionLabel } from '../components/Security'
 import { ago, api, frDate } from '../api'
 import { useApp, useLoad } from '../state'
-import { CardHead, Empty, PageHead } from '../components/ui'
+import { CardHead, Empty, Modal, PageHead } from '../components/ui'
 
 const n = (v?: number) => (v ?? 0).toLocaleString('fr-FR')
 const STATUS: Record<string, [string, string]> = { pending: ['En attente', 'b-o'], approved: ['Accès envoyé', 'b-b'], refused: ['Refusée', 'b-r'], registered: ['Compte créé', 'b-g'] }
 
-function LinkBox({ r }: { r: { link: string; mailed: boolean; email: string } }) {
+function LinkBox({ r, valid = '30 jours' }: { r: { link: string; mailed: boolean; email: string }; valid?: string }) {
   const { toast } = useApp()
   return <div className="b-callout small" style={{ display: 'grid', gap: 8, marginTop: 10 }}>
-    <span>{r.mailed ? <><Mail size={14} style={{ verticalAlign: -2 }} /> E-mail envoyé à {r.email}. Le lien est aussi ici :</> : <>L’envoi d’e-mails n’est pas configuré : envoyez ce lien à <b style={{ fontWeight: 500 }}>{r.email}</b> (valable 30 jours).</>}</span>
+    <span>{r.mailed ? <><Mail size={14} style={{ verticalAlign: -2 }} /> E-mail envoyé à {r.email}. Le lien est aussi ici :</> : <>L’envoi d’e-mails n’est pas configuré : envoyez ce lien à <b style={{ fontWeight: 500 }}>{r.email}</b> (valable {valid}).</>}</span>
     <div className="row" style={{ gap: 8 }}><input className="field mono" readOnly value={r.link} style={{ flex: 1, height: 34, fontSize: 12.5 }} onFocus={e => e.target.select()} />
       <button className="btn" style={{ height: 34 }} onClick={() => { navigator.clipboard?.writeText(r.link); toast('Lien copié') }}><Copy size={14} />Copier</button></div>
   </div>
@@ -95,25 +95,59 @@ function Invite() {
   </section>
 }
 
+/** Heure locale d'une date SQLite en UTC (« 2026-11-19 14:05:00 » → « 15:05 »). */
+const hhmm = (d: string) => new Date(d.replace(' ', 'T') + 'Z').toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+
+/** Suppression d'un compte : ce que deviennent ses studios, puis l'adresse e-mail à retaper. */
+function DeleteUser({ u, onClose, onDone }: { u: any; onClose: () => void; onDone: () => void }) {
+  const { toast } = useApp()
+  const { data: plan } = useLoad<any>(`/api/admin/users/${u.id}/deletion`)
+  const [confirm, setConfirm] = useState('')
+  const ok = confirm.trim().toLowerCase() === u.email.toLowerCase()
+  return <Modal onClose={onClose} label={`Supprimer le compte de ${u.name}`}>
+    <div className="row" style={{ justifyContent: 'space-between' }}><h2 style={{ margin: 0, fontWeight: 500, fontSize: 20 }}>Supprimer le compte de {u.name}</h2><button className="iconbtn" aria-label="Fermer" onClick={onClose}><X size={18} /></button></div>
+    <p className="small" style={{ margin: '12px 0' }}>La suppression est définitive : la personne est déconnectée et ne pourra plus se connecter avec <b style={{ fontWeight: 500 }}>{u.email}</b>.</p>
+    {plan && <div className="b-callout small" style={{ display: 'grid', gap: 6 }}>
+      {plan.delete.length === 0 && plan.transfer.length === 0 && <span>Ce compte n’est propriétaire d’aucun studio.</span>}
+      {plan.delete.length > 0 && <span>Studios supprimés avec le compte (aucun autre membre) : <b style={{ fontWeight: 500 }}>{plan.delete.join(', ')}</b></span>}
+      {plan.transfer.map((t: any) => <span key={t.studio}>Le studio <b style={{ fontWeight: 500 }}>{t.studio}</b> est transféré à <b style={{ fontWeight: 500 }}>{t.to}</b>, qui en devient propriétaire.</span>)}
+    </div>}
+    <form className="stack" style={{ marginTop: 14 }} onSubmit={async e => { e.preventDefault(); if (!ok) return; try { await api.del(`/api/admin/users/${u.id}`, { confirm }); toast('Compte supprimé'); onDone() } catch (er: any) { toast(er.message, true) } }}>
+      <label className="label">Tapez l’adresse e-mail du compte pour confirmer<input className="field" autoFocus autoComplete="off" placeholder={u.email} value={confirm} onChange={e => setConfirm(e.target.value)} /></label>
+      <button className="btn danger" disabled={!ok || !plan}><Trash2 size={15} />Supprimer définitivement</button>
+    </form>
+  </Modal>
+}
+
 function Users() {
   const { toast } = useApp()
   const { data, reload } = useLoad<any[]>('/api/admin/users')
   const [q, setQ] = useState('')
-  const set = async (id: number, patch: any, msg: string) => { try { await api.post(`/api/admin/users/${id}`, patch); toast(msg); reload() } catch (e: any) { toast(e.message, true) } }
+  const [link, setLink] = useState<any>(null)
+  const [del, setDel] = useState<any>(null)
+  const run = async (fn: () => Promise<any>, msg: string) => { try { await fn(); toast(msg); reload() } catch (e: any) { toast(e.message, true) } }
+  const set = (id: number, patch: any, msg: string) => run(() => api.post(`/api/admin/users/${id}`, patch), msg)
   const list = (data ?? []).filter(u => !q || (u.name + ' ' + u.email).toLowerCase().includes(q.toLowerCase()))
   return <section className="card">
     <CardHead title="Utilisateurs" sub={data ? `${data.length} comptes` : ''}><input className="field" style={{ height: 34, width: 220 }} placeholder="Chercher" value={q} onChange={e => setQ(e.target.value)} /></CardHead>
+    {link && <div style={{ marginBottom: 12 }}><div className="row" style={{ justifyContent: 'space-between' }}><b style={{ fontWeight: 500 }}>Lien de nouveau mot de passe pour {link.email}</b><button className="iconbtn" aria-label="Fermer" onClick={() => setLink(null)}><X size={16} /></button></div><LinkBox r={link} valid="2 heures, une seule fois" /></div>}
     <div style={{ overflowX: 'auto' }}><table className="tbl"><thead><tr><th>Nom</th><th>E-mail</th><th>Inscrit</th><th>Vu</th><th>Studios</th><th>Tâches faites</th><th>Rôle</th><th /></tr></thead>
       <tbody>{list.map(u => <tr key={u.id} style={{ opacity: u.disabled ? 0.5 : 1 }}>
         <td><b style={{ fontWeight: 500 }}>{u.name}</b>{u.me && <span className="small muted"> (vous)</span>}</td><td className="small">{u.email}</td>
         <td className="small muted">{frDate(u.created_at)}</td><td className="small muted">{u.last_seen ? ago(u.last_seen) : '—'}</td>
         <td>{u.studios}</td><td>{u.tasks_done}</td>
-        <td>{u.disabled ? <span className="badge b-r">Désactivé</span> : u.is_admin ? <span className="badge b-v">Admin</span> : <span className="badge">Utilisateur</span>}</td>
+        <td><div className="row" style={{ gap: 4, flexWrap: 'wrap' }}>{u.disabled ? <span className="badge b-r">Désactivé</span> : u.is_admin ? <span className="badge b-v">Admin</span> : <span className="badge">Utilisateur</span>}
+          {u.locked_until && <span className="badge b-o" title="Trop de mots de passe faux">Bloqué jusqu’à {hhmm(u.locked_until)}</span>}</div></td>
         <td>{!u.me && <div className="row" style={{ gap: 4, justifyContent: 'flex-end' }}>
+          <button className="iconbtn" title="Lien de nouveau mot de passe" aria-label="Lien de nouveau mot de passe" onClick={async () => { try { const r = await api.post(`/api/admin/users/${u.id}/reset-link`); setLink(r); toast(r.mailed ? 'Lien envoyé par e-mail' : 'Lien créé : copiez-le') } catch (e: any) { toast(e.message, true) } }}><KeyRound size={16} /></button>
+          {u.locked_until && <button className="iconbtn" title="Débloquer" aria-label="Débloquer" onClick={() => run(() => api.post(`/api/admin/users/${u.id}/unlock`), 'Compte débloqué')}><LockOpen size={16} /></button>}
+          {u.totp && <button className="iconbtn" title="Couper la double authentification" aria-label="Couper la double authentification" onClick={() => { if (confirm(`Couper la double authentification de ${u.name} ? Ses codes de secours seront effacés et il sera déconnecté partout. Il pourra se connecter avec son seul mot de passe, puis la réactiver.`)) run(() => api.post(`/api/admin/users/${u.id}/disable-2fa`), 'Double authentification coupée') }}><ShieldOff size={16} /></button>}
           <button className="iconbtn" title={u.is_admin ? 'Retirer les droits admin' : 'Rendre admin'} aria-label="Droits admin" onClick={() => { if (confirm(u.is_admin ? `Retirer les droits admin de ${u.name} ?` : `Donner les droits admin à ${u.name} ? Il pourra gérer la liste d’attente et les comptes.`)) set(u.id, { is_admin: !u.is_admin }, 'Droits mis à jour') }}><ShieldCheck size={16} /></button>
           <button className="iconbtn" title={u.disabled ? 'Réactiver' : 'Désactiver le compte'} aria-label="Désactiver" onClick={() => { if (confirm(u.disabled ? `Réactiver le compte de ${u.name} ?` : `Désactiver le compte de ${u.name} ? Il sera déconnecté et ne pourra plus se connecter.`)) set(u.id, { disabled: !u.disabled }, u.disabled ? 'Compte réactivé' : 'Compte désactivé') }}><Ban size={16} /></button>
+          <button className="iconbtn" title="Supprimer le compte" aria-label="Supprimer le compte" onClick={() => setDel(u)}><Trash2 size={16} /></button>
         </div>}</td>
       </tr>)}</tbody></table></div>
+    {del && <DeleteUser u={del} onClose={() => setDel(null)} onDone={() => { setDel(null); reload() }} />}
   </section>
 }
 
@@ -122,7 +156,7 @@ function Audit() {
   return <section className="card"><CardHead title="Journal de sécurité" sub="Connexions, échecs, blocages, double authentification et actions d’administration (300 derniers événements)." />
     {!data ? null : data.length === 0 ? <Empty text="Rien pour l’instant." /> :
       <div style={{ overflowX: 'auto' }}><table className="tbl"><thead><tr><th>Quand</th><th>Qui</th><th>Événement</th><th>Détail</th><th>Adresse IP</th></tr></thead>
-        <tbody>{data.map((e, i) => <tr key={i}><td className="small muted">{ago(e.at)}</td><td>{e.who ?? '—'}</td><td className={/échou|faux|bloqué|refus/.test(e.action) ? 'err' : ''}>{actionLabel(e.action)}</td><td className="small">{e.detail}</td><td className="small mono">{e.ip || '—'}</td></tr>)}</tbody></table></div>}
+        <tbody>{data.map((e, i) => <tr key={i}><td className="small muted">{ago(e.at)}</td><td>{e.who ?? '—'}</td><td className={/échou|faux|(?<!dé)bloqué|refus/.test(e.action) ? 'err' : ''}>{actionLabel(e.action)}</td><td className="small">{e.detail}</td><td className="small mono">{e.ip || '—'}</td></tr>)}</tbody></table></div>}
   </section>
 }
 

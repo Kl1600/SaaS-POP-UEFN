@@ -11,6 +11,8 @@ const ACTIONS: Record<string, string> = {
   '2fa_activée': 'Double authentification activée', '2fa_désactivée': 'Double authentification désactivée', mot_de_passe_changé: 'Mot de passe changé',
   session_fermée: 'Appareil déconnecté', sessions_fermées: 'Autres appareils déconnectés', compte_créé: 'Compte créé',
   admin_déverrouillé: 'Administration déverrouillée', admin_confirmation_échouée: 'Confirmation admin refusée',
+  admin_lien_mot_de_passe: 'Admin : lien de nouveau mot de passe', admin_compte_débloqué: 'Admin : compte débloqué', admin_2fa_coupée: 'Admin : double authentification coupée',
+  admin_compte_supprimé: 'Admin : compte supprimé',
 }
 export const actionLabel = (a: string) => ACTIONS[a] ?? a.replace(/_/g, ' ').replace(/^admin /, 'Admin : ')
 
