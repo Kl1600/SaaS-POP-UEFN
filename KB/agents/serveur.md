@@ -3,10 +3,10 @@
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
 ```
-EN COURS | #52 Déploiement : construire l'image Docker seulement au déploiement, plus à chaque fusion sur main | 19/11 19:00
+FAIT | #52 Déploiement : construire l'image Docker seulement au déploiement, plus à chaque fusion sur main | 19/11 19:40
 Owner : benybens | Sur la tâche : Claude Code, pour Yassine
 Fait : deployer.yml construit sha-… si absente (publier-image en workflow_call), latest = image déployée ; 5 essais en prod
-Reste : validation humaine ; vérifier qu'une fusion ne lance plus « publier l'image »
+Reste : rien (fusion 2b78313 sans « publier l'image ») ; piège : task.py done échoue sur « git switch main » en worktree
 Bloque : rien
 ```
 
