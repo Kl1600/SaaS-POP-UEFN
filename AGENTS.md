@@ -44,6 +44,8 @@ Windows `pop-link.exe` (`link/`) qui pilote UEFN par son serveur MCP local. Dét
    S'il manque quelque chose, **arrêtez-vous et dites à votre humain quoi** : ce n'est pas à vous de le corriger.
 2. `git pull --rebase` sur `main`. **Tirez avant chaque modification**, pas seulement au début : un autre agent a
    pu pousser entre-temps.
+   **Votre dossier** : `git status --short --branch` doit montrer `main`, sans changement. Sinon, un autre agent
+   travaille dans ce dossier : n'y changez pas de branche, travaillez dans votre propre worktree (§4.5).
 3. Lisez `KB/ETAT.md`, `KB/DECISIONS.md` et les entrées `BLOQUÉ` des autres fichiers de `KB/agents/`.
 4. La mémoire personnelle d'un agent reste sur un seul PC : tout ce que les autres doivent savoir (décision,
    convention, piège) va **dans ce dépôt** (`KB/DECISIONS.md`, `KB/UEFN.md`, ce fichier).
@@ -97,14 +99,21 @@ Une branche longue qui mélange plusieurs sujets ne se relit pas, ne se teste pa
   documentation demandés par l'humain). Pas de branche `claude`, `fix`, `wip`, au nom d'un agent ou d'un humain.
   Pas de travail sans issue : si votre humain demande autre chose, demandez-lui de créer l'issue d'abord
   (ou proposez-la, §6), puis prenez-la.
+- **Toujours depuis `main`.** Une branche part de `origin/main` (`task.py start` le fait ; à la main :
+  `git switch -c outillage/sujet origin/main`), jamais de la branche où se trouve le dossier.
+- **Un dossier par agent.** Plusieurs agents sur le même PC partagent sinon le même dossier, et l'un change la
+  branche sous les pieds de l'autre. Si le dossier principal n'est pas sur `main` propre, ou si un autre agent y
+  travaille : `git worktree add ../PopStudio-<sujet> origin/main --detach`, puis travaillez et lancez
+  `task.py start` dans ce dossier. Une fois la tâche fusionnée : `git worktree remove ../PopStudio-<sujet>`.
+  Laissez le dossier principal sur `main`.
 - **Petite et courte.** Visez moins de 500 lignes changées et 20 fichiers (hors `web/dist`, fichiers de verrou,
   `web/public/downloads`) et moins de 2 jours entre le premier commit et la PR. Au-delà, arrêtez-vous et proposez
   à votre humain de couper la tâche en plusieurs issues. `review` refuse une branche plus grosse sauf avec
   `--gros "raison"`, que la PR affiche.
 - **À jour.** `git fetch origin && git rebase origin/main` au moins une fois par jour et avant `review` (qui refuse
   une branche en retard sur `main`). On rebase sa propre branche ; on ne fusionne pas `main` dedans.
-- **Le hook `pre-push`** (`tools/hooks/pre-push`, activé par `task.py whoami`) refuse un push vers `main` et un nom
-  de branche hors règle. On ne le contourne jamais (`--no-verify` interdit) : s'il bloque, demandez à votre humain.
+- **Le hook `pre-push`** (`tools/hooks/pre-push`, activé par `task.py whoami`) refuse un push vers `main`, un nom
+  de branche hors règle et une branche qui emporte les commits d'une autre tâche (`#M : …`). On ne le contourne jamais (`--no-verify` interdit) : s'il bloque, demandez à votre humain.
 - **Rien de temporaire dans un commit** : dossiers de travail, sauvegardes, bases locales, `.env`. Regardez
   `git status` avant chaque commit.
 - Une branche fusionnée se supprime (`done` le fait). `task.py check` signale les branches trop vieilles, trop

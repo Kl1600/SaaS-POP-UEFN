@@ -2,7 +2,9 @@
 # Garde-fou des branches de POP (AGENTS.md §4.5), activé par « python tools/task.py whoami »
 # (git config core.hooksPath tools/hooks). Refuse :
 #   - tout push vers main : rien n'arrive sur main sans PR, c'est « task.py done » qui fusionne ;
-#   - une branche dont le nom n'est ni issue/N-… ni outillage/….
+#   - une branche dont le nom n'est ni issue/N-… ni outillage/… ;
+#   - une branche qui emporte les commits d'une autre tâche (« #M : … ») : elle a été créée depuis la branche
+#     d'un autre au lieu de main, souvent parce que deux agents partagent le même dossier.
 # Supprimer une branche distante reste permis. Ne le contournez jamais (--no-verify) : demandez à votre humain.
 
 status=0
@@ -20,6 +22,20 @@ while read -r local_ref local_sha remote_ref remote_sha; do
         echo "REFUSÉ (pre-push) : « $branch » n'est pas un nom de branche permis." >&2
         echo "  Une tâche : issue/N-… (créée par « task.py start N »). Outillage ou documentation : outillage/…" >&2
         echo "  Renommez : git branch -m issue/N-sujet   (AGENTS.md §4.5)" >&2
+        status=1
+        continue
+    fi
+    # Commits de la branche absents de main : aucun ne doit appartenir à une autre tâche.
+    git rev-parse -q --verify refs/remotes/origin/main >/dev/null || continue
+    n=$(printf '%s\n' "$branch" | sed -n 's|^issue/\([0-9][0-9]*\)-.*|\1|p')
+    etrangers=$(git log --format='%h %s' "refs/remotes/origin/main..$local_sha" |
+        grep -E '^[0-9a-f]+ #[0-9]+ :' | grep -vE "^[0-9a-f]+ #${n:-x} :")
+    if [ -n "$etrangers" ]; then
+        echo "REFUSÉ (pre-push) : « $branch » contient des commits d'une autre tâche :" >&2
+        printf '%s\n' "$etrangers" | sed 's/^/    /' >&2
+        echo "  La branche a été créée depuis une autre branche au lieu de main. Refaites-la depuis main :" >&2
+        echo "    git switch -c <nouvelle-branche> origin/main   puis   git cherry-pick <vos commits seulement>" >&2
+        echo "  Plusieurs agents sur ce PC : chacun travaille dans son propre worktree (AGENTS.md §4.5)." >&2
         status=1
     fi
 done
