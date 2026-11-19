@@ -890,7 +890,7 @@ fn pause() {
 }
 
 #[tokio::main]
-async   fn main()   {
+async fn main() {
     let args: Vec<String> = std::env::args().collect();
     let flag = |f: &str| {
         args.iter()
