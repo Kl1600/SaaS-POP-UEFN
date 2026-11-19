@@ -252,6 +252,13 @@ def require_clean_tree():
         raise Refused("des fichiers sont modifiés et non commités : commitez ou rangez-les d'abord (git status)")
 
 
+def in_extra_worktree():
+    """Vrai dans un worktree ajouté (git worktree add) : main y est souvent déjà prise par le dossier principal."""
+    here = pathlib.Path(git("rev-parse", "--absolute-git-dir")).resolve()
+    common = pathlib.Path(git("rev-parse", "--path-format=absolute", "--git-common-dir")).resolve()
+    return here != common
+
+
 def unpushed(branch):
     git("fetch", "-q", "origin")
     remote = git("rev-parse", "--verify", "-q", f"origin/{branch}", check=False)
@@ -520,9 +527,16 @@ def cmd_done(a):
     close_issue(n)
     print(f"#{n} fait · PR #{pr['number']} fusionnée")
     if git("branch", "--show-current") == branch and not git("status", "--porcelain"):
-        git("switch", "main")
-        git("pull", "--ff-only", "-q")
-        print("retour sur main à jour")
+        if in_extra_worktree():
+            # « main » ne peut pas être ouverte dans deux dossiers à la fois (AGENTS.md §4.5, un dossier par agent).
+            git("fetch", "-q", "origin")
+            git("switch", "-q", "--detach", "origin/main")
+            git("branch", "-D", branch, check=False)
+            print(f"worktree sur origin/main à jour ; une fois fini : git worktree remove {ROOT}")
+        else:
+            git("switch", "main")
+            git("pull", "--ff-only", "-q")
+            print("retour sur main à jour")
     return 0
 
 
