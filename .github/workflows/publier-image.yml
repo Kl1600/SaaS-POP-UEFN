@@ -1,47 +1,66 @@
-# Construit l'image de production de POP et la publie sur GitHub Container Registry (ghcr.io).
+# Construit l'image de production de POP pour un commit et la publie sur GitHub Container Registry (ghcr.io).
 # Le serveur (Hetzner CPX02, 1 Go de RAM) ne compile jamais : il télécharge cette image (voir deploy/README.md).
-# Étiquettes : `latest` (dernier main) et `sha-<commit>` (pour revenir à une version précise).
+# Plus de construction à chaque fusion sur main (#52) : l'action « déployer » appelle ce workflow seulement si
+# l'image du commit à déployer n'existe pas encore. On peut aussi le lancer à la main (onglet Actions → Run workflow).
+# Étiquette : `sha-<7 caractères du commit>`. `latest` désigne la dernière image déployée : c'est « déployer » qui
+# la pose, après un déploiement réussi.
 name: publier l'image
 
 on:
-  push:
-    branches: [main]
-    paths: [Dockerfile, .dockerignore, server/**, web/**, .github/workflows/publier-image.yml]
+  workflow_call:
+    inputs:
+      commit:
+        description: commit complet à construire
+        type: string
+        required: true
+    outputs:
+      image:
+        description: image publiée (ghcr.io/…:sha-<7 caractères>)
+        value: ${{ jobs.publier.outputs.image }}
   workflow_dispatch:
+    inputs:
+      commit:
+        description: "commit à construire (vide = la branche choisie ci-dessus)"
+        required: false
+        default: ""
 
 permissions:
   contents: read
   packages: write
 
-concurrency:
-  group: publier-image
-  cancel-in-progress: true
-
 jobs:
   publier:
     name: construire et publier (linux/amd64)
     runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.nom.outputs.image }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit || github.sha }}
+      - id: nom
+        run: |
+          commit=$(git rev-parse HEAD)
+          depot=$(echo "ghcr.io/$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+          echo "image=$depot:sha-${commit:0:7}" >> "$GITHUB_OUTPUT"
+          echo "Image à construire : $depot:sha-${commit:0:7} (commit $commit)"
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository }}
-          tags: |
-            type=raw,value=latest
-            type=sha,format=short
       - uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.nom.outputs.image }}
+          # deployer.sh lit org.opencontainers.image.revision pour afficher le commit en ligne.
+          labels: |
+            org.opencontainers.image.revision=${{ steps.nom.outputs.commit }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.title=POP
           cache-from: type=gha
           cache-to: type=gha,mode=max

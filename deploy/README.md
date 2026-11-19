@@ -2,8 +2,8 @@
 
 Un seul serveur : **Caddy** (HTTPS) → **POP** (image Docker) → base SQLite dans le volume `pop-data`,
 copiée en continu hors du serveur par **Litestream**. Le serveur ne compile jamais : l'image est construite par
-GitHub Actions (`.github/workflows/publier-image.yml`) à chaque fusion dans `main` et publiée sur
-`ghcr.io/kl1600/saas-pop-uefn`.
+GitHub Actions (`.github/workflows/publier-image.yml`) **au moment du déploiement** (pas à chaque fusion dans
+`main`, pour économiser les minutes d'Actions) et publiée sur `ghcr.io/kl1600/saas-pop-uefn`.
 
 Mesure du 18/11/2026 (release de `main`, base neuve) : POP utilise 26 Mo de RAM au repos et 65 Mo au plus fort de
 10 studios, 100 WebSocket et 486 requêtes/s. Avec Ubuntu, Docker, Caddy et Litestream, on reste sous 500 Mo :
@@ -41,7 +41,7 @@ Le jeton GitHub `pop-serveur` (lecture de l'image) expire le 16/02/2027 : après
 2. **Le domaine** : chez votre registrar, un enregistrement `A` (et `AAAA` pour l'IPv6) vers l'adresse du serveur.
    Il doit répondre **avant** le premier démarrage, sinon Caddy n'obtient pas de certificat.
 3. **L'image** : la première fois, lancer l'action « publier l'image » (onglet Actions du dépôt → *Run workflow*),
-   ou fusionner une PR dans `main`.
+   ou l'action « déployer » une fois le §4.1 en place (elle construit l'image si besoin).
 4. **Un jeton GitHub pour lire l'image** (le paquet est privé comme le dépôt) : GitHub → Settings → Developer
    settings → Personal access tokens (classic) → droit **`read:packages` seulement**. Il se tape sur le serveur,
    jamais dans un fichier du dépôt.
@@ -78,12 +78,16 @@ Le relais UEFN se connecte alors à `https://<domaine>`.
 
 **Depuis GitHub (un clic)** : onglet **Actions** → **déployer** → **Run workflow**, version `latest` (dernier
 `main`) ou `sha-<7 premiers caractères du commit>` pour une version précise. Il faut le droit d'écriture sur le dépôt.
-L'action vérifie que l'image de `main` est construite, se connecte au serveur, lance `deployer.sh` (télécharge
-l'image, redémarre POP, vérifie que `https://<domaine>` répond) et échoue en rouge sinon, avec les journaux de POP.
+L'action trouve le commit, regarde si son image `sha-<7 caractères>` est déjà publiée et, sinon, la construit
+(environ 8 min ; une construction en échec arrête tout, le serveur garde sa version). Elle se connecte ensuite au
+serveur, lance `deployer.sh` avec cette étiquette précise (télécharge l'image, redémarre POP, vérifie que
+`https://<domaine>` répond, échoue en rouge sinon, avec les journaux de POP), puis fait pointer `latest` sur
+l'image déployée. Revenir à une version déjà publiée ne reconstruit rien.
 Ce n'est **jamais automatique** à chaque fusion : une version peut migrer la base, on choisit le moment.
 Mise en place : §4.1.
 
-**À la main, sur le serveur** : `bash /opt/pop/deployer.sh` (ou `bash /opt/pop/deployer.sh sha-1a2b3c4`).
+**À la main, sur le serveur** : `bash /opt/pop/deployer.sh sha-1a2b3c4` (une image déjà publiée ; sans argument :
+`latest`, la dernière image déployée).
 
 La version déployée est écrite dans `POP_IMAGE` du `.env` (l'ancien `.env` est gardé dans `.env.avant-deploiement`).
 Revenir en arrière = déployer le `sha-…` d'avant. Attention : une version plus ancienne ne connaît pas les migrations

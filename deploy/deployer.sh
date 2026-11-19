@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Met POP à jour sur le serveur. Lancé par l'action GitHub « déployer » (.github/workflows/deployer.yml), par SSH,
 # avec une clé qui ne peut lancer QUE ce script (voir activer-deploiement.sh). Utilisable aussi à la main :
-#   bash /opt/pop/deployer.sh                 dernière image de main
-#   bash /opt/pop/deployer.sh sha-1a2b3c4     une version précise (revenir en arrière)
+#   bash /opt/pop/deployer.sh                 « latest » : la dernière image déployée par l'action
+#   bash /opt/pop/deployer.sh sha-1a2b3c4     une version précise déjà publiée (revenir en arrière)
+# L'action envoie toujours une étiquette sha-… précise ; elle construit l'image avant si elle n'existe pas (#52).
 # Ce que fait le script :
 #   1. refuse toute demande qui n'est pas « latest » ou « sha-<commit> » (la clé GitHub ne peut rien passer d'autre) ;
 #   2. écrit la version choisie dans POP_IMAGE du fichier .env (un « docker compose up -d » à la main la garde) ;

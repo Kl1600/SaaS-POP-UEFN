@@ -1,5 +1,5 @@
 # POP en production sur un seul serveur (voir deploy/README.md).
-#   pop        : l'image publiée par .github/workflows/publier-image.yml (jamais compilée sur le serveur)
+#   pop        : l'image publiée par .github/workflows/publier-image.yml au déploiement (jamais compilée sur le serveur)
 #   caddy      : HTTPS automatique (Let's Encrypt) devant POP, WebSocket compris
 #   litestream : copie continue de la base SQLite vers un stockage S3 (activé par COMPOSE_PROFILES=sauvegarde)
 # Les valeurs viennent du fichier .env posé à côté (modèle : env.exemple). Aucun secret dans ce fichier.
