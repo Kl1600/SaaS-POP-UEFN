@@ -252,3 +252,5 @@ CREATE TABLE file_locks (
   since TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE (map_id, path)
 );
+
+-- essai #46

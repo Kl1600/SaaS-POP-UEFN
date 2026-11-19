@@ -746,3 +746,5 @@ async fn renumber_old_migrations(db: &sqlx::SqlitePool) -> Result<(), sqlx::Erro
     tracing::info!("Migrations locales renumérotées (12-20 → 15-23).");
     Ok(())
 }
+
+// essai #46
