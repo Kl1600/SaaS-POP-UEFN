@@ -23,11 +23,28 @@ jobs:
             const { owner, repo } = context.repo;
             const { before, after, pusher, forced } = context.payload;
             const commits = context.payload.commits || [];
+            // Un commit vient d'une PR si la PR « (#N) » de son titre a été fusionnée dans main avec ce commit,
+            // ou si GitHub le relie à une PR fusionnée. Juste après une fusion, ce lien peut manquer quelques
+            // secondes (fausse alerte #58) : on réessaie pendant environ 1 min avant de conclure.
+            const pause = ms => new Promise(r => setTimeout(r, ms));
+            async function depuisUnePR(c) {
+              const n = (c.message.split('\n')[0].match(/\(#(\d+)\)\s*$/) || [])[1];
+              if (n) {
+                const pr = await github.rest.pulls.get({ owner, repo, pull_number: Number(n) }).catch(() => null);
+                if (pr && pr.data.merged_at && pr.data.base.ref === 'main' && pr.data.merge_commit_sha === c.id) return true;
+              }
+              const prs = await github.request('GET /repos/{owner}/{repo}/commits/{commit_sha}/pulls',
+                { owner, repo, commit_sha: c.id }).catch(() => ({ data: [] }));
+              return prs.data.some(p => p.merged_at && p.base.ref === 'main');
+            }
             const direct = [];
             for (const c of commits) {
-              const prs = await github.request('GET /repos/{owner}/{repo}/commits/{commit_sha}/pulls',
-                { owner, repo, commit_sha: c.id });
-              if (!prs.data.some(p => p.merged_at && p.base.ref === 'main')) direct.push(c);
+              let ok = false;
+              for (let essai = 0; essai < 6 && !ok; essai++) {
+                if (essai) await pause(10000);
+                ok = await depuisUnePR(c);
+              }
+              if (!ok) direct.push(c);
             }
             if (!direct.length && !forced) {
               core.info(`${commits.length} commit(s), tous issus d'une PR fusionnée`);
