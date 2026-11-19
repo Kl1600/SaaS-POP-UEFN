@@ -75,7 +75,8 @@ async fn set_password(st: &AppState, uid: i64, pw: &str) -> Result<u64, AppError
     Ok(tokens)
 }
 
-async fn new_reset(st: &AppState, uid: i64) -> Result<String, AppError> {
+/// Lien de nouveau mot de passe (chemin relatif) : 2 heures, une seule fois.
+pub(crate) async fn new_reset(st: &AppState, uid: i64) -> Result<String, AppError> {
     let token = random_token();
     sqlx::query("INSERT INTO password_resets (token_hash, user_id, expires_at) VALUES (?, ?, datetime('now', '+2 hours'))").bind(sha256_hex(&token)).bind(uid).execute(&st.db).await?;
     Ok(format!("/reinitialiser/{token}"))
@@ -130,6 +131,8 @@ pub async fn reset(State(st): State<AppState>, Json(b): Json<ResetIn>) -> ApiRes
     let uid = row.ok_or_else(|| bad("Lien expiré ou déjà utilisé."))?;
     let tokens = set_password(&st, uid, &b.password).await?;
     sqlx::query("UPDATE password_resets SET used_at = datetime('now') WHERE token_hash = ?").bind(sha256_hex(&b.token)).execute(&st.db).await?;
+    // Un nouveau mot de passe choisi par lien lève le blocage après trop d'essais (#38).
+    sqlx::query("UPDATE users SET failed_logins = 0, locked_until = NULL WHERE id = ?").bind(uid).execute(&st.db).await?;
     Ok(Json(json!({ "ok": true, "tokens_revoked": tokens })))
 }
 

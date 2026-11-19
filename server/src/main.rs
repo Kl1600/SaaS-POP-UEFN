@@ -62,6 +62,24 @@ pub struct AppState {
     pub http: reqwest::Client,
 }
 
+/// État d'application pour les tests de routes : base SQLite en mémoire, migrations appliquées.
+#[cfg(test)]
+pub async fn test_state() -> AppState {
+    let db = SqlitePoolOptions::new().max_connections(1).connect_with(SqliteConnectOptions::from_str("sqlite::memory:").unwrap().foreign_keys(true)).await.unwrap();
+    sqlx::migrate!("./migrations").run(&db).await.unwrap();
+    AppState {
+        db,
+        hub: Arc::new(ws::Hub::default()),
+        limiter: Arc::new(Mutex::new(HashMap::new())),
+        mfa_tickets: Arc::new(Mutex::new(HashMap::new())),
+        board_lock: Arc::new(tokio::sync::Mutex::new(())),
+        secure_cookies: false,
+        dummy_hash: auth::hash_password("mot-de-passe-factice").unwrap(),
+        relays: Arc::new(uefn::RelayHub::default()),
+        http: reqwest::Client::new(),
+    }
+}
+
 /// Protection CSRF : toute requête qui modifie des données doit porter l'en-tête « X-POP: 1 »,
 /// qu'un autre site ne peut pas ajouter sans autorisation CORS (que l'on ne donne jamais).
 async fn csrf(req: Request<Body>, next: Next) -> Response {
@@ -197,7 +215,11 @@ fn api() -> Router<AppState> {
         .route("/api/admin/waitlist/{id}", delete(admin::remove))
         .route("/api/admin/invite", post(admin::invite))
         .route("/api/admin/users", get(admin::users))
-        .route("/api/admin/users/{id}", post(admin::update_user))
+        .route("/api/admin/users/{id}", post(admin::update_user).delete(admin::delete_user))
+        .route("/api/admin/users/{id}/reset-link", post(admin::user_reset_link))
+        .route("/api/admin/users/{id}/unlock", post(admin::unlock_user))
+        .route("/api/admin/users/{id}/disable-2fa", post(admin::disable_user_2fa))
+        .route("/api/admin/users/{id}/deletion", get(admin::deletion_preview))
         .route("/api/maps/{mid}/guide", get(guide::guide))
         .route("/api/maps/{mid}/report", get(report))
         // Tâches
