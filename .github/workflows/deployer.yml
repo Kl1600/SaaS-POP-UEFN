@@ -2,7 +2,9 @@
 # « Déployer depuis GitHub »). Jamais automatique : une nouvelle version peut migrer la base, on choisit le moment.
 # Le runner se connecte en SSH avec une clé qui ne peut lancer que /opt/pop/deployer.sh sur le serveur ; ce script
 # télécharge l'image publiée par « publier l'image », redémarre POP et vérifie que le site répond.
-# Secrets de l'environnement « production » (Settings → Environments) : DEPLOY_HOST, DEPLOY_SSH_KEY, DEPLOY_KNOWN_HOSTS.
+# Secrets du dépôt (Settings → Secrets and variables → Actions) : DEPLOY_HOST, DEPLOY_SSH_KEY, DEPLOY_KNOWN_HOSTS.
+# Pas d'environnement GitHub : ils demandent un abonnement payant sur un dépôt privé. Seul le propriétaire du
+# dépôt peut créer ces secrets.
 name: déployer
 
 on:
@@ -25,7 +27,6 @@ jobs:
   deployer:
     name: mettre à jour le serveur
     runs-on: ubuntu-latest
-    environment: production
     timeout-minutes: 15
     steps:
       - name: Vérifier la version et les secrets
@@ -43,7 +44,7 @@ jobs:
           [ -n "$DEPLOY_SSH_KEY" ] || manque="$manque DEPLOY_SSH_KEY"
           [ -n "$DEPLOY_KNOWN_HOSTS" ] || manque="$manque DEPLOY_KNOWN_HOSTS"
           if [ -n "$manque" ]; then
-            echo "::error::Secrets manquants dans l'environnement production :$manque (voir deploy/README.md)."; exit 1
+            echo "::error::Secrets du dépôt manquants :$manque (voir deploy/README.md)."; exit 1
           fi
 
       - name: L'image de main est prête

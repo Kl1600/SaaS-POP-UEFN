@@ -94,8 +94,8 @@ Puis autoriser la clé (elle ne pourra lancer que `/opt/pop/deployer.sh`, sans t
 ssh pop-admin@<IP> "bash /opt/pop/activer-deploiement.sh '$(cat pop-deployer.pub)'"
 ```
 
-Le script affiche la ligne à mettre dans `DEPLOY_KNOWN_HOSTS`. Dans GitHub : **Settings → Environments → New
-environment** `production`, puis trois **Environment secrets** :
+Le script affiche la ligne à mettre dans `DEPLOY_KNOWN_HOSTS`. Dans GitHub, **le propriétaire du dépôt**
+(seul à voir cette page) : **Settings → Secrets and variables → Actions → New repository secret**, trois fois :
 
 | Secret | Valeur |
 |---|---|
@@ -103,8 +103,9 @@ environment** `production`, puis trois **Environment secrets** :
 | `DEPLOY_SSH_KEY` | tout le contenu du fichier **privé** `pop-deployer` |
 | `DEPLOY_KNOWN_HOSTS` | la ligne affichée par `activer-deploiement.sh`, avec la même adresse que `DEPLOY_HOST` |
 
-Ensuite, **effacez `pop-deployer` de votre PC** (la clé privée n'existe plus que dans GitHub). Option : dans
-l'environnement `production`, *Required reviewers* oblige quelqu'un à approuver chaque déploiement.
+Ensuite, **effacez `pop-deployer` de votre PC** (la clé privée n'existe plus que dans GitHub).
+Ce sont des secrets du dépôt, pas d'un environnement GitHub : sur un dépôt privé, les environnements demandent un
+abonnement payant.
 
 Le serveur doit déjà être connecté à `ghcr.io` (`docker login`, §3) : `deployer.sh` tourne en `pop-admin`.
 Retirer l'accès : supprimer la ligne `deployer-github` de `/home/pop-admin/.ssh/authorized_keys`.
