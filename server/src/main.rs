@@ -339,7 +339,13 @@ async fn main() -> anyhow::Result<()> {
         http: reqwest::Client::builder().timeout(std::time::Duration::from_secs(30)).build()?,
     };
     // Compte de test local « kl » / « kl » (activé par start.sh et Lancer POP.bat, jamais dans l'image Docker).
-    if std::env::var("POP_DEV_ACCOUNT").map(|v| v == "1").unwrap_or(false) {
+    // En ligne (HTTPS), le compte « kl » n'est jamais créé, et s'il existe déjà dans la base il est bloqué :
+    // sinon n'importe qui pourrait se connecter en administrateur avec « kl » / « kl ».
+    if https_mode() {
+        sqlx::query("UPDATE users SET password_hash = '!', is_admin = 0 WHERE email = 'kl'").execute(&st.db).await?;
+        sqlx::query("DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE email = 'kl')").execute(&st.db).await.ok();
+    }
+    if !https_mode() && std::env::var("POP_DEV_ACCOUNT").map(|v| v == "1").unwrap_or(false) {
         let exists: Option<i64> = sqlx::query_scalar("SELECT id FROM users WHERE email = 'kl'").fetch_optional(&st.db).await?;
         if exists.is_none() {
             let h = auth::hash_password("kl").map_err(|e| anyhow::anyhow!("{e:?}"))?;
