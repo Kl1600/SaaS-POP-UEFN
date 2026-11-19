@@ -3,10 +3,10 @@
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
 ```
-EN COURS | #46 CI : consommer moins de minutes GitHub Actions (jobs selon les dossiers touchés, jobs regroupés) | 19/11 17:30
+FAIT | #46 CI : consommer moins de minutes GitHub Actions (jobs selon les dossiers touchés, jobs regroupés) | 19/11 18:10
 Owner : benybens | Sur la tâche : Claude Code, pour Yassine
 Fait : ci.yml par dossier, migrations + audit en 1 job, audit le lundi ; PR doc 1 min (6 avant), serveur 4, relais+web 4
-Reste : validation humaine ; règles des tâches et audit du lundi à voir après fusion
+Reste : voir le 1er audit du lundi 24/11 (schedule) ; règles des tâches vérifiées après fusion
 Bloque : rien
 ```
 
