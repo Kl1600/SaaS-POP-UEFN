@@ -1,24 +1,81 @@
 # Contrôles de chaque PR et de main. `python tools/task.py done` refuse de fusionner tant qu'ils ne sont pas verts.
+# Pour rester sous le quota gratuit de GitHub Actions (#46), chaque contrôle ne tourne que si ce qu'il vérifie a
+# changé ; un contrôle sauté ne coûte rien et compte comme bon pour `task.py done`. Modifier ce fichier fait tout
+# tourner.
 name: CI
 
 on:
   pull_request:
   push:
     branches: [main]
+  # Failles publiées sans changement de code : audit des dépendances chaque lundi.
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  changements:
+    name: dossiers touchés
+    runs-on: ubuntu-latest
+    outputs:
+      serveur: ${{ steps.f.outputs.serveur }}
+      relais: ${{ steps.f.outputs.relais }}
+      web: ${{ steps.f.outputs.web }}
+      migrations: ${{ steps.f.outputs.migrations }}
+      audit: ${{ steps.f.outputs.audit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          filter: blob:none
+      - id: f
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          tout=0
+          case "$EVENT" in
+            pull_request) base=$(git merge-base "origin/$BASE_REF" HEAD) ;;
+            push) base=$BEFORE ;;
+            schedule) base= ;;
+            *) tout=1 ;;
+          esac
+          if [ "$EVENT" = schedule ]; then
+            files=
+          elif [ "$tout" = 1 ] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+            # Lancement à la main, première poussée ou historique réécrit : on vérifie tout.
+            tout=1
+            files=
+          else
+            files=$(git diff --name-only "$base" HEAD)
+          fi
+          echo "$files" | sed 's/^/  /'
+          if printf '%s\n' "$files" | grep -q '^\.github/workflows/ci\.yml$'; then tout=1; fi
+          touche() { [ "$tout" = 1 ] || printf '%s\n' "$files" | grep -Eq "$1"; }
+          out() { if touche "$2"; then echo "$1=1"; else echo "$1=0"; fi >> "$GITHUB_OUTPUT"; }
+          out serveur '^server/'
+          out relais '^link/'
+          out web '^web/'
+          out migrations '^server/migrations/'
+          if [ "$EVENT" = schedule ]; then echo "audit=1" >> "$GITHUB_OUTPUT"
+          else out audit '^(server|link)/(Cargo\.(lock|toml)|\.cargo/audit\.toml)$|^web/package(-lock)?\.json$'; fi
+          cat "$GITHUB_OUTPUT"
+
   serveur:
     name: serveur (build + tests)
+    needs: changements
+    if: needs.changements.outputs.serveur == '1'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -38,6 +95,8 @@ jobs:
 
   relais:
     name: relais pop-link (build + tests)
+    needs: changements
+    if: needs.changements.outputs.relais == '1'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -57,6 +116,8 @@ jobs:
 
   web:
     name: web (types + build + dist à jour)
+    needs: changements
+    if: needs.changements.outputs.web == '1'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -80,33 +141,13 @@ jobs:
             exit 1
           fi
 
-  dependances:
-    name: dépendances (failles connues)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-audit
-      # Échoue sur toute faille connue de la base RustSec. Les exceptions, justifiées une par une,
-      # sont dans <dossier>/.cargo/audit.toml (aujourd'hui : server/ seulement).
-      - name: cargo audit (serveur)
-        run: cargo audit
-        working-directory: server
-      - name: cargo audit (relais)
-        run: cargo audit
-        working-directory: link
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      # Dépendances livrées dans l'interface seulement ; échoue à partir de la gravité élevée.
-      - name: npm audit (web)
-        run: npm audit --omit=dev --audit-level=high
-        working-directory: web
-
-  migrations:
-    name: migrations inchangées
-    if: github.event_name == 'pull_request'
+  # Migrations et failles connues dans un seul job : GitHub arrondit chaque job à la minute.
+  verifications:
+    name: migrations et dépendances
+    needs: changements
+    if: >-
+      needs.changements.outputs.audit == '1' ||
+      (github.event_name == 'pull_request' && needs.changements.outputs.migrations == '1')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -114,6 +155,7 @@ jobs:
           fetch-depth: 0
       # Une migration existante ne se modifie jamais : on en ajoute une nouvelle, numérotée à la suite.
       - name: seules des migrations nouvelles
+        if: github.event_name == 'pull_request' && needs.changements.outputs.migrations == '1'
         run: |
           changed=$(git diff --name-status "origin/${{ github.base_ref }}...HEAD" -- server/migrations | grep -v '^A' || true)
           if [ -n "$changed" ]; then
@@ -123,3 +165,26 @@ jobs:
           fi
           last=$(ls server/migrations | sort | tail -1)
           echo "Dernière migration : $last"
+      - uses: taiki-e/install-action@v2
+        if: needs.changements.outputs.audit == '1'
+        with:
+          tool: cargo-audit
+      # Échoue sur toute faille connue de la base RustSec. Les exceptions, justifiées une par une,
+      # sont dans <dossier>/.cargo/audit.toml (aujourd'hui : server/ seulement).
+      - name: cargo audit (serveur)
+        if: needs.changements.outputs.audit == '1'
+        run: cargo audit
+        working-directory: server
+      - name: cargo audit (relais)
+        if: needs.changements.outputs.audit == '1'
+        run: cargo audit
+        working-directory: link
+      - uses: actions/setup-node@v4
+        if: needs.changements.outputs.audit == '1'
+        with:
+          node-version: 22
+      # Dépendances livrées dans l'interface seulement ; échoue à partir de la gravité élevée.
+      - name: npm audit (web)
+        if: needs.changements.outputs.audit == '1'
+        run: npm audit --omit=dev --audit-level=high
+        working-directory: web

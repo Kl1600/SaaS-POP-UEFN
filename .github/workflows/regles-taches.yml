@@ -16,6 +16,11 @@ permissions:
 
 jobs:
   appliquer:
+    # Seuls une fermeture et « en cours » / « en revue » ont une règle : les autres étiquettes (priorité, domaine,
+    # type, « bloqué ») sautent le job, qui ne coûte alors rien (#46).
+    if: >-
+      github.event.action == 'closed' ||
+      contains(fromJSON('["en cours", "en revue"]'), github.event.label.name)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/github-script@v7
