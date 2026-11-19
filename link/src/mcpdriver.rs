@@ -1,22 +1,46 @@
 //! Pilote du vrai UEFN via son serveur MCP local (http://127.0.0.1:8000/mcp par défaut).
-//! Epic ne publie pas la liste exacte des outils : on la découvre au démarrage et on choisit par mots-clés.
-//! Le fichier de configuration peut imposer les noms (`tools`) si la détection se trompe.
+//!
+//! UEFN n'expose que trois outils « méta » (`list_toolsets`, `describe_toolset`, `call_tool`) ;
+//! les vrais outils sont rangés dans des toolsets et s'appellent par `call_tool`. On découvre au
+//! démarrage les toolsets utiles à POP, puis on choisit chaque outil par son nom réel
+//! (`execute_python`, `BuildAll`, `PushChanges`…). Pour un autre serveur MCP sans toolsets, on garde
+//! la détection par mots-clés. Le fichier de configuration peut imposer les noms (`tools`).
 use anyhow::{anyhow, bail, Result};
 use serde_json::{json, Value};
 use std::collections::HashMap;
+
+/// Toolsets décrits à chaque connexion (les autres ne le sont que par `pop-link diagnostic`).
+const USEFUL_TOOLSETS: &[&str] = &["python_scripting", "VerseToolset.VerseToolset", "SessionToolset", "DeviceToolset", "RevisionControl", "LevelToolset", "ActorToolset"];
+
+/// Outil attendu pour chaque rôle : (morceau du nom du toolset, nom de l'outil).
+const KNOWN: &[(&str, &str, &str)] = &[
+    ("python", "python_scripting", "execute_python"),
+    ("compile", "verse", "BuildAll"),
+    ("push", "session", "PushChanges"),
+    ("session_status", "session", "GetSessionStatus"),
+    ("props_get", "device", "ListClassicDeviceOptions"),
+    ("props_set", "device", "SetClassicDeviceOption"),
+    ("verse_props_list", "device", "ListDeviceProperties"),
+    ("verse_props_get", "device", "GetDeviceProperties"),
+    ("verse_props_set", "device", "SetDeviceProperty"),
+    ("checkin", "revision", "CheckIn"),
+];
 
 pub struct Mcp {
     pub url: String,
     http: reqwest::Client,
     session: Option<String>,
+    /// Outils utilisables. Pour un outil de toolset : `name` complet, `tool` (nom court) et `toolset`.
     pub tools: Vec<Value>,
+    /// Tous les toolsets annoncés par UEFN (nom, description).
+    pub toolsets: Vec<(String, String)>,
     pub overrides: HashMap<String, String>,
     next_id: u64,
 }
 
 impl Mcp {
     pub fn new(url: String, overrides: HashMap<String, String>) -> Self {
-        Self { url, http: reqwest::Client::builder().timeout(std::time::Duration::from_secs(180)).build().unwrap(), session: None, tools: vec![], overrides, next_id: 1 }
+        Self { url, http: reqwest::Client::builder().timeout(std::time::Duration::from_secs(180)).build().unwrap(), session: None, tools: vec![], toolsets: vec![], overrides, next_id: 1 }
     }
 
     async fn rpc(&mut self, method: &str, params: Value) -> Result<Value> {
@@ -47,14 +71,66 @@ impl Mcp {
     }
 
     pub async fn connect(&mut self) -> Result<()> {
+        self.connect_with(false).await
+    }
+
+    /// `all` : décrit tous les toolsets (diagnostic), sinon seulement ceux dont POP se sert.
+    pub async fn connect_with(&mut self, all: bool) -> Result<()> {
+        // On repart de zéro : une connexion ratée (UEFN qui se ferme) ne doit pas laisser d'outils sans session,
+        // sinon `alive` croit la connexion bonne à la réouverture et chaque appel est refusé (#4).
         self.session = None;
+        self.tools.clear();
+        self.toolsets.clear();
         self.rpc("initialize", json!({ "protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": { "name": "pop-link", "version": "0.1.0" } })).await?;
         let _ = self.http.post(&self.url).header("content-type", "application/json").header("accept", "application/json, text/event-stream")
             .header("mcp-session-id", self.session.clone().unwrap_or_default())
             .json(&json!({ "jsonrpc": "2.0", "method": "notifications/initialized" })).send().await;
         let r = self.rpc("tools/list", json!({})).await?;
-        self.tools = r["tools"].as_array().cloned().unwrap_or_default();
+        let top = r["tools"].as_array().cloned().unwrap_or_default();
+        let has = |n: &str| top.iter().any(|t| t["name"] == n);
+        if !(has("call_tool") && has("list_toolsets") && has("describe_toolset")) {
+            self.tools = top;
+            self.toolsets.clear();
+            return Ok(());
+        }
+        // Serveur à toolsets (UEFN) : on aplatit les outils des toolsets utiles.
+        let mut tools: Vec<Value> = top.into_iter().filter(|t| !["call_tool", "list_toolsets", "describe_toolset"].contains(&t["name"].as_str().unwrap_or(""))).collect();
+        let listing = self.raw_call("list_toolsets", json!({})).await?;
+        self.toolsets = parse_toolsets(&listing);
+        let wanted: Vec<String> = self.toolsets.iter().map(|(n, _)| n.clone())
+            .filter(|n| all || USEFUL_TOOLSETS.iter().any(|w| n.contains(w)) || self.overrides.values().any(|o| o.starts_with(&format!("{n}."))))
+            .collect();
+        for ts in wanted {
+            let Ok(txt) = self.raw_call("describe_toolset", json!({ "toolset_name": ts })).await else { continue };
+            let Ok(d) = serde_json::from_str::<Value>(&txt) else { continue };
+            for t in d["tools"].as_array().into_iter().flatten() {
+                let full = t["name"].as_str().unwrap_or("").to_string();
+                let short = full.rsplit('.').next().unwrap_or(&full).to_string();
+                tools.push(json!({ "name": full, "tool": short, "toolset": ts, "description": t["description"], "inputSchema": t.get("inputSchema").or(t.get("input_schema")).cloned().unwrap_or(json!({})) }));
+            }
+        }
+        self.tools = tools;
         Ok(())
+    }
+
+    /// Appel direct d'un outil de premier niveau ; renvoie le texte (erreur si `isError`).
+    async fn raw_call(&mut self, name: &str, args: Value) -> Result<String> {
+        let r = match self.rpc("tools/call", json!({ "name": name, "arguments": args })).await {
+            Ok(r) => r,
+            Err(e) => {
+                // Session MCP perdue (UEFN relancé) : la prochaine vérification refait la connexion complète.
+                if e.to_string().contains("Mcp-Session-Id") {
+                    self.tools.clear();
+                    self.session = None;
+                }
+                return Err(e);
+            }
+        };
+        let txt: String = r["content"].as_array().cloned().unwrap_or_default().iter().filter_map(|c| c["text"].as_str()).collect::<Vec<_>>().join("\n");
+        if r["isError"].as_bool() == Some(true) {
+            bail!("{}", txt.trim());
+        }
+        Ok(txt)
     }
 
     pub async fn alive(&mut self) -> bool {
@@ -67,10 +143,25 @@ impl Mcp {
         self.connect().await.is_ok()
     }
 
-    /// Choisit l'outil pour un rôle (« python », « compile », « push »…).
-    fn pick(&self, role: &str, words: &[&[&str]]) -> Option<Value> {
+    /// Outil réel d'UEFN pour un rôle (nom imposé par la configuration, sinon nom connu).
+    fn known(&self, role: &str) -> Option<Value> {
         if let Some(n) = self.overrides.get(role) {
-            return self.tools.iter().find(|t| t["name"] == n.as_str()).cloned();
+            return self.tools.iter().find(|t| t["name"] == n.as_str() || t["tool"] == n.as_str()).cloned();
+        }
+        let (_, ts, tool) = KNOWN.iter().find(|(r, _, _)| *r == role)?;
+        self.tools.iter().find(|t| t["tool"] == *tool && t["toolset"].as_str().map(|s| s.to_lowercase().contains(ts)).unwrap_or(false)).cloned()
+    }
+
+    /// Choisit l'outil pour un rôle (« python », « compile », « push »…) : nom réel d'UEFN d'abord,
+    /// puis mots-clés pour les autres serveurs MCP.
+    fn pick(&self, role: &str, words: &[&[&str]]) -> Option<Value> {
+        if self.overrides.contains_key(role) || KNOWN.iter().any(|(r, _, _)| *r == role) {
+            if let Some(t) = self.known(role) {
+                return Some(t);
+            }
+            if self.overrides.contains_key(role) || !self.toolsets.is_empty() {
+                return None;
+            }
         }
         // Les outils de lecture ne doivent jamais servir à écrire, et inversement.
         let (avoid, verb): (&[&str], &[&str]) = match role {
@@ -86,20 +177,34 @@ impl Mcp {
         }).cloned()
     }
 
+    /// Appelle un outil (de premier niveau, ou d'un toolset via `call_tool`).
+    /// UEFN enveloppe les résultats dans `{"returnValue": …}` : on renvoie la valeur elle-même.
     async fn call_tool(&mut self, tool: &Value, args: Value) -> Result<String> {
-        let r = self.rpc("tools/call", json!({ "name": tool["name"], "arguments": args })).await?;
-        let txt: String = r["content"].as_array().cloned().unwrap_or_default().iter().filter_map(|c| c["text"].as_str()).collect::<Vec<_>>().join("\n");
-        if r["isError"].as_bool() == Some(true) {
-            bail!("{txt}");
-        }
-        Ok(txt)
+        let txt = match tool["toolset"].as_str() {
+            Some(ts) => {
+                let (ts, short) = (ts.to_string(), tool["tool"].as_str().unwrap_or("").to_string());
+                self.raw_call("call_tool", json!({ "toolset_name": ts, "tool_name": short, "arguments": args })).await?
+            }
+            None => self.raw_call(tool["name"].as_str().unwrap_or(""), args).await?,
+        };
+        Ok(unwrap_return(&txt))
     }
 
     /// Exécute un script Python dans l'éditeur (Python Editor Scripting doit être activé).
     pub async fn python(&mut self, code: &str) -> Result<String> {
-        let t = self.pick("python", &[&["python"], &["exec", "run"]]).ok_or_else(|| anyhow!("Aucun outil Python dans UEFN : activez Python Editor Scripting et les toolsets MCP."))?;
-        let key = first_string_prop(&t).unwrap_or_else(|| "code".into());
-        self.call_tool(&t, json!({ key: code })).await
+        let t = self.pick("python", &[&["python"], &["exec", "run"]]).ok_or_else(|| anyhow!("Aucun outil Python dans UEFN : activez « Enable Project Python Scripts » et démarrez le serveur MCP."))?;
+        // UEFN : `script: { content, language }` ; autres serveurs : un simple champ texte.
+        let args = if t["inputSchema"]["properties"]["script"]["type"] == "object" {
+            json!({ "script": { "content": code, "language": "Python" } })
+        } else {
+            json!({ first_string_prop(&t).unwrap_or_else(|| "code".into()): code })
+        };
+        self.call_tool(&t, args).await
+    }
+
+    /// Outils d'appareils d'UEFN (DeviceToolset) disponibles.
+    fn device_tools(&self) -> bool {
+        self.known("props_set").is_some() || self.known("verse_props_set").is_some()
     }
 
     pub async fn list_actors(&mut self) -> Result<Vec<Value>> {
@@ -109,9 +214,38 @@ impl Mcp {
     }
 
     pub async fn patch(&mut self, patches: &Value) -> Result<()> {
-        // Options d'appareils : outil « Device » d'UEFN quand il existe, sinon Python.
+        // Options d'appareils : DeviceToolset d'UEFN quand il existe, sinon outil trouvé par mots-clés, sinon Python.
         let mut patches = patches.clone();
-        if let Some(t) = self.pick("props_set", &[&["propert", "editable", "option"], &["set", "update", "edit", "write"]]) {
+        if self.device_tools() {
+            let mut classes: HashMap<String, String> = HashMap::new();
+            if let Ok(list) = self.list_actors().await { for a in list { classes.insert(a["id"].as_str().unwrap_or("").into(), a["class"].as_str().unwrap_or("").to_lowercase()); } }
+            for p in patches.as_array_mut().into_iter().flatten() {
+                let id = p["id"].as_str().unwrap_or("").to_string();
+                for key in ["options", "props"] {
+                    let Some(m) = p["changes"][key].as_object().cloned() else { continue };
+                    let verse = key == "props" || classes.get(&id).map(|c| c.contains("verse") || c.contains("scriptdevice")).unwrap_or(false);
+                    for (k, v) in &m {
+                        // Un appareil Verse a ses réglages @editable et aussi des options classiques
+                        // (« Enabled at Game Start »…) : on tente le réglage Verse, puis l'option classique.
+                        let mut err = None;
+                        if verse {
+                            if let Some(t) = self.known("verse_props_set") {
+                                match self.call_tool(&t, json!({ "device": { "refPath": id }, "propertyName": k, "value": serde_json::to_string(v)? })).await {
+                                    Ok(_) => continue,
+                                    Err(e) => err = Some(e),
+                                }
+                            }
+                        }
+                        let t = self.known("props_set").ok_or_else(|| anyhow!("UEFN n'expose pas SetClassicDeviceOption."))?;
+                        let val = v.as_str().map(String::from).unwrap_or_else(|| v.to_string());
+                        if let Err(e) = self.call_tool(&t, json!({ "devicePath": { "refPath": id }, "optionName": k, "value": val })).await {
+                            bail!("option {k} : {}", err.map(|x| format!("{x} ; {e}")).unwrap_or_else(|| e.to_string()));
+                        }
+                    }
+                    p["changes"].as_object_mut().unwrap().remove(key);
+                }
+            }
+        } else if let Some(t) = self.pick("props_set", &[&["propert", "editable", "option"], &["set", "update", "edit", "write"]]) {
             let mut names: HashMap<String, String> = HashMap::new();
             if let Ok(list) = self.list_actors().await { for a in list { names.insert(a["id"].as_str().unwrap_or("").into(), a["name"].as_str().unwrap_or("").into()); } }
             for p in patches.as_array_mut().into_iter().flatten() {
@@ -143,9 +277,17 @@ impl Mcp {
         Ok(serde_json::from_str(line.trim()).unwrap_or_default())
     }
 
-    pub async fn delete(&mut self, ids: &[String]) -> Result<()> {
+    /// Supprime des acteurs et renvoie leur sauvegarde (texte T3D, en base64) pour pouvoir les recréer.
+    /// Une suppression faite par Python n'entre pas dans l'historique d'annulation d'UEFN : sans cette
+    /// sauvegarde, elle serait définitive.
+    pub async fn delete(&mut self, ids: &[String]) -> Result<String> {
         let code = format!("IDS = {}\n{}", serde_json::to_string(ids)?, PY_DEL);
-        self.python(&code).await.map(|_| ())
+        let out = self.python(&code).await?;
+        let saved = out.lines().find_map(|l| l.strip_prefix("T3D=")).map(|s| s.trim().to_string()).unwrap_or_default();
+        if saved.is_empty() {
+            bail!("UEFN n'a pas pu sauvegarder les acteurs avant suppression : rien n'a été supprimé.");
+        }
+        Ok(saved)
     }
 
     pub async fn save_level(&mut self) -> Result<()> {
@@ -155,17 +297,37 @@ impl Mcp {
     pub async fn compile(&mut self) -> Result<Vec<Value>> {
         let t = self.pick("compile", &[&["verse"], &["compile", "build"]]).ok_or_else(|| anyhow!("Outil de compilation Verse introuvable dans UEFN."))?;
         let out = self.call_tool(&t, json!({})).await.or_else(|e| Ok::<String, anyhow::Error>(e.to_string()))?;
+        // UEFN (BuildAll) : liste JSON structurée ; sinon, lignes du journal de compilation.
+        if let Ok(Value::Array(list)) = serde_json::from_str::<Value>(out.trim()) {
+            return Ok(list.iter().map(build_diag).collect());
+        }
         Ok(parse_diagnostics(&out))
     }
 
-    /// Annule la dernière transaction POP de l'éditeur (suppression), puis vérifie que les acteurs sont revenus.
-    pub async fn restore(&mut self, ids: &[String]) -> Result<()> {
-        let code = format!("IDS = {}\n{}", serde_json::to_string(ids)?, PY_RESTORE);
-        let out = self.python(&code).await?;
-        if !out.contains("restored") {
-            bail!("UEFN n'a pas pu annuler la suppression (une autre action a eu lieu depuis) : utilisez Ctrl+Z dans UEFN.");
+    /// Archive dans Lore (ou le système de version du projet) via UEFN : enregistre tout, puis un check-in.
+    pub async fn checkin(&mut self, message: &str) -> Result<()> {
+        let t = self.known("checkin").ok_or_else(|| anyhow!("UEFN n'expose pas l'archivage (ValkyrieRevisionControl.CheckIn)."))?;
+        self.call_tool(&t, json!({ "description": message })).await.map(|_| ())
+    }
+
+    pub fn can_checkin(&self) -> bool {
+        self.known("checkin").is_some()
+    }
+
+    /// Recrée des acteurs supprimés à partir de leur sauvegarde (mêmes réglages, position, dossier, nom).
+    /// Les acteurs recréés ont un nouvel identifiant interne : on renvoie la liste des nouveaux.
+    pub async fn restore(&mut self, saved: &str, expected: usize) -> Result<Vec<String>> {
+        if saved.is_empty() {
+            bail!("Pas de sauvegarde pour cette suppression (faite avant cette version de pop-link) : elle ne peut pas être annulée.");
         }
-        Ok(())
+        let code = format!("SAVED = {}\n{}", serde_json::to_string(saved)?, PY_RESTORE);
+        let out = self.python(&code).await?;
+        let line = out.lines().rev().find(|l| l.trim_start().starts_with('[')).ok_or_else(|| anyhow!("UEFN n'a pas pu recréer les acteurs : {}", out.chars().take(200).collect::<String>()))?;
+        let ids: Vec<String> = serde_json::from_str(line.trim())?;
+        if ids.len() < expected {
+            bail!("UEFN n'a recréé que {} acteur(s) sur {expected}.", ids.len());
+        }
+        Ok(ids)
     }
 
     /// Remplit les arguments d'un outil d'appareil d'après son schéma (acteur, propriété, valeur).
@@ -189,6 +351,9 @@ impl Mcp {
 
     /// Options réelles d'un appareil (outil « Device » d'UEFN MCP).
     pub async fn device_props(&mut self, id: &str, name: &str) -> Result<Value> {
+        if self.device_tools() {
+            return self.device_props_uefn(id).await;
+        }
         let t = self.pick("props_get", &[&["propert", "editable", "option"], &["get", "list", "read", "describe"]]).ok_or_else(|| anyhow!("UEFN n'expose pas d'outil pour lire les options des appareils (voir pop-link diagnostic)."))?;
         let out = self.call_tool(&t, Self::fill_args(&t, id, name, None)).await?;
         let start = out.find('{').ok_or_else(|| anyhow!("réponse illisible : {}", out.chars().take(200).collect::<String>()))?;
@@ -210,6 +375,53 @@ impl Mcp {
         Ok(plan_svg(&items))
     }
 
+    /// Options d'un appareil via le DeviceToolset : options classiques, plus réglages @editable s'il s'agit d'un appareil Verse.
+    async fn device_props_uefn(&mut self, id: &str) -> Result<Value> {
+        let mut out = serde_json::Map::new();
+        let mut ok = false;
+        let mut first_err = None;
+        if let Some(t) = self.known("props_get") {
+            match self.call_tool(&t, json!({ "devicePath": { "refPath": id } })).await {
+                Ok(txt) => {
+                    let list: Value = serde_json::from_str(txt.trim()).map_err(|_| anyhow!("réponse illisible : {}", txt.chars().take(200).collect::<String>()))?;
+                    for o in list.as_array().into_iter().flatten() {
+                        if let Some(n) = o["name"].as_str() { out.insert(n.to_string(), o.get("currentValue").cloned().unwrap_or(Value::Null)); }
+                    }
+                    ok = true;
+                }
+                Err(e) => first_err = Some(e),
+            }
+        }
+        if let (Some(list), Some(get)) = (self.known("verse_props_list"), self.known("verse_props_get")) {
+            let dev = json!({ "refPath": id });
+            if let Ok(schema) = self.call_tool(&list, json!({ "device": dev })).await {
+                ok = true;
+                // Schéma de propriétés JSON (vide quand l'appareil n'a aucun réglage @editable).
+                let s: Value = serde_json::from_str(schema.trim()).unwrap_or(Value::Null);
+                let props = s.get("properties").cloned().unwrap_or(s);
+                let names: Vec<String> = match &props {
+                    Value::Object(m) => m.keys().cloned().collect(),
+                    Value::Array(a) => a.iter().filter_map(|p| p["name"].as_str().map(String::from)).collect(),
+                    _ => vec![],
+                };
+                if !names.is_empty() {
+                    let txt = self.call_tool(&get, json!({ "device": dev, "propertyNames": names })).await?;
+                    match serde_json::from_str::<Value>(txt.trim()) {
+                        Ok(Value::Array(list)) => for p in list {
+                            if let Some(n) = p["name"].as_str().or(p["propertyName"].as_str()) { out.insert(n.to_string(), p.get("value").cloned().unwrap_or(Value::Null)); }
+                        },
+                        Ok(Value::Object(m)) => out.extend(m.get("properties").and_then(|p| p.as_object()).cloned().unwrap_or(m)),
+                        _ => { out.insert("valeur".into(), json!(txt)); }
+                    }
+                }
+            }
+        }
+        if !ok {
+            return Err(first_err.unwrap_or_else(|| anyhow!("UEFN n'expose pas d'outil pour lire les options des appareils (voir pop-link diagnostic).")));
+        }
+        Ok(Value::Object(out))
+    }
+
     /// Outils retenus pour chaque rôle (affiché dans le diagnostic et dans POP).
     pub fn roles(&self) -> Value {
         let name = |t: Option<Value>| t.and_then(|t| t["name"].as_str().map(String::from)).unwrap_or_else(|| "introuvable".into());
@@ -219,12 +431,20 @@ impl Mcp {
             "push": name(self.pick("push", &[&["session"], &["push", "update", "verse", "apply"]])),
             "props_get": name(self.pick("props_get", &[&["propert", "editable", "option"], &["get", "list", "read", "describe"]])),
             "props_set": name(self.pick("props_set", &[&["propert", "editable", "option"], &["set", "update", "edit", "write"]])),
+            "checkin": name(self.known("checkin")),
         })
     }
 
-    pub async fn push_session(&mut self) -> Result<()> {
+    /// `verse_only` : seul le Verse a changé, UEFN saute la recuisson des assets (bien plus rapide).
+    pub async fn push_session(&mut self, verse_only: bool) -> Result<()> {
         let t = self.pick("push", &[&["session"], &["push", "update", "verse", "apply"]]).ok_or_else(|| anyhow!("Outil de session introuvable : lancez une session de test dans UEFN."))?;
-        self.call_tool(&t, json!({})).await.map(|_| ())
+        if let Some(s) = self.known("session_status") {
+            let st = self.call_tool(&s, json!({})).await.unwrap_or_default();
+            if st.trim().eq_ignore_ascii_case("disconnected") {
+                bail!("Aucune session de test en cours : lancez-en une dans UEFN (Lancer la session), puis renvoyez.");
+            }
+        }
+        self.call_tool(&t, json!({ "bVerseOnly": verse_only })).await.map(|_| ())
     }
 }
 
@@ -273,6 +493,55 @@ fn plan_svg(items: &[Value]) -> (String, Value) {
     (format!("data:image/svg+xml;base64,{}", base64::engine::general_purpose::STANDARD.encode(svg)), json!({ "x0": x0, "y0": y0, "x1": x1, "y1": y1 }))
 }
 
+/// Liste « - Nom.Du.Toolset: description » renvoyée par `list_toolsets`.
+fn parse_toolsets(txt: &str) -> Vec<(String, String)> {
+    let mut out: Vec<(String, String)> = vec![];
+    for l in txt.lines() {
+        if let Some(rest) = l.strip_prefix("- ") {
+            if let Some((n, d)) = rest.split_once(':') {
+                if !n.is_empty() && !n.contains(' ') {
+                    out.push((n.to_string(), d.trim().to_string()));
+                    continue;
+                }
+            }
+        }
+        // Description sur plusieurs lignes.
+        if let Some(last) = out.last_mut() {
+            last.1.push(' ');
+            last.1.push_str(l.trim());
+        }
+    }
+    out
+}
+
+/// `{"returnValue": x}` → x (texte brut si c'est une chaîne, JSON sinon).
+fn unwrap_return(txt: &str) -> String {
+    match serde_json::from_str::<Value>(txt.trim()) {
+        Ok(Value::Object(m)) if m.len() == 1 && m.contains_key("returnValue") => match &m["returnValue"] {
+            Value::String(s) => s.clone(),
+            v => v.to_string(),
+        },
+        _ => txt.to_string(),
+    }
+}
+
+/// Diagnostic de BuildAll : chemin Verse `/<racine>/sous/x.verse`, lignes et colonnes comptées à partir de 0.
+fn build_diag(d: &Value) -> Value {
+    let verse_path = d["filePath"].as_str().unwrap_or("").to_string();
+    // La racine du paquet Verse du projet correspond au dossier Content.
+    let rel = verse_path.trim_start_matches('/').split_once('/').map(|(_, r)| format!("Content/{r}")).unwrap_or_else(|| verse_path.clone());
+    let sp = &d["span"];
+    let severity = d["severity"].as_str().unwrap_or("error").to_lowercase();
+    json!({
+        "raw_path": rel, "path": rel, "verse_path": verse_path,
+        "line": sp["startLine"].as_u64().unwrap_or(0) + 1, "col": sp["startCharacter"].as_u64().unwrap_or(0) + 1,
+        "end_line": sp["endLine"].as_u64().unwrap_or(0) + 1, "end_col": sp["endCharacter"].as_u64().unwrap_or(0) + 1,
+        "severity": if severity.contains("warn") { "warning" } else if severity.contains("info") || severity.contains("note") { "info" } else { "error" },
+        "code": d["code"].as_i64().map(|c| c.to_string()).or_else(|| d["code"].as_str().map(String::from)).unwrap_or_default(),
+        "message": d["message"].as_str().unwrap_or(""),
+    })
+}
+
 fn first_string_prop(tool: &Value) -> Option<String> {
     let props = tool["inputSchema"]["properties"].as_object()?;
     for pref in ["code", "script", "python", "source", "command"] {
@@ -306,11 +575,15 @@ pub fn parse_diagnostics(out: &str) -> Vec<Value> {
     d
 }
 
-const PY_RESTORE: &str = r#"import unreal
-unreal.SystemLibrary.execute_console_command(None, 'TRANSACTION UNDO')
+const PY_RESTORE: &str = r#"import unreal, json, base64
 sub = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
-have = set(a.get_path_name() for a in sub.get_all_level_actors())
-print('restored' if all(i in have for i in IDS) else 'missing')
+sel = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).get_selection_set()
+world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
+prev = sub.get_selected_level_actors()
+before = set(a.get_path_name() for a in sub.get_all_level_actors())
+unreal.TypedElementCommonActions().paste_elements_from_string(sel, world, unreal.TypedElementPasteOptions(), base64.b64decode(SAVED).decode('utf-8'))
+sub.set_selected_level_actors(prev)
+print(json.dumps([a.get_path_name() for a in sub.get_all_level_actors() if a.get_path_name() not in before]))
 "#;
 
 const PY_BOUNDS: &str = r#"import unreal, json
@@ -385,10 +658,18 @@ new = sub.duplicate_actors(src, None, unreal.Vector(300, 0, 0))
 print(json.dumps([a.get_path_name() for a in new]))
 "#;
 
-const PY_DEL: &str = r#"import unreal
+const PY_DEL: &str = r#"import unreal, base64
 sub = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
-sub.destroy_actors([a for a in sub.get_all_level_actors() if a.get_path_name() in IDS])
-print('ok')
+sel = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).get_selection_set()
+targets = [a for a in sub.get_all_level_actors() if a.get_path_name() in IDS]
+prev = sub.get_selected_level_actors()
+sub.set_selected_level_actors(targets)
+txt = unreal.TypedElementCommonActions().copy_selected_elements_to_string(sel) if targets else ''
+sub.set_selected_level_actors([a for a in prev if a not in targets])
+if targets and not txt:
+    raise RuntimeError('sauvegarde impossible')
+sub.destroy_actors(targets)
+print('T3D=' + base64.b64encode((txt or '').encode('utf-8')).decode('ascii'))
 "#;
 
 #[cfg(test)]
@@ -399,5 +680,31 @@ mod t {
         assert_eq!(d[0]["path"], "Content/vault.verse");
         assert_eq!(d[0]["line"], 12);
         assert_eq!(d[0]["code"], "3512");
+    }
+
+    #[test]
+    fn build_all() {
+        let v: serde_json::Value = serde_json::from_str(r#"{"severity":"Warning","code":2009,"message":"deprecated","filePath":"/bb30-guid/ai/vault_npc_thief.verse","span":{"startLine":135,"startCharacter":53,"endLine":135,"endCharacter":64}}"#).unwrap();
+        let d = super::build_diag(&v);
+        assert_eq!(d["path"], "Content/ai/vault_npc_thief.verse");
+        assert_eq!(d["line"], 136);
+        assert_eq!(d["col"], 54);
+        assert_eq!(d["severity"], "warning");
+        assert_eq!(d["code"], "2009");
+    }
+
+    #[test]
+    fn return_value() {
+        assert_eq!(super::unwrap_return(r#"{"returnValue":"a\nb\n"}"#), "a\nb\n");
+        assert_eq!(super::unwrap_return(r#"{"returnValue":[1,2]}"#), "[1,2]");
+        assert_eq!(super::unwrap_return("texte"), "texte");
+    }
+
+    #[test]
+    fn toolsets() {
+        let t = super::parse_toolsets("- A.B: un\nsuite\n- C.D: deux");
+        assert_eq!(t.len(), 2);
+        assert_eq!(t[0].0, "A.B");
+        assert_eq!(t[0].1, "un suite");
     }
 }

@@ -121,18 +121,74 @@ pub async fn cancel_invite(State(st): State<AppState>, u: AuthUser, Path(id): Pa
 
 // ---------- Exports ----------
 
-/// Toutes les lignes d'une table qui vérifient une condition, en JSON (colonnes lues dans le schéma).
+/// Colonnes qui ne sortent jamais dans un export, quelle que soit la table (secrets, empreintes de jetons).
+const NEVER_EXPORTED: &[&str] = &["password_hash", "token_hash", "pair_code_hash", "share_token", "totp_secret", "recovery", "sudo_until", "secret"];
+
+/// Tables sensibles : seules ces colonnes sont exportées (liste blanche, #14). Une colonne ajoutée plus tard à ces
+/// tables n'apparaît pas dans l'export tant qu'on ne l'ajoute pas ici.
+const ONLY_USERS: &[&str] = &["id", "email", "name", "credits", "created_at", "last_seen", "is_admin", "disabled", "totp_enabled", "email_verified_at"];
+const ONLY_SESSIONS: &[&str] = &["user_id", "expires_at", "ip", "user_agent", "created_at", "last_seen", "mfa"];
+const ONLY_API_TOKENS: &[&str] = &["id", "user_id", "map_id", "name", "kind", "scope", "created_at", "last_used", "calls"];
+const ONLY_RELAY_DEVICES: &[&str] = &["id", "map_id", "user_id", "name", "last_seen", "created_at"];
+
+fn allowed_columns(table: &str) -> Option<&'static [&'static str]> {
+    match table {
+        "users" => Some(ONLY_USERS),
+        "sessions" => Some(ONLY_SESSIONS),
+        "api_tokens" => Some(ONLY_API_TOKENS),
+        "relay_devices" => Some(ONLY_RELAY_DEVICES),
+        _ => None,
+    }
+}
+
+/// Toutes les lignes d'une table qui vérifient une condition, en JSON (colonnes lues dans le schéma, filtrées).
 async fn rows(st: &AppState, table: &str, cond: &str, binds: &[i64]) -> Result<Value, AppError> {
-    let cols: Vec<(i64, String, String, i64, Option<String>, i64)> = sqlx::query_as(&format!("PRAGMA table_info({table})")).fetch_all(&st.db).await?;
-    let skip = ["password_hash", "token_hash", "pair_code_hash"];
-    let obj = cols.iter().filter(|c| !skip.contains(&c.1.as_str())).map(|c| format!("'{0}', \"{0}\"", c.1)).collect::<Vec<_>>().join(", ");
+    rows_in(&st.db, table, cond, binds).await
+}
+
+async fn rows_in(db: &sqlx::SqlitePool, table: &str, cond: &str, binds: &[i64]) -> Result<Value, AppError> {
+    let cols: Vec<(i64, String, String, i64, Option<String>, i64)> = sqlx::query_as(&format!("PRAGMA table_info({table})")).fetch_all(db).await?;
+    let only = allowed_columns(table);
+    let keep = |name: &str| !NEVER_EXPORTED.contains(&name) && only.map(|o| o.contains(&name)).unwrap_or(true);
+    let obj = cols.iter().filter(|c| keep(&c.1)).map(|c| format!("'{0}', \"{0}\"", c.1)).collect::<Vec<_>>().join(", ");
+    if obj.is_empty() {
+        return Ok(json!([]));
+    }
     let sql = format!("SELECT COALESCE(json_group_array(json_object({obj})), '[]') FROM {table} WHERE {cond}");
     let mut q = sqlx::query_scalar::<_, String>(&sql);
     for b in binds {
         q = q.bind(*b);
     }
-    let s = q.fetch_one(&st.db).await?;
+    let s = q.fetch_one(db).await?;
     Ok(serde_json::from_str(&s).unwrap_or(json!([])))
+}
+
+#[cfg(test)]
+mod export_tests {
+    use super::rows_in;
+
+    #[tokio::test]
+    async fn liste_blanche_des_tables_sensibles() {
+        let db = sqlx::sqlite::SqlitePoolOptions::new().max_connections(1).connect("sqlite::memory:").await.unwrap();
+        sqlx::query("CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT, name TEXT, password_hash TEXT, totp_secret TEXT, recovery TEXT, colonne_future TEXT)").execute(&db).await.unwrap();
+        sqlx::query("INSERT INTO users VALUES (1, 'a@exemple.com', 'A', 'h', 'SECRET', '[\"x\"]', 'nouveau')").execute(&db).await.unwrap();
+        let v = rows_in(&db, "users", "id = ?", &[1]).await.unwrap();
+        let row = v[0].as_object().unwrap();
+        assert_eq!(row["email"], "a@exemple.com");
+        for hidden in ["password_hash", "totp_secret", "recovery", "colonne_future"] {
+            assert!(!row.contains_key(hidden), "{hidden} ne doit pas être exporté");
+        }
+    }
+
+    #[tokio::test]
+    async fn autres_tables_sans_les_secrets() {
+        let db = sqlx::sqlite::SqlitePoolOptions::new().max_connections(1).connect("sqlite::memory:").await.unwrap();
+        sqlx::query("CREATE TABLE pages (id INTEGER PRIMARY KEY, title TEXT, share_token TEXT)").execute(&db).await.unwrap();
+        sqlx::query("INSERT INTO pages VALUES (1, 'Titre', 'abc')").execute(&db).await.unwrap();
+        let v = rows_in(&db, "pages", "id = ?", &[1]).await.unwrap();
+        assert_eq!(v[0]["title"], "Titre");
+        assert!(v[0].get("share_token").is_none());
+    }
 }
 
 fn download(name: &str, v: &Value) -> Response {

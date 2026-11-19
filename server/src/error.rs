@@ -14,6 +14,8 @@ pub enum AppError {
     NotFound,
     Conflict(String),
     TooMany,
+    /// Trop de demandes, avec un message qui dit quand réessayer.
+    TooManyMsg(String),
     /// Refus avec un code que l'interface sait traiter (ex. confirmation du mot de passe pour l'administration).
     Guard(&'static str, String),
     Internal(anyhow::Error),
@@ -31,6 +33,7 @@ impl IntoResponse for AppError {
             AppError::NotFound => (StatusCode::NOT_FOUND, "Introuvable.".into()),
             AppError::Conflict(m) => (StatusCode::CONFLICT, m),
             AppError::TooMany => (StatusCode::TOO_MANY_REQUESTS, "Trop de tentatives, réessayez dans une minute.".into()),
+            AppError::TooManyMsg(m) => (StatusCode::TOO_MANY_REQUESTS, m),
             AppError::Guard(_, m) => (StatusCode::FORBIDDEN, m),
             AppError::Internal(e) => {
                 tracing::error!("erreur interne : {e:?}");
@@ -79,7 +82,15 @@ pub fn check_len(field: &str, v: &str, min: usize, max: usize) -> Result<(), App
 
 impl std::fmt::Display for AppError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{self:?}")
+        // Le message lisible (affiché dans le suivi d'envoi Verse, #5) ; le détail technique reste dans `{:?}`.
+        match self {
+            AppError::BadRequest(m) | AppError::Conflict(m) | AppError::TooManyMsg(m) | AppError::Guard(_, m) => f.write_str(m),
+            AppError::Unauthorized => f.write_str("Connexion requise."),
+            AppError::Forbidden => f.write_str("Action non autorisée pour votre rôle."),
+            AppError::NotFound => f.write_str("Introuvable."),
+            AppError::TooMany => f.write_str("Trop de tentatives, réessayez dans une minute."),
+            AppError::Internal(e) => write!(f, "Erreur interne : {e}"),
+        }
     }
 }
 impl std::error::Error for AppError {}

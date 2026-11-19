@@ -92,17 +92,19 @@ pub async fn user_from_token(state: &AppState, token: &str) -> Result<Option<Aut
 
 /// Limite simple : 10 tentatives par minute et par adresse e-mail.
 pub fn rate_limit(state: &AppState, key: &str) -> Result<(), AppError> {
+    if hit(state, key, 10, Duration::from_secs(60)) { Ok(()) } else { Err(AppError::TooMany) }
+}
+
+/// Compte une tentative pour `key` : `false` au-delà de `max` tentatives dans la fenêtre `window`.
+pub fn hit(state: &AppState, key: &str, max: u32, window: Duration) -> bool {
     let mut m = state.limiter.lock().unwrap();
     let now = Instant::now();
     let e = m.entry(key.to_lowercase()).or_insert((0, now));
-    if now.duration_since(e.1) > Duration::from_secs(60) {
+    if now.duration_since(e.1) > window {
         *e = (0, now);
     }
     e.0 += 1;
-    if e.0 > 10 {
-        return Err(AppError::TooMany);
-    }
-    Ok(())
+    e.0 <= max
 }
 
 pub async fn open_session(state: &AppState, jar: CookieJar, user_id: i64, ip: &str, ua: &str, mfa: bool) -> Result<CookieJar, AppError> {
@@ -152,17 +154,17 @@ pub async fn register(State(st): State<AppState>, crate::security::ClientIp(ip):
         return Err(AppError::Conflict("Un compte existe déjà avec cette adresse.".into()));
     }
     // Inscriptions sur liste d'attente : il faut une invitation de studio ou un lien d'accès validé.
-    let first: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users").fetch_one(&st.db).await?;
     let wid = crate::admin::signup_allowed(&st, &email, &ip, b.invite.as_deref(), b.access.as_deref()).await.map_err(|e| match e {
         AppError::Forbidden => AppError::Conflict("Les inscriptions se font sur liste d’attente : demandez l’accès à la bêta depuis la page d’accueil.".into()),
         other => other,
     })?;
     let hash = hash_password(&b.password)?;
-    let id: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash, is_admin, terms_at, plan, plan_source, trial_until) VALUES (?, ?, ?, ?, datetime('now'), 'starter', 'trial', datetime('now', '+7 days')) RETURNING id")
+    // Jamais administrateur selon l'adresse IP : un en-tête ou un proxy mal réglé suffirait à se faire passer pour
+    // l'ordinateur du serveur. Les administrateurs sont nommés par `pop-server admin ajouter <e-mail>` ou POP_ADMIN_EMAILS.
+    let id: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash, terms_at, plan, plan_source, trial_until) VALUES (?, ?, ?, datetime('now'), 'starter', 'trial', datetime('now', '+7 days')) RETURNING id")
         .bind(&email)
         .bind(b.name.trim())
         .bind(hash)
-        .bind((first == 0 && crate::security::is_loopback(&ip)) as i64)
         .fetch_one(&st.db)
         .await?;
     if let Some(w) = wid { crate::admin::mark_registered(&st, w, id).await; }

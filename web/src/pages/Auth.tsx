@@ -157,12 +157,13 @@ export function ResetPassword({ token }: { token: string }) {
   const [pw, setPw] = useState('')
   const [msg, setMsg] = useState('')
   const [ok, setOk] = useState(false)
+  const [revoked, setRevoked] = useState(0)
   return (
     <div className="auth app">
-      <form className="card stack" style={{ gap: 16 }} onSubmit={async e => { e.preventDefault(); try { await api.post('/api/auth/reset', { token, password: pw }); setOk(true) } catch (er: any) { setMsg(er.message) } }}>
+      <form className="card stack" style={{ gap: 16 }} onSubmit={async e => { e.preventDefault(); try { const r: any = await api.post('/api/auth/reset', { token, password: pw }); setOk(true); setRevoked(r?.tokens_revoked ?? 0) } catch (er: any) { setMsg(er.message) } }}>
         <img src="/logo.png" alt="POP" style={{ filter: 'invert(1)' }} />
         <h1 style={{ margin: 0, fontSize: 24, fontWeight: 400 }}>{tr("Nouveau mot de passe")}</h1>
-        {ok ? <><p>{tr("Mot de passe changé. Vous pouvez vous connecter.")}</p><a className="btn pri" href="/">{tr("Se connecter")}</a></> : <>
+        {ok ? <><p>{tr("Mot de passe changé. Vous pouvez vous connecter.")}{revoked > 0 && <> {tr("Vos {0} jeton(s) d’IA connectée ont été révoqués : recréez-les dans « IA connectées ».", [revoked])}</>}</p><a className="btn pri" href="/">{tr("Se connecter")}</a></> : <>
           <label className="label">{tr("Nouveau mot de passe (10 caractères minimum)")}<input className="field" type="password" value={pw} onChange={e => setPw(e.target.value)} minLength={10} required autoComplete="new-password" /></label>
           {msg && <div className="err" role="alert">{msg}</div>}
           <button className="btn pri">{tr("Enregistrer")}</button>

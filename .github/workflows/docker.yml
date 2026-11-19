@@ -1,0 +1,41 @@
+# Vérifie l'image Docker de production (#19) : elle se construit, ne tourne pas en root, démarre et écrit dans /data,
+# et un volume créé par l'ancienne image (fichiers à root) marche après la migration décrite dans le README.
+# Seulement quand l'image change : la construction complète (Rust en release) prend plusieurs minutes.
+name: image Docker
+
+on:
+  pull_request:
+    paths: [Dockerfile, .dockerignore, .github/workflows/docker.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  image:
+    name: image Docker (build, sans root, /data)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Construire l'image
+        run: docker build -t pop:test .
+      - name: L'image ne tourne pas en root
+        run: |
+          uid=$(docker run --rm --entrypoint id pop:test -u)
+          echo "uid dans le conteneur : $uid"
+          if [ "$uid" = "0" ]; then echo "::error::L'image tourne en root."; exit 1; fi
+      - name: POP démarre et écrit sa base dans /data
+        run: |
+          docker run -d --name pop -p 8080:8080 -e POP_ANALYTICS=0 -v pop-neuf:/data pop:test
+          for i in $(seq 1 30); do curl -fs http://127.0.0.1:8080/ >/dev/null && break; sleep 2; done
+          curl -fs http://127.0.0.1:8080/ >/dev/null || { docker logs pop; exit 1; }
+          docker exec pop ls -la /data
+          docker exec pop test -f /data/pop.db
+      - name: Volume créé par l'ancienne image, puis migration du README
+        run: |
+          docker run --rm -v pop-ancien:/data --user root --entrypoint sh pop:test -c "touch /data/pop.db && chown -R root:root /data"
+          docker run --rm -v pop-ancien:/data --user root --entrypoint chown pop:test -R 10001:10001 /data
+          docker run -d --name pop2 -p 8081:8080 -e POP_ANALYTICS=0 -v pop-ancien:/data pop:test
+          for i in $(seq 1 30); do curl -fs http://127.0.0.1:8081/ >/dev/null && break; sleep 2; done
+          curl -fs http://127.0.0.1:8081/ >/dev/null || { docker logs pop2; exit 1; }
+          docker exec pop2 test -w /data/pop.db

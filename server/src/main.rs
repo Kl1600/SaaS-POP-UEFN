@@ -12,7 +12,6 @@ mod privstats;
 mod model;
 mod legal;
 mod discover;
-mod ai;
 mod mail;
 mod manage;
 mod engine;
@@ -105,6 +104,13 @@ async fn csrf(req: Request<Body>, next: Next) -> Response {
     }
     // Pas de mise en cache des réponses de l'API (données personnelles), sauf les vignettes relayées.
     if path.starts_with("/api/") && path != "/api/img" { h.insert("cache-control", "no-store".parse().unwrap()); }
+    // Fichiers de l'interface : ceux de /assets/ portent leur empreinte dans leur nom et ne changent jamais ; tout
+    // le reste (index.html, pages, téléchargements) est revalidé à chaque visite. Sans cela, après une mise à jour,
+    // un navigateur garde l'ancien index.html qui réclame des fichiers supprimés : page blanche.
+    else if !h.contains_key("cache-control") {
+        let v = if path.starts_with("/assets/") { "public, max-age=31536000, immutable" } else { "no-cache" };
+        h.insert("cache-control", v.parse().unwrap());
+    }
     res
 }
 
@@ -314,11 +320,46 @@ fn api() -> Router<AppState> {
         .route("/api/verse-versions/{id}/revert", post(verse::revert))
         .route("/api/maps/{mid}/verse/symbols", get(verse::symbols))
         .route("/api/maps/{mid}/verse/send", post(verse::send))
-        .route("/api/maps/{mid}/ai/verse", post(ai::verse_ai))
         .route("/api/maps/{mid}/tokens", get(mcp::tokens).post(mcp::create_token))
         .route("/api/tokens/{id}/scope", post(mcp::set_scope))
         .route("/api/tokens/{id}", delete(mcp::delete_token))
         .route("/mcp", post(mcp::mcp))
+}
+
+/// Nomme ou retire un administrateur de la plateforme. Seul quelqu'un qui a accès à la machine du serveur (et à sa
+/// base) peut le faire : c'est ce qui remplace l'ancien « premier compte créé depuis cet ordinateur ».
+async fn admin_cli(db: &sqlx::SqlitePool, args: &[String]) -> anyhow::Result<()> {
+    const USAGE: &str = "Usage : pop-server admin ajouter <e-mail> | retirer <e-mail> | liste";
+    match (args.first().map(String::as_str), args.get(1)) {
+        (Some(action @ ("ajouter" | "retirer")), Some(email)) => {
+            let email = email.trim().to_lowercase();
+            let flag = (action == "ajouter") as i64;
+            let n = sqlx::query("UPDATE users SET is_admin = ? WHERE email = ?").bind(flag).bind(&email).execute(db).await?.rows_affected();
+            if n == 0 {
+                anyhow::bail!("Aucun compte avec l'adresse « {email} » : créez d'abord le compte dans POP, puis relancez.");
+            }
+            sqlx::query("INSERT INTO audit_log (user_id, action, detail, ip) SELECT id, ?, 'commande pop-server admin', '' FROM users WHERE email = ?")
+                .bind(if flag == 1 { "admin_nommé" } else { "admin_retiré" })
+                .bind(&email)
+                .execute(db)
+                .await?;
+            println!("{email} {} administrateur de la plateforme.", if flag == 1 { "est maintenant" } else { "n'est plus" });
+            if flag == 1 {
+                println!("Pour ouvrir l'administration, ce compte doit activer la double authentification (Paramètres → Sécurité).");
+            }
+        }
+        (Some("liste"), _) => {
+            let rows: Vec<(String, String)> = sqlx::query_as("SELECT email, name FROM users WHERE is_admin = 1 ORDER BY email").fetch_all(db).await?;
+            if rows.is_empty() {
+                println!("Aucun administrateur nommé (hors POP_ADMIN_EMAILS).");
+            }
+            for (e, n) in rows {
+                println!("{e}  ({n})");
+            }
+        }
+        _ => anyhow::bail!(USAGE),
+    }
+    Ok(())
 }
 
 #[tokio::main]
@@ -327,7 +368,13 @@ async fn main() -> anyhow::Result<()> {
     let db_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite://pop-data.db".into());
     let opts = SqliteConnectOptions::from_str(&db_url)?.create_if_missing(true).journal_mode(SqliteJournalMode::Wal).foreign_keys(true);
     let db = SqlitePoolOptions::new().max_connections(8).connect_with(opts).await?;
+    renumber_old_migrations(&db).await?;
     sqlx::migrate!("./migrations").run(&db).await?;
+    // `pop-server admin …` : gérer les administrateurs depuis la machine du serveur, puis s'arrêter.
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.first().map(String::as_str) == Some("admin") {
+        return admin_cli(&db, &args[1..]).await;
+    }
     let st = AppState {
         db,
         hub: Arc::new(ws::Hub::default()),
@@ -355,6 +402,7 @@ async fn main() -> anyhow::Result<()> {
         println!("Compte de test : identifiant « kl », mot de passe « kl »");
     }
     tokio::spawn(integrations::scheduler(st.clone()));
+    tokio::spawn(admin::digest_loop(st.clone()));
     tokio::spawn(analytics::crawler(st.clone()));
     tokio::spawn(analytics::social_loop(st.clone()));
     tokio::spawn(manage::backup_loop(st.clone(), db_url.clone()));
@@ -376,5 +424,24 @@ async fn main() -> anyhow::Result<()> {
     println!("POP écoute sur http://{addr}");
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).await?;
+    Ok(())
+}
+
+/// Les migrations de la branche « claude » (comptes, plans, idées, Discover, mentions légales, modèle, Starter/Pro,
+/// paiements) portaient les numéros 12 à 20, déjà pris sur `main` par d'autres migrations. Elles sont maintenant
+/// numérotées 15 à 23. Une base locale qui les a appliquées sous les anciens numéros est mise à jour ici, une seule
+/// fois : on reconnaît l'ancienne numérotation à la migration 13 « personal ». Les bases de production ne sont pas
+/// concernées (rien ne se passe si ce cas n'existe pas).
+async fn renumber_old_migrations(db: &sqlx::SqlitePool) -> Result<(), sqlx::Error> {
+    let table: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = '_sqlx_migrations'").fetch_one(db).await?;
+    if table == 0 { return Ok(()) }
+    let old: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM _sqlx_migrations WHERE version = 13 AND description = 'personal'").fetch_one(db).await?;
+    if old == 0 { return Ok(()) }
+    let mut tx = db.begin().await?;
+    // En deux temps pour ne jamais avoir deux lignes avec le même numéro.
+    sqlx::query("UPDATE _sqlx_migrations SET version = version + 1000 WHERE version BETWEEN 12 AND 20").execute(&mut *tx).await?;
+    sqlx::query("UPDATE _sqlx_migrations SET version = version - 997 WHERE version BETWEEN 1012 AND 1020").execute(&mut *tx).await?;
+    tx.commit().await?;
+    tracing::info!("Migrations locales renumérotées (12-20 → 15-23).");
     Ok(())
 }

@@ -137,14 +137,16 @@ pub async fn send(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64>,
     let mut out = json!({ "diagnostics": diags, "errors": errors, "pushed": false, "archived": false });
     if errors > 0 {
         step(&st, mid, &run, 4, "skipped", json!("Corrigez les erreurs pour envoyer en session."));
+        step(&st, mid, &run, 5, "skipped", json!("Corrigez les erreurs pour archiver."));
         return Ok(Json(out));
     }
     // 4. Session de test.
     if b.push {
         step(&st, mid, &run, 4, "running", json!(null));
-        match exec(&st, o(), "push_session", json!({})).await {
+        // Seul le Verse a changé : envoi rapide sans recuisson des assets (#5).
+        match exec(&st, o(), "push_session", json!({ "verse_only": true })).await {
             Ok(_) => { step(&st, mid, &run, 4, "done", json!(null)); out["pushed"] = json!(true); }
-            Err(e) => { step(&st, mid, &run, 4, "failed", json!(format!("{e}"))); }
+            Err(e) => { step(&st, mid, &run, 4, "failed", json!(format!("{e}"))); out["push_error"] = json!(format!("{e}")); }
         }
     } else {
         step(&st, mid, &run, 4, "skipped", json!(null));
@@ -155,8 +157,9 @@ pub async fn send(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64>,
         let msg = match b.task { Some(n) if !msg.contains(&format!("#{n}")) => format!("#{n} {msg}"), _ => msg };
         step(&st, mid, &run, 5, "running", json!(null));
         match exec(&st, o(), "lore_checkin", json!({ "message": msg, "paths": b.files.iter().map(|f| f.path.clone()).collect::<Vec<_>>() })).await {
+            Ok(v) if v["queued"].as_bool() == Some(true) => { step(&st, mid, &run, 5, "queued", json!("UEFN est fermé : archivage en attente.")); }
             Ok(_) => { step(&st, mid, &run, 5, "done", json!(null)); out["archived"] = json!(true); }
-            Err(e) => { step(&st, mid, &run, 5, "failed", json!(format!("{e}"))); }
+            Err(e) => { step(&st, mid, &run, 5, "failed", json!(format!("{e}"))); out["lore_error"] = json!(format!("{e}")); }
         }
     } else {
         step(&st, mid, &run, 5, "skipped", json!(null));

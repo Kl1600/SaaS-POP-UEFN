@@ -193,7 +193,7 @@ export function Account() {
       </section>
       <section className="card">
         <CardHead title={tr("Mot de passe")} sub={tr("Changer le mot de passe déconnecte vos autres appareils.")} />
-        <form className="stack" onSubmit={async e => { e.preventDefault(); try { await api.post('/api/me/password', pw); toast(tr("Mot de passe changé : reconnectez-vous")); setTimeout(() => (location.href = '/'), 1200) } catch (er: any) { toast(er.message, true) } }}>
+        <form className="stack" onSubmit={async e => { e.preventDefault(); try { const r: any = await api.post('/api/me/password', pw); toast(r?.tokens_revoked ? tr("Mot de passe changé : reconnectez-vous. {0} jeton(s) d’IA connectée révoqué(s) : recréez-les dans « IA connectées ».", [r.tokens_revoked]) : tr("Mot de passe changé : reconnectez-vous")); setTimeout(() => (location.href = '/'), 1200) } catch (er: any) { toast(er.message, true) } }}>
           <label className="label">{tr("Mot de passe actuel")}<input className="field" type="password" value={pw.current} onChange={e => setPw({ ...pw, current: e.target.value })} required autoComplete="current-password" /></label>
           <label className="label">{tr("Nouveau (10 caractères minimum)")}<input className="field" type="password" value={pw.new} onChange={e => setPw({ ...pw, new: e.target.value })} minLength={10} required autoComplete="new-password" /></label>
           <button className="btn pri">{tr("Changer le mot de passe")}</button>

@@ -280,7 +280,8 @@ async fn on_relay_msg(st: &AppState, mid: i64, pending: &Arc<Mutex<HashMap<Strin
             notify(st, mid, json!({ "t": "verse", "what": "symbols" }));
         }
         "actors" => {
-            sqlx::query("UPDATE uefn_state SET actors = ?, updated_at = datetime('now') WHERE map_id = ?").bind(v["actors"].to_string()).bind(mid).execute(&st.db).await?;
+            let actors = keep_device_values(st, mid, &v["actors"], None).await?;
+            sqlx::query("UPDATE uefn_state SET actors = ?, updated_at = datetime('now') WHERE map_id = ?").bind(actors.to_string()).bind(mid).execute(&st.db).await?;
             notify(st, mid, json!({ "t": "uefn", "what": "actors" }));
         }
         "locks" => {
@@ -297,6 +298,39 @@ async fn on_relay_msg(st: &AppState, mid: i64, pending: &Arc<Mutex<HashMap<Strin
         _ => {}
     }
     Ok(())
+}
+
+/// La liste d'acteurs envoyée par le relais ne contient pas les options des appareils (elles sont lues
+/// une par une, à la sélection). On garde donc les valeurs déjà connues, et on y applique les options
+/// que l'on vient de modifier (`patches`) : sans cela, l'annulation suivante n'aurait plus la valeur d'avant.
+async fn keep_device_values(st: &AppState, mid: i64, actors: &Value, patches: Option<&Value>) -> Result<Value, AppError> {
+    let Some(list) = actors.as_array() else { return Ok(actors.clone()) };
+    let old: Option<(String,)> = sqlx::query_as("SELECT actors FROM uefn_state WHERE map_id = ?").bind(mid).fetch_optional(&st.db).await?;
+    let old: Vec<Value> = old.and_then(|(s,)| serde_json::from_str(&s).ok()).unwrap_or_default();
+    let known: HashMap<&str, &Value> = old.iter().filter_map(|a| Some((a["id"].as_str()?, a))).collect();
+    let empty = |v: &Value| v.as_object().map(|m| m.is_empty()).unwrap_or(true);
+    let mut out = list.clone();
+    for a in out.iter_mut() {
+        let id = a["id"].as_str().unwrap_or("").to_string();
+        for field in ["options", "props"] {
+            if empty(&a[field]) {
+                if let Some(prev) = known.get(id.as_str()).map(|p| &p[field]).filter(|p| !empty(p)) {
+                    a[field] = (*prev).clone();
+                }
+            }
+            for p in patches.and_then(|p| p.as_array()).into_iter().flatten().filter(|p| p["id"].as_str() == Some(id.as_str())) {
+                if let Some(m) = p["changes"][field].as_object() {
+                    if !a[field].is_object() {
+                        a[field] = json!({});
+                    }
+                    for (k, v) in m {
+                        a[field][k] = v.clone();
+                    }
+                }
+            }
+        }
+    }
+    Ok(Value::Array(out))
 }
 
 pub fn valid_path(p: &str) -> bool {
@@ -478,6 +512,9 @@ async fn prepare(st: &AppState, o: &Origin<'_>, action: &str, args: &mut Value) 
                     if let Some(m) = ch[field].as_object() {
                         let mut prev = json!({});
                         for (k, v) in m {
+                            if field == "props" {
+                                check_prop_type(k, &a[field][k], v)?;
+                            }
                             prev[k] = a[field][k].clone();
                             lines.push(format!("{name} · {label} {k} : {} → {}", short(&a[field][k]), short(v)));
                         }
@@ -595,7 +632,12 @@ pub async fn exec(st: &AppState, o: Origin<'_>, action: &str, mut args: Value) -
         notify(st, mid, json!({ "t": "uefn", "what": "journal" }));
         return Ok(json!({ "queued": true, "action_id": aid, "message": "UEFN n’est pas disponible : modification mise en attente, elle partira à l’ouverture." }));
     }
-    run_action(st, mid, aid, action, &args).await
+    let r = run_action(st, mid, aid, action, &args).await;
+    if matches!(&r, Ok(v) if v["retry"].as_bool() == Some(true)) {
+        let st2 = st.clone();
+        tokio::spawn(async move { flush_queue(&st2, mid).await });
+    }
+    r
 }
 
 async fn run_action(st: &AppState, mid: i64, aid: Option<i64>, action: &str, args: &Value) -> Result<Value, AppError> {
@@ -607,6 +649,8 @@ async fn run_action(st: &AppState, mid: i64, aid: Option<i64>, action: &str, arg
     match &res {
         Ok(data) => {
             if let Some(actors) = data.get("actors").filter(|a| a.is_array()) {
+                let patches = if matches!(action, "actor_update" | "actor_update_raw") { Some(&args["patches"]) } else { None };
+                let actors = keep_device_values(st, mid, actors, patches).await?;
                 sqlx::query("UPDATE uefn_state SET actors = ?, updated_at = datetime('now') WHERE map_id = ?").bind(actors.to_string()).bind(mid).execute(&st.db).await?;
                 notify(st, mid, json!({ "t": "uefn", "what": "actors" }));
             }
@@ -618,26 +662,94 @@ async fn run_action(st: &AppState, mid: i64, aid: Option<i64>, action: &str, arg
                         extra_undo = Some(json!({ "action": "actor_delete", "args": { "ids": ids } }).to_string());
                     }
                 }
+                // Une suppression s'annule en recréant les acteurs depuis la sauvegarde faite par le relais.
+                if action == "actor_delete" {
+                    if let Some(saved) = data.get("saved").and_then(|s| s.as_str()) {
+                        let cur: Option<(Option<String>,)> = sqlx::query_as("SELECT undo FROM uefn_actions WHERE id = ?").bind(id).fetch_optional(&st.db).await?;
+                        if let Some(mut u) = cur.and_then(|(u,)| u).and_then(|u| serde_json::from_str::<Value>(&u).ok()) {
+                            u["args"]["saved"] = json!(saved);
+                            extra_undo = Some(u.to_string());
+                        }
+                    }
+                }
                 let mut short_data = data.clone();
                 if let Some(o) = short_data.as_object_mut() {
                     o.remove("actors");
+                    o.remove("saved");
                 }
                 sqlx::query("UPDATE uefn_actions SET status = 'done', after = ?, undo = COALESCE(?, undo) WHERE id = ?").bind(short_data.to_string()).bind(extra_undo).bind(id).execute(&st.db).await?;
             }
         }
+        // L'archivage n'a besoin que du relais quand il passe par `lore_cmd` ; sinon il passe par UEFN. Relais
+        // en ligne mais UEFN fermé : il reste en attente et part à la réouverture, comme les autres actions (#4).
+        Err(AppError::Conflict(m)) if action == "lore_checkin" && m.contains("UEFN est fermé") => {
+            if let Some(id) = aid {
+                sqlx::query("UPDATE uefn_actions SET status = 'queued' WHERE id = ?").bind(id).execute(&st.db).await?;
+            }
+            notify(st, mid, json!({ "t": "uefn", "what": "journal" }));
+            return Ok(json!({ "queued": true, "action_id": aid, "message": "UEFN est fermé : archivage mis en attente, il partira à la réouverture d’UEFN." }));
+        }
+        // À la réouverture, le serveur MCP d'UEFN répond avant que le projet soit chargé (vérifié le 18/11/2026) :
+        // l'action reste en attente et `flush_queue` la réessaie un peu plus tard (#4).
+        Err(AppError::Conflict(m)) if m.contains("no project is currently open") || m.contains("Mcp-Session-Id") => {
+            if let Some(id) = aid {
+                sqlx::query("UPDATE uefn_actions SET status = 'queued' WHERE id = ?").bind(id).execute(&st.db).await?;
+            }
+            notify(st, mid, json!({ "t": "uefn", "what": "journal" }));
+            return Ok(json!({ "queued": true, "retry": true, "action_id": aid, "message": "UEFN ouvre encore le projet : action mise en attente, elle repartira dans quelques secondes." }));
+        }
         Err(e) => {
             if let Some(id) = aid {
-                sqlx::query("UPDATE uefn_actions SET status = 'failed', error = ? WHERE id = ?").bind(format!("{e:?}")).bind(id).execute(&st.db).await?;
+                sqlx::query("UPDATE uefn_actions SET status = 'failed', error = ? WHERE id = ?").bind(format!("{e}")).bind(id).execute(&st.db).await?;
             }
         }
     }
     notify(st, mid, json!({ "t": "uefn", "what": "journal" }));
+    // Le texte brut d'UEFN reste dans le journal ; l'interface reçoit un message en français (#6).
+    let res = res.map_err(|e| match e {
+        AppError::Conflict(m) if matches!(action, "actor_update" | "actor_update_raw") => AppError::Conflict(french_option_error(&m)),
+        AppError::Conflict(m) if action == "lore_checkin" && m.to_lowercase().contains("nothing to check in") => {
+            AppError::Conflict("Rien à archiver : aucune modification en attente dans Lore.".into())
+        }
+        e => e,
+    });
     res.map(|mut d| {
         if let Some(o) = d.as_object_mut() {
             o.remove("actors");
+            o.remove("saved");
         }
         d
     })
+}
+
+/// Un réglage @editable garde son type : un entier reste entier, un booléen reste un booléen, un texte reste un
+/// texte. UEFN arrondirait 2,5 en 2 sans rien dire (vérifié le 18/11/2026) : POP refuse avant d'envoyer.
+/// Une valeur actuelle inconnue (null, référence) ne bloque rien : UEFN tranche.
+fn check_prop_type(k: &str, cur: &Value, new: &Value) -> Result<(), AppError> {
+    let int = |v: &Value| v.is_i64() || v.is_u64();
+    let expected = if int(cur) { Some(("un nombre entier", int(new))) }
+        else if cur.is_f64() { Some(("un nombre", new.is_number())) }
+        else if cur.is_boolean() { Some(("oui ou non", new.is_boolean())) }
+        else if cur.is_string() { Some(("un texte", new.is_string())) }
+        else { None };
+    match expected {
+        Some((what, false)) => Err(bad(format!("« {k} » attend {what} : la valeur {} est refusée, rien n’a changé.", short(new)))),
+        _ => Ok(()),
+    }
+}
+
+/// Traduit un refus d'UEFN sur une option ou un réglage (« option bouton : Reference to a device… ») en français.
+fn french_option_error(m: &str) -> String {
+    let Some(rest) = m.strip_prefix("option ") else { return m.to_string() };
+    let key = rest.split(" : ").next().unwrap_or("").trim();
+    let why = if m.contains("Reference to a device") {
+        "il faut une référence à un appareil ou à un accessoire posé dans le niveau"
+    } else if m.contains("AllowedValues") || m.contains("not accept") || m.contains("rejecting") {
+        "cette valeur ne fait pas partie des valeurs acceptées"
+    } else {
+        "valeur invalide"
+    };
+    format!("UEFN a refusé la valeur de « {key} » : {why}. Rien n’a changé (détail dans le journal).")
 }
 
 async fn apply_file_cache(st: &AppState, mid: i64, action: &str, args: &Value, uid: i64, task: Option<i64>, note: &str) -> Result<(), AppError> {
@@ -667,17 +779,33 @@ async fn apply_file_cache(st: &AppState, mid: i64, action: &str, args: &Value, u
 
 /// Envoie les actions en attente dès que le relais ou UEFN redevient disponible.
 pub async fn flush_queue(st: &AppState, mid: i64) {
-    let _g = st.board_lock.lock().await;
-    let rows: Vec<(i64, String, String)> = match sqlx::query_as("SELECT id, action, args FROM uefn_actions WHERE map_id = ? AND status = 'queued' ORDER BY id").bind(mid).fetch_all(&st.db).await {
-        Ok(r) => r,
-        Err(_) => return,
-    };
-    for (id, action, args) in rows {
-        if !ready(st, mid, &action) {
-            continue;
+    // UEFN peut répondre avant d'avoir chargé le projet (2 min 30 pour un petit projet, mesuré le 18/11/2026) :
+    // on réessaie toutes les 20 s, 10 minutes au plus (#4).
+    for _ in 0..30 {
+        let mut retry = false;
+        {
+            let _g = st.board_lock.lock().await;
+            let rows: Vec<(i64, String, String)> = match sqlx::query_as("SELECT id, action, args FROM uefn_actions WHERE map_id = ? AND status = 'queued' ORDER BY id").bind(mid).fetch_all(&st.db).await {
+                Ok(r) => r,
+                Err(_) => return,
+            };
+            for (id, action, args) in rows {
+                if !ready(st, mid, &action) {
+                    continue;
+                }
+                let args: Value = serde_json::from_str(&args).unwrap_or(json!({}));
+                if let Ok(v) = run_action(st, mid, Some(id), &action, &args).await {
+                    if v["retry"].as_bool() == Some(true) {
+                        retry = true;
+                        break;
+                    }
+                }
+            }
         }
-        let args: Value = serde_json::from_str(&args).unwrap_or(json!({}));
-        let _ = run_action(st, mid, Some(id), &action, &args).await;
+        if !retry {
+            return;
+        }
+        tokio::time::sleep(std::time::Duration::from_secs(20)).await;
     }
 }
 
@@ -726,8 +854,18 @@ pub async fn undo(State(st): State<AppState>, u: AuthUser, Path(id): Path<i64>) 
     if status != "done" {
         return Err(bad("Seule une action réussie s’annule."));
     }
-    let r = exec(&st, Origin { ctx: &ctx, source: "undo", task: None }, u2["action"].as_str().unwrap_or(""), u2["args"].clone()).await?;
-    sqlx::query("UPDATE uefn_actions SET status = 'undone' WHERE id = ?").bind(id).execute(&st.db).await?;
+    // Réserve l'annulation avant de l'envoyer : deux Ctrl+Z rapprochés n'annulent pas deux fois la même action (#6).
+    let claimed = sqlx::query("UPDATE uefn_actions SET status = 'undone' WHERE id = ? AND status = 'done'").bind(id).execute(&st.db).await?.rows_affected();
+    if claimed == 0 {
+        return Err(bad("Cette action vient déjà d’être annulée."));
+    }
+    let r = match exec(&st, Origin { ctx: &ctx, source: "undo", task: None }, u2["action"].as_str().unwrap_or(""), u2["args"].clone()).await {
+        Ok(r) => r,
+        Err(e) => {
+            sqlx::query("UPDATE uefn_actions SET status = 'done' WHERE id = ?").bind(id).execute(&st.db).await?;
+            return Err(e);
+        }
+    };
     notify(&st, mid, json!({ "t": "uefn", "what": "journal" }));
     Ok(Json(r))
 }
@@ -775,4 +913,31 @@ pub async fn delete_filter(State(st): State<AppState>, u: AuthUser, Path(id): Pa
     map_ctx(&st, &u, mid).await?.require(Role::Freelance)?;
     sqlx::query("DELETE FROM saved_filters WHERE id = ?").bind(id).execute(&st.db).await?;
     Ok(Json(json!({ "ok": true })))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn un_reglage_garde_son_type() {
+        assert!(check_prop_type("nombre", &json!(3), &json!(7)).is_ok());
+        assert!(check_prop_type("nombre", &json!(3), &json!(2.5)).is_err());
+        assert!(check_prop_type("nombre", &json!(3), &json!("abc")).is_err());
+        assert!(check_prop_type("vitesse", &json!(1.5), &json!(2)).is_ok());
+        assert!(check_prop_type("actif", &json!(true), &json!(false)).is_ok());
+        assert!(check_prop_type("actif", &json!(true), &json!("oui")).is_err());
+        assert!(check_prop_type("texte", &json!("a"), &json!("b")).is_ok());
+        assert!(check_prop_type("texte", &json!("a"), &json!(3)).is_err());
+        // Valeur actuelle inconnue (référence vide) : UEFN tranche.
+        assert!(check_prop_type("bouton", &Value::Null, &json!("x")).is_ok());
+    }
+
+    #[test]
+    fn refus_uefn_en_francais() {
+        let m = "option bouton : Reference to a device or prop placed in the level: {\"refPath\": \"<actor path>\"}, or null to clear. Got: \"x\" ; Device '/a' has no option named 'bouton'.";
+        let f = french_option_error(m);
+        assert!(f.starts_with("UEFN a refusé la valeur de « bouton » : il faut une référence"), "{f}");
+        assert_eq!(french_option_error("Relais hors ligne."), "Relais hors ligne.");
+    }
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Folder, FolderOpen, ChevronRight, ChevronDown, Eye, EyeOff, Lock, Copy, Trash2, FolderInput, Pencil, Save, Archive, RotateCcw, RefreshCw, Plus, X, Star, AlertTriangle, Link2, Cpu, Box, Shapes, Code2, Check, Ban,
+  Folder, FolderOpen, ChevronRight, ChevronDown, Eye, EyeOff, Lock, Copy, Trash2, FolderInput, Pencil, Save, Archive, RotateCcw, RefreshCw, Plus, X, Star, AlertTriangle, Link2, Cpu, Box, Shapes, Code2, Check, Ban, Play,
 } from 'lucide-react'
 import { ago, api } from '../api'
 import { useApp, useLive, useLoad } from '../state'
@@ -51,7 +51,10 @@ export default function Organizer() {
   const [tab, setTab] = useState<'details' | 'top' | 'journal'>('details')
   const [task, setTask] = useState<number | ''>('')
   const [showLink, setShowLink] = useState(false)
-  useLive(['uefn'], reload)
+  // Après une annulation ou un changement venu d'UEFN, le panneau Détails relit les valeurs réelles (#6).
+  const [rev, setRev] = useState(0)
+  const refresh = () => { reload(); setRev(r => r + 1) }
+  useLive(['uefn'], refresh)
 
   const actors: Actor[] = st?.actors ?? []
   const vis = useMemo(() => actors.filter(a => matches(a, q)), [actors, q])
@@ -77,7 +80,7 @@ export default function Organizer() {
       const j: any[] = await api.get(`/api/maps/${map!.id}/uefn/journal`)
       const last = j.find(x => x.undoable && x.who === me?.user.name)
       if (!last) return toast(tr("Rien à annuler."))
-      try { await api.post(`/api/uefn-actions/${last.id}/undo`); toast(tr("Annulé : {0}", [last.summary.slice(0, 60)])); reload() } catch (er: any) { toast(er.message, true) }
+      try { await api.post(`/api/uefn-actions/${last.id}/undo`); toast(tr("Annulé : {0}", [last.summary.slice(0, 60)])); refresh() } catch (er: any) { toast(er.message, true) }
     }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
@@ -139,6 +142,8 @@ export default function Organizer() {
         <span className={'badge ' + (st.status === 'connected' ? 'b-g' : st.status === 'closed' ? 'b-o' : 'b-r')}>{STATUS_LABEL[st.status]}</span>
         <button className="btn" onClick={() => setShowLink(v => !v)}><Link2 size={16} />UEFN Link</button>
         <button className="btn" disabled={st.status !== 'connected'} onClick={() => act('refresh_actors', {}, tr("Acteurs actualisés"))}><RefreshCw size={16} />{tr("Actualiser")}</button>
+        {/* Envoi complet (acteurs et Verse) dans la session de test en cours (#5). */}
+        <button className="btn" disabled={readOnly} title={tr("Envoie les modifications du niveau dans la session de test en cours")} onClick={() => act('push_session', {}, tr("Envoyé en session de test"))}><Play size={16} />{tr("Envoyer en session")}</button>
       </PageHead>
       {st.status !== 'connected' && <div className="warn"><AlertTriangle size={18} /><span>{tr("{0} : lecture seule sur le dernier état connu{1}. Vos modifications seront mises en attente et envoyées à l’ouverture.", [st.status === 'offline' ? tr("Relais hors ligne") : tr("UEFN fermé"), st.updated_at ? ` (${ago(st.updated_at)})` : ''])}</span></div>}
       {st.approvals.length > 0 && <div className="warn" style={{ flexWrap: 'wrap' }}><AlertTriangle size={18} /><div style={{ flex: 1 }}>{st.approvals.map((p: any) => (
@@ -170,9 +175,9 @@ export default function Organizer() {
         <section className="card oright">
           <Tabs value={tab} onChange={setTab} items={[['details', tr("Détails")], ['top', tr("Vue du dessus")], ['journal', tr("Changements et journal")]]} />
           <div style={{ marginTop: 16 }}>
-            {tab === 'details' && (selected.length === 0 ? <p className="muted">{tr("Sélectionnez un ou plusieurs acteurs dans l’arbre.")}</p> : selected.length === 1 ? <Details a={selected[0]} all={actors} tags={st.tags} update={update} canEdit={canEdit} me={me?.user.email ?? ''} connected={st.status === 'connected'} /> : <Bulk list={selected} tags={st.tags} update={update} canEdit={canEdit} connected={st.status === 'connected'} />)}
+            {tab === 'details' && (selected.length === 0 ? <p className="muted">{tr("Sélectionnez un ou plusieurs acteurs dans l’arbre.")}</p> : selected.length === 1 ? <Details a={selected[0]} all={actors} tags={st.tags} update={update} canEdit={canEdit} me={me?.user.email ?? ''} connected={st.status === 'connected'} rev={rev} /> : <Bulk list={selected} tags={st.tags} update={update} canEdit={canEdit} connected={st.status === 'connected'} />)}
             {tab === 'top' && <TopView actors={vis} sel={sel} setSel={setSel} update={update} canEdit={canEdit} hasImage={st.has_topview} bounds={st.topview_bounds} refresh={() => act('render_topview', {}, tr("Vue du dessus rendue par UEFN"))} connected={st.status === 'connected'} />}
-            {tab === 'journal' && <Journal st={st} task={task} setTask={setTask} tasks={tasks ?? []} act={act} reload={reload} />}
+            {tab === 'journal' && <Journal st={st} task={task} setTask={setTask} tasks={tasks ?? []} act={act} reload={refresh} />}
           </div>
         </section>
       </div>
@@ -191,7 +196,7 @@ function Field({ s, value, onSet, disabled }: { s: NonNullable<Actor['schema']>[
   </div>
 }
 
-function Details({ a, all, tags, update, canEdit, me, connected }: { a: Actor; all: Actor[]; tags: string[]; update: (ids: string[], ch: any) => any; canEdit: boolean; me: string; connected: boolean }) {
+function Details({ a, all, tags, update, canEdit, me, connected, rev }: { a: Actor; all: Actor[]; tags: string[]; update: (ids: string[], ch: any) => any; canEdit: boolean; me: string; connected: boolean; rev: number }) {
   const { map } = useApp()
   // Options réelles lues dans UEFN à la sélection.
   const [live, setLive] = useState<{ values: Record<string, any>; schema: any[] } | null>(null)
@@ -203,7 +208,7 @@ function Details({ a, all, tags, update, canEdit, me, connected }: { a: Actor; a
     let off = false
     api.get(`/api/maps/${map!.id}/uefn/props?id=${encodeURIComponent(a.id)}`).then(r => { if (!off) setLive(r) }).catch(e => { if (!off) setLiveErr(e.message) })
     return () => { off = true }
-  }, [a.id, connected, tick])
+  }, [a.id, connected, tick, rev])
   const setOpt = async (key: string, v: any) => { await update([a.id], { [isVerse ? 'props' : 'options']: { [key]: v } }); setTick(t => t + 1) }
   const schema = live?.schema ?? a.schema ?? []
   const values = live?.values ?? (a.type === 'verse_device' ? a.props : a.options)
@@ -231,7 +236,7 @@ function Details({ a, all, tags, update, canEdit, me, connected }: { a: Actor; a
       </div>
     </section>
     {(a.type === 'device' || isVerse) && <section><div className="dsec" style={{ marginTop: 0 }}>{isVerse ? tr("Propriétés Verse (@editable)") : tr("Options de l’appareil")}{live && <span className="small muted">{' '}{tr("· lues dans UEFN")}</span>}</div>
-      {schema.length > 0 ? <div className="ofields">{schema.map((s: any) => <Field key={s.key} s={s} value={values?.[s.key]} disabled={dis} onSet={v => setOpt(s.key, v)} />)}</div>
+      {schema.length > 0 ? <div className="ofields">{schema.map((s: any) => <Field key={`${s.key}:${tick}:${rev}`} s={s} value={values?.[s.key]} disabled={dis} onSet={v => setOpt(s.key, v)} />)}</div>
         : <p className="small muted">{liveErr || (connected ? tr("Lecture des options dans UEFN…") : tr("Options disponibles quand UEFN est connecté."))}</p>}
     </section>}
     {(a.type === 'device' || isVerse) && a.events.length > 0 && <section><div className="dsec" style={{ marginTop: 0 }}>{tr("Liens d’événements (qui déclenche quoi)")}</div>

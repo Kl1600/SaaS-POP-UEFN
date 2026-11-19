@@ -11,7 +11,7 @@ import '../landing.css'
 export function WaitlistForm({ onDone }: { onDone?: () => void }) {
   const { t, lang } = useI18n()
   const w = t.wl
-  const [f, setF] = useState({ name: '', email: '', studio: '', team: fr.wl.teams[0], experience: fr.wl.exps[0], links: '', message: '' })
+  const [f, setF] = useState({ name: '', email: '', studio: '', team: fr.wl.teams[0], experience: fr.wl.exps[0], links: '', message: '', pop_hp: '' })
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [done, setDone] = useState<null | { already?: boolean; status?: string }>(null)
@@ -39,6 +39,8 @@ export function WaitlistForm({ onDone }: { onDone?: () => void }) {
     <label>{w.exp}<select value={f.experience} onChange={up('experience')}>{fr.wl.exps.map((x, i) => <option key={x} value={x}>{w.exps[i]}</option>)}</select></label>
     <label><span>{w.links} {opt()}</span><input value={f.links} onChange={up('links')} maxLength={400} placeholder={w.linksPh} /></label>
     <label><span>{w.msg} {opt()}</span><textarea value={f.message} onChange={up('message')} maxLength={1480} rows={3} placeholder={w.msgPh} /></label>
+    {/* Champ piège : invisible et hors du parcours clavier, seuls les robots le remplissent. */}
+    <input name="pop_hp" value={f.pop_hp} onChange={up('pop_hp')} tabIndex={-1} autoComplete="off" aria-hidden="true" style={{ position: 'absolute', left: '-10000px', width: 1, height: 1, opacity: 0 }} />
     {err && <p className="lwerr" role="alert">{err}</p>}
     <button className="lbtn pri" disabled={busy}>{busy ? w.sending : <>{w.send} <ArrowRight size={18} /></>}</button>
     <p className="lwsmall">{w.nospam} <a href="/confidentialite" target="_blank" rel="noopener">{w.privacy}</a></p>
