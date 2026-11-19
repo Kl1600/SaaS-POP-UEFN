@@ -3,6 +3,14 @@
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
 ```
+EN COURS | #8 Formater le code Rust avec rustfmt et le vérifier dans le CI | 19/11 13:45
+Owner : benybens | Sur la tâche : Claude Code, pour Yassine
+Fait : cargo fmt (server/, link/), cargo fmt --check dans ci.yml (serveur, relais)
+Reste : validation humaine (PR de test mal formatée)
+Bloque : #9 clippy
+```
+
+```
 EN COURS | #38 Administration : dépanner un compte (nouveau mot de passe, débloquer, couper la double authentification, supprimer) | 19/11 11:20
 Owner : benybens | Sur la tâche : Claude Code, pour benybens
 Fait : routes /api/admin/users/{id}/…, reset lève le blocage, manage::deletion_plan partagé avec delete_me
@@ -11,10 +19,10 @@ Bloque : rien
 ```
 
 ```
-EN COURS | #11 Sécurité : vérifier l'adresse e-mail avant d'activer un compte et de donner le rôle admin | 17/11 16:00
+FAIT | #11 Sécurité : vérifier l'adresse e-mail avant d'activer un compte et de donner le rôle admin | 19/11 13:30
 Owner : benybens | Sur la tâche : Claude Code, pour Yassine
 Fait : migration 0024 (ex-0012, renumérotée au rebase du 19/11), verify.rs, is_admin exige une adresse vérifiée, page /verifier-email et bandeau
-Reste : validation humaine ; envoi SMTP réel non testé (pas de SMTP de test)
+Reste : rien (validé le 19/11 avec un vrai SMTP Gmail)
 Bloque : rien
 ```
 

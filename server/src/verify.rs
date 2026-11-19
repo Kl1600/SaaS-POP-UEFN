@@ -18,7 +18,11 @@ const VALID_HOURS: i64 = 24;
 const RESEND_SECONDS: i64 = 120;
 
 pub async fn is_verified(st: &AppState, uid: i64) -> Result<bool, AppError> {
-    let v: Option<Option<String>> = sqlx::query_scalar("SELECT email_verified_at FROM users WHERE id = ?").bind(uid).fetch_optional(&st.db).await?;
+    let v: Option<Option<String>> =
+        sqlx::query_scalar("SELECT email_verified_at FROM users WHERE id = ?")
+            .bind(uid)
+            .fetch_optional(&st.db)
+            .await?;
     Ok(matches!(v, Some(Some(_))))
 }
 
@@ -64,7 +68,11 @@ pub struct VerifyIn {
 }
 
 /// Ouvre le lien reçu par e-mail : marque l'adresse comme vérifiée. Pas besoin d'être connecté.
-pub async fn verify(State(st): State<AppState>, crate::security::ClientIp(ip): crate::security::ClientIp, Json(b): Json<VerifyIn>) -> ApiResult<Value> {
+pub async fn verify(
+    State(st): State<AppState>,
+    crate::security::ClientIp(ip): crate::security::ClientIp,
+    Json(b): Json<VerifyIn>,
+) -> ApiResult<Value> {
     crate::auth::rate_limit(&st, &format!("ip:verify:{ip}"))?;
     let row: Option<(i64, String)> = sqlx::query_as(
         "SELECT v.user_id, u.email FROM email_verifications v JOIN users u ON u.id = v.user_id
@@ -74,7 +82,10 @@ pub async fn verify(State(st): State<AppState>, crate::security::ClientIp(ip): c
     .fetch_optional(&st.db)
     .await?;
     let (uid, email) = row.ok_or_else(|| bad("Lien de vérification invalide, déjà utilisé ou expiré : demandez-en un nouveau depuis POP."))?;
-    sqlx::query("UPDATE email_verifications SET used_at = datetime('now') WHERE token_hash = ?").bind(sha256_hex(b.token.trim())).execute(&st.db).await?;
+    sqlx::query("UPDATE email_verifications SET used_at = datetime('now') WHERE token_hash = ?")
+        .bind(sha256_hex(b.token.trim()))
+        .execute(&st.db)
+        .await?;
     mark_verified(&st, uid).await?;
     crate::security::audit(&st, Some(uid), "email_vérifié", &email, &ip).await;
     Ok(Json(json!({ "ok": true, "email": email })))
@@ -86,7 +97,9 @@ pub async fn resend(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value>
         return Ok(Json(json!({ "ok": true, "already": true })));
     }
     if !mail::configured() {
-        return Err(bad("L’envoi d’e-mails n’est pas configuré sur ce serveur : demandez à l’administrateur."));
+        return Err(bad(
+            "L’envoi d’e-mails n’est pas configuré sur ce serveur : demandez à l’administrateur.",
+        ));
     }
     let recent: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM email_verifications WHERE user_id = ? AND created_at > datetime('now', ?)")
         .bind(u.id)

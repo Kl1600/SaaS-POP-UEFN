@@ -14,7 +14,8 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use time::{macros::format_description, Date, Duration, OffsetDateTime, Weekday};
 
-const FMT: &[time::format_description::FormatItem<'static>] = format_description!("[year]-[month]-[day]");
+const FMT: &[time::format_description::FormatItem<'static>] =
+    format_description!("[year]-[month]-[day]");
 
 fn today() -> Date {
     OffsetDateTime::now_utc().date()
@@ -37,7 +38,11 @@ fn next_workday(mut d: Date) -> Date {
 
 // ---------- Vue d'ensemble ----------
 
-pub async fn overview(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64>) -> ApiResult<Value> {
+pub async fn overview(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(mid): Path<i64>,
+) -> ApiResult<Value> {
     map_ctx(&st, &u, mid).await?;
     let (doing, blocked, done_week, total, done): (i64, i64, i64, i64, i64) = sqlx::query_as(
         "SELECT COALESCE(SUM(status = 'doing'), 0), COALESCE(SUM(status = 'blocked'), 0),
@@ -83,7 +88,12 @@ pub async fn overview(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i
     .bind(mid)
     .fetch_all(&st.db)
     .await?;
-    let ms: Vec<(i64, String, String, String)> = sqlx::query_as("SELECT id, title, date, kind FROM milestones WHERE map_id = ? ORDER BY date").bind(mid).fetch_all(&st.db).await?;
+    let ms: Vec<(i64, String, String, String)> = sqlx::query_as(
+        "SELECT id, title, date, kind FROM milestones WHERE map_id = ? ORDER BY date",
+    )
+    .bind(mid)
+    .fetch_all(&st.db)
+    .await?;
     Ok(Json(json!({
         "tiles": {
             "doing": doing, "blocked": blocked, "done_week": done_week, "done_prev_week": done_prev, "total": total, "done": done,
@@ -110,21 +120,43 @@ pub struct MilestoneIn {
     kind: Option<String>,
 }
 
-pub async fn add_milestone(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64>, Json(b): Json<MilestoneIn>) -> ApiResult<Value> {
+pub async fn add_milestone(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(mid): Path<i64>,
+    Json(b): Json<MilestoneIn>,
+) -> ApiResult<Value> {
     let ctx = map_ctx(&st, &u, mid).await?;
     ctx.require(Role::Member)?;
     check_len("Titre", &b.title, 1, 80)?;
     parse_date(&b.date).ok_or_else(|| bad("Date invalide."))?;
-    let id: i64 = sqlx::query_scalar("INSERT INTO milestones (map_id, title, date, kind) VALUES (?, ?, ?, ?) RETURNING id")
-        .bind(mid).bind(b.title.trim()).bind(&b.date).bind(b.kind.unwrap_or_else(|| "jalon".into())).fetch_one(&st.db).await?;
+    let id: i64 = sqlx::query_scalar(
+        "INSERT INTO milestones (map_id, title, date, kind) VALUES (?, ?, ?, ?) RETURNING id",
+    )
+    .bind(mid)
+    .bind(b.title.trim())
+    .bind(&b.date)
+    .bind(b.kind.unwrap_or_else(|| "jalon".into()))
+    .fetch_one(&st.db)
+    .await?;
     notify(&st, mid, json!({ "t": "refresh", "what": "plan" }));
     Ok(Json(json!({ "id": id })))
 }
 
-pub async fn delete_milestone(State(st): State<AppState>, u: AuthUser, Path(id): Path<i64>) -> ApiResult<Value> {
-    let (mid,): (i64,) = sqlx::query_as("SELECT map_id FROM milestones WHERE id = ?").bind(id).fetch_one(&st.db).await?;
+pub async fn delete_milestone(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(id): Path<i64>,
+) -> ApiResult<Value> {
+    let (mid,): (i64,) = sqlx::query_as("SELECT map_id FROM milestones WHERE id = ?")
+        .bind(id)
+        .fetch_one(&st.db)
+        .await?;
     map_ctx(&st, &u, mid).await?.require(Role::Member)?;
-    sqlx::query("DELETE FROM milestones WHERE id = ?").bind(id).execute(&st.db).await?;
+    sqlx::query("DELETE FROM milestones WHERE id = ?")
+        .bind(id)
+        .execute(&st.db)
+        .await?;
     Ok(Json(json!({ "ok": true })))
 }
 
@@ -170,58 +202,96 @@ type T = (&'static str, &'static str, &'static [usize], bool); // titre, étique
 fn genre_loop(genre: &str) -> Vec<T> {
     match genre {
         "cr" => vec![
-            ("Équipes gendarmes / voleurs", "code", &[], false), ("Coffre-fort et minuteur de braquage", "code", &[0], false),
-            ("Prison et système d’arrestation", "code", &[0], false), ("Véhicules de police", "carte", &[], false),
-            ("Route d’évasion", "carte", &[3], false), ("Tester une manche complète", "test", &[1, 2, 4], false),
+            ("Équipes gendarmes / voleurs", "code", &[], false),
+            ("Coffre-fort et minuteur de braquage", "code", &[0], false),
+            ("Prison et système d’arrestation", "code", &[0], false),
+            ("Véhicules de police", "carte", &[], false),
+            ("Route d’évasion", "carte", &[3], false),
+            ("Tester une manche complète", "test", &[1, 2, 4], false),
         ],
         "tycoon" => vec![
-            ("Générateur de ressource", "code", &[], false), ("Transformation et vente", "code", &[0], false),
-            ("Améliorations achetables", "code", &[1], false), ("Zone de production habillée", "carte", &[], true),
+            ("Générateur de ressource", "code", &[], false),
+            ("Transformation et vente", "code", &[0], false),
+            ("Améliorations achetables", "code", &[1], false),
+            ("Zone de production habillée", "carte", &[], true),
             ("Tester 15 min de progression", "test", &[2, 3], false),
         ],
         "boxfight" => vec![
-            ("Manches et score", "code", &[], false), ("Arène et murs", "carte", &[], false), ("Choix des armes par manche", "code", &[0], false),
+            ("Manches et score", "code", &[], false),
+            ("Arène et murs", "carte", &[], false),
+            ("Choix des armes par manche", "code", &[0], false),
             ("Tester en 2v2", "test", &[1, 2], false),
         ],
         "deathrun" => vec![
-            ("Checkpoints et réapparition", "code", &[], false), ("Niveaux 1 à 5", "carte", &[], false), ("Niveaux 6 à 10", "carte", &[1], false),
-            ("Chronomètre et classement", "code", &[0], false), ("Tester tous les niveaux", "test", &[2, 3], false),
+            ("Checkpoints et réapparition", "code", &[], false),
+            ("Niveaux 1 à 5", "carte", &[], false),
+            ("Niveaux 6 à 10", "carte", &[1], false),
+            ("Chronomètre et classement", "code", &[0], false),
+            ("Tester tous les niveaux", "test", &[2, 3], false),
         ],
         "horreur" => vec![
-            ("Scénario et énigmes", "conception", &[], false), ("Ambiance sonore et lumières", "carte", &[], false), ("Créature et poursuite", "code", &[0], false),
+            ("Scénario et énigmes", "conception", &[], false),
+            ("Ambiance sonore et lumières", "carte", &[], false),
+            ("Créature et poursuite", "code", &[0], false),
             ("Tester la peur (5 joueurs)", "test", &[1, 2], false),
         ],
         "course" => vec![
-            ("Circuit principal", "carte", &[], false), ("Véhicules et points de départ", "carte", &[0], false), ("Tours, chrono et arrivée", "code", &[], false),
+            ("Circuit principal", "carte", &[], false),
+            ("Véhicules et points de départ", "carte", &[0], false),
+            ("Tours, chrono et arrivée", "code", &[], false),
             ("Tester 3 courses", "test", &[1, 2], false),
         ],
         _ => vec![
-            ("Rotation des mini-jeux", "code", &[], false), ("Mini-jeu 1", "carte", &[], false), ("Mini-jeu 2", "carte", &[], false),
-            ("Score global", "code", &[0], false), ("Tester une soirée complète", "test", &[1, 2, 3], false),
+            ("Rotation des mini-jeux", "code", &[], false),
+            ("Mini-jeu 1", "carte", &[], false),
+            ("Mini-jeu 2", "carte", &[], false),
+            ("Score global", "code", &[0], false),
+            ("Tester une soirée complète", "test", &[1, 2, 3], false),
         ],
     }
 }
 
 fn skeleton(genre: &str) -> Vec<(&'static str, Vec<T>)> {
     vec![
-        ("Lot 1 · Fondations", vec![
-            ("Créer le projet UEFN et le dépôt", "code", &[], false), ("Blocking de l’île", "carte", &[], false),
-            ("Écrire la boucle de jeu (1 page)", "conception", &[], false), ("Règles et conventions de nommage", "conception", &[2], true),
-        ]),
+        (
+            "Lot 1 · Fondations",
+            vec![
+                ("Créer le projet UEFN et le dépôt", "code", &[], false),
+                ("Blocking de l’île", "carte", &[], false),
+                ("Écrire la boucle de jeu (1 page)", "conception", &[], false),
+                ("Règles et conventions de nommage", "conception", &[2], true),
+            ],
+        ),
         ("Lot 2 · Boucle de jeu", genre_loop(genre)),
-        ("Lot 3 · Économie et récompenses", vec![
-            ("Tableau des prix et des dépenses", "conception", &[], false), ("Boutique en jeu", "code", &[0], false),
-            ("Première offre en jeu", "code", &[1], false), ("Interface de la boutique", "conception", &[1], true),
-        ]),
-        ("Lot 4 · Finitions et publication", vec![
-            ("Tutoriel et textes", "conception", &[], true), ("Optimisation mémoire", "carte", &[], false),
-            ("Vignette, titre et description", "conception", &[], true), ("Traductions FR / EN", "conception", &[0], true),
-            ("Playtest à plusieurs", "test", &[1], false), ("Checklist de soumission Epic", "test", &[2], false),
-        ]),
+        (
+            "Lot 3 · Économie et récompenses",
+            vec![
+                ("Tableau des prix et des dépenses", "conception", &[], false),
+                ("Boutique en jeu", "code", &[0], false),
+                ("Première offre en jeu", "code", &[1], false),
+                ("Interface de la boutique", "conception", &[1], true),
+            ],
+        ),
+        (
+            "Lot 4 · Finitions et publication",
+            vec![
+                ("Tutoriel et textes", "conception", &[], true),
+                ("Optimisation mémoire", "carte", &[], false),
+                ("Vignette, titre et description", "conception", &[], true),
+                ("Traductions FR / EN", "conception", &[0], true),
+                ("Playtest à plusieurs", "test", &[1], false),
+                ("Checklist de soumission Epic", "test", &[2], false),
+            ],
+        ),
     ]
 }
 
-pub async fn preview(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64>, Json(b): Json<GenIn>) -> ApiResult<Value> {
+pub async fn preview(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(mid): Path<i64>,
+    Json(b): Json<GenIn>,
+) -> ApiResult<Value> {
     let ctx = map_ctx(&st, &u, mid).await?;
     ctx.require(Role::Member)?;
     let release = parse_date(&b.release_date).ok_or_else(|| bad("Date de sortie invalide."))?;
@@ -234,22 +304,60 @@ pub async fn preview(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i6
     for (lot, list) in skeleton(&b.genre) {
         let base = tasks.len();
         for (i, (title, tag, deps, ai)) in list.iter().enumerate() {
-            tasks.push(PlanTask { key: base + i, title: title.to_string(), tag: tag.to_string(), deps: deps.iter().map(|d| base + d).collect(), planned_day: None, assignee_id: None, ai: b.ai && *ai, lot: lot.to_string() });
+            tasks.push(PlanTask {
+                key: base + i,
+                title: title.to_string(),
+                tag: tag.to_string(),
+                deps: deps.iter().map(|d| base + d).collect(),
+                planned_day: None,
+                assignee_id: None,
+                ai: b.ai && *ai,
+                lot: lot.to_string(),
+            });
         }
     }
     // Idées votées du tableau blanc.
     if let Some(bid) = b.board_id {
-        let (bmid, objects): (i64, String) = sqlx::query_as("SELECT map_id, objects FROM boards WHERE id = ?").bind(bid).fetch_one(&st.db).await?;
+        let (bmid, objects): (i64, String) =
+            sqlx::query_as("SELECT map_id, objects FROM boards WHERE id = ?")
+                .bind(bid)
+                .fetch_one(&st.db)
+                .await?;
         if bmid == mid {
             let objs: Value = serde_json::from_str(&objects).unwrap_or(json!({}));
-            let mut voted: Vec<(i64, String)> = objs.as_object().map(|m| m.values().filter(|o| o["kind"] == "sticky" && !o["task_id"].is_i64()).filter_map(|o| {
-                let v: i64 = o["votes"].as_object().map(|x| x.values().filter_map(|n| n.as_i64()).sum()).unwrap_or(0);
-                (v > 0).then(|| (v, o["text"].as_str().unwrap_or("").chars().take(140).collect()))
-            }).collect()).unwrap_or_default();
+            let mut voted: Vec<(i64, String)> = objs
+                .as_object()
+                .map(|m| {
+                    m.values()
+                        .filter(|o| o["kind"] == "sticky" && !o["task_id"].is_i64())
+                        .filter_map(|o| {
+                            let v: i64 = o["votes"]
+                                .as_object()
+                                .map(|x| x.values().filter_map(|n| n.as_i64()).sum())
+                                .unwrap_or(0);
+                            (v > 0).then(|| {
+                                (
+                                    v,
+                                    o["text"].as_str().unwrap_or("").chars().take(140).collect(),
+                                )
+                            })
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
             voted.sort_by(|a, b| b.0.cmp(&a.0));
             for (_, t) in voted.into_iter().take(10) {
                 let k = tasks.len();
-                tasks.push(PlanTask { key: k, title: t, tag: "conception".into(), deps: vec![], planned_day: None, assignee_id: None, ai: false, lot: "Idées votées du tableau".into() });
+                tasks.push(PlanTask {
+                    key: k,
+                    title: t,
+                    tag: "conception".into(),
+                    deps: vec![],
+                    planned_day: None,
+                    assignee_id: None,
+                    ai: false,
+                    lot: "Idées votées du tableau".into(),
+                });
             }
         }
     }
@@ -264,7 +372,14 @@ pub async fn preview(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i6
     for i in 0..tasks.len() {
         let tag = tasks[i].tag.clone();
         let cands: Vec<&GenMember> = b.members.iter().filter(|m| m.tag == tag).collect();
-        let who = if !cands.is_empty() { cands[i % cands.len()].user_id } else if !b.members.is_empty() { rr += 1; b.members[rr % b.members.len()].user_id } else { u.id };
+        let who = if !cands.is_empty() {
+            cands[i % cands.len()].user_id
+        } else if !b.members.is_empty() {
+            rr += 1;
+            b.members[rr % b.members.len()].user_id
+        } else {
+            u.id
+        };
         tasks[i].assignee_id = Some(who);
         let mut day = start;
         for d in tasks[i].deps.clone() {
@@ -283,13 +398,33 @@ pub async fn preview(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i6
         }
         tasks[i].planned_day = Some(fmt(day));
     }
-    let last = tasks.iter().filter_map(|t| t.planned_day.as_deref().and_then(parse_date)).max().unwrap_or(start);
+    let last = tasks
+        .iter()
+        .filter_map(|t| t.planned_day.as_deref().and_then(parse_date))
+        .max()
+        .unwrap_or(start);
     let human: usize = tasks.iter().filter(|t| !t.ai).count();
     let milestones = vec![
-        PlanMilestone { title: "Gel du contenu".into(), date: fmt(release - Duration::days(7)), kind: "gel".into() },
-        PlanMilestone { title: "Playtest à plusieurs".into(), date: fmt(release - Duration::days(5)), kind: "test".into() },
-        PlanMilestone { title: "Soumission à Epic".into(), date: fmt(release - Duration::days(4)), kind: "soumission".into() },
-        PlanMilestone { title: "Sortie".into(), date: fmt(release), kind: "sortie".into() },
+        PlanMilestone {
+            title: "Gel du contenu".into(),
+            date: fmt(release - Duration::days(7)),
+            kind: "gel".into(),
+        },
+        PlanMilestone {
+            title: "Playtest à plusieurs".into(),
+            date: fmt(release - Duration::days(5)),
+            kind: "test".into(),
+        },
+        PlanMilestone {
+            title: "Soumission à Epic".into(),
+            date: fmt(release - Duration::days(4)),
+            kind: "soumission".into(),
+        },
+        PlanMilestone {
+            title: "Sortie".into(),
+            date: fmt(release),
+            kind: "sortie".into(),
+        },
     ];
     Ok(Json(json!({
         "tasks": tasks, "milestones": milestones,
@@ -303,7 +438,12 @@ pub struct ApplyIn {
     milestones: Vec<PlanMilestone>,
 }
 
-pub async fn apply(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64>, Json(b): Json<ApplyIn>) -> ApiResult<Value> {
+pub async fn apply(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(mid): Path<i64>,
+    Json(b): Json<ApplyIn>,
+) -> ApiResult<Value> {
     let ctx = map_ctx(&st, &u, mid).await?;
     ctx.require(Role::Member)?;
     if b.tasks.len() > 300 {
@@ -311,19 +451,50 @@ pub async fn apply(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64>
     }
     let mut numbers: HashMap<usize, i64> = HashMap::new();
     for t in &b.tasks {
-        let deps: Vec<i64> = t.deps.iter().filter_map(|k| numbers.get(k).copied()).collect();
-        let (_, n) = insert_task(&st, &ctx, &NewTask {
-            title: t.title.clone(), tag: Some(t.tag.clone()), description: None, assignee_id: t.assignee_id, deps: Some(deps),
-            planned_day: t.planned_day.clone(), lot: Some(t.lot.clone()), status: None, ai: Some(t.ai), origin: Some("plan".into()),
-        }).await?;
+        let deps: Vec<i64> = t
+            .deps
+            .iter()
+            .filter_map(|k| numbers.get(k).copied())
+            .collect();
+        let (_, n) = insert_task(
+            &st,
+            &ctx,
+            &NewTask {
+                title: t.title.clone(),
+                tag: Some(t.tag.clone()),
+                description: None,
+                assignee_id: t.assignee_id,
+                deps: Some(deps),
+                planned_day: t.planned_day.clone(),
+                lot: Some(t.lot.clone()),
+                status: None,
+                ai: Some(t.ai),
+                origin: Some("plan".into()),
+            },
+        )
+        .await?;
         numbers.insert(t.key, n);
     }
     for m in &b.milestones {
         if parse_date(&m.date).is_some() {
-            sqlx::query("INSERT INTO milestones (map_id, title, date, kind) VALUES (?, ?, ?, ?)").bind(mid).bind(&m.title).bind(&m.date).bind(&m.kind).execute(&st.db).await?;
+            sqlx::query("INSERT INTO milestones (map_id, title, date, kind) VALUES (?, ?, ?, ?)")
+                .bind(mid)
+                .bind(&m.title)
+                .bind(&m.date)
+                .bind(&m.kind)
+                .execute(&st.db)
+                .await?;
         }
     }
-    log_activity(&st, mid, Some(u.id), "plan", "Plan de projet validé", &format!("{} tâches, {} jalons", b.tasks.len(), b.milestones.len())).await?;
+    log_activity(
+        &st,
+        mid,
+        Some(u.id),
+        "plan",
+        "Plan de projet validé",
+        &format!("{} tâches, {} jalons", b.tasks.len(), b.milestones.len()),
+    )
+    .await?;
     notify(&st, mid, json!({ "t": "refresh", "what": "tasks" }));
     Ok(Json(json!({ "created": b.tasks.len() })))
 }
@@ -354,13 +525,27 @@ async fn timeline_data(st: &AppState, mid: i64) -> Result<(Vec<PT>, Vec<(i64, i6
     Ok((tasks, deps))
 }
 
-pub async fn timeline(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64>) -> ApiResult<Value> {
+pub async fn timeline(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(mid): Path<i64>,
+) -> ApiResult<Value> {
     let ctx = map_ctx(&st, &u, mid).await?;
     let (tasks, deps) = timeline_data(&st, mid).await?;
     // Chemin critique : plus longue chaîne de tâches non finies reliées par des dépendances.
-    let open: HashMap<i64, &PT> = tasks.iter().filter(|t| t.status != "done").map(|t| (t.id, t)).collect();
+    let open: HashMap<i64, &PT> = tasks
+        .iter()
+        .filter(|t| t.status != "done")
+        .map(|t| (t.id, t))
+        .collect();
     let mut memo: HashMap<i64, (i64, Option<i64>)> = HashMap::new();
-    fn longest(id: i64, deps: &[(i64, i64)], open: &HashMap<i64, &PT>, memo: &mut HashMap<i64, (i64, Option<i64>)>, depth: u32) -> i64 {
+    fn longest(
+        id: i64,
+        deps: &[(i64, i64)],
+        open: &HashMap<i64, &PT>,
+        memo: &mut HashMap<i64, (i64, Option<i64>)>,
+        depth: u32,
+    ) -> i64 {
         if let Some(v) = memo.get(&id) {
             return v.0;
         }
@@ -394,8 +579,17 @@ pub async fn timeline(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i
         critical.push(id);
         end = memo.get(&id).and_then(|v| v.1);
     }
-    let ms: Vec<(i64, String, String, String)> = sqlx::query_as("SELECT id, title, date, kind FROM milestones WHERE map_id = ? ORDER BY date").bind(mid).fetch_all(&st.db).await?;
-    let release: Option<(Option<String>,)> = sqlx::query_as("SELECT release_date FROM maps WHERE id = ?").bind(mid).fetch_optional(&st.db).await?;
+    let ms: Vec<(i64, String, String, String)> = sqlx::query_as(
+        "SELECT id, title, date, kind FROM milestones WHERE map_id = ? ORDER BY date",
+    )
+    .bind(mid)
+    .fetch_all(&st.db)
+    .await?;
+    let release: Option<(Option<String>,)> =
+        sqlx::query_as("SELECT release_date FROM maps WHERE id = ?")
+            .bind(mid)
+            .fetch_optional(&st.db)
+            .await?;
     // Charge par personne sur la semaine en cours.
     let members: Vec<(i64, String, i64)> = sqlx::query_as("SELECT u.id, u.name, m.hours_per_week FROM memberships m JOIN users u ON u.id = m.user_id WHERE m.studio_id = ? ORDER BY u.name").bind(ctx.studio_id).fetch_all(&st.db).await?;
     let t0 = today();
@@ -424,17 +618,31 @@ pub struct MoveIn {
 }
 
 /// Déplace une barre puis recalcule : les tâches qui en dépendent glissent, et on signale les jalons dépassés.
-pub async fn move_and_recalc(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64>, Json(b): Json<MoveIn>) -> ApiResult<Value> {
+pub async fn move_and_recalc(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(mid): Path<i64>,
+    Json(b): Json<MoveIn>,
+) -> ApiResult<Value> {
     let ctx = map_ctx(&st, &u, mid).await?;
     ctx.can_edit()?;
     parse_date(&b.planned_day).ok_or_else(|| bad("Date invalide."))?;
-    sqlx::query("UPDATE tasks SET planned_day = ? WHERE id = ? AND map_id = ?").bind(&b.planned_day).bind(b.task_id).bind(mid).execute(&st.db).await?;
+    sqlx::query("UPDATE tasks SET planned_day = ? WHERE id = ? AND map_id = ?")
+        .bind(&b.planned_day)
+        .bind(b.task_id)
+        .bind(mid)
+        .execute(&st.db)
+        .await?;
     let out = recalc_inner(&st, mid).await?;
     notify(&st, mid, json!({ "t": "refresh", "what": "plan" }));
     Ok(Json(out))
 }
 
-pub async fn recalc(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64>) -> ApiResult<Value> {
+pub async fn recalc(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(mid): Path<i64>,
+) -> ApiResult<Value> {
     map_ctx(&st, &u, mid).await?.can_edit()?;
     let out = recalc_inner(&st, mid).await?;
     notify(&st, mid, json!({ "t": "refresh", "what": "plan" }));
@@ -444,7 +652,15 @@ pub async fn recalc(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64
 async fn recalc_inner(st: &AppState, mid: i64) -> Result<Value, AppError> {
     let (tasks, deps) = timeline_data(st, mid).await?;
     let t0 = today();
-    let mut day: HashMap<i64, Date> = tasks.iter().filter_map(|t| t.planned_day.as_deref().and_then(parse_date).map(|d| (t.id, d))).collect();
+    let mut day: HashMap<i64, Date> = tasks
+        .iter()
+        .filter_map(|t| {
+            t.planned_day
+                .as_deref()
+                .and_then(parse_date)
+                .map(|d| (t.id, d))
+        })
+        .collect();
     let status: HashMap<i64, &str> = tasks.iter().map(|t| (t.id, t.status.as_str())).collect();
     let mut shifted = vec![];
     // Les tâches non finies prévues dans le passé reviennent à aujourd'hui.
@@ -486,22 +702,41 @@ async fn recalc_inner(st: &AppState, mid: i64) -> Result<Value, AppError> {
         if let Some(d) = day.get(&t.id) {
             let s = fmt(*d);
             if t.planned_day.as_deref() != Some(s.as_str()) {
-                sqlx::query("UPDATE tasks SET planned_day = ? WHERE id = ?").bind(&s).bind(t.id).execute(&st.db).await?;
+                sqlx::query("UPDATE tasks SET planned_day = ? WHERE id = ?")
+                    .bind(&s)
+                    .bind(t.id)
+                    .execute(&st.db)
+                    .await?;
             }
         }
     }
-    let ms: Vec<(String, String)> = sqlx::query_as("SELECT title, date FROM milestones WHERE map_id = ? AND date >= date('now') ORDER BY date").bind(mid).fetch_all(&st.db).await?;
+    let ms: Vec<(String, String)> = sqlx::query_as(
+        "SELECT title, date FROM milestones WHERE map_id = ? AND date >= date('now') ORDER BY date",
+    )
+    .bind(mid)
+    .fetch_all(&st.db)
+    .await?;
     let mut alerts = vec![];
     // Alerte quand une tâche décalée passe de l'autre côté d'un jalon.
     for t in &tasks {
-        let (Some(old), Some(new)) = (t.planned_day.as_deref().and_then(parse_date), day.get(&t.id).copied()) else { continue };
+        let (Some(old), Some(new)) = (
+            t.planned_day.as_deref().and_then(parse_date),
+            day.get(&t.id).copied(),
+        ) else {
+            continue;
+        };
         if new <= old {
             continue;
         }
         for (title, date) in &ms {
             if let Some(d) = parse_date(date) {
                 if old <= d && new > d {
-                    alerts.push(format!("#{} {} glisse au {}, après « {title} » ({date}).", t.number, t.title, fmt(new)));
+                    alerts.push(format!(
+                        "#{} {} glisse au {}, après « {title} » ({date}).",
+                        t.number,
+                        t.title,
+                        fmt(new)
+                    ));
                 }
             }
         }
@@ -514,17 +749,36 @@ async fn recalc_inner(st: &AppState, mid: i64) -> Result<Value, AppError> {
 }
 
 /// Calendrier des mises à jour et des saisons : jalons de la map + repères Fortnite à vérifier.
-pub async fn seasons(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64>) -> ApiResult<Value> {
+pub async fn seasons(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(mid): Path<i64>,
+) -> ApiResult<Value> {
     map_ctx(&st, &u, mid).await?;
-    let ms: Vec<(String, String, String)> = sqlx::query_as("SELECT title, date, kind FROM milestones WHERE map_id = ? ORDER BY date").bind(mid).fetch_all(&st.db).await?;
-    let mut ev: Vec<Value> = ms.into_iter().map(|(t, d, k)| json!({"date": d, "title": t, "kind": "map", "sub": k})).collect();
+    let ms: Vec<(String, String, String)> =
+        sqlx::query_as("SELECT title, date, kind FROM milestones WHERE map_id = ? ORDER BY date")
+            .bind(mid)
+            .fetch_all(&st.db)
+            .await?;
+    let mut ev: Vec<Value> = ms
+        .into_iter()
+        .map(|(t, d, k)| json!({"date": d, "title": t, "kind": "map", "sub": k}))
+        .collect();
     // Repères génériques : à confirmer avec les annonces d'Epic.
     for (d, t, k) in [
         ("2026-11-26", "Thanksgiving (US) : pic de joueurs", "aim"),
         ("2026-12-19", "Vacances de Noël (France)", "aim"),
-        ("2026-12-21", "Fêtes : modération Epic souvent plus lente (à confirmer)", "avoid"),
+        (
+            "2026-12-21",
+            "Fêtes : modération Epic souvent plus lente (à confirmer)",
+            "avoid",
+        ),
         ("2027-02-01", "Ventes en jeu reversées à 50 %", "money"),
-        ("2027-02-13", "Vacances d’hiver (France, zone variable)", "aim"),
+        (
+            "2027-02-13",
+            "Vacances d’hiver (France, zone variable)",
+            "aim",
+        ),
     ] {
         ev.push(json!({"date": d, "title": t, "kind": k}));
     }

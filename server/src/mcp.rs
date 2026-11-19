@@ -25,19 +25,44 @@ pub struct TokenIn {
     scope: Option<String>,
 }
 
-const KINDS: &[&str] = &["claude_code", "claude_desktop", "cursor", "codex", "windsurf", "vscode", "gemini", "autre"];
+const KINDS: &[&str] = &[
+    "claude_code",
+    "claude_desktop",
+    "cursor",
+    "codex",
+    "windsurf",
+    "vscode",
+    "gemini",
+    "autre",
+];
 
-pub async fn create_token(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64>, Json(b): Json<TokenIn>) -> ApiResult<Value> {
+pub async fn create_token(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(mid): Path<i64>,
+    Json(b): Json<TokenIn>,
+) -> ApiResult<Value> {
     map_ctx(&st, &u, mid).await?.require(Role::Freelance)?;
     check_len("Nom", &b.name, 1, 60)?;
     let token = format!("pop_{}", random_token());
-    let kind = b.kind.filter(|k| KINDS.contains(&k.as_str())).unwrap_or_else(|| "autre".into());
-    let scope = if b.scope.as_deref() == Some("read") { "read" } else { "write" };
+    let kind = b
+        .kind
+        .filter(|k| KINDS.contains(&k.as_str()))
+        .unwrap_or_else(|| "autre".into());
+    let scope = if b.scope.as_deref() == Some("read") {
+        "read"
+    } else {
+        "write"
+    };
     let id: i64 = sqlx::query_scalar("INSERT INTO api_tokens (user_id, map_id, name, token_hash, kind, scope) VALUES (?, ?, ?, ?, ?, ?) RETURNING id").bind(u.id).bind(mid).bind(b.name.trim()).bind(sha256_hex(&token)).bind(&kind).bind(scope).fetch_one(&st.db).await?;
     Ok(Json(json!({ "token": token, "id": id })))
 }
 
-pub async fn tokens(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64>) -> ApiResult<Value> {
+pub async fn tokens(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(mid): Path<i64>,
+) -> ApiResult<Value> {
     map_ctx(&st, &u, mid).await?;
     let rows: Vec<(i64, String, String, String, String, Option<String>, i64)> = sqlx::query_as("SELECT id, name, created_at, kind, scope, last_used, calls FROM api_tokens WHERE user_id = ? AND map_id = ? ORDER BY id DESC").bind(u.id).bind(mid).fetch_all(&st.db).await?;
     Ok(Json(json!(rows.into_iter().map(|(id, n, at, kind, scope, last, calls)| json!({"id": id, "name": n, "created_at": at, "kind": kind, "scope": scope, "last_used": last, "calls": calls})).collect::<Vec<_>>())))
@@ -48,14 +73,32 @@ pub struct ScopeIn {
     scope: String,
 }
 
-pub async fn set_scope(State(st): State<AppState>, u: AuthUser, Path(id): Path<i64>, Json(b): Json<ScopeIn>) -> ApiResult<Value> {
+pub async fn set_scope(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(id): Path<i64>,
+    Json(b): Json<ScopeIn>,
+) -> ApiResult<Value> {
     let scope = if b.scope == "read" { "read" } else { "write" };
-    sqlx::query("UPDATE api_tokens SET scope = ? WHERE id = ? AND user_id = ?").bind(scope).bind(id).bind(u.id).execute(&st.db).await?;
+    sqlx::query("UPDATE api_tokens SET scope = ? WHERE id = ? AND user_id = ?")
+        .bind(scope)
+        .bind(id)
+        .bind(u.id)
+        .execute(&st.db)
+        .await?;
     Ok(Json(json!({ "ok": true })))
 }
 
-pub async fn delete_token(State(st): State<AppState>, u: AuthUser, Path(id): Path<i64>) -> ApiResult<Value> {
-    sqlx::query("DELETE FROM api_tokens WHERE id = ? AND user_id = ?").bind(id).bind(u.id).execute(&st.db).await?;
+pub async fn delete_token(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(id): Path<i64>,
+) -> ApiResult<Value> {
+    sqlx::query("DELETE FROM api_tokens WHERE id = ? AND user_id = ?")
+        .bind(id)
+        .bind(u.id)
+        .execute(&st.db)
+        .await?;
     Ok(Json(json!({ "ok": true })))
 }
 
@@ -92,13 +135,23 @@ fn tools() -> Value {
     ])
 }
 
-const READ_TOOLS: &[&str] = &["uefn_status", "list_actors", "get_actor", "list_verse_files", "read_verse_file", "list_tasks", "get_task", "next_task"];
+const READ_TOOLS: &[&str] = &[
+    "uefn_status",
+    "list_actors",
+    "get_actor",
+    "list_verse_files",
+    "read_verse_file",
+    "list_tasks",
+    "get_task",
+    "next_task",
+];
 
 fn rpc_ok(id: Value, result: Value) -> Response {
     Json(json!({ "jsonrpc": "2.0", "id": id, "result": result })).into_response()
 }
 fn rpc_err(id: Value, code: i64, msg: &str) -> Response {
-    Json(json!({ "jsonrpc": "2.0", "id": id, "error": { "code": code, "message": msg } })).into_response()
+    Json(json!({ "jsonrpc": "2.0", "id": id, "error": { "code": code, "message": msg } }))
+        .into_response()
 }
 fn text(v: impl Into<String>, is_error: bool) -> Value {
     json!({ "content": [{ "type": "text", "text": v.into() }], "isError": is_error })
@@ -109,10 +162,21 @@ pub struct McpQ {
     token: Option<String>,
 }
 
-pub async fn mcp(State(st): State<AppState>, headers: HeaderMap, axum::extract::Query(q): axum::extract::Query<McpQ>, Json(req): Json<Value>) -> Response {
+pub async fn mcp(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    axum::extract::Query(q): axum::extract::Query<McpQ>,
+    Json(req): Json<Value>,
+) -> Response {
     let id = req.get("id").cloned().unwrap_or(Value::Null);
     // Jeton dans l'en-tête Authorization, ou dans l'adresse (?token=) pour les applications qui ne gèrent pas les en-têtes.
-    let token = headers.get("authorization").and_then(|v| v.to_str().ok()).and_then(|v| v.strip_prefix("Bearer ")).map(String::from).or(q.token).unwrap_or_default();
+    let token = headers
+        .get("authorization")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .map(String::from)
+        .or(q.token)
+        .unwrap_or_default();
     let token = token.as_str();
     let row: Option<(i64, i64, String, String, String)> = match sqlx::query_as(
         "SELECT t.user_id, t.map_id, u.email, u.name, t.scope FROM api_tokens t JOIN users u ON u.id = t.user_id WHERE t.token_hash = ? AND u.disabled = 0",
@@ -121,22 +185,42 @@ pub async fn mcp(State(st): State<AppState>, headers: HeaderMap, axum::extract::
         Err(_) => return rpc_err(id, -32603, "Erreur interne"),
     };
     let Some((uid, mid, email, name, scope)) = row else {
-        return (StatusCode::UNAUTHORIZED, Json(json!({ "error": "Jeton POP invalide." }))).into_response();
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({ "error": "Jeton POP invalide." })),
+        )
+            .into_response();
     };
-    let _ = sqlx::query("UPDATE api_tokens SET last_used = datetime('now'), calls = calls + 1 WHERE token_hash = ?").bind(sha256_hex(token)).execute(&st.db).await;
+    let _ = sqlx::query(
+        "UPDATE api_tokens SET last_used = datetime('now'), calls = calls + 1 WHERE token_hash = ?",
+    )
+    .bind(sha256_hex(token))
+    .execute(&st.db)
+    .await;
     crate::access::notify(&st, mid, json!({ "t": "refresh", "what": "ai" }));
-    let user = AuthUser { id: uid, email, name, sid: String::new() };
+    let user = AuthUser {
+        id: uid,
+        email,
+        name,
+        sid: String::new(),
+    };
     let method = req["method"].as_str().unwrap_or("");
     match method {
-        "initialize" => rpc_ok(id, json!({
-            "protocolVersion": req["params"]["protocolVersion"].as_str().unwrap_or("2025-06-18"),
-            "capabilities": { "tools": {} },
-            "serverInfo": { "name": "pop", "version": "0.1.0" },
-            "instructions": "Outils POP : gérer les tâches de la map (list_tasks, next_task, create_task, set_task_status, comment_task) et piloter UEFN via le relais du créateur. Avant de travailler, prenez une tâche avec next_task et passez-la en cours ; quand elle est finie, passez-la en done avec une note. Toute action UEFN est journalisée et annulable ; les suppressions attendent une validation humaine."
-        })),
+        "initialize" => rpc_ok(
+            id,
+            json!({
+                "protocolVersion": req["params"]["protocolVersion"].as_str().unwrap_or("2025-06-18"),
+                "capabilities": { "tools": {} },
+                "serverInfo": { "name": "pop", "version": "0.1.0" },
+                "instructions": "Outils POP : gérer les tâches de la map (list_tasks, next_task, create_task, set_task_status, comment_task) et piloter UEFN via le relais du créateur. Avant de travailler, prenez une tâche avec next_task et passez-la en cours ; quand elle est finie, passez-la en done avec une note. Toute action UEFN est journalisée et annulable ; les suppressions attendent une validation humaine."
+            }),
+        ),
         m if m.starts_with("notifications/") => StatusCode::ACCEPTED.into_response(),
         "ping" => rpc_ok(id, json!({})),
-        "tools/list" => rpc_ok(id, json!({ "tools": tools().as_array().cloned().unwrap_or_default().into_iter().filter(|t| scope != "read" || READ_TOOLS.contains(&t["name"].as_str().unwrap_or(""))).collect::<Vec<_>>() })),
+        "tools/list" => rpc_ok(
+            id,
+            json!({ "tools": tools().as_array().cloned().unwrap_or_default().into_iter().filter(|t| scope != "read" || READ_TOOLS.contains(&t["name"].as_str().unwrap_or(""))).collect::<Vec<_>>() }),
+        ),
         "tools/call" => {
             let name = req["params"]["name"].as_str().unwrap_or("");
             if scope == "read" && !READ_TOOLS.contains(&name) {
@@ -144,22 +228,52 @@ pub async fn mcp(State(st): State<AppState>, headers: HeaderMap, axum::extract::
             }
             let args = req["params"]["arguments"].clone();
             match call(&st, &user, mid, name, args).await {
-                Ok(v) => rpc_ok(id, text(serde_json::to_string_pretty(&v).unwrap_or_default(), false)),
-                Err(e) => rpc_ok(id, text(match e { AppError::BadRequest(m) | AppError::Conflict(m) => m, AppError::Forbidden => "Action non autorisée pour votre rôle.".into(), AppError::NotFound => "Introuvable.".into(), other => format!("{other}") }, true)),
+                Ok(v) => rpc_ok(
+                    id,
+                    text(serde_json::to_string_pretty(&v).unwrap_or_default(), false),
+                ),
+                Err(e) => rpc_ok(
+                    id,
+                    text(
+                        match e {
+                            AppError::BadRequest(m) | AppError::Conflict(m) => m,
+                            AppError::Forbidden => "Action non autorisée pour votre rôle.".into(),
+                            AppError::NotFound => "Introuvable.".into(),
+                            other => format!("{other}"),
+                        },
+                        true,
+                    ),
+                ),
             }
         }
         _ => rpc_err(id, -32601, "Méthode inconnue"),
     }
 }
 
-async fn call(st: &AppState, user: &AuthUser, mid: i64, name: &str, a: Value) -> Result<Value, AppError> {
+async fn call(
+    st: &AppState,
+    user: &AuthUser,
+    mid: i64,
+    name: &str,
+    a: Value,
+) -> Result<Value, AppError> {
     let ctx = map_ctx(st, user, mid).await?;
     let task = a["task"].as_i64();
-    let o = || Origin { ctx: &ctx, source: "mcp", task };
+    let o = || Origin {
+        ctx: &ctx,
+        source: "mcp",
+        task,
+    };
     let task_by_number = |n: Option<i64>| async move {
         let n = n.ok_or_else(|| crate::error::bad("Numéro de tâche manquant."))?;
-        let r: Option<(i64,)> = sqlx::query_as("SELECT id FROM tasks WHERE map_id = ? AND number = ?").bind(mid).bind(n).fetch_optional(&st.db).await?;
-        r.map(|r| r.0).ok_or_else(|| crate::error::bad(&format!("Tâche #{n} introuvable dans cette map.")))
+        let r: Option<(i64,)> =
+            sqlx::query_as("SELECT id FROM tasks WHERE map_id = ? AND number = ?")
+                .bind(mid)
+                .bind(n)
+                .fetch_optional(&st.db)
+                .await?;
+        r.map(|r| r.0)
+            .ok_or_else(|| crate::error::bad(&format!("Tâche #{n} introuvable dans cette map.")))
     };
     match name {
         "list_tasks" => {
@@ -174,22 +288,44 @@ async fn call(st: &AppState, user: &AuthUser, mid: i64, name: &str, a: Value) ->
         }
         "get_task" => {
             let tid = task_by_number(a["number"].as_i64()).await?;
-            let crate::Json(v) = crate::tasks::detail(State(st.clone()), user.clone(), axum::extract::Path(tid)).await?;
+            let crate::Json(v) =
+                crate::tasks::detail(State(st.clone()), user.clone(), axum::extract::Path(tid))
+                    .await?;
             Ok(v)
         }
         "next_task" => {
-            let crate::Json(v) = crate::guide::guide(State(st.clone()), user.clone(), axum::extract::Path(mid), axum::extract::Query(Default::default())).await?;
+            let crate::Json(v) = crate::guide::guide(
+                State(st.clone()),
+                user.clone(),
+                axum::extract::Path(mid),
+                axum::extract::Query(Default::default()),
+            )
+            .await?;
             Ok(json!({ "résumé": v["points"], "suggestions": v["suggestions"] }))
         }
         "create_task" => {
             ctx.can_edit()?;
             let b = crate::tasks::NewTask {
-                title: a["title"].as_str().unwrap_or("").to_string(), tag: a["tag"].as_str().map(String::from), description: a["description"].as_str().map(String::from),
-                assignee_id: if a["assign_to_me"].as_bool().unwrap_or(false) { Some(user.id) } else { None },
-                deps: a["depends_on"].as_array().map(|d| d.iter().filter_map(|x| x.as_i64()).collect()), planned_day: a["planned_day"].as_str().map(String::from),
-                lot: None, status: None, ai: Some(true), origin: Some("ia".into()),
+                title: a["title"].as_str().unwrap_or("").to_string(),
+                tag: a["tag"].as_str().map(String::from),
+                description: a["description"].as_str().map(String::from),
+                assignee_id: if a["assign_to_me"].as_bool().unwrap_or(false) {
+                    Some(user.id)
+                } else {
+                    None
+                },
+                deps: a["depends_on"]
+                    .as_array()
+                    .map(|d| d.iter().filter_map(|x| x.as_i64()).collect()),
+                planned_day: a["planned_day"].as_str().map(String::from),
+                lot: None,
+                status: None,
+                ai: Some(true),
+                origin: Some("ia".into()),
             };
-            if b.title.trim().is_empty() { return Err(crate::error::bad("Titre manquant.")) }
+            if b.title.trim().is_empty() {
+                return Err(crate::error::bad("Titre manquant."));
+            }
             let (tid, number) = crate::tasks::insert_task(st, &ctx, &b).await?;
             crate::access::notify(st, mid, json!({ "t": "refresh", "what": "tasks" }));
             Ok(json!({ "id": tid, "number": number, "message": format!("Tâche #{number} créée.") }))
@@ -200,22 +336,45 @@ async fn call(st: &AppState, user: &AuthUser, mid: i64, name: &str, a: Value) ->
             let status = a["status"].as_str().unwrap_or("");
             crate::tasks::set_status_internal(st, mid, tid, user.id, status, "IA").await?;
             if let Some(note) = a["note"].as_str().filter(|n| !n.trim().is_empty()) {
-                sqlx::query("INSERT INTO comments (map_id, target, user_id, body) VALUES (?, ?, ?, ?)").bind(mid).bind(format!("task:{tid}")).bind(user.id).bind(format!("[IA] {}", note.trim())).execute(&st.db).await?;
+                sqlx::query(
+                    "INSERT INTO comments (map_id, target, user_id, body) VALUES (?, ?, ?, ?)",
+                )
+                .bind(mid)
+                .bind(format!("task:{tid}"))
+                .bind(user.id)
+                .bind(format!("[IA] {}", note.trim()))
+                .execute(&st.db)
+                .await?;
             }
             crate::access::notify(st, mid, json!({ "t": "refresh", "what": "tasks" }));
-            Ok(json!({ "message": format!("Tâche #{} : {}.", a["number"], crate::tasks::status_label(status)) }))
+            Ok(
+                json!({ "message": format!("Tâche #{} : {}.", a["number"], crate::tasks::status_label(status)) }),
+            )
         }
         "comment_task" => {
             ctx.can_edit()?;
             let tid = task_by_number(a["number"].as_i64()).await?;
             let body = a["text"].as_str().unwrap_or("").trim();
-            if body.is_empty() { return Err(crate::error::bad("Commentaire vide.")) }
-            sqlx::query("INSERT INTO comments (map_id, target, user_id, body) VALUES (?, ?, ?, ?)").bind(mid).bind(format!("task:{tid}")).bind(user.id).bind(format!("[IA] {body}")).execute(&st.db).await?;
+            if body.is_empty() {
+                return Err(crate::error::bad("Commentaire vide."));
+            }
+            sqlx::query("INSERT INTO comments (map_id, target, user_id, body) VALUES (?, ?, ?, ?)")
+                .bind(mid)
+                .bind(format!("task:{tid}"))
+                .bind(user.id)
+                .bind(format!("[IA] {body}"))
+                .execute(&st.db)
+                .await?;
             crate::access::notify(st, mid, json!({ "t": "refresh", "what": "tasks" }));
             Ok(json!({ "message": "Commentaire ajouté." }))
         }
         "uefn_status" => {
-            let pending: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM uefn_actions WHERE map_id = ? AND status = 'queued'").bind(mid).fetch_one(&st.db).await?;
+            let pending: i64 = sqlx::query_scalar(
+                "SELECT COUNT(*) FROM uefn_actions WHERE map_id = ? AND status = 'queued'",
+            )
+            .bind(mid)
+            .fetch_one(&st.db)
+            .await?;
             Ok(json!({ "status": st.relays.status(mid), "pending": pending }))
         }
         "list_actors" => {
@@ -227,42 +386,107 @@ async fn call(st: &AppState, user: &AuthUser, mid: i64, name: &str, a: Value) ->
         }
         "get_actor" => {
             let snap = snapshot(st, mid).await?;
-            snap.actors.into_iter().find(|x| x["id"] == a["id"]).ok_or(AppError::NotFound)
+            snap.actors
+                .into_iter()
+                .find(|x| x["id"] == a["id"])
+                .ok_or(AppError::NotFound)
         }
-        "update_actors" => exec(st, o(), "actor_update", json!({ "ids": a["ids"], "changes": a["changes"] })).await,
+        "update_actors" => {
+            exec(
+                st,
+                o(),
+                "actor_update",
+                json!({ "ids": a["ids"], "changes": a["changes"] }),
+            )
+            .await
+        }
         "duplicate_actors" => exec(st, o(), "actor_duplicate", json!({ "ids": a["ids"] })).await,
         "delete_actors" => {
             ctx.require(Role::Member)?;
             let snap = snapshot(st, mid).await?;
-            let ids: Vec<String> = a["ids"].as_array().cloned().unwrap_or_default().iter().filter_map(|x| x.as_str().map(String::from)).collect();
+            let ids: Vec<String> = a["ids"]
+                .as_array()
+                .cloned()
+                .unwrap_or_default()
+                .iter()
+                .filter_map(|x| x.as_str().map(String::from))
+                .collect();
             if ids.is_empty() {
                 return Err(bad("Aucun acteur."));
             }
-            let names: Vec<String> = ids.iter().map(|i| snap.actors.iter().find(|x| x["id"].as_str() == Some(i)).and_then(|x| x["name"].as_str()).unwrap_or(i).to_string()).collect();
-            let summary = format!("L’IA de {} demande de supprimer : {}", user.name, names.join(", "));
+            let names: Vec<String> = ids
+                .iter()
+                .map(|i| {
+                    snap.actors
+                        .iter()
+                        .find(|x| x["id"].as_str() == Some(i))
+                        .and_then(|x| x["name"].as_str())
+                        .unwrap_or(i)
+                        .to_string()
+                })
+                .collect();
+            let summary = format!(
+                "L’IA de {} demande de supprimer : {}",
+                user.name,
+                names.join(", ")
+            );
             let aid: i64 = sqlx::query_scalar("INSERT INTO approvals (map_id, user_id, action, args, summary) VALUES (?, ?, 'actor_delete', ?, ?) RETURNING id")
                 .bind(mid).bind(user.id).bind(json!({ "ids": ids }).to_string()).bind(&summary).fetch_one(&st.db).await?;
             let admins: Vec<i64> = sqlx::query_scalar("SELECT m.user_id FROM memberships m JOIN maps p ON p.studio_id = m.studio_id WHERE p.id = ? AND m.role IN ('owner', 'admin', 'member')").bind(mid).fetch_all(&st.db).await.unwrap_or_default();
-            for a in admins { crate::account::notify_user(st, a, mid, "Une IA connectée demande à supprimer des acteurs : validation requise", "/organiseur").await; }
+            for a in admins {
+                crate::account::notify_user(
+                    st,
+                    a,
+                    mid,
+                    "Une IA connectée demande à supprimer des acteurs : validation requise",
+                    "/organiseur",
+                )
+                .await;
+            }
             notify(st, mid, json!({ "t": "uefn", "what": "actors" }));
-            Ok(json!({ "pending_approval": aid, "message": "Suppression en attente : un membre doit la valider dans l’Organiseur de POP." }))
+            Ok(
+                json!({ "pending_approval": aid, "message": "Suppression en attente : un membre doit la valider dans l’Organiseur de POP." }),
+            )
         }
         "list_verse_files" => {
-            let rows: Vec<(String, String)> = sqlx::query_as("SELECT path, updated_at FROM verse_files WHERE map_id = ? ORDER BY path").bind(mid).fetch_all(&st.db).await?;
-            Ok(json!(rows.into_iter().map(|(p, at)| json!({"path": p, "updated_at": at})).collect::<Vec<_>>()))
+            let rows: Vec<(String, String)> = sqlx::query_as(
+                "SELECT path, updated_at FROM verse_files WHERE map_id = ? ORDER BY path",
+            )
+            .bind(mid)
+            .fetch_all(&st.db)
+            .await?;
+            Ok(json!(rows
+                .into_iter()
+                .map(|(p, at)| json!({"path": p, "updated_at": at}))
+                .collect::<Vec<_>>()))
         }
         "read_verse_file" => {
-            let (c,): (String,) = sqlx::query_as("SELECT content FROM verse_files WHERE map_id = ? AND path = ?").bind(mid).bind(a["path"].as_str().unwrap_or("")).fetch_one(&st.db).await?;
+            let (c,): (String,) =
+                sqlx::query_as("SELECT content FROM verse_files WHERE map_id = ? AND path = ?")
+                    .bind(mid)
+                    .bind(a["path"].as_str().unwrap_or(""))
+                    .fetch_one(&st.db)
+                    .await?;
             Ok(json!({ "path": a["path"], "content": c }))
         }
-        "write_verse_file" => exec(st, o(), "write_file", json!({ "path": a["path"], "content": a["content"] })).await,
+        "write_verse_file" => {
+            exec(
+                st,
+                o(),
+                "write_file",
+                json!({ "path": a["path"], "content": a["content"] }),
+            )
+            .await
+        }
         "compile_verse" => exec(st, o(), "compile", json!({})).await,
         "push_to_session" => exec(st, o(), "push_session", json!({})).await,
         "save_level" => exec(st, o(), "save_level", json!({})).await,
         "lore_checkin" => exec(st, o(), "lore_checkin", json!({ "message": a["message"] })).await,
         "undo_action" => {
             let id = a["id"].as_i64().ok_or_else(|| bad("id manquant"))?;
-            crate::uefn::undo(State(st.clone()), user.clone(), Path(id)).await.map(|j| j.0)
+            crate::uefn::undo(State(st.clone()), user.clone(), Path(id))
+                .await
+                .map(|j| j.0)
         }
         _ => Err(bad("Outil inconnu.")),
     }

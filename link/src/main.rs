@@ -68,15 +68,29 @@ struct OpenCache {
 type Open = Arc<tokio::sync::Mutex<OpenCache>>;
 
 fn newest_mtime(dir: &std::path::Path, depth: usize) -> std::time::SystemTime {
-    let mut best = std::fs::metadata(dir).and_then(|m| m.modified()).unwrap_or(std::time::UNIX_EPOCH);
-    if depth == 0 { return best }
+    let mut best = std::fs::metadata(dir)
+        .and_then(|m| m.modified())
+        .unwrap_or(std::time::UNIX_EPOCH);
+    if depth == 0 {
+        return best;
+    }
     if let Ok(rd) = std::fs::read_dir(dir) {
         for e in rd.flatten() {
             let n = e.file_name().to_string_lossy().to_string();
-            if ["Intermediate", "DerivedDataCache", ".git", "Binaries"].contains(&n.as_str()) { continue }
+            if ["Intermediate", "DerivedDataCache", ".git", "Binaries"].contains(&n.as_str()) {
+                continue;
+            }
             let p = e.path();
-            let t = if p.is_dir() { newest_mtime(&p, depth - 1) } else { e.metadata().and_then(|m| m.modified()).unwrap_or(std::time::UNIX_EPOCH) };
-            if t > best { best = t }
+            let t = if p.is_dir() {
+                newest_mtime(&p, depth - 1)
+            } else {
+                e.metadata()
+                    .and_then(|m| m.modified())
+                    .unwrap_or(std::time::UNIX_EPOCH)
+            };
+            if t > best {
+                best = t
+            }
         }
     }
     best
@@ -87,11 +101,18 @@ fn config_path() -> PathBuf {
         return PathBuf::from(p);
     }
     let base = if cfg!(windows) {
-        std::env::var("APPDATA").map(PathBuf::from).unwrap_or_else(|_| PathBuf::from("."))
+        std::env::var("APPDATA")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| PathBuf::from("."))
     } else if cfg!(target_os = "macos") {
-        std::env::var("HOME").map(|h| PathBuf::from(h).join("Library/Application Support")).unwrap_or_else(|_| PathBuf::from("."))
+        std::env::var("HOME")
+            .map(|h| PathBuf::from(h).join("Library/Application Support"))
+            .unwrap_or_else(|_| PathBuf::from("."))
     } else {
-        std::env::var("XDG_CONFIG_HOME").map(PathBuf::from).or_else(|_| std::env::var("HOME").map(|h| PathBuf::from(h).join(".config"))).unwrap_or_else(|_| PathBuf::from("."))
+        std::env::var("XDG_CONFIG_HOME")
+            .map(PathBuf::from)
+            .or_else(|_| std::env::var("HOME").map(|h| PathBuf::from(h).join(".config")))
+            .unwrap_or_else(|_| PathBuf::from("."))
     };
     base.join("pop-link").join("config.json")
 }
@@ -125,10 +146,21 @@ struct Ui {
 type Shared = Arc<Mutex<Ui>>;
 
 fn log(ui: &Shared, action: &str, res: &str) {
-    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
-    let hms = format!("{:02}:{:02}:{:02}", (now / 3600 + 1) % 24, now / 60 % 60, now % 60);
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let hms = format!(
+        "{:02}:{:02}:{:02}",
+        (now / 3600 + 1) % 24,
+        now / 60 % 60,
+        now % 60
+    );
     let mut u = ui.lock().unwrap();
-    u.journal.insert(0, (hms, action.to_string(), res.chars().take(200).collect()));
+    u.journal.insert(
+        0,
+        (hms, action.to_string(), res.chars().take(200).collect()),
+    );
     u.journal.truncate(100);
     println!("[{}] {action} → {res}", u.journal[0].0);
 }
@@ -149,15 +181,41 @@ struct Link {
 impl Link {
     /// UEFN est « connecté » pour ce projet seulement si c'est le projet ouvert dans l'éditeur.
     async fn uefn_here(&mut self) -> bool {
-        if !self.mcp.alive().await { return false }
-        if self.all_projects.len() <= 1 { return true }
+        if !self.mcp.alive().await {
+            return false;
+        }
+        if self.all_projects.len() <= 1 {
+            return true;
+        }
         let mut c = self.open.lock().await;
-        if c.at.map(|t| t.elapsed() > Duration::from_secs(15)).unwrap_or(true) {
-            let names: Vec<String> = self.all_projects.iter().map(|p| PathBuf::from(p).file_name().map(|n| n.to_string_lossy().to_lowercase()).unwrap_or_default()).collect();
+        if c.at
+            .map(|t| t.elapsed() > Duration::from_secs(15))
+            .unwrap_or(true)
+        {
+            let names: Vec<String> = self
+                .all_projects
+                .iter()
+                .map(|p| {
+                    PathBuf::from(p)
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_lowercase())
+                        .unwrap_or_default()
+                })
+                .collect();
             let out = self.mcp.python("import unreal\nprint(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_dir()))\nprint(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_plugins_dir()))\ntry:\n    print(unreal.EditorLevelLibrary.get_editor_world().get_path_name())\nexcept Exception: pass").await.unwrap_or_default().to_lowercase();
-            let by_python = self.all_projects.iter().zip(&names).find(|(_, n)| !n.is_empty() && out.contains(n.as_str())).map(|(p, _)| p.clone());
+            let by_python = self
+                .all_projects
+                .iter()
+                .zip(&names)
+                .find(|(_, n)| !n.is_empty() && out.contains(n.as_str()))
+                .map(|(p, _)| p.clone());
             // Sinon : le projet modifié le plus récemment (UEFN écrit dans le projet ouvert).
-            c.open = by_python.or_else(|| self.all_projects.iter().max_by_key(|p| newest_mtime(&PathBuf::from(p), 3)).cloned());
+            c.open = by_python.or_else(|| {
+                self.all_projects
+                    .iter()
+                    .max_by_key(|p| newest_mtime(&PathBuf::from(p), 3))
+                    .cloned()
+            });
             c.at = Some(std::time::Instant::now());
         }
         c.open.as_deref() == Some(self.cfg.project.as_str())
@@ -171,12 +229,26 @@ impl Link {
     }
 
     async fn exec(&mut self, action: &str, a: &Value) -> Result<Value> {
-        let ids: Vec<String> = a["ids"].as_array().cloned().unwrap_or_default().iter().filter_map(|x| x.as_str().map(String::from)).collect();
+        let ids: Vec<String> = a["ids"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default()
+            .iter()
+            .filter_map(|x| x.as_str().map(String::from))
+            .collect();
         let mut out = json!({});
         match action {
-            "write_file" => self.scan.write(a["path"].as_str().unwrap_or(""), a["content"].as_str().ok_or_else(|| anyhow!("contenu manquant"))?)?,
+            "write_file" => self.scan.write(
+                a["path"].as_str().unwrap_or(""),
+                a["content"]
+                    .as_str()
+                    .ok_or_else(|| anyhow!("contenu manquant"))?,
+            )?,
             "delete_file" => self.scan.delete(a["path"].as_str().unwrap_or(""))?,
-            "rename_file" => self.scan.rename(a["path"].as_str().unwrap_or(""), a["to"].as_str().unwrap_or(""))?,
+            "rename_file" => self.scan.rename(
+                a["path"].as_str().unwrap_or(""),
+                a["to"].as_str().unwrap_or(""),
+            )?,
             "actor_update" | "actor_update_raw" => {
                 self.need_uefn()?;
                 self.mcp.patch(&a["patches"]).await?;
@@ -196,12 +268,22 @@ impl Link {
             "actor_restore" => {
                 self.need_uefn()?;
                 let expected = a["actors"].as_array().map(|x| x.len()).unwrap_or(ids.len());
-                out["created_ids"] = json!(self.mcp.restore(a["saved"].as_str().unwrap_or(""), expected).await?);
+                out["created_ids"] = json!(
+                    self.mcp
+                        .restore(a["saved"].as_str().unwrap_or(""), expected)
+                        .await?
+                );
                 out["actors"] = json!(self.mcp.list_actors().await?);
             }
             "actor_props" => {
                 self.need_uefn()?;
-                out["props"] = self.mcp.device_props(a["id"].as_str().unwrap_or(""), a["name"].as_str().unwrap_or("")).await?;
+                out["props"] = self
+                    .mcp
+                    .device_props(
+                        a["id"].as_str().unwrap_or(""),
+                        a["name"].as_str().unwrap_or(""),
+                    )
+                    .await?;
             }
             "refresh_actors" => {
                 self.need_uefn()?;
@@ -214,18 +296,39 @@ impl Link {
                 let files: Vec<String> = self.scan.read_all().into_iter().map(|(p, _)| p).collect();
                 let root = self.cfg.project.replace('\\', "/").to_lowercase();
                 for x in d.iter_mut() {
-                    let raw = x["raw_path"].as_str().unwrap_or(x["path"].as_str().unwrap_or("")).replace('\\', "/");
+                    let raw = x["raw_path"]
+                        .as_str()
+                        .unwrap_or(x["path"].as_str().unwrap_or(""))
+                        .replace('\\', "/");
                     let low = raw.to_lowercase();
-                    let rel = if low.starts_with(&root) { raw[root.len()..].trim_start_matches('/').to_string() } else { raw.clone() };
-                    let best = files.iter().find(|f| f.eq_ignore_ascii_case(&rel)).or_else(|| files.iter().filter(|f| low.ends_with(&f.to_lowercase())).max_by_key(|f| f.len()))
-                        .or_else(|| files.iter().find(|f| f.rsplit('/').next() == raw.rsplit('/').next()));
+                    let rel = if low.starts_with(&root) {
+                        raw[root.len()..].trim_start_matches('/').to_string()
+                    } else {
+                        raw.clone()
+                    };
+                    let best = files
+                        .iter()
+                        .find(|f| f.eq_ignore_ascii_case(&rel))
+                        .or_else(|| {
+                            files
+                                .iter()
+                                .filter(|f| low.ends_with(&f.to_lowercase()))
+                                .max_by_key(|f| f.len())
+                        })
+                        .or_else(|| {
+                            files
+                                .iter()
+                                .find(|f| f.rsplit('/').next() == raw.rsplit('/').next())
+                        });
                     x["path"] = json!(best.cloned().unwrap_or(rel));
                 }
                 out["diagnostics"] = json!(d);
             }
             "push_session" => {
                 self.need_uefn()?;
-                self.mcp.push_session(a["verse_only"].as_bool().unwrap_or(false)).await?;
+                self.mcp
+                    .push_session(a["verse_only"].as_bool().unwrap_or(false))
+                    .await?;
             }
             "save_level" => {
                 self.need_uefn()?;
@@ -242,8 +345,20 @@ impl Link {
                     self.mcp.checkin(&msg).await?;
                     return Ok(out);
                 };
-                let parts: Vec<String> = cmd.split_whitespace().map(|w| if w == "{message}" { msg.clone() } else { w.to_string() }).collect();
-                let st = std::process::Command::new(&parts[0]).args(&parts[1..]).current_dir(&self.cfg.project).output()?;
+                let parts: Vec<String> = cmd
+                    .split_whitespace()
+                    .map(|w| {
+                        if w == "{message}" {
+                            msg.clone()
+                        } else {
+                            w.to_string()
+                        }
+                    })
+                    .collect();
+                let st = std::process::Command::new(&parts[0])
+                    .args(&parts[1..])
+                    .current_dir(&self.cfg.project)
+                    .output()?;
                 if !st.status.success() {
                     bail!("Lore : {}", String::from_utf8_lossy(&st.stderr));
                 }
@@ -265,11 +380,23 @@ impl Link {
 async fn run(port: u16) -> Result<()> {
     let cfg = load()?;
     // Liste des projets reliés : liaison simplifiée (plusieurs) ou appairage classique (un seul).
-    let links: Vec<ProjLink> = if cfg.links.is_empty() { vec![ProjLink { project: cfg.project.clone(), map: cfg.map.clone(), token: cfg.token.clone() }] } else { cfg.links.clone() };
+    let links: Vec<ProjLink> = if cfg.links.is_empty() {
+        vec![ProjLink {
+            project: cfg.project.clone(),
+            map: cfg.map.clone(),
+            token: cfg.token.clone(),
+        }]
+    } else {
+        cfg.links.clone()
+    };
     let all: Vec<String> = links.iter().map(|l| l.project.clone()).collect();
     let open: Open = Default::default();
     let mut uis = vec![];
-    println!("UEFN Link · {} projet(s) relié(s) à {}", links.len(), cfg.server);
+    println!(
+        "UEFN Link · {} projet(s) relié(s) à {}",
+        links.len(),
+        cfg.server
+    );
     for l in &links {
         let root = PathBuf::from(&l.project);
         if !root.is_dir() {
@@ -281,10 +408,26 @@ async fn run(port: u16) -> Result<()> {
         c.map = l.map.clone();
         c.token = l.token.clone();
         let mcp_url = mcpdriver::find_url(c.uefn_mcp_url.as_deref(), &root);
-        let ui: Shared = Arc::new(Mutex::new(Ui { relay: "connexion…".into(), uefn: "?".into(), project: c.project.clone(), map: c.map.clone(), mcp_url: mcp_url.clone(), ..Default::default() }));
+        let ui: Shared = Arc::new(Mutex::new(Ui {
+            relay: "connexion…".into(),
+            uefn: "?".into(),
+            project: c.project.clone(),
+            map: c.map.clone(),
+            mcp_url: mcp_url.clone(),
+            ..Default::default()
+        }));
         uis.push(ui.clone());
         println!("  · {} → map « {} »", c.project, c.map);
-        let mut link = Link { open: open.clone(), all_projects: all.clone(), scan: files::Scanner::new(root), mcp: mcpdriver::Mcp::new(mcp_url, c.tools.clone()), cfg: c, uefn: false, last_actors: String::new(), ui: ui.clone() };
+        let mut link = Link {
+            open: open.clone(),
+            all_projects: all.clone(),
+            scan: files::Scanner::new(root),
+            mcp: mcpdriver::Mcp::new(mcp_url, c.tools.clone()),
+            cfg: c,
+            uefn: false,
+            last_actors: String::new(),
+            ui: ui.clone(),
+        };
         tokio::spawn(async move {
             let mut backoff = 1;
             loop {
@@ -301,7 +444,10 @@ async fn run(port: u16) -> Result<()> {
         });
     }
     if uis.is_empty() {
-        bail!("Aucun projet UEFN valide dans la configuration ({}).", config_path().display());
+        bail!(
+            "Aucun projet UEFN valide dans la configuration ({}).",
+            config_path().display()
+        );
     }
     println!("Page d'état : http://127.0.0.1:{port}  (laissez cette fenêtre ouverte)");
     local_page(uis, port).await;
@@ -310,15 +456,30 @@ async fn run(port: u16) -> Result<()> {
 }
 
 async fn session(link: &mut Link) -> Result<()> {
-    let ws_url = link.cfg.server.replacen("http", "ws", 1).trim_end_matches('/').to_string() + "/api/relay/ws";
+    let ws_url = link
+        .cfg
+        .server
+        .replacen("http", "ws", 1)
+        .trim_end_matches('/')
+        .to_string()
+        + "/api/relay/ws";
     let mut req = ws_url.into_client_request()?;
-    req.headers_mut().insert("authorization", format!("Bearer {}", link.cfg.token).parse()?);
-    let (ws, _) = tokio_tungstenite::connect_async(req).await.context("POP injoignable")?;
+    req.headers_mut().insert(
+        "authorization",
+        format!("Bearer {}", link.cfg.token).parse()?,
+    );
+    let (ws, _) = tokio_tungstenite::connect_async(req)
+        .await
+        .context("POP injoignable")?;
     let (mut sink, mut stream) = ws.split();
     let (tx, mut rx) = mpsc::unbounded_channel::<Value>();
     let writer = tokio::spawn(async move {
         while let Some(v) = rx.recv().await {
-            if sink.send(Message::Text(v.to_string().into())).await.is_err() {
+            if sink
+                .send(Message::Text(v.to_string().into()))
+                .await
+                .is_err()
+            {
                 break;
             }
         }
@@ -326,10 +487,22 @@ async fn session(link: &mut Link) -> Result<()> {
     link.ui.lock().unwrap().relay = "connecté".into();
     log(&link.ui, "connexion", "relié à POP");
     link.uefn = link.uefn_here().await;
-    link.ui.lock().unwrap().uefn = if link.uefn { "connecté".into() } else { "fermé".into() };
-    link.ui.lock().unwrap().tools = link.mcp.tools.iter().filter_map(|t| t["name"].as_str().map(String::from)).collect();
+    link.ui.lock().unwrap().uefn = if link.uefn {
+        "connecté".into()
+    } else {
+        "fermé".into()
+    };
+    link.ui.lock().unwrap().tools = link
+        .mcp
+        .tools
+        .iter()
+        .filter_map(|t| t["name"].as_str().map(String::from))
+        .collect();
     tx.send(json!({ "t": "tools", "url": link.mcp.url.clone(), "tools": link.mcp.tools.iter().map(|t| json!({ "name": t["name"], "description": t["description"] })).collect::<Vec<_>>(), "roles": link.mcp.roles() })).ok();
-    let project_name = PathBuf::from(&link.cfg.project).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+    let project_name = PathBuf::from(&link.cfg.project)
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
     tx.send(json!({ "t": "hello", "project": project_name, "uefn": if link.uefn { "connected" } else { "closed" } }))?;
     sync(link, &tx, true).await;
     let mut tick = tokio::time::interval(Duration::from_secs(2));
@@ -393,21 +566,47 @@ async fn sync(link: &mut Link, tx: &mpsc::UnboundedSender<Value>, full: bool) {
         let all = full || changed.len() > 1 && changed.len() == link.scan.read_all().len();
         tx.send(json!({ "t": "files", "full": all, "files": changed.iter().map(|(p, c)| json!({"path": p, "content": c})).collect::<Vec<_>>() })).ok();
         if !full {
-            log(&link.ui, "fichiers", &format!("{} fichier(s) envoyés", changed.len()));
+            log(
+                &link.ui,
+                "fichiers",
+                &format!("{} fichier(s) envoyés", changed.len()),
+            );
         }
     }
     // Digests générés par UEFN : %LOCALAPPDATA%\UnrealEditorFortnite\Saved\VerseProject\FortniteGame
-    let extra = link.cfg.digests_dir.as_ref().map(PathBuf::from).or_else(|| std::env::var("LOCALAPPDATA").ok().map(|l| PathBuf::from(l).join("UnrealEditorFortnite").join("Saved").join("VerseProject").join("FortniteGame")).filter(|p| p.is_dir()));
+    let extra = link
+        .cfg
+        .digests_dir
+        .as_ref()
+        .map(PathBuf::from)
+        .or_else(|| {
+            std::env::var("LOCALAPPDATA")
+                .ok()
+                .map(|l| {
+                    PathBuf::from(l)
+                        .join("UnrealEditorFortnite")
+                        .join("Saved")
+                        .join("VerseProject")
+                        .join("FortniteGame")
+                })
+                .filter(|p| p.is_dir())
+        });
     if let Some(d) = link.scan.digests(extra.as_deref()) {
         let mut syms = vec![];
         for (name, c) in &d {
             digest::parse(c, name, &mut syms);
         }
         let tags = digest::tags(&link.scan.read_all());
-        log(&link.ui, "digests", &format!("{} symboles, {} tags", syms.len(), tags.len()));
-        tx.send(json!({ "t": "digests", "symbols": syms, "tags": tags })).ok();
+        log(
+            &link.ui,
+            "digests",
+            &format!("{} symboles, {} tags", syms.len(), tags.len()),
+        );
+        tx.send(json!({ "t": "digests", "symbols": syms, "tags": tags }))
+            .ok();
     } else if !changed.is_empty() {
-        tx.send(json!({ "t": "digests_tags", "tags": digest::tags(&link.scan.read_all()) })).ok();
+        tx.send(json!({ "t": "digests_tags", "tags": digest::tags(&link.scan.read_all()) }))
+            .ok();
     }
 }
 
@@ -415,41 +614,92 @@ async fn sync(link: &mut Link, tx: &mpsc::UnboundedSender<Value>, full: bool) {
 
 async fn local_page(uis: Vec<Shared>, port: u16) {
     use axum::{routing::get, Router};
-    let app = Router::new().route("/", get(move || {
-        let list: Vec<Ui> = uis.iter().map(|u| u.lock().unwrap().clone()).collect();
-        async move { axum::response::Html(list.iter().map(page).collect::<Vec<_>>().join("")) }
-    }));
+    let app = Router::new().route(
+        "/",
+        get(move || {
+            let list: Vec<Ui> = uis.iter().map(|u| u.lock().unwrap().clone()).collect();
+            async move { axum::response::Html(list.iter().map(page).collect::<Vec<_>>().join("")) }
+        }),
+    );
     match tokio::net::TcpListener::bind(("127.0.0.1", port)).await {
-        Ok(l) => { let _ = axum::serve(l, app).await; }
-        Err(e) => println!("Page d'état indisponible ({e}) : un autre pop-link est peut-être déjà ouvert."),
+        Ok(l) => {
+            let _ = axum::serve(l, app).await;
+        }
+        Err(e) => println!(
+            "Page d'état indisponible ({e}) : un autre pop-link est peut-être déjà ouvert."
+        ),
     }
 }
 
 fn esc(s: &str) -> String {
-    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
 }
 
 fn page(u: &Ui) -> String {
-    let rows: String = u.journal.iter().map(|(h, a, r)| format!("<tr><td>{}</td><td>{}</td><td>{}</td></tr>", esc(h), esc(a), esc(r))).collect();
+    let rows: String = u
+        .journal
+        .iter()
+        .map(|(h, a, r)| {
+            format!(
+                "<tr><td>{}</td><td>{}</td><td>{}</td></tr>",
+                esc(h),
+                esc(a),
+                esc(r)
+            )
+        })
+        .collect();
     let uefn = if u.uefn.is_empty() { "?" } else { &u.uefn };
-    let tools = if u.tools.is_empty() { "<span class=muted>aucun (UEFN fermé ou serveur MCP arrêté)</span>".to_string() } else { u.tools.iter().map(|t| format!("<code>{}</code>", esc(t))).collect::<Vec<_>>().join(" ") };
-    format!(r#"<!doctype html><html lang="fr"><meta charset="utf-8"><meta http-equiv="refresh" content="3"><title>UEFN Link</title>
+    let tools = if u.tools.is_empty() {
+        "<span class=muted>aucun (UEFN fermé ou serveur MCP arrêté)</span>".to_string()
+    } else {
+        u.tools
+            .iter()
+            .map(|t| format!("<code>{}</code>", esc(t)))
+            .collect::<Vec<_>>()
+            .join(" ")
+    };
+    format!(
+        r#"<!doctype html><html lang="fr"><meta charset="utf-8"><meta http-equiv="refresh" content="3"><title>UEFN Link</title>
 <style>body{{font-family:system-ui,sans-serif;background:#000;color:#fafafa;margin:0;padding:32px}}.card{{background:#0f0f0f;border:1px solid #222;border-radius:16px;padding:20px;max-width:900px;margin-bottom:16px}}
 h1{{font-weight:500;margin:0 0 8px}}.muted{{color:#a3a3a3}}table{{width:100%;border-collapse:collapse;font-size:14px}}td{{padding:6px;border-top:1px solid #222;vertical-align:top}}code{{background:#1a1a1a;border-radius:6px;padding:1px 6px;margin:2px;display:inline-block;font-size:12px}}</style>
 <div class="card"><h1>UEFN Link</h1><p class="muted">Projet : {}<br>Map POP : {}<br>UEFN MCP : {}</p>
 <p>Relais : <b>{}</b> · UEFN : <b>{}</b></p><p class="muted" style="margin-bottom:4px">Outils UEFN détectés :</p><div>{}</div></div>
 <div class="card"><h2 style="font-weight:500;margin-top:0">Journal</h2><table>{}</table></div>"#,
-        esc(&u.project), esc(&u.map), esc(&u.mcp_url), esc(&u.relay), esc(uefn), tools, rows)
+        esc(&u.project),
+        esc(&u.map),
+        esc(&u.mcp_url),
+        esc(&u.relay),
+        esc(uefn),
+        tools,
+        rows
+    )
 }
 
 // ---------- Ligne de commande ----------
 
 async fn pair(server: &str, code: &str, project: &str, name: &str) -> Result<()> {
     let server = server.trim_end_matches('/').to_string();
-    let r: Value = reqwest::Client::new().post(format!("{server}/api/relay/pair")).json(&json!({ "code": code, "name": name })).send().await?.json().await?;
-    let token = r["token"].as_str().ok_or_else(|| anyhow!("{}", r["error"].as_str().unwrap_or("appairage refusé")))?;
+    let r: Value = reqwest::Client::new()
+        .post(format!("{server}/api/relay/pair"))
+        .json(&json!({ "code": code, "name": name }))
+        .send()
+        .await?
+        .json()
+        .await?;
+    let token = r["token"]
+        .as_str()
+        .ok_or_else(|| anyhow!("{}", r["error"].as_str().unwrap_or("appairage refusé")))?;
     let project = std::path::absolute(project)?.to_string_lossy().to_string();
-    save(&Config { server, token: token.into(), project: project.clone(), map: r["map"].as_str().unwrap_or("").into(), ..Default::default() })?;
+    save(&Config {
+        server,
+        token: token.into(),
+        project: project.clone(),
+        map: r["map"].as_str().unwrap_or("").into(),
+        ..Default::default()
+    })?;
     println!("Appairé à la map « {} ». Projet : {project}\nConfiguration : {}\nLancez maintenant : pop-link run", r["map"].as_str().unwrap_or(""), config_path().display());
     Ok(())
 }
@@ -465,13 +715,34 @@ fn ask(q: &str) -> String {
 
 /// Projets UEFN du dossier « Documents/Fortnite Projects ».
 fn find_projects() -> Vec<PathBuf> {
-    let home = std::env::var("USERPROFILE").or_else(|_| std::env::var("HOME")).unwrap_or_default();
+    let home = std::env::var("USERPROFILE")
+        .or_else(|_| std::env::var("HOME"))
+        .unwrap_or_default();
     let mut out = vec![];
-    for base in [PathBuf::from(&home).join("Documents").join("Fortnite Projects"), PathBuf::from(&home).join("OneDrive").join("Documents").join("Fortnite Projects")] {
+    for base in [
+        PathBuf::from(&home)
+            .join("Documents")
+            .join("Fortnite Projects"),
+        PathBuf::from(&home)
+            .join("OneDrive")
+            .join("Documents")
+            .join("Fortnite Projects"),
+    ] {
         if let Ok(rd) = std::fs::read_dir(&base) {
             for e in rd.flatten() {
                 let p = e.path();
-                if p.is_dir() && std::fs::read_dir(&p).map(|r| r.flatten().any(|f| f.path().extension().map(|x| x == "uefnproject").unwrap_or(false))).unwrap_or(false) {
+                if p.is_dir()
+                    && std::fs::read_dir(&p)
+                        .map(|r| {
+                            r.flatten().any(|f| {
+                                f.path()
+                                    .extension()
+                                    .map(|x| x == "uefnproject")
+                                    .unwrap_or(false)
+                            })
+                        })
+                        .unwrap_or(false)
+                {
                     out.push(p);
                 }
             }
@@ -482,41 +753,84 @@ fn find_projects() -> Vec<PathBuf> {
 
 /// pop-link.exe téléchargé depuis POP : tout est automatique (adresse et code intégrés).
 async fn auto_pair(emb: &Value) -> Result<()> {
-    let server = emb["server"].as_str().unwrap_or("").trim_end_matches('/').to_string();
+    let server = emb["server"]
+        .as_str()
+        .unwrap_or("")
+        .trim_end_matches('/')
+        .to_string();
     let code = emb["code"].as_str().unwrap_or("").to_string();
     let projects = find_projects();
     let projects = if projects.is_empty() {
         println!("Aucun projet trouvé dans Documents\\Fortnite Projects.");
-        vec![PathBuf::from(ask("Dossier du projet UEFN (glissez le dossier ici) :"))]
-    } else { projects };
+        vec![PathBuf::from(ask(
+            "Dossier du projet UEFN (glissez le dossier ici) :",
+        ))]
+    } else {
+        projects
+    };
     println!("Projets UEFN trouvés :");
-    for p in &projects { println!("  · {}", p.display()) }
+    for p in &projects {
+        println!("  · {}", p.display())
+    }
     let device = std::env::var("COMPUTERNAME").unwrap_or_else(|_| "PC UEFN".into());
     let body = json!({ "code": code, "device": device, "projects": projects.iter().map(|p| json!({ "name": p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default() })).collect::<Vec<_>>() });
-    let r: Value = reqwest::Client::new().post(format!("{server}/api/relay/pair-studio")).json(&body).send().await.context("POP injoignable")?.json().await?;
-    let list = r["links"].as_array().ok_or_else(|| anyhow!("{}", r["error"].as_str().unwrap_or("liaison refusée")))?;
+    let r: Value = reqwest::Client::new()
+        .post(format!("{server}/api/relay/pair-studio"))
+        .json(&body)
+        .send()
+        .await
+        .context("POP injoignable")?
+        .json()
+        .await?;
+    let list = r["links"]
+        .as_array()
+        .ok_or_else(|| anyhow!("{}", r["error"].as_str().unwrap_or("liaison refusée")))?;
     let mut links = vec![];
     for (l, p) in list.iter().zip(projects.iter()) {
-        links.push(ProjLink { project: std::path::absolute(p)?.to_string_lossy().to_string(), map: l["project"].as_str().unwrap_or("").into(), token: l["token"].as_str().unwrap_or("").into() });
+        links.push(ProjLink {
+            project: std::path::absolute(p)?.to_string_lossy().to_string(),
+            map: l["project"].as_str().unwrap_or("").into(),
+            token: l["token"].as_str().unwrap_or("").into(),
+        });
     }
-    let first = links.first().cloned().ok_or_else(|| anyhow!("aucun projet relié"))?;
-    save(&Config { server, token: first.token, project: first.project, map: first.map, links, ..Default::default() })?;
-    println!("\nC'est relié : {} projet(s) synchronisé(s) avec POP.\n", list.len());
+    let first = links
+        .first()
+        .cloned()
+        .ok_or_else(|| anyhow!("aucun projet relié"))?;
+    save(&Config {
+        server,
+        token: first.token,
+        project: first.project,
+        map: first.map,
+        links,
+        ..Default::default()
+    })?;
+    println!(
+        "\nC'est relié : {} projet(s) synchronisé(s) avec POP.\n",
+        list.len()
+    );
     Ok(())
 }
 
 /// Premier lancement par double-clic : questions simples dans la console.
 async fn guided_pair() -> Result<()> {
     println!("UEFN Link · première configuration\n");
-    let server = ask("Adresse de POP (ex. https://pop.mon-studio.fr ou http://192.168.1.20:8080) :");
+    let server =
+        ask("Adresse de POP (ex. https://pop.mon-studio.fr ou http://192.168.1.20:8080) :");
     let code = ask("Code d'appairage (POP → Organiseur → « Obtenir un code ») :");
     let projects = find_projects();
     let project = if projects.is_empty() {
         ask("Dossier du projet UEFN (glissez le dossier ici) :")
     } else {
-        for (i, p) in projects.iter().enumerate() { println!("  {}. {}", i + 1, p.display()) }
+        for (i, p) in projects.iter().enumerate() {
+            println!("  {}. {}", i + 1, p.display())
+        }
         let c = ask("Numéro du projet (ou chemin complet) :");
-        c.parse::<usize>().ok().and_then(|n| projects.get(n.wrapping_sub(1))).map(|p| p.to_string_lossy().to_string()).unwrap_or(c)
+        c.parse::<usize>()
+            .ok()
+            .and_then(|n| projects.get(n.wrapping_sub(1)))
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or(c)
     };
     let name = std::env::var("COMPUTERNAME").unwrap_or_else(|_| "PC UEFN".into());
     pair(&server, &code, &project, &name).await
@@ -524,19 +838,40 @@ async fn guided_pair() -> Result<()> {
 
 async fn diagnostic() -> Result<()> {
     let cfg = load().ok();
-    let root = cfg.as_ref().map(|c| PathBuf::from(&c.project)).unwrap_or_else(|| PathBuf::from("."));
+    let root = cfg
+        .as_ref()
+        .map(|c| PathBuf::from(&c.project))
+        .unwrap_or_else(|| PathBuf::from("."));
     let url = mcpdriver::find_url(cfg.as_ref().and_then(|c| c.uefn_mcp_url.as_deref()), &root);
     println!("Serveur MCP d'UEFN : {url}");
-    let mut m = mcpdriver::Mcp::new(url, cfg.as_ref().map(|c| c.tools.clone()).unwrap_or_default());
+    let mut m = mcpdriver::Mcp::new(
+        url,
+        cfg.as_ref().map(|c| c.tools.clone()).unwrap_or_default(),
+    );
     m.connect_with(true).await.context("UEFN injoignable : ouvrez le projet dans UEFN, puis Édition → Préférences de l'éditeur → Agentic Workflows → Model Context Protocol → Start Server")?;
     if !m.toolsets.is_empty() {
         println!("{} toolsets :", m.toolsets.len());
-        for (n, d) in &m.toolsets { println!("  · {n} : {}", d.chars().take(90).collect::<String>()) }
+        for (n, d) in &m.toolsets {
+            println!("  · {n} : {}", d.chars().take(90).collect::<String>())
+        }
         println!();
     }
     println!("{} outils :", m.tools.len());
-    let one_line = |s: &str| s.split_whitespace().collect::<Vec<_>>().join(" ").chars().take(110).collect::<String>();
-    for t in &m.tools { println!("  - {} : {}", t["name"].as_str().unwrap_or(""), one_line(t["description"].as_str().unwrap_or(""))) }
+    let one_line = |s: &str| {
+        s.split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+            .chars()
+            .take(110)
+            .collect::<String>()
+    };
+    for t in &m.tools {
+        println!(
+            "  - {} : {}",
+            t["name"].as_str().unwrap_or(""),
+            one_line(t["description"].as_str().unwrap_or(""))
+        )
+    }
     println!("\nRôles choisis : {}", m.roles());
     match m.list_actors().await {
         Ok(a) => println!("Python OK : {} acteurs dans le niveau ouvert.", a.len()),
@@ -549,22 +884,51 @@ async fn diagnostic() -> Result<()> {
 }
 
 fn pause() {
-    if cfg!(windows) { ask("\nAppuyez sur Entrée pour fermer."); }
+    if cfg!(windows) {
+        ask("\nAppuyez sur Entrée pour fermer.");
+    }
 }
 
 #[tokio::main]
 async fn main() {
     let args: Vec<String> = std::env::args().collect();
-    let flag = |f: &str| args.iter().position(|a| a == f).and_then(|i| args.get(i + 1)).cloned();
+    let flag = |f: &str| {
+        args.iter()
+            .position(|a| a == f)
+            .and_then(|i| args.get(i + 1))
+            .cloned()
+    };
     let port = flag("--port").and_then(|p| p.parse().ok()).unwrap_or(47800);
     let r = match args.get(1).map(String::as_str) {
-        Some("pair") if args.len() >= 5 => pair(&args[2], &args[3], &args[4], &flag("--name").unwrap_or_else(|| "UEFN Link".into())).await,
-        Some("diagnostic") => { let r = diagnostic().await; if let Err(e) = &r { println!("{e:#}") } pause(); Ok(()) }
+        Some("pair") if args.len() >= 5 => {
+            pair(
+                &args[2],
+                &args[3],
+                &args[4],
+                &flag("--name").unwrap_or_else(|| "UEFN Link".into()),
+            )
+            .await
+        }
+        Some("diagnostic") => {
+            let r = diagnostic().await;
+            if let Err(e) = &r {
+                println!("{e:#}")
+            }
+            pause();
+            Ok(())
+        }
         Some("run") => run(port).await,
         None => {
             if load().is_err() {
-                let r = match embedded() { Some(emb) => auto_pair(&emb).await, None => guided_pair().await };
-                if let Err(e) = r { println!("\nLiaison impossible : {e:#}"); pause(); return; }
+                let r = match embedded() {
+                    Some(emb) => auto_pair(&emb).await,
+                    None => guided_pair().await,
+                };
+                if let Err(e) = r {
+                    println!("\nLiaison impossible : {e:#}");
+                    pause();
+                    return;
+                }
             }
             run(port).await
         }
@@ -573,5 +937,8 @@ async fn main() {
             Ok(())
         }
     };
-    if let Err(e) = r { println!("Erreur : {e:#}"); pause(); }
+    if let Err(e) = r {
+        println!("Erreur : {e:#}");
+        pause();
+    }
 }
