@@ -17,6 +17,8 @@ le CPX02 (1 Go + 2 Go de swap) suffit pour la bêta. Passer au CPX12 (2 Go) depu
 | `litestream.yml` | sauvegarde continue de `/data/pop.db` vers un stockage S3 |
 | `env.exemple` | modèle du fichier `.env` du serveur (domaine, e-mails, SMTP, stockage) |
 | `installer-serveur.sh` | prépare un Ubuntu 24.04 neuf (mises à jour, swap, Docker, pare-feu, SSH par clé) |
+| `deployer.sh` | met POP à jour sur le serveur (lancé par l'action GitHub « déployer » ou à la main) |
+| `activer-deploiement.sh` | autorise la clé de GitHub à lancer `deployer.sh`, et rien d'autre |
 
 ## 1. Avant de commencer
 
@@ -59,12 +61,53 @@ Le relais UEFN se connecte alors à `https://<domaine>`.
 
 ## 4. Mettre à jour, revenir en arrière
 
+**Depuis GitHub (un clic)** : onglet **Actions** → **déployer** → **Run workflow**, version `latest` (dernier
+`main`) ou `sha-<7 premiers caractères du commit>` pour une version précise. Il faut le droit d'écriture sur le dépôt.
+L'action vérifie que l'image de `main` est construite, se connecte au serveur, lance `deployer.sh` (télécharge
+l'image, redémarre POP, vérifie que `https://<domaine>` répond) et échoue en rouge sinon, avec les journaux de POP.
+Ce n'est **jamais automatique** à chaque fusion : une version peut migrer la base, on choisit le moment.
+Mise en place : §4.1.
+
+**À la main, sur le serveur** : `bash /opt/pop/deployer.sh` (ou `bash /opt/pop/deployer.sh sha-1a2b3c4`).
+
+La version déployée est écrite dans `POP_IMAGE` du `.env` (l'ancien `.env` est gardé dans `.env.avant-deploiement`).
+Revenir en arrière = déployer le `sha-…` d'avant. Attention : une version plus ancienne ne connaît pas les migrations
+plus récentes ; rien n'est remis en arrière automatiquement.
+
+### 4.1 Déployer depuis GitHub : mise en place (une fois)
+
+Sur votre PC, une clé réservée à GitHub (sans phrase de passe, elle ne servira qu'à lancer `deployer.sh`) :
+
 ```sh
-cd /opt/pop && docker compose pull && docker compose up -d && docker image prune -f
+ssh-keygen -t ed25519 -N "" -C deployer-github -f pop-deployer
 ```
 
-Revenir à une version : dans `.env`, `POP_IMAGE=ghcr.io/kl1600/saas-pop-uefn:sha-<7 premiers caractères du commit>`,
-puis `docker compose up -d`. Attention : une version plus ancienne ne connaît pas les migrations plus récentes.
+Sur un serveur installé avant l'ajout de ces scripts, copier d'abord les deux scripts :
+
+```sh
+scp deploy/deployer.sh deploy/activer-deploiement.sh pop-admin@<IP>:/opt/pop/
+```
+
+Puis autoriser la clé (elle ne pourra lancer que `/opt/pop/deployer.sh`, sans terminal ni redirection) :
+
+```sh
+ssh pop-admin@<IP> "bash /opt/pop/activer-deploiement.sh '$(cat pop-deployer.pub)'"
+```
+
+Le script affiche la ligne à mettre dans `DEPLOY_KNOWN_HOSTS`. Dans GitHub : **Settings → Environments → New
+environment** `production`, puis trois **Environment secrets** :
+
+| Secret | Valeur |
+|---|---|
+| `DEPLOY_HOST` | l'adresse IP (ou le nom) du serveur |
+| `DEPLOY_SSH_KEY` | tout le contenu du fichier **privé** `pop-deployer` |
+| `DEPLOY_KNOWN_HOSTS` | la ligne affichée par `activer-deploiement.sh`, avec la même adresse que `DEPLOY_HOST` |
+
+Ensuite, **effacez `pop-deployer` de votre PC** (la clé privée n'existe plus que dans GitHub). Option : dans
+l'environnement `production`, *Required reviewers* oblige quelqu'un à approuver chaque déploiement.
+
+Le serveur doit déjà être connecté à `ghcr.io` (`docker login`, §3) : `deployer.sh` tourne en `pop-admin`.
+Retirer l'accès : supprimer la ligne `deployer-github` de `/home/pop-admin/.ssh/authorized_keys`.
 
 ## 5. Sauvegardes
 

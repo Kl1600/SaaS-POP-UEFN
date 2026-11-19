@@ -1,0 +1,88 @@
+# Met POP en ligne sur le serveur, d'un clic : onglet Actions → « déployer » → Run workflow (voir deploy/README.md,
+# « Déployer depuis GitHub »). Jamais automatique : une nouvelle version peut migrer la base, on choisit le moment.
+# Le runner se connecte en SSH avec une clé qui ne peut lancer que /opt/pop/deployer.sh sur le serveur ; ce script
+# télécharge l'image publiée par « publier l'image », redémarre POP et vérifie que le site répond.
+# Secrets de l'environnement « production » (Settings → Environments) : DEPLOY_HOST, DEPLOY_SSH_KEY, DEPLOY_KNOWN_HOSTS.
+name: déployer
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "latest (dernier main) ou sha-<7 caractères du commit> pour une version précise"
+        required: true
+        default: latest
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: deployer
+  cancel-in-progress: false
+
+jobs:
+  deployer:
+    name: mettre à jour le serveur
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 15
+    steps:
+      - name: Vérifier la version et les secrets
+        env:
+          VERSION: ${{ inputs.version }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          if ! [[ "$VERSION" =~ ^(latest|sha-[0-9a-f]{7,40})$ ]]; then
+            echo "::error::Version « $VERSION » refusée : latest ou sha-<7 caractères du commit>."; exit 1
+          fi
+          manque=""
+          [ -n "$DEPLOY_HOST" ] || manque="$manque DEPLOY_HOST"
+          [ -n "$DEPLOY_SSH_KEY" ] || manque="$manque DEPLOY_SSH_KEY"
+          [ -n "$DEPLOY_KNOWN_HOSTS" ] || manque="$manque DEPLOY_KNOWN_HOSTS"
+          if [ -n "$manque" ]; then
+            echo "::error::Secrets manquants dans l'environnement production :$manque (voir deploy/README.md)."; exit 1
+          fi
+
+      - name: L'image de main est prête
+        if: inputs.version == 'latest'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          # « latest » = la dernière image construite. Si main vient de bouger, l'image peut encore être en construction.
+          tete=$(gh api "repos/$GH_REPO/commits/main" --jq .sha)
+          derniere=$(gh run list --workflow publier-image.yml --branch main --limit 1 --json headSha,status,conclusion \
+            --jq '.[0] | "\(.headSha) \(.status) \(.conclusion)"')
+          echo "main : $tete ; dernière construction d'image : $derniere"
+          read -r sha statut conclusion <<<"$derniere"
+          if [ "$statut" != completed ]; then
+            echo "::error::L'image est en cours de construction (publier l'image). Relancez quand elle est finie."; exit 1
+          fi
+          if [ "$conclusion" != success ]; then
+            echo "::error::La dernière construction de l'image a échoué : on ne déploie pas. Voir l'action « publier l'image »."; exit 1
+          fi
+          if [ "$sha" != "$tete" ]; then
+            echo "::notice::Le dernier commit de main ne touche pas l'image : on déploie l'image de ${sha:0:7}."
+          fi
+
+      - name: Déployer sur le serveur
+        env:
+          VERSION: ${{ inputs.version }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deployer
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deployer ~/.ssh/known_hosts
+          # StrictHostKeyChecking=yes : si l'empreinte du serveur ne correspond pas, on refuse de se connecter.
+          ssh -i ~/.ssh/deployer -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes \
+            -o ConnectTimeout=20 "pop-admin@$DEPLOY_HOST" "$VERSION"
+
+      - name: Effacer la clé
+        if: always()
+        run: rm -f ~/.ssh/deployer
