@@ -89,6 +89,10 @@ install -d -m 750 -o pop-admin -g pop-admin /opt/pop
 for f in docker-compose.yml Caddyfile litestream.yml env.exemple README.md; do
   install -m 640 -o pop-admin -g pop-admin "$ICI/$f" /opt/pop/"$f"
 done
+# Mise à jour d'un clic depuis GitHub (README, « Déployer depuis GitHub »).
+for f in deployer.sh activer-deploiement.sh; do
+  install -m 750 -o pop-admin -g pop-admin "$ICI/$f" /opt/pop/"$f"
+done
 if [ ! -f /opt/pop/.env ]; then
   install -m 600 -o pop-admin -g pop-admin /opt/pop/env.exemple /opt/pop/.env
 fi
