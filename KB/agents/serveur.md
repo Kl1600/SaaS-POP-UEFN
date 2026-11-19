@@ -3,6 +3,14 @@
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
 ```
+EN COURS | #52 Déploiement : construire l'image Docker seulement au déploiement, plus à chaque fusion sur main | 19/11 19:00
+Owner : benybens | Sur la tâche : Claude Code, pour Yassine
+Fait : deployer.yml construit sha-… si absente (publier-image en workflow_call), latest = image déployée ; 5 essais en prod
+Reste : validation humaine ; vérifier qu'une fusion ne lance plus « publier l'image »
+Bloque : rien
+```
+
+```
 FAIT | #46 CI : consommer moins de minutes GitHub Actions (jobs selon les dossiers touchés, jobs regroupés) | 19/11 18:10
 Owner : benybens | Sur la tâche : Claude Code, pour Yassine
 Fait : ci.yml par dossier, migrations + audit en 1 job, audit le lundi ; PR doc 1 min (6 avant), serveur 4, relais+web 4
