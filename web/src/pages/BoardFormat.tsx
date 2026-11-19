@@ -6,6 +6,7 @@ import {
   AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, PaintBucket, Square, Lock, Unlock,
   Paintbrush, ClipboardPaste, Minus, Plus, MoveRight, MoveLeft, Baseline, Eraser, Shapes,
 } from 'lucide-react'
+import { tr } from '../i18n/t'
 
 export type O = Record<string, any>
 
@@ -15,14 +16,14 @@ export const COLORS = [
   '#E9E9EB', '#F3F3F3', '#FFD8D6', '#FFE2CC', '#FFF3A3', '#D3F2D4', '#C9F0EA', '#CDE7FF', '#D9DEFA', '#EADCF8', '#FBD5EA', '#EBDDD3',
 ]
 export const FONTS: Record<string, [string, string]> = {
-  sans: ['Sans', "'Geist', system-ui, sans-serif"],
-  serif: ['Serif', "Georgia, 'Times New Roman', serif"],
-  mono: ['Mono', "'Geist Mono', ui-monospace, monospace"],
-  hand: ['Manuscrite', "'Comic Sans MS', 'Chalkboard SE', 'Marker Felt', cursive"],
-  round: ['Arrondie', "'Arial Rounded MT Bold', 'Nunito', 'Varela Round', sans-serif"],
+  sans: [tr("Sans"), tr("'Geist', system-ui, sans-serif")],
+  serif: [tr("Serif"), tr("Georgia, 'Times New Roman', serif")],
+  mono: [tr("Mono"), tr("'Geist Mono', ui-monospace, monospace")],
+  hand: [tr("Manuscrite"), tr("'Comic Sans MS', 'Chalkboard SE', 'Marker Felt', cursive")],
+  round: [tr("Arrondie"), tr("'Arial Rounded MT Bold', 'Nunito', 'Varela Round', sans-serif")],
 }
 export const SIZES = [10, 12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 64, 80, 96]
-export const SHAPES: [string, string][] = [['rect', 'Rectangle'], ['round', 'Arrondi'], ['ellipse', 'Cercle'], ['diamond', 'Losange'], ['triangle', 'Triangle'], ['hexagon', 'Hexagone'], ['para', 'Parallélogramme'], ['star', 'Étoile'], ['arrow', 'Flèche'], ['bubble', 'Bulle']]
+export const SHAPES: [string, string][] = [['rect', tr("Rectangle")], ['round', tr("Arrondi")], ['ellipse', tr("Cercle")], ['diamond', tr("Losange")], ['triangle', tr("Triangle")], ['hexagon', tr("Hexagone")], ['para', tr("Parallélogramme")], ['star', tr("Étoile")], ['arrow', tr("Flèche")], ['bubble', tr("Bulle")]]
 const TEXT_KINDS = ['sticky', 'text', 'shape', 'comment', 'frame']
 const STYLE_KEYS = ['fs', 'ff', 'ta', 'va', 'tc', 'bg', 'bc', 'bw', 'bs', 'op', 'b', 'i', 'u', 's', 'color', 'width', 'dashed', 'arrow', 'arrowStart', 'style']
 
@@ -45,7 +46,7 @@ export function sanitize(html: string): string {
     if (tag === 'font') { tag = 'span'; const c = el.getAttribute('color'); if (c && VAL_OK.test(c)) st.push(`color:${c}`) }
     el.style && [...el.style].forEach(p => { const v = el.style.getPropertyValue(p); if (CSS_OK.test(p) && VAL_OK.test(v)) st.push(`${p}:${v}`) })
     if (st.length) attrs.push(`style="${st.join(';')}"`)
-    if (tag === 'a') { const h = el.getAttribute('href') ?? ''; if (/^(https?:\/\/|mailto:)/i.test(h)) attrs.push(`href="${esc(h)}" target="_blank" rel="noopener noreferrer"`) }
+    if (tag === 'a') { const h = el.getAttribute('href') ?? ''; if (/^(https?:\/\/|mailto:)/i.test(h)) attrs.push(tr("href=\"{0}\" target=\"_blank\" rel=\"noopener noreferrer\"", [esc(h)])) }
     if (tag === 'br') return '<br>'
     return `<${tag}${attrs.length ? ' ' + attrs.join(' ') : ''}>${inner}</${tag}>`
   }
@@ -125,7 +126,7 @@ export function RichEdit({ o, style, onType, onDone }: { o: O; style?: React.CSS
     }} />
 }
 function askLink() {
-  const u = prompt('Adresse du lien (https://…) — laisser vide pour retirer')
+  const u = prompt(tr("Adresse du lien (https://…) — laisser vide pour retirer"))
   if (u === null) return
   if (!u) exec('unlink'); else exec('createLink', /^(https?:\/\/|mailto:)/i.test(u) ? u : 'https://' + u)
 }
@@ -159,7 +160,7 @@ function Swatches({ value, onPick, none, label }: { value?: string; onPick: (c: 
     </div>
     <div className="row" style={{ gap: 8, marginTop: 8 }}>
       {none && <button className="pill" onMouseDown={e => e.preventDefault()} onClick={() => onPick('none')}>{none}</button>}
-      <label className="pill" title="Couleur personnalisée"><span className="sw" style={{ width: 14, height: 14, background: 'conic-gradient(red,yellow,lime,cyan,blue,magenta,red)' }} />Autre<input type="color" value={value && value.startsWith('#') && value.length === 7 ? value : '#000000'} onChange={e => onPick(e.target.value)} style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }} /></label>
+      <label className="pill" title={tr("Couleur personnalisée")}><span className="sw" style={{ width: 14, height: 14, background: 'conic-gradient(red,yellow,lime,cyan,blue,magenta,red)' }} />{tr("Autre")}<input type="color" value={value && value.startsWith('#') && value.length === 7 ? value : '#000000'} onChange={e => onPick(e.target.value)} style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }} /></label>
     </div>
   </div>
 }
@@ -213,88 +214,88 @@ export function FormatBar({ sel, editing, push, pos, extra }: Props) {
   const Sep = () => <span className="fsep" />
 
   return <div ref={bar} className="fmtbar" style={pos ? undefined : { left: '50%', bottom: 16 }} onPointerDown={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
-    {isShape && !editing && P('shape', 'Type de forme', <Shapes size={16} />, <div className="fgrid">
+    {isShape && !editing && P('shape', tr("Type de forme"), <Shapes size={16} />, <div className="fgrid">
       {SHAPES.map(([k, l]) => <button key={k} className={'shapepick' + (first.shape === k ? ' on' : '')} title={l} aria-label={l} onClick={() => set({ shape: k }, o => o.kind === 'shape')}><svg viewBox="0 0 100 100" width="26" height="26"><ShapeIcon k={k} /></svg></button>)}
     </div>)}
 
     {hasText && <>
-      {P('font', 'Police', <span className="fface">{FONTS[first.ff ?? 'sans'][0]}</span>, <div className="flist">
+      {P('font', tr("Police"), <span className="fface">{FONTS[first.ff ?? 'sans'][0]}</span>, <div className="flist">
         {Object.entries(FONTS).map(([k, [l, f]]) => <button key={k} className={(first.ff ?? 'sans') === k ? 'on' : ''} style={{ fontFamily: f }} onClick={() => { set({ ff: k }, txt); setPop(null) }}>{l}</button>)}
       </div>)}
       <div className="fsize">
-        <B t="Réduire la taille" onClick={() => bump(-1)}><Minus size={13} /></B>
-        {P('size', 'Taille du texte', <span className="mono">{size}</span>, <div className="flist" style={{ maxHeight: 260, overflow: 'auto' }}>
+        <B t={tr("Réduire la taille")} onClick={() => bump(-1)}><Minus size={13} /></B>
+        {P('size', tr("Taille du texte"), <span className="mono">{size}</span>, <div className="flist" style={{ maxHeight: 260, overflow: 'auto' }}>
           {SIZES.map(s => <button key={s} className={s === size ? 'on' : ''} onClick={() => { set({ fs: s }, txt); setPop(null) }}>{s}</button>)}
         </div>)}
-        <B t="Agrandir la taille" onClick={() => bump(1)}><Plus size={13} /></B>
+        <B t={tr("Agrandir la taille")} onClick={() => bump(1)}><Plus size={13} /></B>
       </div>
       <Sep />
-      <B t="Gras (Ctrl+B)" on={!editing && all('b')} onClick={() => toggle('b')}><Bold size={16} /></B>
-      <B t="Italique (Ctrl+I)" on={!editing && all('i')} onClick={() => toggle('i')}><Italic size={16} /></B>
-      <B t="Souligné (Ctrl+U)" on={!editing && all('u')} onClick={() => toggle('u')}><Underline size={16} /></B>
-      <B t="Barré (Ctrl+Maj+X)" on={!editing && all('s')} onClick={() => toggle('s')}><Strikethrough size={16} /></B>
-      {P('tc', 'Couleur du texte', <span className="fcol"><Baseline size={16} /><i style={{ background: first.tc ?? 'var(--text)' }} /></span>,
-        <Swatches label="Couleur du texte" value={first.tc} none="Par défaut" onPick={c => { if (editing) exec('foreColor', c === 'none' ? 'inherit' : c); else set(o => ({ tc: c === 'none' ? undefined : c, html: o.html ? stripColor(o.html) : o.html }), txt); setPop(null) }} />)}
-      {editing && P('hl', 'Surligner', <Highlighter size={16} />, <Swatches label="Surlignage" none="Aucun" onPick={c => { exec('hiliteColor', c === 'none' ? 'transparent' : c); setPop(null) }} />)}
+      <B t={tr("Gras (Ctrl+B)")} on={!editing && all('b')} onClick={() => toggle('b')}><Bold size={16} /></B>
+      <B t={tr("Italique (Ctrl+I)")} on={!editing && all('i')} onClick={() => toggle('i')}><Italic size={16} /></B>
+      <B t={tr("Souligné (Ctrl+U)")} on={!editing && all('u')} onClick={() => toggle('u')}><Underline size={16} /></B>
+      <B t={tr("Barré (Ctrl+Maj+X)")} on={!editing && all('s')} onClick={() => toggle('s')}><Strikethrough size={16} /></B>
+      {P('tc', tr("Couleur du texte"), <span className="fcol"><Baseline size={16} /><i style={{ background: first.tc ?? 'var(--text)' }} /></span>,
+        <Swatches label={tr("Couleur du texte")} value={first.tc} none={tr("Par défaut")} onPick={c => { if (editing) exec('foreColor', c === 'none' ? 'inherit' : c); else set(o => ({ tc: c === 'none' ? undefined : c, html: o.html ? stripColor(o.html) : o.html }), txt); setPop(null) }} />)}
+      {editing && P('hl', tr("Surligner"), <Highlighter size={16} />, <Swatches label={tr("Surlignage")} none={tr("Aucun")} onPick={c => { exec('hiliteColor', c === 'none' ? 'transparent' : c); setPop(null) }} />)}
       <Sep />
-      {P('ta', 'Alignement', first.ta === 'center' ? <AlignCenter size={16} /> : first.ta === 'right' ? <AlignRight size={16} /> : <AlignLeft size={16} />, <div className="frow">
-        <B t="À gauche" on={(first.ta ?? 'left') === 'left'} onClick={() => set({ ta: 'left' }, txt)}><AlignLeft size={16} /></B>
-        <B t="Centré" on={first.ta === 'center'} onClick={() => set({ ta: 'center' }, txt)}><AlignCenter size={16} /></B>
-        <B t="À droite" on={first.ta === 'right'} onClick={() => set({ ta: 'right' }, txt)}><AlignRight size={16} /></B>
+      {P('ta', tr("Alignement"), first.ta === 'center' ? <AlignCenter size={16} /> : first.ta === 'right' ? <AlignRight size={16} /> : <AlignLeft size={16} />, <div className="frow">
+        <B t={tr("À gauche")} on={(first.ta ?? 'left') === 'left'} onClick={() => set({ ta: 'left' }, txt)}><AlignLeft size={16} /></B>
+        <B t={tr("Centré")} on={first.ta === 'center'} onClick={() => set({ ta: 'center' }, txt)}><AlignCenter size={16} /></B>
+        <B t={tr("À droite")} on={first.ta === 'right'} onClick={() => set({ ta: 'right' }, txt)}><AlignRight size={16} /></B>
         <span className="fsep" />
-        <B t="En haut" on={first.va === 'top'} onClick={() => set({ va: 'top' }, txt)}><AlignVerticalJustifyStart size={16} /></B>
-        <B t="Au milieu" on={first.va === 'middle'} onClick={() => set({ va: 'middle' }, txt)}><AlignVerticalJustifyCenter size={16} /></B>
-        <B t="En bas" on={first.va === 'bottom'} onClick={() => set({ va: 'bottom' }, txt)}><AlignVerticalJustifyEnd size={16} /></B>
+        <B t={tr("En haut")} on={first.va === 'top'} onClick={() => set({ va: 'top' }, txt)}><AlignVerticalJustifyStart size={16} /></B>
+        <B t={tr("Au milieu")} on={first.va === 'middle'} onClick={() => set({ va: 'middle' }, txt)}><AlignVerticalJustifyCenter size={16} /></B>
+        <B t={tr("En bas")} on={first.va === 'bottom'} onClick={() => set({ va: 'bottom' }, txt)}><AlignVerticalJustifyEnd size={16} /></B>
       </div>)}
       {editing && <>
-        <B t="Liste à puces (Ctrl+Maj+8)" onClick={() => exec('insertUnorderedList')}><List size={16} /></B>
-        <B t="Liste numérotée (Ctrl+Maj+7)" onClick={() => exec('insertOrderedList')}><ListOrdered size={16} /></B>
-        <B t="Lien (Ctrl+K)" onClick={askLink}><Link2 size={16} /></B>
-        <B t="Effacer la mise en forme" onClick={() => exec('removeFormat')}><Eraser size={16} /></B>
+        <B t={tr("Liste à puces (Ctrl+Maj+8)")} onClick={() => exec('insertUnorderedList')}><List size={16} /></B>
+        <B t={tr("Liste numérotée (Ctrl+Maj+7)")} onClick={() => exec('insertOrderedList')}><ListOrdered size={16} /></B>
+        <B t={tr("Lien (Ctrl+K)")} onClick={askLink}><Link2 size={16} /></B>
+        <B t={tr("Effacer la mise en forme")} onClick={() => exec('removeFormat')}><Eraser size={16} /></B>
       </>}
     </>}
 
     {!editing && hasFill && <>
       <Sep />
-      {P('bg', 'Couleur de fond', <span className="fcol"><PaintBucket size={16} /><i style={{ background: first.bg && first.bg !== 'none' ? first.bg : 'transparent', border: '1px solid var(--border)' }} /></span>,
-        <Swatches label="Couleur de fond" value={first.bg} none="Sans fond" onPick={c => { set(o => o.kind === 'sticky' && c === 'none' ? { bg: undefined } : { bg: c, fill: undefined }, o => o.kind !== 'connector' && o.kind !== 'stroke'); setPop(null) }} />)}
+      {P('bg', tr("Couleur de fond"), <span className="fcol"><PaintBucket size={16} /><i style={{ background: first.bg && first.bg !== 'none' ? first.bg : 'transparent', border: tr("1px solid var(--border)") }} /></span>,
+        <Swatches label={tr("Couleur de fond")} value={first.bg} none={tr("Sans fond")} onPick={c => { set(o => o.kind === 'sticky' && c === 'none' ? { bg: undefined } : { bg: c, fill: undefined }, o => o.kind !== 'connector' && o.kind !== 'stroke'); setPop(null) }} />)}
     </>}
-    {!editing && hasBorder && P('bd', 'Bordure', <Square size={16} style={{ color: first.bc }} />, <div style={{ width: 252 }}>
-      <Swatches label="Couleur de bordure" value={first.bc} none="Sans bordure" onPick={c => set(c === 'none' ? { bw: 0 } : { bc: c, bw: first.bw || 1.5 })} />
+    {!editing && hasBorder && P('bd', tr("Bordure"), <Square size={16} style={{ color: first.bc }} />, <div style={{ width: 252 }}>
+      <Swatches label={tr("Couleur de bordure")} value={first.bc} none={tr("Sans bordure")} onPick={c => set(c === 'none' ? { bw: 0 } : { bc: c, bw: first.bw || 1.5 })} />
       <div className="frow" style={{ marginTop: 10 }}>
-        <span className="small muted" style={{ width: 60 }}>Épaisseur</span>
-        {[0, 1, 2, 4, 6].map(w => <B key={w} t={`${w} px`} on={(first.bw ?? (first.kind === 'shape' ? 1.5 : 0)) === w || (w === 1 && first.bw === undefined && first.kind === 'shape')} onClick={() => set({ bw: w })}><span style={{ width: 16, height: Math.max(1, w), background: w ? 'currentColor' : 'transparent', borderTop: w ? 0 : '1px dashed currentColor' }} /></B>)}
+        <span className="small muted" style={{ width: 60 }}>{tr("Épaisseur")}</span>
+        {[0, 1, 2, 4, 6].map(w => <B key={w} t={`${w} px`} on={(first.bw ?? (first.kind === 'shape' ? 1.5 : 0)) === w || (w === 1 && first.bw === undefined && first.kind === 'shape')} onClick={() => set({ bw: w })}><span style={{ width: 16, height: Math.max(1, w), background: w ? 'currentColor' : 'transparent', borderTop: w ? 0 : tr("1px dashed currentColor") }} /></B>)}
       </div>
       <div className="frow">
-        <span className="small muted" style={{ width: 60 }}>Trait</span>
-        {[['solid', 'Plein'], ['dashed', 'Tirets'], ['dotted', 'Points']].map(([k, l]) => <B key={k} t={l} on={(first.bs ?? (first.dashed ? 'dashed' : 'solid')) === k} onClick={() => set({ bs: k, dashed: undefined, bw: first.bw || 1.5 })}><span style={{ width: 18, borderTop: `2px ${k} currentColor` }} /></B>)}
+        <span className="small muted" style={{ width: 60 }}>{tr("Trait")}</span>
+        {[['solid', tr("Plein")], ['dashed', tr("Tirets")], ['dotted', tr("Points")]].map(([k, l]) => <B key={k} t={l} on={(first.bs ?? (first.dashed ? 'dashed' : 'solid')) === k} onClick={() => set({ bs: k, dashed: undefined, bw: first.bw || 1.5 })}><span style={{ width: 18, borderTop: tr("2px {0} currentColor", [k]) }} /></B>)}
       </div>
     </div>)}
 
     {!editing && onlyLines && <>
-      {P('lc', 'Couleur du trait', <span className="fcol"><Paintbrush size={16} /><i style={{ background: first.color?.startsWith?.('#') ? first.color : 'var(--text)' }} /></span>,
-        <Swatches label="Couleur du trait" value={first.color} onPick={c => { set({ color: c }); setPop(null) }} />)}
-      {P('lw', 'Épaisseur', <span className="mono small">{first.width ?? (isConn ? 1.6 : 2.5)}</span>, <div className="flist">
+      {P('lc', tr("Couleur du trait"), <span className="fcol"><Paintbrush size={16} /><i style={{ background: first.color?.startsWith?.('#') ? first.color : 'var(--text)' }} /></span>,
+        <Swatches label={tr("Couleur du trait")} value={first.color} onPick={c => { set({ color: c }); setPop(null) }} />)}
+      {P('lw', tr("Épaisseur"), <span className="mono small">{first.width ?? (isConn ? 1.6 : 2.5)}</span>, <div className="flist">
         {[1, 2, 3, 4, 6, 8, 12, 16].map(w => <button key={w} onClick={() => { set({ width: w }); setPop(null) }}><span style={{ display: 'inline-block', width: 40, height: Math.min(w, 10), background: 'currentColor', borderRadius: 4, marginRight: 8, verticalAlign: 'middle' }} />{w}</button>)}
       </div>)}
-      <B t="Pointillés" on={sel.every(o => o.dashed)} onClick={() => set({ dashed: !sel.every(o => o.dashed) })}><span style={{ width: 18, borderTop: '2px dashed currentColor' }} /></B>
+      <B t={tr("Pointillés")} on={sel.every(o => o.dashed)} onClick={() => set({ dashed: !sel.every(o => o.dashed) })}><span style={{ width: 18, borderTop: tr("2px dashed currentColor") }} /></B>
       {isConn && <>
-        {P('cs', 'Forme de la ligne', <span className="small">{({ straight: 'Droit', elbow: 'Coudé', curve: 'Courbe' } as any)[first.style ?? 'curve']}</span>, <div className="flist">
-          {[['straight', 'Droit'], ['elbow', 'Coudé'], ['curve', 'Courbe']].map(([k, l]) => <button key={k} onClick={() => { set({ style: k }, o => o.kind === 'connector'); setPop(null) }}>{l}</button>)}
+        {P('cs', tr("Forme de la ligne"), <span className="small">{({ straight: tr("Droit"), elbow: tr("Coudé"), curve: tr("Courbe") } as any)[first.style ?? 'curve']}</span>, <div className="flist">
+          {[['straight', tr("Droit")], ['elbow', tr("Coudé")], ['curve', tr("Courbe")]].map(([k, l]) => <button key={k} onClick={() => { set({ style: k }, o => o.kind === 'connector'); setPop(null) }}>{l}</button>)}
         </div>)}
-        <B t="Flèche au départ" on={sel.every(o => o.arrowStart)} onClick={() => set({ arrowStart: !sel.every(o => o.arrowStart) }, o => o.kind === 'connector')}><MoveLeft size={16} /></B>
-        <B t="Flèche à l’arrivée" on={sel.every(o => o.arrow)} onClick={() => set({ arrow: !sel.every(o => o.arrow) }, o => o.kind === 'connector')}><MoveRight size={16} /></B>
+        <B t={tr("Flèche au départ")} on={sel.every(o => o.arrowStart)} onClick={() => set({ arrowStart: !sel.every(o => o.arrowStart) }, o => o.kind === 'connector')}><MoveLeft size={16} /></B>
+        <B t={tr("Flèche à l’arrivée")} on={sel.every(o => o.arrow)} onClick={() => set({ arrow: !sel.every(o => o.arrow) }, o => o.kind === 'connector')}><MoveRight size={16} /></B>
       </>}
     </>}
 
     {!editing && <>
       <Sep />
-      {P('op', 'Opacité', <span className="mono small">{Math.round((first.op ?? 1) * 100)}%</span>, <div style={{ width: 200, padding: 4 }}>
-        <input type="range" min={10} max={100} step={5} value={Math.round((first.op ?? 1) * 100)} onChange={e => set({ op: Number(e.target.value) / 100 })} style={{ width: '100%' }} aria-label="Opacité" />
+      {P('op', tr("Opacité"), <span className="mono small">{Math.round((first.op ?? 1) * 100)}%</span>, <div style={{ width: 200, padding: 4 }}>
+        <input type="range" min={10} max={100} step={5} value={Math.round((first.op ?? 1) * 100)} onChange={e => set({ op: Number(e.target.value) / 100 })} style={{ width: '100%' }} aria-label={tr("Opacité")} />
       </div>)}
-      <B t="Copier le style" onClick={() => { styleClip = Object.fromEntries(STYLE_KEYS.filter(k => first[k] !== undefined).map(k => [k, first[k]])) }}><Paintbrush size={16} /></B>
-      <B t="Coller le style" onClick={() => { if (styleClip) set(o => Object.fromEntries(Object.entries(styleClip!).filter(([k]) => (o.kind === 'connector' || o.kind === 'stroke') === ['color', 'width', 'dashed', 'arrow', 'arrowStart', 'style'].includes(k) || k === 'op'))) }}><ClipboardPaste size={16} /></B>
-      <B t={sel.every(o => o.lk) ? 'Déverrouiller' : 'Verrouiller (empêche de déplacer)'} on={sel.every(o => o.lk)} onClick={() => set({ lk: !sel.every(o => o.lk) })}>{sel.every(o => o.lk) ? <Lock size={16} /> : <Unlock size={16} />}</B>
+      <B t={tr("Copier le style")} onClick={() => { styleClip = Object.fromEntries(STYLE_KEYS.filter(k => first[k] !== undefined).map(k => [k, first[k]])) }}><Paintbrush size={16} /></B>
+      <B t={tr("Coller le style")} onClick={() => { if (styleClip) set(o => Object.fromEntries(Object.entries(styleClip!).filter(([k]) => (o.kind === 'connector' || o.kind === 'stroke') === ['color', 'width', 'dashed', 'arrow', 'arrowStart', 'style'].includes(k) || k === 'op'))) }}><ClipboardPaste size={16} /></B>
+      <B t={sel.every(o => o.lk) ? tr("Déverrouiller") : tr("Verrouiller (empêche de déplacer)")} on={sel.every(o => o.lk)} onClick={() => set({ lk: !sel.every(o => o.lk) })}>{sel.every(o => o.lk) ? <Lock size={16} /> : <Unlock size={16} />}</B>
     </>}
     {extra && !editing && <><Sep />{extra}</>}
   </div>
@@ -321,9 +322,9 @@ function ShapeSvgInner({ k, p }: { k: string; p: any }) {
 export function PenBar({ color, width, onColor, onWidth }: { color: string; width: number; onColor: (c: string) => void; onWidth: (w: number) => void }) {
   return <div className="row" style={{ gap: 4 }}>
     {['#1A1A1A', '#E5484D', '#F76B15', '#FFB224', '#46A758', '#0090FF', '#8E4EC6', '#FFFFFF'].map(c => <button key={c} className={'sw' + (color === c ? ' on' : '')} style={{ background: c, width: 20, height: 20 }} aria-label={c} title={c} onClick={() => onColor(c)} />)}
-    <label className="sw" title="Autre couleur" style={{ width: 20, height: 20, background: 'conic-gradient(red,yellow,lime,cyan,blue,magenta,red)', position: 'relative' }}><input type="color" value={color} onChange={e => onColor(e.target.value)} style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }} /></label>
+    <label className="sw" title={tr("Autre couleur")} style={{ width: 20, height: 20, background: 'conic-gradient(red,yellow,lime,cyan,blue,magenta,red)', position: 'relative' }}><input type="color" value={color} onChange={e => onColor(e.target.value)} style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }} /></label>
     <span className="tsep" />
-    {[2, 4, 8, 14].map(w => <button key={w} className={'tool' + (width === w ? ' on' : '')} style={{ width: 30 }} title={`${w} px`} aria-label={`Épaisseur ${w}`} onClick={() => onWidth(w)}><span style={{ width: Math.min(w + 2, 16), height: Math.min(w + 2, 16), borderRadius: '50%', background: 'currentColor' }} /></button>)}
+    {[2, 4, 8, 14].map(w => <button key={w} className={'tool' + (width === w ? ' on' : '')} style={{ width: 30 }} title={`${w} px`} aria-label={tr("Épaisseur {0}", [w])} onClick={() => onWidth(w)}><span style={{ width: Math.min(w + 2, 16), height: Math.min(w + 2, 16), borderRadius: '50%', background: 'currentColor' }} /></button>)}
   </div>
 }
 

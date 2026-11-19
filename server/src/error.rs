@@ -16,7 +16,7 @@ pub enum AppError {
     TooMany,
     /// Trop de demandes, avec un message qui dit quand réessayer.
     TooManyMsg(String),
-    /// Refus avec un code que l'interface sait traiter (ex. double authentification requise).
+    /// Refus avec un code que l'interface sait traiter (ex. confirmation du mot de passe pour l'administration).
     Guard(&'static str, String),
     Internal(anyhow::Error),
 }

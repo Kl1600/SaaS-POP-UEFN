@@ -21,6 +21,7 @@ pub struct NameIn {
 }
 
 pub async fn rename_studio(State(st): State<AppState>, u: AuthUser, Path(sid): Path<i64>, Json(b): Json<NameIn>) -> ApiResult<Value> {
+    if crate::studio::is_personal(&st, sid).await? { return Err(bad("Votre espace perso ne se renomme pas, ne se supprime pas et ne se transfère pas.")) }
     if studio_role(&st, &u, sid).await? < Role::Admin {
         return Err(AppError::Forbidden);
     }
@@ -36,6 +37,7 @@ pub struct ConfirmIn {
 
 /// Suppression définitive d'un studio : le propriétaire retape son nom.
 pub async fn delete_studio(State(st): State<AppState>, u: AuthUser, Path(sid): Path<i64>, Json(b): Json<ConfirmIn>) -> ApiResult<Value> {
+    if crate::studio::is_personal(&st, sid).await? { return Err(bad("Votre espace perso ne se renomme pas, ne se supprime pas et ne se transfère pas.")) }
     if studio_role(&st, &u, sid).await? != Role::Owner {
         return Err(AppError::Forbidden);
     }
@@ -60,7 +62,7 @@ pub async fn delete_map(State(st): State<AppState>, u: AuthUser, Path(mid): Path
         return Err(bad("Le nom tapé ne correspond pas au nom de la map."));
     }
     let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM maps WHERE studio_id = ?").bind(ctx.studio_id).fetch_one(&st.db).await?;
-    if n <= 1 {
+    if n <= 1 && !crate::studio::is_personal(&st, ctx.studio_id).await? {
         return Err(bad("C’est la dernière map du studio : créez-en une autre avant, ou supprimez le studio."));
     }
     sqlx::query("DELETE FROM maps WHERE id = ?").bind(mid).execute(&st.db).await?;
@@ -75,6 +77,7 @@ pub struct TransferIn {
 
 /// Le propriétaire passe la main ; il devient admin.
 pub async fn transfer(State(st): State<AppState>, u: AuthUser, Path(sid): Path<i64>, Json(b): Json<TransferIn>) -> ApiResult<Value> {
+    if crate::studio::is_personal(&st, sid).await? { return Err(bad("Votre espace perso ne se renomme pas, ne se supprime pas et ne se transfère pas.")) }
     if studio_role(&st, &u, sid).await? != Role::Owner {
         return Err(AppError::Forbidden);
     }
@@ -98,6 +101,7 @@ pub async fn transfer(State(st): State<AppState>, u: AuthUser, Path(sid): Path<i
 }
 
 pub async fn leave(State(st): State<AppState>, u: AuthUser, Path(sid): Path<i64>) -> ApiResult<Value> {
+    if crate::studio::is_personal(&st, sid).await? { return Err(bad("Votre espace perso ne se renomme pas, ne se supprime pas et ne se transfère pas.")) }
     if studio_role(&st, &u, sid).await? == Role::Owner {
         return Err(bad("Le propriétaire ne peut pas quitter le studio : transférez d’abord la propriété, ou supprimez le studio."));
     }
@@ -326,6 +330,7 @@ pub async fn backup_loop(st: AppState, db_url: String) {
         let day = chrono::Utc::now().format("%Y-%m-%d").to_string();
         let file = dir.join(format!("pop-{day}.db"));
         if !file.exists() && std::fs::create_dir_all(&dir).is_ok() {
+            crate::legal::purge(&st).await;
             match sqlx::query(&format!("VACUUM INTO '{}'", file.to_string_lossy().replace('\'', "''"))).execute(&st.db).await {
                 Ok(_) => tracing::info!("sauvegarde : {}", file.display()),
                 Err(e) => tracing::warn!("sauvegarde impossible : {e}"),

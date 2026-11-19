@@ -1,9 +1,12 @@
+import { tr } from './i18n/t'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { api } from './api'
 
 export type MapInfo = { id: number; name: string; genre: string; release_date: string | null; status: string }
-export type Studio = { id: number; name: string; role: string; maps: MapInfo[] }
-export type Me = { user: { id: number; name: string; email: string }; credits: number; studios: Studio[]; admin?: boolean; admin_pending?: number }
+export type Studio = { id: number; name: string; role: string; personal?: boolean; analyse?: boolean; maps: MapInfo[] }
+/** Nom affiché d’un studio : « Mes maps » pour l’espace perso. */
+export const studioName = (s?: { name: string; personal?: boolean } | null) => s ? (s.personal ? tr("Mes maps (seul)") : s.name) : ""
+export type Me = { user: { id: number; name: string; email: string }; credits: number; studios: Studio[]; admin?: boolean; admin_pending?: number; username?: string | null; must_change_password?: boolean; plan?: string; trial_until?: string | null; analyse?: boolean; billing_state?: string; ai_credits?: number }
 export type Presence = { uid: number; name: string; place: string }
 
 type Ctx = {
@@ -13,6 +16,8 @@ type Ctx = {
   studio: Studio | null
   map: MapInfo | null
   setMapId: (id: number) => void
+  /** Studio affiché par les pages /studio/:sid (sinon : celui de la map en cours). */
+  setStudioId: (id: number | null) => void
   role: string
   canEdit: boolean
   isAdmin: boolean
@@ -31,6 +36,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [me, setMe] = useState<Me | null>(null)
   const [loading, setLoading] = useState(true)
   const [mapId, setMapIdState] = useState<number | null>(() => Number(localStorage.getItem('pop.map')) || null)
+  const [studioId, setStudioId] = useState<number | null>(null)
   const [dark, setDark] = useState(() => localStorage.getItem('pop.dark') === '1')
   const [toastMsg, setToast] = useState<{ m: string; bad: boolean; action?: { label: string; run: () => void }; k: number } | null>(null)
   const [presence, setPresence] = useState<Presence[]>([])
@@ -44,7 +50,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const allMaps = me?.studios.flatMap(s => s.maps.map(m => ({ s, m }))) ?? []
   const cur = allMaps.find(x => x.m.id === mapId) ?? allMaps[0] ?? null
-  const studio = cur?.s ?? null
+  const studio = (studioId ? me?.studios.find(s => s.id === studioId) : null) ?? cur?.s ?? null
   const map = cur?.m ?? null
   const role = studio?.role ?? 'viewer'
 
@@ -80,7 +86,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const send = useCallback((m: any) => { if (sock.current?.readyState === 1) sock.current.send(JSON.stringify(m)) }, [])
 
   const value = useMemo<Ctx>(() => ({
-    me, loading, reload, studio, map, setMapId, role,
+    me, loading, reload, studio, map, setMapId, setStudioId, role,
     canEdit: role !== 'viewer', isAdmin: role === 'owner' || role === 'admin',
     dark, toggleDark, toast, presence, subscribe, send,
   }), [me, loading, studio, map, role, dark, presence])

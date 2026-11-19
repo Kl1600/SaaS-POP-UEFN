@@ -16,11 +16,11 @@ use std::collections::HashMap;
 
 const DEFAULT_BASE: &str = "https://api.fortnite.com/ecosystem/v1";
 
-fn base() -> String {
+pub(crate) fn base() -> String {
     std::env::var("POP_FORTNITE_API").unwrap_or_else(|_| DEFAULT_BASE.into())
 }
 
-fn valid_code(c: &str) -> bool {
+pub(crate) fn valid_code(c: &str) -> bool {
     let b = c.as_bytes();
     (b.len() == 14 && b[4] == b'-' && b[9] == b'-' && c.chars().filter(|x| *x != '-').all(|x| x.is_ascii_digit()))
         || (c.starts_with("playlist_") && c.len() < 80 && c.chars().all(|x| x.is_ascii_alphanumeric() || x == '_'))
@@ -32,7 +32,7 @@ fn next_url(link: &str) -> String {
     else { format!("{}{}", base(), if link.starts_with('/') { link.to_string() } else { format!("/{link}") }) }
 }
 
-async fn get_json(st: &AppState, url: &str) -> Result<(u16, Value), String> {
+pub(crate) async fn get_json(st: &AppState, url: &str) -> Result<(u16, Value), String> {
     let r = st.http.get(url).header("accept", "application/json").header("user-agent", "POP-UEFN/1.0").timeout(std::time::Duration::from_secs(25)).send().await.map_err(|e| e.to_string())?;
     let code = r.status().as_u16();
     let v = r.json::<Value>().await.unwrap_or(Value::Null);
@@ -58,7 +58,7 @@ async fn upsert_island(st: &AppState, it: &Value, is_new: bool) -> Result<(), sq
 }
 
 /// Métriques journalières (7 jours) d'une île, enregistrées jour par jour.
-async fn fetch_metrics(st: &AppState, code: &str) -> Result<bool, String> {
+pub(crate) async fn fetch_metrics(st: &AppState, code: &str) -> Result<bool, String> {
     let mut url = format!("{}/islands/{code}/metrics/day", base());
     let (mut status, mut v) = get_json(st, &url).await?;
     if status == 400 {
@@ -242,7 +242,12 @@ pub async fn crawler(st: AppState) {
     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
     loop {
         match crawl(&st).await {
-            Ok(m) => tracing::info!("analyse Fortnite : {m}"),
+            Ok(m) => {
+                tracing::info!("analyse Fortnite : {m}");
+                hourly_sweep(&st).await;
+                crate::model::daily(&st).await;
+                crate::ideas::refresh_all(&st).await
+            }
             Err(e) => {
                 tracing::warn!("analyse Fortnite : {e}");
                 let _ = sqlx::query("UPDATE fn_status SET last_error = ? WHERE id = 1").bind(&e).execute(&st.db).await;
@@ -265,7 +270,8 @@ fn island_json(r: &(String, String, String, String, String)) -> Value {
     json!({ "code": r.0, "title": r.1, "creator": r.2, "category": r.3, "tags": serde_json::from_str::<Value>(&r.4).unwrap_or(json!([])) })
 }
 
-pub async fn status(State(st): State<AppState>, _u: AuthUser) -> ApiResult<Value> {
+pub async fn status(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
+    crate::billing::require_market(&st, &u).await?;
     let (last_run, last_ok, err, islands): (Option<String>, Option<String>, Option<String>, i64) = sqlx::query_as("SELECT last_run, last_ok, last_error, islands FROM fn_status WHERE id = 1").fetch_one(&st.db).await?;
     let latest: Option<String> = sqlx::query_scalar("SELECT MAX(day) FROM fn_metrics").fetch_one(&st.db).await?;
     let measured: i64 = sqlx::query_scalar("SELECT COUNT(DISTINCT code) FROM fn_metrics").fetch_one(&st.db).await?;
@@ -280,7 +286,8 @@ pub async fn status(State(st): State<AppState>, _u: AuthUser) -> ApiResult<Value
 
 static REFRESHING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
-pub async fn refresh(State(st): State<AppState>, _u: AuthUser) -> ApiResult<Value> {
+pub async fn refresh(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
+    crate::billing::require_market(&st, &u).await?;
     if REFRESHING.swap(true, std::sync::atomic::Ordering::SeqCst) {
         return Ok(Json(json!({ "running": true })));
     }
@@ -295,7 +302,8 @@ pub async fn refresh(State(st): State<AppState>, _u: AuthUser) -> ApiResult<Valu
 }
 
 /// Maps qui marchent en ce moment : joueurs du dernier jour, évolution sur la veille.
-pub async fn trending(State(st): State<AppState>, _u: AuthUser, Query(q): Query<ListQ>) -> ApiResult<Value> {
+pub async fn trending(State(st): State<AppState>, u: AuthUser, Query(q): Query<ListQ>) -> ApiResult<Value> {
+    crate::billing::require_analyse(&st, &u).await?;
     let rows: Vec<(String, String, String, String, String, Option<i64>, Option<i64>, Option<i64>, Option<f64>, Option<f64>, Option<i64>, String)> = sqlx::query_as(
         "WITH d AS (SELECT MAX(day) AS last FROM fn_metrics WHERE unique_players IS NOT NULL)
          SELECT i.code, i.title, i.creator, i.category, i.tags, m.unique_players, m.peak_ccu, m.plays, m.avg_minutes,
@@ -321,7 +329,8 @@ pub async fn trending(State(st): State<AppState>, _u: AuthUser, Query(q): Query<
 }
 
 /// Meilleurs démarrages : îles sorties récemment, classées sur leur premier jour mesuré.
-pub async fn launches(State(st): State<AppState>, _u: AuthUser, Query(q): Query<ListQ>) -> ApiResult<Value> {
+pub async fn launches(State(st): State<AppState>, u: AuthUser, Query(q): Query<ListQ>) -> ApiResult<Value> {
+    crate::billing::require_analyse(&st, &u).await?;
     let rows: Vec<(String, String, String, String, String, String, String, Option<i64>, Option<i64>, Option<i64>, Option<i64>, Option<f64>)> = sqlx::query_as(
         "SELECT i.code, i.title, i.creator, i.category, i.tags, i.first_seen, f.day, f.unique_players, f.peak_ccu, f.plays,
                 (SELECT l.unique_players FROM fn_metrics l WHERE l.code = i.code AND l.unique_players IS NOT NULL ORDER BY l.day DESC LIMIT 1),
@@ -341,7 +350,8 @@ pub async fn launches(State(st): State<AppState>, _u: AuthUser, Query(q): Query<
 
 /// Analyse du marché : pour chaque genre (tag), joueurs, concurrence, rétention, évolution sur 7 jours
 /// et un verdict simple (opportunité, très disputé, saturé, niche).
-pub async fn market(State(st): State<AppState>, _u: AuthUser) -> ApiResult<Value> {
+pub async fn market(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
+    crate::billing::require_market(&st, &u).await?;
     let islands: Vec<(String, String, String, i64)> = sqlx::query_as(
         "SELECT code, title, tags, (seen_new = 1 AND first_seen > datetime('now', '-7 days')) FROM fn_islands WHERE code NOT LIKE 'playlist_%'",
     ).fetch_all(&st.db).await?;
@@ -438,6 +448,7 @@ pub async fn market(State(st): State<AppState>, _u: AuthUser) -> ApiResult<Value
 }
 
 pub async fn island(State(st): State<AppState>, u: AuthUser, Path(code): Path<String>) -> ApiResult<Value> {
+    crate::billing::require_market(&st, &u).await?;
     if !valid_code(&code) { return Err(bad("Code d’île invalide (format 1234-5678-9012).")) }
     let meta: Option<(String, String, String, String, String)> = sqlx::query_as("SELECT code, title, creator, category, tags FROM fn_islands WHERE code = ?").bind(&code).fetch_optional(&st.db).await?;
     let meta = match meta {
@@ -483,6 +494,7 @@ pub struct WatchIn {
 }
 
 pub async fn watch(State(st): State<AppState>, u: AuthUser, Json(b): Json<WatchIn>) -> ApiResult<Value> {
+    crate::billing::require_market(&st, &u).await?;
     let code = b.code.trim().to_string();
     if !valid_code(&code) { return Err(bad("Code d’île invalide (format 1234-5678-9012).")) }
     if b.on {
@@ -493,7 +505,8 @@ pub async fn watch(State(st): State<AppState>, u: AuthUser, Json(b): Json<WatchI
     Ok(Json(json!({ "ok": true })))
 }
 
-pub async fn watched(State(st): State<AppState>, _u: AuthUser) -> ApiResult<Value> {
+pub async fn watched(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
+    crate::billing::require_market(&st, &u).await?;
     let rows: Vec<(String, Option<String>, Option<i64>)> = sqlx::query_as(
         "SELECT w.code, i.title, (SELECT unique_players FROM fn_metrics m WHERE m.code = w.code AND unique_players IS NOT NULL ORDER BY day DESC LIMIT 1) FROM fn_watch w LEFT JOIN fn_islands i ON i.code = w.code ORDER BY w.added_at DESC",
     ).fetch_all(&st.db).await?;
@@ -685,6 +698,7 @@ pub async fn social_loop(st: AppState) {
 
 pub async fn tiktok_refresh(State(st): State<AppState>, u: AuthUser, Path(sid): Path<i64>) -> ApiResult<Value> {
     if studio_role(&st, &u, sid).await? < Role::Member { return Err(AppError::Forbidden) }
+    crate::billing::require_studio(&st, sid).await?;
     let social = integ_cfg(&st, sid, "apify").await?;
     let yt = integ_cfg(&st, sid, "youtube").await?;
     if secret(&social, "token").is_none() && secret(&yt, "key").is_none() {
@@ -700,6 +714,7 @@ pub async fn tiktok_refresh(State(st): State<AppState>, u: AuthUser, Path(sid): 
 /// Tendances calculées sur les vidéos collectées (TikTok + YouTube Shorts).
 pub async fn tiktok(State(st): State<AppState>, u: AuthUser, Path(sid): Path<i64>) -> ApiResult<Value> {
     studio_role(&st, &u, sid).await?;
+    crate::billing::require_studio(&st, sid).await?;
     let social = integ_cfg(&st, sid, "apify").await?;
     let yt = integ_cfg(&st, sid, "youtube").await?;
     let rows: Vec<(String, String, String, String, String, String, Option<String>, i64, i64, i64, i64, String, String, String)> = sqlx::query_as(
@@ -779,4 +794,85 @@ pub async fn tiktok(State(st): State<AppState>, u: AuthUser, Path(sid): Path<i64
         "total": rows.len(), "last_fetch": last, "hashtags": rank(tags, 3), "sounds": rank(sounds, 2), "maps": maps,
         "videos": videos.into_iter().take(36).map(|x| x.1).collect::<Vec<_>>(),
     })))
+}
+
+// ---------- Relevés horaires : ce qui monte en ce moment (comme la rangée Trending d'Epic) ----------
+
+/// Joueurs en même temps, heure par heure, d'une île (7 derniers jours d'Epic).
+pub async fn fetch_hourly(st: &AppState, code: &str) -> Result<usize, String> {
+    let url = format!("{}/islands/{code}/metrics/hour", base());
+    let (status, v) = get_json(st, &url).await?;
+    if status == 429 { return Err("limite".into()) }
+    if status != 200 { return Ok(0) }
+    let arr = v["peakCCU"].as_array().or(v["peakCCU"]["intervals"].as_array()).cloned().unwrap_or_default();
+    let mut n = 0;
+    for p in arr {
+        let Some(ts) = p["timestamp"].as_str() else { continue };
+        let _ = sqlx::query("INSERT INTO fn_hourly (code, ts, ccu) VALUES (?, ?, ?) ON CONFLICT(code, ts) DO UPDATE SET ccu = excluded.ccu")
+            .bind(code).bind(ts.chars().take(13).collect::<String>()).bind(p["value"].as_i64()).execute(&st.db).await;
+        n += 1;
+    }
+    Ok(n)
+}
+
+/// Une fois par heure : les ~200 maps les plus jouées et les nouvelles qui grimpent.
+pub async fn hourly_sweep(st: &AppState) {
+    let due: bool = sqlx::query_scalar("SELECT hourly_ok IS NULL OR hourly_ok < datetime('now', '-55 minutes') FROM fn_status WHERE id = 1").fetch_one(&st.db).await.unwrap_or(false);
+    if !due { return }
+    let _ = sqlx::query("UPDATE fn_status SET hourly_ok = datetime('now') WHERE id = 1").execute(&st.db).await;
+    let codes: Vec<String> = sqlx::query_scalar(
+        "SELECT code FROM (
+           SELECT m.code, m.unique_players AS p FROM fn_metrics m WHERE m.day = (SELECT MAX(day) FROM fn_metrics) AND m.code NOT LIKE 'playlist_%' ORDER BY m.unique_players DESC LIMIT 200)
+         UNION
+         SELECT code FROM (
+           SELECT m.code FROM fn_metrics m JOIN fn_islands i ON i.code = m.code
+           WHERE m.day = (SELECT MAX(day) FROM fn_metrics) AND i.seen_new = 1 AND i.first_seen > datetime('now', '-14 days') AND m.unique_players >= 50
+           ORDER BY m.unique_players DESC LIMIT 60)",
+    ).fetch_all(&st.db).await.unwrap_or_default();
+    let mut ok = 0;
+    for c in &codes {
+        match fetch_hourly(st, c).await { Ok(_) => ok += 1, Err(_) => break }
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    }
+    let _ = sqlx::query("DELETE FROM fn_hourly WHERE ts < strftime('%Y-%m-%dT%H', 'now', '-9 days')").execute(&st.db).await;
+    tracing::info!("analyse : relevé horaire de {ok} maps");
+}
+
+/// Maps qui montent : les 3 dernières heures face aux mêmes heures des jours d'avant.
+pub async fn rising(st: &AppState) -> Vec<(String, f64, f64, f64)> {
+    let rows: Vec<(String, String, Option<i64>)> = sqlx::query_as("SELECT code, ts, ccu FROM fn_hourly WHERE ts > strftime('%Y-%m-%dT%H', 'now', '-8 days') ORDER BY code, ts")
+        .fetch_all(&st.db).await.unwrap_or_default();
+    let mut by: std::collections::HashMap<String, Vec<(String, f64)>> = std::collections::HashMap::new();
+    for (c, ts, v) in rows { if let Some(v) = v { by.entry(c).or_default().push((ts, v as f64)) } }
+    let mut out = vec![];
+    for (code, h) in by {
+        if h.len() < 48 { continue }
+        let recent = &h[h.len() - 3..];
+        let now = recent.iter().map(|x| x.1).sum::<f64>() / 3.0;
+        let hours: std::collections::HashSet<String> = recent.iter().map(|x| x.0.chars().skip(11).take(2).collect()).collect();
+        let today = recent[2].0.chars().take(10).collect::<String>();
+        let past: Vec<f64> = h.iter().filter(|x| !x.0.starts_with(&today) && hours.contains(&x.0.chars().skip(11).take(2).collect::<String>())).map(|x| x.1).collect();
+        if past.len() < 3 { continue }
+        let usual = past.iter().sum::<f64>() / past.len() as f64;
+        let ratio = if usual > 0.0 { now / usual } else if now > 0.0 { 9.0 } else { 0.0 };
+        if ratio >= 1.4 && now >= 20.0 { out.push((code, now, usual, ratio)) }
+    }
+    out.sort_by(|a, b| (b.3 * b.1.ln_1p()).partial_cmp(&(a.3 * a.1.ln_1p())).unwrap());
+    out
+}
+
+pub async fn rising_codes(st: &AppState) -> std::collections::HashSet<String> { rising(st).await.into_iter().map(|r| r.0).collect() }
+
+/// Liste « Ça monte maintenant ».
+pub async fn rising_list(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
+    crate::billing::require_analyse(&st, &u).await?;
+    let r = rising(&st).await;
+    let mut out = vec![];
+    for (code, now, usual, ratio) in r.into_iter().take(30) {
+        let row: Option<(String, String, String)> = sqlx::query_as("SELECT title, creator, tags FROM fn_islands WHERE code = ?").bind(&code).fetch_optional(&st.db).await?;
+        let (title, creator, tags) = row.unwrap_or_default();
+        out.push(json!({ "code": code, "title": title, "creator": creator, "tags": serde_json::from_str::<Value>(&tags).unwrap_or(json!([])), "now": now.round(), "usual": usual.round(), "ratio": (ratio * 10.0).round() / 10.0 }));
+    }
+    let last: Option<String> = sqlx::query_scalar("SELECT hourly_ok FROM fn_status WHERE id = 1").fetch_one(&st.db).await?;
+    Ok(Json(json!({ "items": out, "checked_at": last })))
 }

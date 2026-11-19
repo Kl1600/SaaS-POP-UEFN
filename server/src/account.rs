@@ -63,11 +63,33 @@ pub async fn change_password(State(st): State<AppState>, u: AuthUser, Json(b): J
     Ok(Json(json!({ "ok": true, "tokens_revoked": tokens })))
 }
 
+#[derive(Deserialize)]
+pub struct FirstPasswordIn {
+    new: String,
+    #[serde(default)]
+    accept_terms: bool,
+}
+
+/// Première connexion d'un compte créé par l'administrateur : choisir son propre mot de passe.
+/// Garde la session en cours, ferme les autres.
+pub async fn first_password(State(st): State<AppState>, u: AuthUser, Json(b): Json<FirstPasswordIn>) -> ApiResult<Value> {
+    let must: i64 = sqlx::query_scalar("SELECT must_change_password FROM users WHERE id = ?").bind(u.id).fetch_one(&st.db).await?;
+    if must == 0 { return Err(bad("Changez votre mot de passe depuis Paramètres → Compte.")) }
+    if !b.accept_terms { return Err(bad("Acceptez les conditions d’utilisation et la politique de confidentialité pour continuer.")) }
+    crate::security::password_policy(&b.new, &u.email)?;
+    let old: String = sqlx::query_scalar("SELECT password_hash FROM users WHERE id = ?").bind(u.id).fetch_one(&st.db).await?;
+    if crate::auth::verify_password(&b.new, &old) { return Err(bad("Choisissez un mot de passe différent du mot de passe provisoire.")) }
+    sqlx::query("UPDATE users SET password_hash = ?, must_change_password = 0, terms_at = datetime('now') WHERE id = ?").bind(hash_password(&b.new)?).bind(u.id).execute(&st.db).await?;
+    sqlx::query("DELETE FROM sessions WHERE user_id = ? AND token_hash != ?").bind(u.id).bind(&u.sid).execute(&st.db).await?;
+    crate::security::audit(&st, Some(u.id), "mot_de_passe_choisi", "première connexion", "").await;
+    Ok(Json(json!({ "ok": true })))
+}
+
 async fn set_password(st: &AppState, uid: i64, pw: &str) -> Result<u64, AppError> {
     let email: String = sqlx::query_scalar("SELECT email FROM users WHERE id = ?").bind(uid).fetch_one(&st.db).await?;
     crate::security::password_policy(pw, &email)?;
     crate::security::audit(st, Some(uid), "mot_de_passe_changé", "", "").await;
-    sqlx::query("UPDATE users SET password_hash = ? WHERE id = ?").bind(hash_password(pw)?).bind(uid).execute(&st.db).await?;
+    sqlx::query("UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?").bind(hash_password(pw)?).bind(uid).execute(&st.db).await?;
     // Déconnecte les autres appareils et révoque les jetons IA : un mot de passe changé après un vol ne doit
     // laisser aucun accès ouvert (#13). Renvoie le nombre de jetons révoqués.
     sqlx::query("DELETE FROM sessions WHERE user_id = ?").bind(uid).execute(&st.db).await?;
@@ -152,7 +174,7 @@ fn fold(s: &str) -> Vec<char> {
         }
     }).collect()
 }
-fn fold_str(s: &str) -> String { fold(s).into_iter().collect() }
+pub fn fold_str(s: &str) -> String { fold(s).into_iter().collect() }
 
 struct Q { words: Vec<String> }
 impl Q {
@@ -196,7 +218,7 @@ fn block_text(blocks: &str) -> String {
     out
 }
 
-/// Recherche globale dans la map : tâches, pages, tableaux, fichiers Verse, acteurs, jalons, membres et actions.
+/// Recherche globale dans la map : tâches, pages, tableaux, acteurs, jalons, membres et actions.
 /// Insensible aux majuscules et aux accents ; plusieurs mots = tous doivent être présents.
 pub async fn search(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64>, Query(q): Query<SearchQ>) -> ApiResult<Value> {
     let ctx = map_ctx(&st, &u, mid).await?;
@@ -238,15 +260,6 @@ pub async fn search(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64
             out.push((sc, json!({ "kind": "Tableau", "title": t, "detail": if query.score(&t, "").is_some() { String::new() } else { snippet(&text, &query) }, "link": format!("/tableau/{id}") })));
         }
     }
-    // Fichiers Verse.
-    let files: Vec<(String, String)> = sqlx::query_as("SELECT path, content FROM verse_files WHERE map_id = ? LIMIT 2000").bind(mid).fetch_all(&st.db).await?;
-    for (p, c) in files {
-        let name = p.rsplit('/').next().unwrap_or(&p).to_string();
-        let Some(sc) = query.score(&p, &c) else { continue };
-        let first = query.words[0].clone();
-        let (line, text) = c.lines().enumerate().find(|(_, l)| fold_str(l).contains(first.as_str())).map(|(i, l)| (i + 1, l.trim().to_string())).unwrap_or((1, String::new()));
-        out.push((sc, json!({ "kind": "Verse", "title": name, "detail": if text.is_empty() { p.clone() } else { format!("ligne {line} : {}", snippet(&text, &query)) }, "link": format!("/verse?f={}&l={line}", urlencode(&p)) })));
-    }
     // Acteurs UEFN.
     let actors: Option<String> = sqlx::query_scalar("SELECT actors FROM uefn_state WHERE map_id = ?").bind(mid).fetch_optional(&st.db).await?;
     let actors: Vec<Value> = actors.and_then(|a| serde_json::from_str(&a).ok()).unwrap_or_default();
@@ -282,7 +295,7 @@ pub async fn search(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64
         let by_person = uid.map(|x| found_people.contains(&x)).unwrap_or(false);
         let sc = if by_person { Some(4) } else { query.score(&t, &d).map(|s| s - 4) };
         let Some(sc) = sc else { continue };
-        let link = match kind.as_str() { "task" | "comment" => "/taches", "page" => "/pages", "board" => "/tableau", "checkin" => "/verse", "plan" => "/planifier", "money" => "/remunerer", "playtest" => "/lancer", "team" => "/equipe", _ => "/" };
+        let link = match kind.as_str() { "task" | "comment" => "/taches", "page" => "/pages", "board" => "/tableau", "checkin" => "/organiseur", "plan" => "/planifier", "money" => "/remunerer", "playtest" => "/lancer", "team" => "/equipe", _ => "/" };
         out.push((sc, json!({ "kind": "Action", "title": format!("{t}{}", if d.is_empty() { String::new() } else { format!(" · {d}") }), "detail": format!("{} · {}", who.unwrap_or_else(|| "Système".into()), at.get(..16).unwrap_or(&at).replace('T', " ")), "link": link, "at": at })));
         nact += 1; if nact >= 8 { break }
     }

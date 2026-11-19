@@ -9,7 +9,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource/geist-mono": "^5.3.0",
+    "@fontsource/plus-jakarta-sans": "^5.3.0",
     "@types/qrcode": "^1.5.6",
+    "flag-icons": "^7.6.0",
     "lib0": "^0.2.120",
     "lucide-react": "^0.460.0",
     "monaco-editor": "^0.52.0",

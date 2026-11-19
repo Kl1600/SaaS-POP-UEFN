@@ -3,7 +3,15 @@ mod account;
 mod security;
 mod admin;
 mod analytics;
-mod ai;
+mod billing;
+mod ideas;
+mod stripe;
+mod aipop;
+mod aiplan;
+mod privstats;
+mod model;
+mod legal;
+mod discover;
 mod mail;
 mod manage;
 mod engine;
@@ -53,8 +61,6 @@ pub struct AppState {
     pub db: sqlx::SqlitePool,
     pub hub: Arc<ws::Hub>,
     pub limiter: Arc<Mutex<HashMap<String, (u32, Instant)>>>,
-    /// Connexions en attente du code de double authentification : empreinte du ticket → (utilisateur, création, essais).
-    pub mfa_tickets: Arc<Mutex<HashMap<String, (i64, Instant, u32)>>>,
     pub board_lock: Arc<tokio::sync::Mutex<()>>,
     pub secure_cookies: bool,
     pub dummy_hash: String,
@@ -71,7 +77,6 @@ pub async fn test_state() -> AppState {
         db,
         hub: Arc::new(ws::Hub::default()),
         limiter: Arc::new(Mutex::new(HashMap::new())),
-        mfa_tickets: Arc::new(Mutex::new(HashMap::new())),
         board_lock: Arc::new(tokio::sync::Mutex::new(())),
         secure_cookies: false,
         dummy_hash: auth::hash_password("mot-de-passe-factice").unwrap(),
@@ -84,6 +89,17 @@ pub async fn test_state() -> AppState {
 /// qu'un autre site ne peut pas ajouter sans autorisation CORS (que l'on ne donne jamais).
 async fn csrf(req: Request<Body>, next: Next) -> Response {
     let m = req.method().clone();
+    // HTTPS forcé : derrière le proxy (Caddy, Nginx, Cloudflare…), une requête arrivée en http est renvoyée en https.
+    if https_mode() {
+        let proto = req.headers().get("x-forwarded-proto").and_then(|v| v.to_str().ok()).unwrap_or("");
+        if proto.eq_ignore_ascii_case("http") {
+            let host = req.headers().get("host").and_then(|v| v.to_str().ok()).unwrap_or("").to_string();
+            if !host.is_empty() && host.chars().all(|c| c.is_ascii_alphanumeric() || ".-:[]".contains(c)) {
+                let pq = req.uri().path_and_query().map(|x| x.as_str().to_string()).unwrap_or_else(|| "/".into());
+                return axum::response::Redirect::permanent(&format!("https://{host}{pq}")).into_response();
+            }
+        }
+    }
     let path = req.uri().path().to_string();
     if m != Method::GET && m != Method::HEAD && m != Method::OPTIONS && !path.starts_with("/api/hooks/") && !path.starts_with("/api/relay/") && path != "/mcp" {
         let ok = req.headers().get("x-pop").and_then(|v| v.to_str().ok()) == Some("1");
@@ -99,12 +115,12 @@ async fn csrf(req: Request<Body>, next: Next) -> Response {
     h.insert("permissions-policy", "camera=(), microphone=(), geolocation=(), payment=()".parse().unwrap());
     h.insert("cross-origin-opener-policy", "same-origin".parse().unwrap());
     // Politique de contenu : scripts uniquement de POP, aucune intégration de POP dans un autre site.
-    h.insert("content-security-policy", "default-src 'self'; script-src 'self' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' ws: wss:; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'".parse().unwrap());
-    if std::env::var("POP_SECURE_COOKIES").map(|v| v == "1").unwrap_or(false) {
-        h.insert("strict-transport-security", "max-age=31536000; includeSubDomains".parse().unwrap());
+    h.insert("content-security-policy", "default-src 'self'; script-src 'self' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' ws: wss:; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'".parse().unwrap());
+    if https_mode() {
+        h.insert("strict-transport-security", "max-age=63072000; includeSubDomains".parse().unwrap());
     }
-    // Pas de mise en cache des réponses de l'API (données personnelles).
-    if path.starts_with("/api/") { h.insert("cache-control", "no-store".parse().unwrap()); }
+    // Pas de mise en cache des réponses de l'API (données personnelles), sauf les vignettes relayées.
+    if path.starts_with("/api/") && path != "/api/img" { h.insert("cache-control", "no-store".parse().unwrap()); }
     // Fichiers de l'interface : ceux de /assets/ portent leur empreinte dans leur nom et ne changent jamais ; tout
     // le reste (index.html, pages, téléchargements) est revalidé à chaque visite. Sans cela, après une mise à jour,
     // un navigateur garde l'ancien index.html qui réclame des fichiers supprimés : page blanche.
@@ -113,6 +129,11 @@ async fn csrf(req: Request<Body>, next: Next) -> Response {
         h.insert("cache-control", v.parse().unwrap());
     }
     res
+}
+
+/// Production en HTTPS : `POP_SECURE_COOKIES=1`, ou une adresse publique en `https://`.
+pub fn https_mode() -> bool {
+    std::env::var("POP_SECURE_COOKIES").map(|v| v == "1").unwrap_or(false) || mail::public_url().starts_with("https://")
 }
 
 /// Rapport du soir (texte prêt à poster sur Discord).
@@ -156,6 +177,24 @@ fn api() -> Router<AppState> {
         .route("/api/notifications/read", post(account::read_notifications))
         .route("/api/studios/{sid}/members/{uid}/reset-link", post(account::admin_reset_link))
         .route("/api/maps/{mid}/search", get(account::search))
+        .route("/api/billing", get(stripe::status))
+        .route("/api/billing/checkout", post(stripe::checkout))
+        .route("/api/billing/portal", post(stripe::portal))
+        .route("/api/admin/ai", get(aipop::admin_report))
+        .route("/api/admin/users/{id}/credits", post(aipop::admin_grant))
+        .route("/api/maps/{mid}/ai/plan", post(aiplan::propose))
+        .route("/api/maps/{mid}/ai/plan/apply", post(aiplan::apply))
+        .route("/api/maps/{mid}/private-stats", get(privstats::get).post(privstats::import))
+        .route("/api/legal", get(legal::get))
+        .route("/api/admin/legal", put(legal::save))
+        .route("/api/img", get(legal::image))
+        .route("/api/analytics/rising", get(analytics::rising_list))
+        .route("/api/admin/model", get(model::admin_status).post(model::admin_refresh))
+        .route("/api/ideas", get(ideas::list))
+        .route("/api/ideas/niches", get(ideas::all_niches))
+        .route("/api/ideas/profile", axum::routing::put(ideas::save_settings))
+        .route("/api/ideas/{id}/state", post(ideas::set_state))
+        .route("/api/ideas/{id}/start", post(ideas::start))
         .route("/api/analytics/status", get(analytics::status))
         .route("/api/analytics/refresh", post(analytics::refresh))
         .route("/api/analytics/trending", get(analytics::trending))
@@ -179,6 +218,7 @@ fn api() -> Router<AppState> {
         .route("/api/invitations/{id}", axum::routing::delete(manage::cancel_invite))
         .route("/api/studios", post(studio::create_studio))
         .route("/api/studios/{sid}/maps", post(studio::create_map).get(studio::maps_summary))
+        .route("/api/maps/{mid}/move", post(studio::move_map))
         .route("/api/studios/{sid}/members", get(studio::members))
         .route("/api/studios/{sid}/members/{uid}", patch(studio::update_member).delete(studio::remove_member))
         .route("/api/studios/{sid}/invitations", post(studio::invite))
@@ -186,6 +226,7 @@ fn api() -> Router<AppState> {
         .route("/api/studios/{sid}/integrations", get(studio::integrations))
         .route("/api/studios/{sid}/integrations/{kind}", put(studio::set_integration))
         .route("/api/hooks/lore/{sid}", post(studio::lore_hook))
+        .route("/api/hooks/stripe", post(stripe::webhook))
         .route("/api/hooks/discord/{sid}", post(integrations::discord_hook))
         .route("/api/hooks/github/{sid}", post(integrations::github_hook))
         .route("/api/studios/{sid}/discord/send", post(integrations::discord_send))
@@ -196,11 +237,8 @@ fn api() -> Router<AppState> {
         .route("/api/maps/{mid}/overview", get(plan::overview))
         .route("/api/waitlist", post(admin::join))
         .route("/api/waitlist/access", get(admin::check_access))
-        .route("/api/auth/mfa", post(auth::login_mfa))
         .route("/api/me/security", get(security::overview))
-        .route("/api/me/2fa/setup", post(security::setup_2fa))
-        .route("/api/me/2fa/enable", post(security::enable_2fa))
-        .route("/api/me/2fa/disable", post(security::disable_2fa))
+        .route("/api/me/first-password", post(account::first_password))
         .route("/api/me/sessions/{id}", delete(security::revoke_session))
         .route("/api/me/sessions/close-others", post(security::revoke_others))
         .route("/api/admin/unlock", post(security::unlock_admin))
@@ -216,11 +254,14 @@ fn api() -> Router<AppState> {
         .route("/api/admin/invite", post(admin::invite))
         .route("/api/admin/users", get(admin::users))
         .route("/api/admin/users/{id}", post(admin::update_user).delete(admin::delete_user))
+        .route("/api/admin/accounts", post(admin::create_account))
+        .route("/api/admin/users/{id}/plan", post(admin::set_plan))
+        .route("/api/admin/users/{id}/password", post(admin::reset_password))
         .route("/api/admin/users/{id}/reset-link", post(admin::user_reset_link))
         .route("/api/admin/users/{id}/unlock", post(admin::unlock_user))
-        .route("/api/admin/users/{id}/disable-2fa", post(admin::disable_user_2fa))
         .route("/api/admin/users/{id}/deletion", get(admin::deletion_preview))
         .route("/api/maps/{mid}/guide", get(guide::guide))
+        .route("/api/maps/{mid}/guide/ask", get(guide::ask))
         .route("/api/maps/{mid}/report", get(report))
         // Tâches
         .route("/api/maps/{mid}/tasks", get(tasks::list).post(tasks::create))
@@ -261,6 +302,7 @@ fn api() -> Router<AppState> {
         .route("/api/maps/{mid}/plan/recalc", post(plan::recalc))
         .route("/api/maps/{mid}/seasons", get(plan::seasons))
         // Lancer et suivre
+        .route("/api/maps/{mid}/discover", get(discover::get).post(discover::save))
         .route("/api/maps/{mid}/checks", get(launch::checks))
         .route("/api/maps/{mid}/checks/{key}", put(launch::set_check))
         .route("/api/maps/{mid}/launch-steps", get(launch::steps).post(launch::add_step))
@@ -298,7 +340,6 @@ fn api() -> Router<AppState> {
         .route("/api/verse-versions/{id}/revert", post(verse::revert))
         .route("/api/maps/{mid}/verse/symbols", get(verse::symbols))
         .route("/api/maps/{mid}/verse/send", post(verse::send))
-        .route("/api/maps/{mid}/ai/verse", post(ai::verse_ai))
         .route("/api/maps/{mid}/tokens", get(mcp::tokens).post(mcp::create_token))
         .route("/api/tokens/{id}/scope", post(mcp::set_scope))
         .route("/api/tokens/{id}", delete(mcp::delete_token))
@@ -347,6 +388,7 @@ async fn main() -> anyhow::Result<()> {
     let db_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite://pop-data.db".into());
     let opts = SqliteConnectOptions::from_str(&db_url)?.create_if_missing(true).journal_mode(SqliteJournalMode::Wal).foreign_keys(true);
     let db = SqlitePoolOptions::new().max_connections(8).connect_with(opts).await?;
+    renumber_old_migrations(&db).await?;
     sqlx::migrate!("./migrations").run(&db).await?;
     // `pop-server admin …` : gérer les administrateurs depuis la machine du serveur, puis s'arrêter.
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -357,19 +399,24 @@ async fn main() -> anyhow::Result<()> {
         db,
         hub: Arc::new(ws::Hub::default()),
         limiter: Arc::new(Mutex::new(HashMap::new())),
-        mfa_tickets: Arc::new(Mutex::new(HashMap::new())),
         board_lock: Arc::new(tokio::sync::Mutex::new(())),
-        secure_cookies: std::env::var("POP_SECURE_COOKIES").map(|v| v == "1").unwrap_or(false),
+        secure_cookies: https_mode(),
         dummy_hash: auth::hash_password("mot-de-passe-factice").map_err(|e| anyhow::anyhow!("{e:?}"))?,
         relays: Arc::new(uefn::RelayHub::default()),
         http: reqwest::Client::builder().timeout(std::time::Duration::from_secs(30)).build()?,
     };
     // Compte de test local « kl » / « kl » (activé par start.sh et Lancer POP.bat, jamais dans l'image Docker).
-    if std::env::var("POP_DEV_ACCOUNT").map(|v| v == "1").unwrap_or(false) {
+    // En ligne (HTTPS), le compte « kl » n'est jamais créé, et s'il existe déjà dans la base il est bloqué :
+    // sinon n'importe qui pourrait se connecter en administrateur avec « kl » / « kl ».
+    if https_mode() {
+        sqlx::query("UPDATE users SET password_hash = '!', is_admin = 0 WHERE email = 'kl'").execute(&st.db).await?;
+        sqlx::query("DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE email = 'kl')").execute(&st.db).await.ok();
+    }
+    if !https_mode() && std::env::var("POP_DEV_ACCOUNT").map(|v| v == "1").unwrap_or(false) {
         let exists: Option<i64> = sqlx::query_scalar("SELECT id FROM users WHERE email = 'kl'").fetch_optional(&st.db).await?;
         if exists.is_none() {
             let h = auth::hash_password("kl").map_err(|e| anyhow::anyhow!("{e:?}"))?;
-            sqlx::query("INSERT INTO users (email, name, password_hash, is_admin) VALUES ('kl', 'KL', ?, 1)").bind(h).execute(&st.db).await?;
+            sqlx::query("INSERT INTO users (email, name, password_hash, is_admin, plan) VALUES ('kl', 'KL', ?, 1, 'pro')").bind(h).execute(&st.db).await?;
         }
         sqlx::query("UPDATE users SET is_admin = 1 WHERE email = 'kl'").execute(&st.db).await?;
         println!("Compte de test : identifiant « kl », mot de passe « kl »");
@@ -397,5 +444,24 @@ async fn main() -> anyhow::Result<()> {
     println!("POP écoute sur http://{addr}");
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).await?;
+    Ok(())
+}
+
+/// Les migrations de la branche « claude » (comptes, plans, idées, Discover, mentions légales, modèle, Starter/Pro,
+/// paiements) portaient les numéros 12 à 20, déjà pris sur `main` par d'autres migrations. Elles sont maintenant
+/// numérotées 15 à 23. Une base locale qui les a appliquées sous les anciens numéros est mise à jour ici, une seule
+/// fois : on reconnaît l'ancienne numérotation à la migration 13 « personal ». Les bases de production ne sont pas
+/// concernées (rien ne se passe si ce cas n'existe pas).
+async fn renumber_old_migrations(db: &sqlx::SqlitePool) -> Result<(), sqlx::Error> {
+    let table: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = '_sqlx_migrations'").fetch_one(db).await?;
+    if table == 0 { return Ok(()) }
+    let old: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM _sqlx_migrations WHERE version = 13 AND description = 'personal'").fetch_one(db).await?;
+    if old == 0 { return Ok(()) }
+    let mut tx = db.begin().await?;
+    // En deux temps pour ne jamais avoir deux lignes avec le même numéro.
+    sqlx::query("UPDATE _sqlx_migrations SET version = version + 1000 WHERE version BETWEEN 12 AND 20").execute(&mut *tx).await?;
+    sqlx::query("UPDATE _sqlx_migrations SET version = version - 997 WHERE version BETWEEN 1012 AND 1020").execute(&mut *tx).await?;
+    tx.commit().await?;
+    tracing::info!("Migrations locales renumérotées (12-20 → 15-23).");
     Ok(())
 }

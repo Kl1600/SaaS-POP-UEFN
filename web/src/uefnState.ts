@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from './api'
 import { useApp } from './state'
+import { tr } from './i18n/t'
 
 /** État du relais UEFN Link pour la map courante, tenu à jour par le WebSocket. */
 export function useUefnStatus() {
@@ -15,4 +16,4 @@ export function useUefnStatus() {
   return s
 }
 
-export const STATUS_LABEL: Record<string, string> = { connected: 'UEFN connecté', closed: 'UEFN fermé', offline: 'Relais hors ligne' }
+export const STATUS_LABEL: Record<string, string> = { connected: tr("UEFN connecté"), closed: tr("UEFN fermé"), offline: tr("Relais hors ligne") }

@@ -6,4 +6,5 @@ web/node_modules/
 *.db-wal
 *.zip
 .DS_Store
+.env
 __pycache__/

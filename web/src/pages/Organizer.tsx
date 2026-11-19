@@ -6,6 +6,7 @@ import { ago, api } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { CardHead, PageHead, Tabs } from '../components/ui'
 import { STATUS_LABEL } from '../uefnState'
+import { tr, tx } from '../i18n/t'
 
 type Actor = {
   id: string; name: string; type: string; class: string; folder: string; hidden: boolean; kind_label?: string; icon?: string; locked_by?: string
@@ -14,7 +15,7 @@ type Actor = {
 }
 
 const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[’']/g, "'")
-const TYPE_LABEL: Record<string, string> = { device: 'Appareil', prop: 'Accessoire', mesh: 'Maillage', verse_device: 'Appareil Verse' }
+const TYPE_LABEL: Record<string, string> = { device: tr("Appareil"), prop: tr("Accessoire"), mesh: tr("Maillage"), verse_device: tr("Appareil Verse") }
 const TYPE_ICON: Record<string, any> = { device: Cpu, prop: Box, mesh: Shapes, verse_device: Code2 }
 
 /** « tag:vault_plate type:appareil dossier:Planque 3 option:Équipe 2 texte libre » */
@@ -64,12 +65,12 @@ export default function Organizer() {
   const act = async (action: string, args: any, ok?: string) => {
     try {
       const r = await api.post(`/api/maps/${map!.id}/uefn/action`, { action, args, task: task || null })
-      toast(r.queued ? 'UEFN indisponible : changement mis en attente' : ok ?? 'Envoyé à UEFN')
+      toast(r.queued ? tr("UEFN indisponible : changement mis en attente") : ok ?? tr("Envoyé à UEFN"))
       reload()
       return r
     } catch (e: any) { toast(e.message, true) }
   }
-  const update = (ids: string[], changes: any) => act('actor_update', { ids, changes }, `${ids.length} acteur(s) modifié(s)`)
+  const update = (ids: string[], changes: any) => act('actor_update', { ids, changes }, tr("{0} acteur(s) modifié(s)", [ids.length]))
 
   // Ctrl+Z : annule votre dernière action
   useEffect(() => {
@@ -78,8 +79,8 @@ export default function Organizer() {
       e.preventDefault()
       const j: any[] = await api.get(`/api/maps/${map!.id}/uefn/journal`)
       const last = j.find(x => x.undoable && x.who === me?.user.name)
-      if (!last) return toast('Rien à annuler.')
-      try { await api.post(`/api/uefn-actions/${last.id}/undo`); toast(`Annulé : ${last.summary.slice(0, 60)}`); refresh() } catch (er: any) { toast(er.message, true) }
+      if (!last) return toast(tr("Rien à annuler."))
+      try { await api.post(`/api/uefn-actions/${last.id}/undo`); toast(tr("Annulé : {0}", [last.summary.slice(0, 60)])); refresh() } catch (er: any) { toast(er.message, true) }
     }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
@@ -120,7 +121,7 @@ export default function Organizer() {
           <button key={a.id} className={'otree-actor' + (sel.includes(a.id) ? ' on' : '')} style={{ paddingLeft: 8 + (depth + (n.path ? 1 : 0)) * 14 + 18 }} onClick={e => click(e, a.id)} title={a.class}>
             <I size={15} /><span className="oname">{a.name}</span>
             <span className="small muted">{a.kind_label ?? TYPE_LABEL[a.type]}</span>
-            {a.hidden && <EyeOff size={13} />}{a.locked_by && <span title={`Verrouillé par ${a.locked_by}`}><Lock size={13} /></span>}
+            {a.hidden && <EyeOff size={13} />}{a.locked_by && <span title={tr("Verrouillé par {0}", [a.locked_by])}><Lock size={13} /></span>}
           </button>
         ) })}
       </>}
@@ -128,54 +129,54 @@ export default function Organizer() {
   }
 
   const bulkRename = async () => {
-    if (selected.length === 1) { const n = prompt('Nouveau nom', selected[0].name); if (n) update([selected[0].id], { name: n }) }
-    else { const base = prompt(`Renommer ${selected.length} acteurs : préfixe (un numéro sera ajouté)`, 'acteur_'); if (base) for (const [i, a] of selected.entries()) await update([a.id], { name: `${base}${String(i + 1).padStart(2, '0')}` }) }
+    if (selected.length === 1) { const n = prompt(tr("Nouveau nom"), selected[0].name); if (n) update([selected[0].id], { name: n }) }
+    else { const base = prompt(tr("Renommer {0} acteurs : préfixe (un numéro sera ajouté)", [selected.length]), 'acteur_'); if (base) for (const [i, a] of selected.entries()) await update([a.id], { name: `${base}${String(i + 1).padStart(2, '0')}` }) }
   }
-  const moveFolder = () => { const f = prompt('Dossier de destination (ex. Planques/Planque 3)', selected[0]?.folder ?? ''); if (f !== null) update(sel, { folder: f }) }
-  const del = () => { if (confirm(`Supprimer ${selected.length} acteur(s) du niveau ?\n${selected.map(a => a.name).join(', ')}`)) act('actor_delete', { ids: sel }, 'Supprimé (annulable avec Ctrl+Z)').then(() => setSel([])) }
+  const moveFolder = () => { const f = prompt(tr("Dossier de destination (ex. Planques/Planque 3)"), selected[0]?.folder ?? ''); if (f !== null) update(sel, { folder: f }) }
+  const del = () => { if (confirm(tr("Supprimer {0} acteur(s) du niveau ?\n{1}", [selected.length, selected.map(a => a.name).join(', ')]))) act('actor_delete', { ids: sel }, tr("Supprimé (annulable avec Ctrl+Z)")).then(() => setSel([])) }
 
   if (!st) return null
   return (
     <main className="content">
-      <PageHead title="Organiseur" help="L’outliner d’UEFN dans le navigateur : retrouvez, modifiez et rangez les acteurs du niveau à plusieurs.">
+      <PageHead title={tr("Organiseur")} help={tr("L’outliner d’UEFN dans le navigateur : retrouvez, modifiez et rangez les acteurs du niveau à plusieurs.")}>
         <span className={'badge ' + (st.status === 'connected' ? 'b-g' : st.status === 'closed' ? 'b-o' : 'b-r')}>{STATUS_LABEL[st.status]}</span>
         <button className="btn" onClick={() => setShowLink(v => !v)}><Link2 size={16} />UEFN Link</button>
-        <button className="btn" disabled={st.status !== 'connected'} onClick={() => act('refresh_actors', {}, 'Acteurs actualisés')}><RefreshCw size={16} />Actualiser</button>
+        <button className="btn" disabled={st.status !== 'connected'} onClick={() => act('refresh_actors', {}, tr("Acteurs actualisés"))}><RefreshCw size={16} />{tr("Actualiser")}</button>
         {/* Envoi complet (acteurs et Verse) dans la session de test en cours (#5). */}
-        <button className="btn" disabled={readOnly} title="Envoie les modifications du niveau dans la session de test en cours" onClick={() => act('push_session', {}, 'Envoyé en session de test')}><Play size={16} />Envoyer en session</button>
+        <button className="btn" disabled={readOnly} title={tr("Envoie les modifications du niveau dans la session de test en cours")} onClick={() => act('push_session', {}, tr("Envoyé en session de test"))}><Play size={16} />{tr("Envoyer en session")}</button>
       </PageHead>
-      {st.status !== 'connected' && <div className="warn"><AlertTriangle size={18} /><span>{st.status === 'offline' ? 'Relais hors ligne' : 'UEFN fermé'} : lecture seule sur le dernier état connu{st.updated_at ? ` (${ago(st.updated_at)})` : ''}. Vos modifications seront mises en attente et envoyées à l’ouverture.</span></div>}
+      {st.status !== 'connected' && <div className="warn"><AlertTriangle size={18} /><span>{tr("{0} : lecture seule sur le dernier état connu{1}. Vos modifications seront mises en attente et envoyées à l’ouverture.", [st.status === 'offline' ? tr("Relais hors ligne") : tr("UEFN fermé"), st.updated_at ? ` (${ago(st.updated_at)})` : ''])}</span></div>}
       {st.approvals.length > 0 && <div className="warn" style={{ flexWrap: 'wrap' }}><AlertTriangle size={18} /><div style={{ flex: 1 }}>{st.approvals.map((p: any) => (
         <div key={p.id} className="row" style={{ flexWrap: 'wrap', padding: '4px 0' }}><span style={{ flex: 1 }}>{p.summary}</span>
-          {canDelete && <><button className="btn" onClick={async () => { await api.post(`/api/approvals/${p.id}/approve`); reload() }}><Check size={15} />Valider</button><button className="btn" onClick={async () => { await api.post(`/api/approvals/${p.id}/refuse`); reload() }}><Ban size={15} />Refuser</button></>}</div>
+          {canDelete && <><button className="btn" onClick={async () => { await api.post(`/api/approvals/${p.id}/approve`); reload() }}><Check size={15} />{tr("Valider")}</button><button className="btn" onClick={async () => { await api.post(`/api/approvals/${p.id}/refuse`); reload() }}><Ban size={15} />{tr("Refuser")}</button></>}</div>
       ))}</div></div>}
       {(actors.length === 0 || showLink) && <Pairing status={st.status} tools={st.tools} />}
 
       <div className="ogrid">
         <aside className="card oleft">
-          <input className="field" style={{ width: '100%' }} placeholder="Chercher : nom, type, tag:x, dossier:x, option:x" value={q} onChange={e => setQ(e.target.value)} aria-label="Recherche d’acteurs" />
+          <input className="field" style={{ width: '100%' }} placeholder={tr("Chercher : nom, type, tag:x, dossier:x, option:x")} value={q} onChange={e => setQ(e.target.value)} aria-label={tr("Recherche d’acteurs")} />
           <div className="row" style={{ flexWrap: 'wrap', gap: 6, margin: '8px 0' }}>
-            {filters?.map(f => <span key={f.id} className={'chip' + (q === f.query ? ' on' : '')} style={{ height: 30, paddingRight: 4 }}><button className="link" style={{ textDecoration: 'none', color: 'inherit' }} onClick={() => setQ(f.query)}><Star size={12} /> {f.name}</button><button className="iconbtn" style={{ width: 22, height: 22 }} aria-label="Supprimer le filtre" onClick={async () => { await api.del(`/api/filters/${f.id}`); reloadFilters() }}><X size={12} /></button></span>)}
-            {q && canEdit && <button className="chip" style={{ height: 30 }} onClick={async () => { const n = prompt('Nom du filtre', q); if (n) { await api.post(`/api/maps/${map!.id}/filters`, { name: n, query: q }); reloadFilters() } }}><Plus size={12} />Enregistrer le filtre</button>}
+            {filters?.map(f => <span key={f.id} className={'chip' + (q === f.query ? ' on' : '')} style={{ height: 30, paddingRight: 4 }}><button className="link" style={{ textDecoration: 'none', color: 'inherit' }} onClick={() => setQ(f.query)}><Star size={12} /> {f.name}</button><button className="iconbtn" style={{ width: 22, height: 22 }} aria-label={tr("Supprimer le filtre")} onClick={async () => { await api.del(`/api/filters/${f.id}`); reloadFilters() }}><X size={12} /></button></span>)}
+            {q && canEdit && <button className="chip" style={{ height: 30 }} onClick={async () => { const n = prompt(tr("Nom du filtre"), q); if (n) { await api.post(`/api/maps/${map!.id}/filters`, { name: n, query: q }); reloadFilters() } }}><Plus size={12} />{tr("Enregistrer le filtre")}</button>}
           </div>
-          <div className="small muted" style={{ marginBottom: 6 }}>{vis.length} / {actors.length} acteurs{sel.length ? ` · ${sel.length} sélectionné(s)` : ''}</div>
+          <div className="small muted" style={{ marginBottom: 6 }}>{vis.length} / {actors.length} acteurs{sel.length ? tr(" · {0} sélectionné(s)", [sel.length]) : ''}</div>
           {sel.length > 0 && <div className="row" style={{ flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
-            <button className="iconbtn" title="Renommer" aria-label="Renommer" disabled={readOnly && !canEdit} onClick={bulkRename}><Pencil size={16} /></button>
-            <button className="iconbtn" title="Déplacer dans un dossier" aria-label="Déplacer" disabled={!canEdit} onClick={moveFolder}><FolderInput size={16} /></button>
-            <button className="iconbtn" title="Dupliquer" aria-label="Dupliquer" disabled={!canEdit} onClick={() => act('actor_duplicate', { ids: sel }, 'Dupliqué')}><Copy size={16} /></button>
-            <button className="iconbtn" title="Masquer / afficher en éditeur" aria-label="Masquer" disabled={!canEdit} onClick={() => update(sel, { hidden: !selected.every(a => a.hidden) })}>{selected.every(a => a.hidden) ? <Eye size={16} /> : <EyeOff size={16} />}</button>
-            {canDelete && <button className="iconbtn" title="Supprimer" aria-label="Supprimer" onClick={del}><Trash2 size={16} /></button>}
-            <button className="iconbtn" title="Désélectionner" aria-label="Désélectionner" onClick={() => setSel([])}><X size={16} /></button>
+            <button className="iconbtn" title={tr("Renommer")} aria-label={tr("Renommer")} disabled={readOnly && !canEdit} onClick={bulkRename}><Pencil size={16} /></button>
+            <button className="iconbtn" title={tr("Déplacer dans un dossier")} aria-label={tr("Déplacer")} disabled={!canEdit} onClick={moveFolder}><FolderInput size={16} /></button>
+            <button className="iconbtn" title={tr("Dupliquer")} aria-label={tr("Dupliquer")} disabled={!canEdit} onClick={() => act('actor_duplicate', { ids: sel }, tr("Dupliqué"))}><Copy size={16} /></button>
+            <button className="iconbtn" title={tr("Masquer / afficher en éditeur")} aria-label={tr("Masquer")} disabled={!canEdit} onClick={() => update(sel, { hidden: !selected.every(a => a.hidden) })}>{selected.every(a => a.hidden) ? <Eye size={16} /> : <EyeOff size={16} />}</button>
+            {canDelete && <button className="iconbtn" title={tr("Supprimer")} aria-label={tr("Supprimer")} onClick={del}><Trash2 size={16} /></button>}
+            <button className="iconbtn" title={tr("Désélectionner")} aria-label={tr("Désélectionner")} onClick={() => setSel([])}><X size={16} /></button>
           </div>}
           <div className="otree"><NodeView n={root} depth={0} /></div>
-          <p className="small muted">Ctrl/Cmd+clic : ajouter · Maj+clic : plage · Ctrl+Z : annuler</p>
+          <p className="small muted">{tr("Ctrl/Cmd+clic : ajouter · Maj+clic : plage · Ctrl+Z : annuler")}</p>
         </aside>
 
         <section className="card oright">
-          <Tabs value={tab} onChange={setTab} items={[['details', 'Détails'], ['top', 'Vue du dessus'], ['journal', 'Changements et journal']]} />
+          <Tabs value={tab} onChange={setTab} items={[['details', tr("Détails")], ['top', tr("Vue du dessus")], ['journal', tr("Changements et journal")]]} />
           <div style={{ marginTop: 16 }}>
-            {tab === 'details' && (selected.length === 0 ? <p className="muted">Sélectionnez un ou plusieurs acteurs dans l’arbre.</p> : selected.length === 1 ? <Details a={selected[0]} all={actors} tags={st.tags} update={update} canEdit={canEdit} me={me?.user.email ?? ''} connected={st.status === 'connected'} rev={rev} /> : <Bulk list={selected} tags={st.tags} update={update} canEdit={canEdit} connected={st.status === 'connected'} />)}
-            {tab === 'top' && <TopView actors={vis} sel={sel} setSel={setSel} update={update} canEdit={canEdit} hasImage={st.has_topview} bounds={st.topview_bounds} refresh={() => act('render_topview', {}, 'Vue du dessus rendue par UEFN')} connected={st.status === 'connected'} />}
+            {tab === 'details' && (selected.length === 0 ? <p className="muted">{tr("Sélectionnez un ou plusieurs acteurs dans l’arbre.")}</p> : selected.length === 1 ? <Details a={selected[0]} all={actors} tags={st.tags} update={update} canEdit={canEdit} me={me?.user.email ?? ''} connected={st.status === 'connected'} rev={rev} /> : <Bulk list={selected} tags={st.tags} update={update} canEdit={canEdit} connected={st.status === 'connected'} />)}
+            {tab === 'top' && <TopView actors={vis} sel={sel} setSel={setSel} update={update} canEdit={canEdit} hasImage={st.has_topview} bounds={st.topview_bounds} refresh={() => act('render_topview', {}, tr("Vue du dessus rendue par UEFN"))} connected={st.status === 'connected'} />}
             {tab === 'journal' && <Journal st={st} task={task} setTask={setTask} tasks={tasks ?? []} act={act} reload={refresh} />}
           </div>
         </section>
@@ -186,12 +187,12 @@ export default function Organizer() {
 
 function Field({ s, value, onSet, disabled }: { s: NonNullable<Actor['schema']>[number] | { key: string; label: string; type: string; values: string[]; default: any; help: string; disabled?: string }; value: any; onSet: (v: any) => void; disabled: boolean }) {
   const off = disabled || !!s.disabled
-  const input = s.type === 'enum' ? <select className="field" value={value ?? ''} disabled={off} onChange={e => onSet(e.target.value)}>{value === undefined && <option value="">(valeurs différentes)</option>}{s.values.map(v => <option key={v}>{v}</option>)}</select>
-    : s.type === 'bool' ? <select className="field" value={value === undefined ? '' : value ? '1' : '0'} disabled={off} onChange={e => onSet(e.target.value === '1')}>{value === undefined && <option value="">(valeurs différentes)</option>}<option value="1">Oui</option><option value="0">Non</option></select>
-    : <input className="field" type={s.type === 'number' ? 'number' : 'text'} key={String(value)} defaultValue={value ?? ''} placeholder={value === undefined ? '(valeurs différentes)' : ''} disabled={off} onBlur={e => { const v = s.type === 'number' ? Number(e.target.value) : e.target.value; if (e.target.value !== '' && v !== value) onSet(v) }} />
+  const input = s.type === 'enum' ? <select className="field" value={value ?? ''} disabled={off} onChange={e => onSet(e.target.value)}>{value === undefined && <option value="">{tr("(valeurs différentes)")}</option>}{s.values.map(v => <option key={v}>{v}</option>)}</select>
+    : s.type === 'bool' ? <select className="field" value={value === undefined ? '' : value ? '1' : '0'} disabled={off} onChange={e => onSet(e.target.value === '1')}>{value === undefined && <option value="">{tr("(valeurs différentes)")}</option>}<option value="1">{tr("Oui")}</option><option value="0">{tr("Non")}</option></select>
+    : <input className="field" type={s.type === 'number' ? 'number' : 'text'} key={String(value)} defaultValue={value ?? ''} placeholder={value === undefined ? tr("(valeurs différentes)") : ''} disabled={off} onBlur={e => { const v = s.type === 'number' ? Number(e.target.value) : e.target.value; if (e.target.value !== '' && v !== value) onSet(v) }} />
   return <div className={'ofield' + (s.disabled ? ' disabled' : '')}>
-    <label className="label"><span>{s.label}</span>{input}</label>
-    <div className="small muted">{s.disabled ?? s.help}{s.default !== null && s.default !== undefined && s.default !== '' && <> · par défaut : {typeof s.default === 'boolean' ? (s.default ? 'Oui' : 'Non') : String(s.default)}</>}</div>
+    <label className="label"><span>{tx(s.label)}</span>{input}</label>
+    <div className="small muted">{tx(s.disabled ?? s.help)}{s.default !== null && s.default !== undefined && s.default !== '' && <>{' '}{tr("· par défaut : {0}", [typeof s.default === 'boolean' ? (s.default ? tr("Oui") : tr("Non")) : String(s.default)])}</>}</div>
   </div>
 }
 
@@ -222,32 +223,32 @@ function Details({ a, all, tags, update, canEdit, me, connected, rev }: { a: Act
   )
   return <div className="stack" style={{ gap: 18 }}>
     <div className="row" style={{ flexWrap: 'wrap' }}>
-      <input className="field" style={{ flex: 1, fontSize: 18 }} key={a.name} defaultValue={a.name} disabled={dis} onBlur={e => e.target.value !== a.name && update([a.id], { name: e.target.value })} aria-label="Nom" />
+      <input className="field" style={{ flex: 1, fontSize: 18 }} key={a.name} defaultValue={a.name} disabled={dis} onBlur={e => e.target.value !== a.name && update([a.id], { name: e.target.value })} aria-label={tr("Nom")} />
       <span className="badge">{a.kind_label ?? TYPE_LABEL[a.type]}</span><span className="small muted mono">{a.class}</span>
     </div>
-    {locked && <div className="warn"><Lock size={16} /><span>Verrouillé dans Lore par {a.locked_by} : lecture seule.</span></div>}
-    <div className="row small muted" style={{ flexWrap: 'wrap' }}><span>Dossier : <b style={{ fontWeight: 500, color: 'var(--text)' }}>{a.folder || '—'}</b></span><span>Visible en éditeur : {a.hidden ? 'non' : 'oui'}</span></div>
-    <section><div className="dsec" style={{ marginTop: 0 }}>Transformation</div>{vec('location', 'Position', ['X', 'Y', 'Z'])}{vec('rotation', 'Rotation', ['Tangage', 'Lacet', 'Roulis'])}{vec('scale', 'Échelle', ['X', 'Y', 'Z'])}</section>
-    <section><div className="dsec" style={{ marginTop: 0 }}>Tags Verse</div>
+    {locked && <div className="warn"><Lock size={16} /><span>{tr("Verrouillé dans Lore par {0} : lecture seule.", [a.locked_by])}</span></div>}
+    <div className="row small muted" style={{ flexWrap: 'wrap' }}><span>{tr("Dossier :")}{' '}<b style={{ fontWeight: 500, color: 'var(--text)' }}>{a.folder || '—'}</b></span><span>{tr("Visible en éditeur : {0}", [a.hidden ? 'non' : 'oui'])}</span></div>
+    <section><div className="dsec" style={{ marginTop: 0 }}>{tr("Transformation")}</div>{vec('location', tr("Position"), ['X', 'Y', 'Z'])}{vec('rotation', tr("Rotation"), [tr("Tangage"), tr("Lacet"), tr("Roulis")])}{vec('scale', tr("Échelle"), ['X', 'Y', 'Z'])}</section>
+    <section><div className="dsec" style={{ marginTop: 0 }}>{tr("Tags Verse")}</div>
       <div className="row" style={{ flexWrap: 'wrap', gap: 6 }}>
-        {a.tags.map(t => <span key={t} className="chip" style={{ height: 30 }}>{t}{!dis && <button className="iconbtn" style={{ width: 22, height: 22 }} aria-label={`Retirer ${t}`} onClick={() => update([a.id], { tags_remove: [t] })}><X size={12} /></button>}</span>)}
-        {!dis && <select className="field" style={{ height: 32 }} value="" onChange={e => e.target.value && update([a.id], { tags_add: [e.target.value] })} aria-label="Ajouter un tag"><option value="">+ tag du projet</option>{tags.filter(t => !a.tags.includes(t)).map(t => <option key={t}>{t}</option>)}</select>}
+        {a.tags.map(t => <span key={t} className="chip" style={{ height: 30 }}>{t}{!dis && <button className="iconbtn" style={{ width: 22, height: 22 }} aria-label={tr("Retirer {0}", [t])} onClick={() => update([a.id], { tags_remove: [t] })}><X size={12} /></button>}</span>)}
+        {!dis && <select className="field" style={{ height: 32 }} value="" onChange={e => e.target.value && update([a.id], { tags_add: [e.target.value] })} aria-label={tr("Ajouter un tag")}><option value="">{tr("+ tag du projet")}</option>{tags.filter(t => !a.tags.includes(t)).map(t => <option key={t}>{t}</option>)}</select>}
       </div>
     </section>
-    {(a.type === 'device' || isVerse) && <section><div className="dsec" style={{ marginTop: 0 }}>{isVerse ? 'Propriétés Verse (@editable)' : 'Options de l’appareil'}{live && <span className="small muted"> · lues dans UEFN</span>}</div>
+    {(a.type === 'device' || isVerse) && <section><div className="dsec" style={{ marginTop: 0 }}>{isVerse ? tr("Propriétés Verse (@editable)") : tr("Options de l’appareil")}{live && <span className="small muted">{' '}{tr("· lues dans UEFN")}</span>}</div>
       {schema.length > 0 ? <div className="ofields">{schema.map((s: any) => <Field key={`${s.key}:${tick}:${rev}`} s={s} value={values?.[s.key]} disabled={dis} onSet={v => setOpt(s.key, v)} />)}</div>
-        : <p className="small muted">{liveErr || (connected ? 'Lecture des options dans UEFN…' : 'Options disponibles quand UEFN est connecté.')}</p>}
+        : <p className="small muted">{liveErr || (connected ? tr("Lecture des options dans UEFN…") : tr("Options disponibles quand UEFN est connecté."))}</p>}
     </section>}
-    {(a.type === 'device' || isVerse) && a.events.length > 0 && <section><div className="dsec" style={{ marginTop: 0 }}>Liens d’événements (qui déclenche quoi)</div>
+    {(a.type === 'device' || isVerse) && a.events.length > 0 && <section><div className="dsec" style={{ marginTop: 0 }}>{tr("Liens d’événements (qui déclenche quoi)")}</div>
       <div className="list">{a.events.map((e, i) => (
         <div key={i} className="li"><Link2 size={15} /><span style={{ flex: 1 }}><span className="mono small">{e.event}</span> → <b style={{ fontWeight: 500 }}>{all.find(x => x.id === e.target)?.name ?? e.target}</b>.<span className="mono small">{e.function}</span></span>
-          {!dis && <button className="iconbtn" aria-label="Retirer le lien" onClick={() => update([a.id], { events: a.events.filter((_, j) => j !== i) })}><X size={14} /></button>}</div>
-      ))}{a.events.length === 0 && <p className="small muted">Aucun lien.</p>}</div>
+          {!dis && <button className="iconbtn" aria-label={tr("Retirer le lien")} onClick={() => update([a.id], { events: a.events.filter((_, j) => j !== i) })}><X size={14} /></button>}</div>
+      ))}{a.events.length === 0 && <p className="small muted">{tr("Aucun lien.")}</p>}</div>
       {!dis && <form className="row" style={{ flexWrap: 'wrap', marginTop: 8 }} onSubmit={e => { e.preventDefault(); if (ev.event && ev.target && ev.function) { update([a.id], { events: [...a.events, ev] }); setEv({ event: '', target: '', function: '' }) } }}>
-        <input className="field mono" placeholder="Événement (ex. InteractedWithEvent)" value={ev.event} onChange={e => setEv({ ...ev, event: e.target.value })} />
-        <select className="field" value={ev.target} onChange={e => setEv({ ...ev, target: e.target.value })}><option value="">Appareil cible…</option>{all.filter(x => x.type === 'device' || x.type === 'verse_device').map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
-        <input className="field mono" placeholder="Fonction (ex. Start)" value={ev.function} onChange={e => setEv({ ...ev, function: e.target.value })} />
-        <button className="btn">Ajouter</button>
+        <input className="field mono" placeholder={tr("Événement (ex. InteractedWithEvent)")} value={ev.event} onChange={e => setEv({ ...ev, event: e.target.value })} />
+        <select className="field" value={ev.target} onChange={e => setEv({ ...ev, target: e.target.value })}><option value="">{tr("Appareil cible…")}</option>{all.filter(x => x.type === 'device' || x.type === 'verse_device').map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
+        <input className="field mono" placeholder={tr("Fonction (ex. Start)")} value={ev.function} onChange={e => setEv({ ...ev, function: e.target.value })} />
+        <button className="btn">{tr("Ajouter")}</button>
       </form>}
     </section>}
   </div>
@@ -275,16 +276,16 @@ function Bulk({ list: base, tags, update, canEdit, connected }: { list: Actor[];
   const val = (k: string) => { const vs = list.map(a => (a.type === 'verse_device' ? a.props[k] : a.options[k])); return vs.every(v => JSON.stringify(v) === JSON.stringify(vs[0])) ? vs[0] : undefined }
   const allTags = [...new Set(list.flatMap(a => a.tags))]
   return <div className="stack" style={{ gap: 18 }}>
-    <div><b style={{ fontWeight: 500, fontSize: 18 }}>{list.length} acteurs sélectionnés</b><div className="small muted">{list.map(a => a.name).join(', ').slice(0, 220)}</div></div>
-    {locked.length > 0 && <div className="warn"><Lock size={16} /><span>{locked.length} acteur(s) verrouillé(s) dans Lore : la modification sera refusée s’ils sont pris par quelqu’un d’autre.</span></div>}
-    <section><div className="dsec" style={{ marginTop: 0 }}>Tags Verse</div>
+    <div><b style={{ fontWeight: 500, fontSize: 18 }}>{tr("{0} acteurs sélectionnés", [list.length])}</b><div className="small muted">{list.map(a => a.name).join(', ').slice(0, 220)}</div></div>
+    {locked.length > 0 && <div className="warn"><Lock size={16} /><span>{tr("{0} acteur(s) verrouillé(s) dans Lore : la modification sera refusée s’ils sont pris par quelqu’un d’autre.", [locked.length])}</span></div>}
+    <section><div className="dsec" style={{ marginTop: 0 }}>{tr("Tags Verse")}</div>
       <div className="row" style={{ flexWrap: 'wrap', gap: 6 }}>
-        {allTags.map(t => <span key={t} className="chip" style={{ height: 30 }}>{t}{canEdit && <button className="iconbtn" style={{ width: 22, height: 22 }} aria-label={`Retirer ${t} de tous`} onClick={() => update(ids, { tags_remove: [t] })}><X size={12} /></button>}</span>)}
-        {canEdit && <select className="field" style={{ height: 32 }} value="" onChange={e => e.target.value && update(ids, { tags_add: [e.target.value] })}><option value="">+ tag pour tous</option>{tags.map(t => <option key={t}>{t}</option>)}</select>}
+        {allTags.map(t => <span key={t} className="chip" style={{ height: 30 }}>{t}{canEdit && <button className="iconbtn" style={{ width: 22, height: 22 }} aria-label={tr("Retirer {0} de tous", [t])} onClick={() => update(ids, { tags_remove: [t] })}><X size={12} /></button>}</span>)}
+        {canEdit && <select className="field" style={{ height: 32 }} value="" onChange={e => e.target.value && update(ids, { tags_add: [e.target.value] })}><option value="">{tr("+ tag pour tous")}</option>{tags.map(t => <option key={t}>{t}</option>)}</select>}
       </div>
     </section>
-    <section><div className="dsec" style={{ marginTop: 0 }}>Options communes · la nouvelle valeur s’applique à tous</div>
-      {common.length === 0 ? <p className="small muted">Ces acteurs n’ont aucune option en commun.</p> :
+    <section><div className="dsec" style={{ marginTop: 0 }}>{tr("Options communes · la nouvelle valeur s’applique à tous")}</div>
+      {common.length === 0 ? <p className="small muted">{tr("Ces acteurs n’ont aucune option en commun.")}</p> :
         <div className="ofields">{common.map(s => <Field key={s.key} s={{ ...s, disabled: undefined }} value={val(s.key)} disabled={!canEdit} onSet={v => upd(ids, { [list[0].type === 'verse_device' ? 'props' : 'options']: { [s.key]: v } })} />)}</div>}
     </section>
   </div>
@@ -307,14 +308,14 @@ function TopView({ actors, sel, setSel, update, canEdit, hasImage, bounds, refre
   const toBoard = () => {
     if (!img?.image || !boards?.[0]) return
     send({ t: 'board', board: boards[0].id, op: 'upsert', objs: [{ id: 'plan-' + Date.now(), kind: 'image', x: -100, y: -100, w: W, h: H, url: img.image, locked: true }] })
-    toast(`Vue du dessus posée en fond du tableau « ${boards[0].title} »`)
+    toast(tr("Vue du dessus posée en fond du tableau « {0} »", [boards[0].title]))
   }
   return <div className="stack">
     <div className="row" style={{ flexWrap: 'wrap' }}>
-      <button className="btn" disabled={!connected} onClick={refresh}><RefreshCw size={16} />Rafraîchir</button>
-      <button className="btn" disabled={!img?.image} onClick={toBoard}>Utiliser comme fond du tableau blanc</button>
-      <span className="small muted">{actors.length} acteur(s) du filtre · glisser un point le déplace (x, y)</span>
-      <span className="spacer" /><button className="iconbtn" aria-label="Zoomer" onClick={() => setView(v => ({ ...v, z: Math.min(5, v.z * 1.25) }))}><Plus size={16} /></button><button className="iconbtn" aria-label="Dézoomer" onClick={() => setView(v => ({ ...v, z: Math.max(0.3, v.z / 1.25) }))}>−</button>
+      <button className="btn" disabled={!connected} onClick={refresh}><RefreshCw size={16} />{tr("Rafraîchir")}</button>
+      <button className="btn" disabled={!img?.image} onClick={toBoard}>{tr("Utiliser comme fond du tableau blanc")}</button>
+      <span className="small muted">{tr("{0} acteur(s) du filtre · glisser un point le déplace (x, y)", [actors.length])}</span>
+      <span className="spacer" /><button className="iconbtn" aria-label={tr("Zoomer")} onClick={() => setView(v => ({ ...v, z: Math.min(5, v.z * 1.25) }))}><Plus size={16} /></button><button className="iconbtn" aria-label={tr("Dézoomer")} onClick={() => setView(v => ({ ...v, z: Math.max(0.3, v.z / 1.25) }))}>−</button>
     </div>
     <div ref={box} className="otop" onWheel={e => { const z = Math.min(5, Math.max(0.3, view.z * (e.deltaY < 0 ? 1.1 : 0.9))); setView(v => ({ ...v, z })) }}
       onPointerDown={e => { if ((e.target as HTMLElement).dataset.aid) return; pan.current = { sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y } }}
@@ -323,11 +324,11 @@ function TopView({ actors, sel, setSel, update, canEdit, hasImage, bounds, refre
         pan.current = null
         if (drag) { const a = actors.find(x => x.id === drag.id)!; const [wx, wy] = toWorld(drag.x, drag.y); update([a.id], { transform: { location: [Math.round(wx), Math.round(wy), a.transform.location[2]] } }); setDrag(null) }
       }}>
-      <div style={{ position: 'absolute', left: 0, top: 0, width: W, height: H, transform: `translate(${view.x}px,${view.y}px) scale(${view.z})`, transformOrigin: '0 0' }}>
-        {img?.image ? <img src={img.image} alt="Vue du dessus de la map" width={W} height={H} draggable={false} style={{ display: 'block' }} /> : <div className="empty" style={{ width: W, height: H, display: 'grid', placeItems: 'center', border: '1px dashed var(--border)' }}>Pas encore d’image : « Rafraîchir » quand UEFN est ouvert.</div>}
+      <div style={{ position: 'absolute', left: 0, top: 0, width: W, height: H, transform: tr("translate({0}px,{1}px) scale({2})", [view.x, view.y, view.z]), transformOrigin: '0 0' }}>
+        {img?.image ? <img src={img.image} alt={tr("Vue du dessus de la map")} width={W} height={H} draggable={false} style={{ display: 'block' }} /> : <div className="empty" style={{ width: W, height: H, display: 'grid', placeItems: 'center', border: tr("1px dashed var(--border)") }}>{tr("Pas encore d’image : « Rafraîchir » quand UEFN est ouvert.")}</div>}
         {actors.map(a => {
           const [px, py] = drag?.id === a.id ? [drag.x, drag.y] : toPx(a.transform.location[0], a.transform.location[1])
-          return <button key={a.id} data-aid={a.id} className={'opoint' + (sel.includes(a.id) ? ' on' : '')} style={{ left: px, top: py, transform: `translate(-50%,-50%) scale(${1 / view.z})` }} title={a.name}
+          return <button key={a.id} data-aid={a.id} className={'opoint' + (sel.includes(a.id) ? ' on' : '')} style={{ left: px, top: py, transform: tr("translate(-50%,-50%) scale({0})", [1 / view.z]) }} title={a.name}
             onPointerDown={e => { e.stopPropagation(); setSel([a.id]); if (canEdit && !a.locked_by) { (e.target as HTMLElement).setPointerCapture?.(e.pointerId); setDrag({ id: a.id, x: px, y: py }) } }} aria-label={a.name} />
         })}
       </div>
@@ -340,25 +341,25 @@ function Journal({ st, task, setTask, tasks, act, reload }: { st: any; task: num
   const { data, reload: reloadJ } = useLoad<any[]>(map ? `/api/maps/${map.id}/uefn/journal` : null, [map?.id])
   useLive(['uefn'], reloadJ)
   const [msg, setMsg] = useState('')
-  const S: Record<string, [string, string]> = { done: ['Fait', 'b-g'], queued: ['En attente', 'b-o'], sent: ['Envoyé', ''], failed: ['Échec', 'b-r'], undone: ['Annulé', ''] }
+  const S: Record<string, [string, string]> = { done: [tr("Fait"), 'b-g'], queued: [tr("En attente"), 'b-o'], sent: [tr("Envoyé"), ''], failed: [tr("Échec"), 'b-r'], undone: [tr("Annulé"), ''] }
   return <div className="stack">
-    <div className="tiles" style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
-      <div className="card"><div className="lab">Acteurs modifiés non enregistrés</div><div className="num">{st.unsaved_actors}</div></div>
-      <div className="card"><div className="lab">Changements en attente d’UEFN</div><div className="num">{st.pending}</div></div>
+    <div className="tiles" style={{ gridTemplateColumns: tr("repeat(2, minmax(0, 1fr))") }}>
+      <div className="card"><div className="lab">{tr("Acteurs modifiés non enregistrés")}</div><div className="num">{st.unsaved_actors}</div></div>
+      <div className="card"><div className="lab">{tr("Changements en attente d’UEFN")}</div><div className="num">{st.pending}</div></div>
     </div>
     <div className="row" style={{ flexWrap: 'wrap' }}>
-      <select className="field" value={task} onChange={e => setTask(e.target.value ? Number(e.target.value) : '')} aria-label="Tâche"><option value="">Sans tâche</option>{tasks.filter(t => t.status !== 'done').map(t => <option key={t.id} value={t.number}>#{t.number} {t.title}</option>)}</select>
-      <button className="btn" disabled={!canEdit} onClick={() => act('save_level', {}, 'Niveau enregistré')}><Save size={16} />Enregistrer le niveau</button>
-      <input className="field" placeholder="Message Lore" value={msg} onChange={e => setMsg(e.target.value)} />
-      <button className="btn pri" disabled={!canEdit} onClick={() => act('lore_checkin', { message: `${task ? `#${task} ` : ''}${msg || 'Organisation du niveau'}` }, 'Archivé dans Lore')}><Archive size={16} />Archiver dans Lore</button>
+      <select className="field" value={task} onChange={e => setTask(e.target.value ? Number(e.target.value) : '')} aria-label={tr("Tâche")}><option value="">{tr("Sans tâche")}</option>{tasks.filter(t => t.status !== 'done').map(t => <option key={t.id} value={t.number}>#{t.number} {t.title}</option>)}</select>
+      <button className="btn" disabled={!canEdit} onClick={() => act('save_level', {}, tr("Niveau enregistré"))}><Save size={16} />{tr("Enregistrer le niveau")}</button>
+      <input className="field" placeholder={tr("Message Lore")} value={msg} onChange={e => setMsg(e.target.value)} />
+      <button className="btn pri" disabled={!canEdit} onClick={() => act('lore_checkin', { message: `${task ? `#${task} ` : ''}${msg || tr("Organisation du niveau")}` }, tr("Archivé dans Lore"))}><Archive size={16} />{tr("Archiver dans Lore")}</button>
     </div>
-    <p className="small muted">La publication de l’île pour les joueurs (nouvelle version, certification) se fait dans le portail créateur d’Epic. POP prépare la checklist et les notes de version (Lancer et suivre).</p>
-    <div style={{ overflowX: 'auto' }}><table className="tbl"><thead><tr><th>Quand</th><th>Qui</th><th>Changement (avant → après)</th><th>Tâche</th><th>État</th><th /></tr></thead><tbody>
+    <p className="small muted">{tr("La publication de l’île pour les joueurs (nouvelle version, certification) se fait dans le portail créateur d’Epic. POP prépare la checklist et les notes de version (Lancer et suivre).")}</p>
+    <div style={{ overflowX: 'auto' }}><table className="tbl"><thead><tr><th>{tr("Quand")}</th><th>{tr("Qui")}</th><th>{tr("Changement (avant → après)")}</th><th>{tr("Tâche")}</th><th>{tr("État")}</th><th /></tr></thead><tbody>
       {data?.map(r => <tr key={r.id}>
         <td className="small muted" style={{ whiteSpace: 'nowrap' }}>{ago(r.at)}</td><td className="small">{r.who}{r.source === 'mcp' ? ' (IA)' : r.source === 'undo' ? ' (annulation)' : ''}</td>
         <td className="small">{r.summary}{r.error && <div className="err small">{r.error}</div>}</td><td className="mono small">{r.task ? `#${r.task}` : ''}</td>
         <td><span className={'badge ' + (S[r.status]?.[1] ?? '')}>{S[r.status]?.[0] ?? r.status}</span></td>
-        <td>{r.undoable && canEdit && <button className="iconbtn" aria-label="Annuler" title="Annuler" onClick={async () => { try { await api.post(`/api/uefn-actions/${r.id}/undo`); reload(); reloadJ() } catch (e: any) { toast(e.message, true) } }}><RotateCcw size={15} /></button>}</td>
+        <td>{r.undoable && canEdit && <button className="iconbtn" aria-label={tr("Annuler")} title={tr("Annuler")} onClick={async () => { try { await api.post(`/api/uefn-actions/${r.id}/undo`); reload(); reloadJ() } catch (e: any) { toast(e.message, true) } }}><RotateCcw size={15} /></button>}</td>
       </tr>)}
     </tbody></table></div>
   </div>
@@ -371,25 +372,25 @@ function Pairing({ status, tools }: { status: string; tools: any }) {
   const local = ['localhost', '127.0.0.1', '::1'].includes(location.hostname)
   const roles = tools?.roles ?? {}
   return <section className="card">
-    <CardHead title="Relier UEFN avec UEFN Link" sub="Le relais tourne sur le PC Windows où UEFN est ouvert. Il ne touche qu’au projet choisi et pilote UEFN par son serveur MCP officiel." />
+    <CardHead title={tr("Relier UEFN avec UEFN Link")} sub={tr("Le relais tourne sur le PC Windows où UEFN est ouvert. Il ne touche qu’au projet choisi et pilote UEFN par son serveur MCP officiel.")} />
     <ol style={{ margin: 0, paddingLeft: 20, lineHeight: 1.9 }}>
-      <li>Dans UEFN, projet ouvert : <b style={{ fontWeight: 500 }}>Projet → Paramètres du projet → Enable Project Python Scripts</b>, puis <b style={{ fontWeight: 500 }}>Édition → Préférences de l’éditeur → Model Context Protocol → Start Server</b>.</li>
-      <li><a className="btn pri" style={{ height: 34 }} href={`/api/studios/${studio!.id}/relay/download`} download>Télécharger UEFN Link</a> <span className="small muted">déjà configuré pour votre compte (valable 24 h) : rien à taper.</span></li>
-      <li>Double-cliquez sur <b style={{ fontWeight: 500 }}>pop-link.exe</b> sur le PC (Windows peut demander « Exécuter quand même »). Tous vos projets UEFN sont importés : une map par projet, synchronisée. Laissez la fenêtre ouverte.</li>
+      <li>{tr("Dans UEFN, projet ouvert :")}{' '}<b style={{ fontWeight: 500 }}>{tr("Projet → Paramètres du projet → Enable Project Python Scripts")}</b>{tr(", puis")}{' '}<b style={{ fontWeight: 500 }}>{tr("Édition → Préférences de l’éditeur → Model Context Protocol → Start Server")}</b>.</li>
+      <li><a className="btn pri" style={{ height: 34 }} href={`/api/studios/${studio!.id}/relay/download`} download>{tr("Télécharger UEFN Link")}</a> <span className="small muted">{tr("déjà configuré pour votre compte (valable 24 h) : rien à taper.")}</span></li>
+      <li>{tr("Double-cliquez sur")}{' '}<b style={{ fontWeight: 500 }}>pop-link.exe</b>{' '}{tr("sur le PC (Windows peut demander « Exécuter quand même »). Tous vos projets UEFN sont importés : une map par projet, synchronisée. Laissez la fenêtre ouverte.")}</li>
     </ol>
     <details style={{ marginTop: 10 }}>
-      <summary className="small" style={{ cursor: 'pointer' }}>Autre méthode : code d’appairage pour cette map seulement</summary>
-      <div style={{ marginTop: 8 }}>{canEdit && <button className="btn" style={{ height: 34 }} onClick={async () => { try { setCode((await api.post(`/api/maps/${map!.id}/relay/pair`)).code) } catch (e: any) { toast(e.message, true) } }}>Obtenir un code</button>}
-        {code && <span> → <b className="mono" style={{ fontSize: 18, letterSpacing: 2 }}>{code}</b> <span className="small muted">(10 minutes)</span></span>}
-        <p className="small muted">Puis sur le PC : <span className="mono">pop-link.exe pair {local ? 'http://<adresse-du-serveur>:8080' : location.origin} {code ?? '<code>'} "C:\Users\vous\Documents\Fortnite Projects\MonIle"</span>. En cas de souci : <span className="mono">pop-link.exe diagnostic</span>.</p>
+      <summary className="small" style={{ cursor: 'pointer' }}>{tr("Autre méthode : code d’appairage pour cette map seulement")}</summary>
+      <div style={{ marginTop: 8 }}>{canEdit && <button className="btn" style={{ height: 34 }} onClick={async () => { try { setCode((await api.post(`/api/maps/${map!.id}/relay/pair`)).code) } catch (e: any) { toast(e.message, true) } }}>{tr("Obtenir un code")}</button>}
+        {code && <span> → <b className="mono" style={{ fontSize: 18, letterSpacing: 2 }}>{code}</b> <span className="small muted">{tr("(10 minutes)")}</span></span>}
+        <p className="small muted">{tr("Puis sur le PC :")}{' '}<span className="mono">{tr("pop-link.exe pair {0} {1} \"C:\\Users\\vous\\Documents\\Fortnite Projects\\MonIle\"", [local ? 'http://<adresse-du-serveur>:8080' : location.origin, code ?? '<code>'])}</span>{tr(". En cas de souci :")}{' '}<span className="mono">{tr("pop-link.exe diagnostic")}</span>.</p>
       </div>
     </details>
     <div className="row small" style={{ flexWrap: 'wrap', marginTop: 12 }}>
-      <span>État : <b style={{ fontWeight: 500 }}>{STATUS_LABEL[status]}</b></span>
-      {tools?.url && <span className="muted">MCP : {tools.url}</span>}
-      {tools?.list && <span className="muted">{tools.list.length} outil(s) UEFN · Python : {roles.python ?? '?'} · compilation : {roles.compile ?? '?'} · session : {roles.push ?? '?'}</span>}
+      <span>{tr("État :")}{' '}<b style={{ fontWeight: 500 }}>{STATUS_LABEL[status]}</b></span>
+      {tools?.url && <span className="muted">{tr("MCP : {0}", [tools.url])}</span>}
+      {tools?.list && <span className="muted">{tr("{0} outil(s) UEFN · Python : {1} · compilation : {2} · session : {3}", [tools.list.length, roles.python ?? '?', roles.compile ?? '?', roles.push ?? '?'])}</span>}
     </div>
-    {tools?.list?.length > 0 && <details style={{ marginTop: 8 }}><summary className="small" style={{ cursor: 'pointer' }}>Voir les outils détectés</summary><div className="row small" style={{ flexWrap: 'wrap', gap: 6, marginTop: 8 }}>{tools.list.map((t: any) => <span key={t.name} className="chip mono" style={{ height: 26 }} title={t.description}>{t.name}</span>)}</div></details>}
-    {devices && devices.length > 0 && <div className="list" style={{ marginTop: 12 }}>{devices.map(d => <div key={d.id} className="li"><span style={{ flex: 1 }}>{d.name} <span className="small muted">({d.owner}{d.last_seen ? ', vu ' + ago(d.last_seen) : ''})</span></span>{canEdit && <button className="iconbtn" aria-label="Retirer ce relais" onClick={async () => { if (confirm('Retirer ce relais ? Il faudra l’appairer à nouveau.')) { await api.del(`/api/relay-devices/${d.id}`); reload() } }}><Trash2 size={15} /></button>}</div>)}</div>}
+    {tools?.list?.length > 0 && <details style={{ marginTop: 8 }}><summary className="small" style={{ cursor: 'pointer' }}>{tr("Voir les outils détectés")}</summary><div className="row small" style={{ flexWrap: 'wrap', gap: 6, marginTop: 8 }}>{tools.list.map((t: any) => <span key={t.name} className="chip mono" style={{ height: 26 }} title={t.description}>{t.name}</span>)}</div></details>}
+    {devices && devices.length > 0 && <div className="list" style={{ marginTop: 12 }}>{devices.map(d => <div key={d.id} className="li"><span style={{ flex: 1 }}>{d.name} <span className="small muted">({d.owner}{d.last_seen ? ', vu ' + ago(d.last_seen) : ''})</span></span>{canEdit && <button className="iconbtn" aria-label={tr("Retirer ce relais")} onClick={async () => { if (confirm(tr("Retirer ce relais ? Il faudra l’appairer à nouveau."))) { await api.del(`/api/relay-devices/${d.id}`); reload() } }}><Trash2 size={15} /></button>}</div>)}</div>}
   </section>
 }

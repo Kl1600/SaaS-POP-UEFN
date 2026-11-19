@@ -265,16 +265,16 @@ pub async fn invite(State(st): State<AppState>, u: AuthUser, Json(b): Json<Invit
 pub async fn users(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
     require(&st, &u).await?;
     #[allow(clippy::type_complexity)]
-    let rows: Vec<(i64, String, String, String, Option<String>, i64, i64, i64, i64, Option<String>, i64)> = sqlx::query_as(
+    let rows: Vec<(i64, String, String, String, Option<String>, i64, i64, i64, i64, Option<String>, i64, String, Option<String>)> = sqlx::query_as(
         "SELECT u.id, u.email, u.name, u.created_at, u.last_seen, u.is_admin, u.disabled,
                 (SELECT COUNT(*) FROM memberships m WHERE m.user_id = u.id),
-                (SELECT COUNT(*) FROM tasks t WHERE t.assignee_id = u.id AND t.status = 'done'),
-                CASE WHEN u.locked_until > datetime('now') THEN u.locked_until END, u.totp_enabled
+                (SELECT COUNT(*) FROM tasks t WHERE t.assignee_id = u.id AND t.status = 'done'), u.username, u.must_change_password, u.plan,
+                CASE WHEN u.locked_until > datetime('now') THEN u.locked_until END
          FROM users u ORDER BY u.created_at DESC LIMIT 2000",
     ).fetch_all(&st.db).await?;
     Ok(Json(json!(rows.into_iter().map(|r| json!({
         "id": r.0, "email": r.1, "name": r.2, "created_at": r.3, "last_seen": r.4, "is_admin": r.5 == 1, "disabled": r.6 == 1, "studios": r.7, "tasks_done": r.8,
-        "locked_until": r.9, "totp": r.10 == 1, "me": r.0 == u.id,
+        "username": r.9, "must_change": r.10 == 1, "plan": r.11, "locked_until": r.12, "me": r.0 == u.id,
     })).collect::<Vec<_>>())))
 }
 
@@ -294,6 +294,94 @@ pub async fn update_user(State(st): State<AppState>, u: AuthUser, Path(id): Path
         }
     }
     Ok(Json(json!({ "ok": true })))
+}
+
+#[derive(Deserialize)]
+pub struct PlanIn { plan: String }
+/// Change l'abonnement d'un compte (bêta : pas encore de paiement).
+pub async fn set_plan(State(st): State<AppState>, u: AuthUser, Path(id): Path<i64>, Json(b): Json<PlanIn>) -> ApiResult<Value> {
+    require(&st, &u).await?;
+    if !crate::billing::PLANS.contains(&b.plan.as_str()) { return Err(bad("Plan inconnu.")) }
+    let n = sqlx::query("UPDATE users SET plan = ? WHERE id = ?").bind(&b.plan).bind(id).execute(&st.db).await?.rows_affected();
+    if n == 0 { return Err(AppError::NotFound) }
+    log(&st, &u, "admin_plan_modifié", &format!("utilisateur {id} : {}", b.plan)).await;
+    Ok(Json(json!({ "ok": true })))
+}
+
+// ---------- Comptes créés par l'administrateur (bêta) ----------
+
+/// Mot de passe provisoire lisible, sans caractères ambigus (ex. « k7mq-x2pa-9hrt »).
+fn temp_password() -> String {
+    use rand::Rng;
+    const A: &[u8] = b"abcdefghjkmnpqrstuvwxyz23456789";
+    let mut r = rand::rngs::OsRng;
+    (0..3).map(|_| (0..4).map(|_| A[r.gen_range(0..A.len())] as char).collect::<String>()).collect::<Vec<_>>().join("-")
+}
+
+/// Identifiant : 3 à 32 caractères, lettres sans accent, chiffres, point, tiret, tiret bas.
+fn check_username(raw: &str) -> Result<String, AppError> {
+    let u = raw.trim().to_lowercase();
+    let n = u.chars().count();
+    if !(3..=32).contains(&n) { return Err(bad("L’identifiant doit faire entre 3 et 32 caractères.")) }
+    if !u.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '.' | '-' | '_')) {
+        return Err(bad("L’identifiant ne peut contenir que des lettres sans accent, des chiffres, des points et des tirets."))
+    }
+    Ok(u)
+}
+
+#[derive(Deserialize)]
+pub struct AccountIn {
+    username: String,
+    name: String,
+    email: String,
+    password: Option<String>,
+    waitlist_id: Option<i64>,
+    plan: Option<String>,
+}
+
+/// Crée le compte d'un bêta-testeur. Le mot de passe (provisoire) n'est montré qu'une fois ;
+/// la personne devra le changer à sa première connexion.
+pub async fn create_account(State(st): State<AppState>, u: AuthUser, Json(b): Json<AccountIn>) -> ApiResult<Value> {
+    require(&st, &u).await?;
+    let username = check_username(&b.username)?;
+    let email = b.email.trim().to_lowercase();
+    if !email.contains('@') || email.len() > 200 { return Err(bad("Adresse e-mail invalide.")) }
+    let name: String = if b.name.trim().is_empty() { username.clone() } else { b.name.trim().chars().take(80).collect() };
+    let taken: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users WHERE username = ?1 OR email = ?1").bind(&username).fetch_one(&st.db).await?;
+    if taken > 0 { return Err(AppError::Conflict("Cet identifiant est déjà pris.".into())) }
+    let has: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users WHERE email = ?").bind(&email).fetch_one(&st.db).await?;
+    if has > 0 { return Err(AppError::Conflict("Un compte existe déjà avec cette adresse e-mail.".into())) }
+    let password = match b.password.as_deref().map(str::trim).filter(|p| !p.is_empty()) {
+        Some(p) => { crate::security::password_policy(p, &email)?; p.to_string() }
+        None => temp_password(),
+    };
+    let plan = b.plan.as_deref().unwrap_or("pro");
+    if !crate::billing::PLANS.contains(&plan) { return Err(bad("Plan inconnu.")) }
+    let id: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash, username, must_change_password, plan) VALUES (?, ?, ?, ?, 1, ?) RETURNING id")
+        .bind(&email).bind(&name).bind(crate::auth::hash_password(&password)?).bind(&username).bind(plan).fetch_one(&st.db).await?;
+    // Relie la demande de la liste d'attente (celle choisie, sinon celle de la même adresse).
+    let wid: Option<i64> = match b.waitlist_id {
+        Some(w) => Some(w),
+        None => sqlx::query_scalar("SELECT id FROM waitlist WHERE email = ?").bind(&email).fetch_optional(&st.db).await?,
+    };
+    if let Some(w) = wid {
+        sqlx::query("UPDATE waitlist SET decided_at = COALESCE(decided_at, datetime('now')), decided_by = COALESCE(decided_by, ?) WHERE id = ?").bind(u.id).bind(w).execute(&st.db).await?;
+        mark_registered(&st, w, id).await;
+    }
+    log(&st, &u, "admin_compte_créé", &format!("{username} ({email})")).await;
+    Ok(Json(json!({ "id": id, "username": username, "name": name, "email": email, "password": password, "url": crate::mail::public_url() + "/connexion" })))
+}
+
+/// Nouveau mot de passe provisoire pour un utilisateur (ses sessions sont fermées).
+pub async fn reset_password(State(st): State<AppState>, u: AuthUser, Path(id): Path<i64>) -> ApiResult<Value> {
+    require(&st, &u).await?;
+    if id == u.id { return Err(bad("Changez votre propre mot de passe dans Paramètres.")) }
+    let (email, username): (String, Option<String>) = sqlx::query_as("SELECT email, username FROM users WHERE id = ?").bind(id).fetch_optional(&st.db).await?.ok_or(AppError::NotFound)?;
+    let password = temp_password();
+    sqlx::query("UPDATE users SET password_hash = ?, must_change_password = 1, failed_logins = 0, locked_until = NULL WHERE id = ?").bind(crate::auth::hash_password(&password)?).bind(id).execute(&st.db).await?;
+    sqlx::query("DELETE FROM sessions WHERE user_id = ?").bind(id).execute(&st.db).await?;
+    log(&st, &u, "admin_mot_de_passe_réinitialisé", &username.clone().unwrap_or_else(|| email.clone())).await;
+    Ok(Json(json!({ "username": username.unwrap_or(email), "password": password, "url": crate::mail::public_url() + "/connexion" })))
 }
 
 // ---------- Dépannage d'un compte (#38) ----------
@@ -326,18 +414,6 @@ pub async fn unlock_user(State(st): State<AppState>, u: AuthUser, Path(id): Path
     sqlx::query("UPDATE users SET failed_logins = 0, locked_until = NULL WHERE id = ?").bind(id).execute(&st.db).await?;
     log(&st, &u, "admin_compte_débloqué", &email).await;
     Ok(Json(json!({ "ok": true })))
-}
-
-/// Coupe la double authentification d'un membre qui a perdu son téléphone et ses codes de secours :
-/// secret et codes effacés, toutes ses sessions fermées. Il se reconnecte avec son seul mot de passe.
-pub async fn disable_user_2fa(State(st): State<AppState>, u: AuthUser, Path(id): Path<i64>) -> ApiResult<Value> {
-    let (email, _) = target(&st, &u, id).await?;
-    let on: i64 = sqlx::query_scalar("SELECT totp_enabled FROM users WHERE id = ?").bind(id).fetch_one(&st.db).await?;
-    if on == 0 { return Err(bad("Ce compte n’a pas la double authentification.")) }
-    sqlx::query("UPDATE users SET totp_enabled = 0, totp_secret = NULL, recovery = '[]', totp_last_step = 0 WHERE id = ?").bind(id).execute(&st.db).await?;
-    let n = sqlx::query("DELETE FROM sessions WHERE user_id = ?").bind(id).execute(&st.db).await?.rows_affected();
-    log(&st, &u, "admin_2fa_coupée", &format!("{email} · {n} session(s) fermée(s)")).await;
-    Ok(Json(json!({ "ok": true, "sessions_closed": n })))
 }
 
 fn plan_json(p: &crate::manage::DeletionPlan) -> Value {
@@ -414,12 +490,12 @@ mod depannage_tests {
     const NEW_PW: &str = "Nouveau-secret-tout-neuf-77";
 
     async fn user(st: &AppState, email: &str, admin: bool) -> AuthUser {
-        let id: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash, is_admin, totp_enabled) VALUES (?, ?, ?, ?, ?) RETURNING id")
-            .bind(email).bind(email.split('@').next().unwrap()).bind(hash_password(PW).unwrap()).bind(admin as i64).bind(admin as i64)
+        let id: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash, is_admin) VALUES (?, ?, ?, ?) RETURNING id")
+            .bind(email).bind(email.split('@').next().unwrap()).bind(hash_password(PW).unwrap()).bind(admin as i64)
             .fetch_one(&st.db).await.unwrap();
         let sid = format!("session-{id}");
-        // Session d'admin déverrouillée (double authentification + confirmation récente).
-        sqlx::query("INSERT INTO sessions (token_hash, user_id, expires_at, mfa, sudo_until) VALUES (?, ?, datetime('now', '+1 day'), 1, datetime('now', '+10 minutes'))")
+        // Session d'admin déverrouillée (mot de passe confirmé il y a moins de 30 minutes).
+        sqlx::query("INSERT INTO sessions (token_hash, user_id, expires_at, sudo_until) VALUES (?, ?, datetime('now', '+1 day'), datetime('now', '+10 minutes'))")
             .bind(&sid).bind(id).execute(&st.db).await.unwrap();
         AuthUser { id, email: email.into(), name: email.into(), sid }
     }
@@ -430,13 +506,12 @@ mod depannage_tests {
     async fn audited(st: &AppState, action: &str, by: i64) -> bool {
         sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM audit_log WHERE action = ? AND user_id = ?").bind(action).bind(by).fetch_one(&st.db).await.unwrap() > 0
     }
-    /// Les cinq actions de dépannage, sur le compte `id`, par `u`.
+    /// Les quatre actions de dépannage, sur le compte `id`, par `u`.
     async fn all(st: &AppState, u: &AuthUser, id: i64) -> Vec<Result<Value, AppError>> {
         let s = || State(st.clone());
         vec![
             user_reset_link(s(), u.clone(), Path(id)).await.map(|j| j.0),
             unlock_user(s(), u.clone(), Path(id)).await.map(|j| j.0),
-            disable_user_2fa(s(), u.clone(), Path(id)).await.map(|j| j.0),
             deletion_preview(s(), u.clone(), Path(id)).await.map(|j| j.0),
             delete_user(s(), u.clone(), Path(id), Json(DeleteUserIn { confirm: "x@exemple.com".into() })).await.map(|j| j.0),
         ]
@@ -476,8 +551,7 @@ mod depannage_tests {
         let b = serde_json::from_value(json!({ "token": token, "password": NEW_PW })).unwrap();
         let _ = crate::account::reset(State(st.clone()), Json(b)).await.unwrap();
         // Le blocage est levé : connexion immédiate avec le nouveau mot de passe.
-        let v = login(&st, "membre@exemple.com", NEW_PW).await.unwrap();
-        assert!(v.get("mfa").is_none());
+        login(&st, "membre@exemple.com", NEW_PW).await.unwrap();
         // Le lien ne sert qu'une fois.
         let b = serde_json::from_value(json!({ "token": token, "password": "Encore-un-autre-secret-88" })).unwrap();
         assert!(crate::account::reset(State(st.clone()), Json(b)).await.is_err());
@@ -498,25 +572,6 @@ mod depannage_tests {
         login(&st, "membre@exemple.com", PW).await.unwrap();
         let list = users(State(st.clone()), admin.clone()).await.unwrap().0;
         assert!(list.as_array().unwrap().iter().find(|r| r["id"] == m.id).unwrap()["locked_until"].is_null());
-    }
-
-    #[tokio::test]
-    async fn couper_la_double_authentification() {
-        let st = crate::test_state().await;
-        let admin = user(&st, "admin@exemple.com", true).await;
-        let m = user(&st, "membre@exemple.com", false).await;
-        assert!(matches!(disable_user_2fa(State(st.clone()), admin.clone(), Path(m.id)).await, Err(AppError::BadRequest(_))), "pas de double authentification à couper");
-        sqlx::query("UPDATE users SET totp_enabled = 1, totp_secret = 'JBSWY3DPEHPK3PXP', recovery = '[\"h1\",\"h2\"]' WHERE id = ?").bind(m.id).execute(&st.db).await.unwrap();
-        assert_eq!(login(&st, "membre@exemple.com", PW).await.unwrap()["mfa"], true, "le code est demandé");
-        let r = disable_user_2fa(State(st.clone()), admin.clone(), Path(m.id)).await.unwrap().0;
-        assert_eq!(r["sessions_closed"], 1);
-        let (on, secret, rec): (i64, Option<String>, String) = sqlx::query_as("SELECT totp_enabled, totp_secret, recovery FROM users WHERE id = ?").bind(m.id).fetch_one(&st.db).await.unwrap();
-        assert_eq!((on, secret, rec.as_str()), (0, None, "[]"));
-        assert!(audited(&st, "admin_2fa_coupée", admin.id).await);
-        // Connexion avec le seul mot de passe ; la personne peut ensuite réactiver la double authentification.
-        assert!(login(&st, "membre@exemple.com", PW).await.unwrap().get("mfa").is_none());
-        let me = AuthUser { id: m.id, email: m.email.clone(), name: m.name.clone(), sid: String::new() };
-        let _ = crate::security::setup_2fa(State(st.clone()), me).await.unwrap();
     }
 
     #[tokio::test]

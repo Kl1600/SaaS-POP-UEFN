@@ -1,0 +1,39 @@
+/* Choix de la langue (site vitrine et application). */
+/* ---------- Choix de la langue ---------- */
+.llang{position:relative}
+.llangbtn{display:inline-flex;align-items:center;gap:7px;background:transparent;border:1px solid var(--line2, var(--border, rgba(127,127,127,.35)));border-radius:999px;padding:7px 11px 7px 9px;color:var(--t1, var(--text, inherit));font-size:13.5px;font-weight:600;transition:border-color .15s,background .15s}
+.llangbtn:hover{border-color:rgba(127,127,127,.6);background:rgba(127,127,127,.08)}
+.llangbtn img{width:20px;height:15px;border-radius:3px;object-fit:cover;box-shadow:0 0 0 1px rgba(255,255,255,.12)}
+.llangbtn svg{opacity:.7}
+.llangpop{position:absolute;top:calc(100% + 10px);inset-inline-end:0;width:min(620px,calc(100vw - 24px));background:#fff;color:#16161a;border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,.45),0 0 0 1px rgba(0,0,0,.06);padding:16px;z-index:60;animation:llangin .16s ease-out}
+@keyframes llangin{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.llanghead{display:flex;gap:10px;align-items:center;margin-bottom:12px}
+.llangsearch{flex:1;display:flex;align-items:center;gap:8px;border:1px solid #dcdce2;border-radius:10px;padding:0 12px;color:#70707a;transition:border-color .15s,box-shadow .15s}
+.llangsearch:focus-within{border-color:#ED753E;box-shadow:0 0 0 3px rgba(237,117,62,.18)}
+.llangsearch input{flex:1;border:0;outline:0;background:transparent;color:#16161a;font-size:15px;padding:11px 0;min-width:0}
+.llangsearch input::placeholder{color:#8a8a94}
+.llangx{display:grid;place-items:center;width:38px;height:38px;border:0;border-radius:10px;background:#f2f2f5;color:#40404a}
+.llangx:hover{background:#e7e7ec}
+.llanggrid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;max-height:min(60vh,420px);overflow:auto}
+.llangopt{display:flex;align-items:center;gap:11px;border:0;background:transparent;border-radius:10px;padding:10px;text-align:start;color:#16161a;transition:background .12s}
+.llangopt:hover{background:#f3f3f6}
+.llangopt.on{background:#fff1e9;box-shadow:inset 0 0 0 1px rgba(237,117,62,.45)}
+.llangopt img{width:30px;height:22px;border-radius:4px;object-fit:cover;flex:none;box-shadow:0 0 0 1px rgba(0,0,0,.08)}
+.llangopt span{display:flex;flex-direction:column;min-width:0}
+.llangopt b{font-size:14.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.llangopt small{font-size:13px;color:#70707a}
+.llangnone{grid-column:1/-1;text-align:center;color:#8a8a94;padding:18px 0}
+@media (max-width:640px){.llanggrid{grid-template-columns:repeat(2,1fr)}.llangpop{position:fixed;top:64px;inset-inline:12px;width:auto}}
+@media (max-width:820px){.llangbtn span{display:none}.llangbtn{padding:7px 9px}}
+
+
+.llangnote{margin:0 0 12px;padding:10px 12px;border-radius:10px;background:#fff6ef;color:#7a3d18;font-size:13.5px;line-height:1.45}
+.llang.inapp .llangbtn{height:36px}
+.authlang .llangbtn{color:#fff;border-color:rgba(255,255,255,.3)}
+.authlang .llangpop{top:auto;bottom:calc(100% + 10px);inset-inline-end:auto;left:50%;transform:translateX(-50%);animation:none}
+.llang.inapp .llangbtn{height:38px;font-weight:500}
+.llang.inapp .llangpop{z-index:80}
+.llang img{margin:0;display:inline-block}
+.llangbtn img{height:15px}
+.llangopt img{height:22px}
+.authlang{position:relative}

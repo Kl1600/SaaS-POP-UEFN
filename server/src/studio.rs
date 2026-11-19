@@ -202,6 +202,97 @@ pub async fn remove_member(State(st): State<AppState>, u: AuthUser, Path((sid, u
     Ok(Json(json!({ "ok": true })))
 }
 
+/// Espace perso (maps faites seul) : pas d'invitations ni de gestion de studio.
+pub async fn is_personal(st: &AppState, sid: i64) -> Result<bool, AppError> {
+    Ok(sqlx::query_scalar::<_, i64>("SELECT personal FROM studios WHERE id = ?").bind(sid).fetch_optional(&st.db).await?.unwrap_or(0) == 1)
+}
+
+/// Crée (si besoin) l'espace perso du compte et renvoie son id.
+pub async fn ensure_personal(st: &AppState, uid: i64) -> Result<i64, AppError> {
+    let found: Option<i64> = sqlx::query_scalar("SELECT s.id FROM studios s JOIN memberships m ON m.studio_id = s.id WHERE s.personal = 1 AND m.user_id = ? AND m.role = 'owner' LIMIT 1").bind(uid).fetch_optional(&st.db).await?;
+    if let Some(id) = found { return Ok(id) }
+    // Ancien studio créé automatiquement (« Studio de … », seul membre) : il devient l'espace perso.
+    let auto: Option<i64> = sqlx::query_scalar(
+        "SELECT s.id FROM studios s JOIN memberships m ON m.studio_id = s.id WHERE m.user_id = ? AND m.role = 'owner' AND s.name LIKE 'Studio de %'
+           AND (SELECT COUNT(*) FROM memberships x WHERE x.studio_id = s.id) = 1 ORDER BY s.id LIMIT 1",
+    ).bind(uid).fetch_optional(&st.db).await?;
+    if let Some(id) = auto {
+        sqlx::query("UPDATE studios SET personal = 1 WHERE id = ?").bind(id).execute(&st.db).await?;
+        return Ok(id);
+    }
+    let id: i64 = sqlx::query_scalar("INSERT INTO studios (name, personal) VALUES ('Mes maps', 1) RETURNING id").fetch_one(&st.db).await?;
+    sqlx::query("INSERT INTO memberships (studio_id, user_id, role) VALUES (?, ?, 'owner')").bind(id).bind(uid).execute(&st.db).await?;
+    Ok(id)
+}
+
+#[derive(Deserialize)]
+pub struct MoveIn {
+    studio_id: Option<i64>,
+    new_studio: Option<String>,
+    /// Vrai : ne déplace rien, renvoie seulement ce que le déplacement changerait (pour la confirmation).
+    #[serde(default)]
+    preview: bool,
+}
+
+/// Passer une map dans un autre studio (ou dans un nouveau studio créé pour l'occasion), par exemple
+/// pour travailler en équipe sur une map commencée seul, ou la reprendre seul. Il faut être admin des deux côtés.
+/// Vers l'espace perso : toutes les tâches attribuées à quelqu'un d'autre reviennent à la personne
+/// qui déplace la map, et les fichiers verrouillés par d'autres sont libérés (ils n'y ont plus accès).
+pub async fn move_map(State(st): State<AppState>, u: AuthUser, Path(mid): Path<i64>, Json(b): Json<MoveIn>) -> ApiResult<Value> {
+    let ctx = map_ctx(&st, &u, mid).await?;
+    ctx.require(Role::Admin)?;
+    let new_name = b.new_studio.as_deref().map(str::trim).filter(|n| !n.is_empty());
+    if let Some(name) = new_name { check_len("Nom du studio", name, 1, 60)?; }
+    if let (Some(sid), None) = (b.studio_id, new_name) {
+        if studio_role(&st, &u, sid).await? < Role::Admin { return Err(AppError::Forbidden) }
+        if sid == ctx.studio_id { return Ok(Json(json!({ "ok": true, "studio_id": sid, "reassigned": 0 }))) }
+    } else if new_name.is_none() {
+        return Err(bad("Choisissez un studio."));
+    }
+    if !is_personal(&st, ctx.studio_id).await? {
+        let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM maps WHERE studio_id = ?").bind(ctx.studio_id).fetch_one(&st.db).await?;
+        if n <= 1 { return Err(bad("C’est la dernière map du studio : elle ne peut pas le quitter.")) }
+    }
+    let to_personal = match (b.studio_id, new_name) { (Some(sid), None) => is_personal(&st, sid).await?, _ => false };
+    let others: i64 = if to_personal {
+        sqlx::query_scalar("SELECT COUNT(*) FROM tasks WHERE map_id = ? AND assignee_id IS NOT NULL AND assignee_id <> ?").bind(mid).bind(u.id).fetch_one(&st.db).await?
+    } else { 0 };
+    if b.preview {
+        return Ok(Json(json!({ "ok": true, "preview": true, "to_personal": to_personal, "reassigned": others })));
+    }
+
+    // Tout ou rien : la map ne peut pas se retrouver à moitié déplacée.
+    let mut tx = st.db.begin().await?;
+    let target = match (b.studio_id, new_name) {
+        (_, Some(name)) => {
+            let sid: i64 = sqlx::query_scalar("INSERT INTO studios (name) VALUES (?) RETURNING id").bind(name).fetch_one(&mut *tx).await?;
+            sqlx::query("INSERT INTO memberships (studio_id, user_id, role) VALUES (?, ?, 'owner')").bind(sid).bind(u.id).execute(&mut *tx).await?;
+            sid
+        }
+        (Some(sid), None) => sid,
+        _ => unreachable!(),
+    };
+    // Garde-fou si la map a été déplacée entre-temps par quelqu'un d'autre.
+    let r = sqlx::query("UPDATE maps SET studio_id = ? WHERE id = ? AND studio_id = ?").bind(target).bind(mid).bind(ctx.studio_id).execute(&mut *tx).await?;
+    if r.rows_affected() == 0 { return Err(bad("La map a changé de place entre-temps. Rechargez la page.")) }
+    let mut reassigned = 0;
+    if to_personal {
+        reassigned = sqlx::query("UPDATE tasks SET assignee_id = ? WHERE map_id = ? AND assignee_id IS NOT NULL AND assignee_id <> ?")
+            .bind(u.id).bind(mid).bind(u.id).execute(&mut *tx).await?.rows_affected();
+        sqlx::query("DELETE FROM file_locks WHERE map_id = ? AND (user_id IS NULL OR user_id <> ?)").bind(mid).bind(u.id).execute(&mut *tx).await?;
+    }
+    tx.commit().await?;
+
+    let (title, detail) = if to_personal {
+        ("Map reprise en solo", if reassigned > 0 { format!("{} tâche(s) réattribuée(s) à {}", reassigned, u.name) } else { String::new() })
+    } else {
+        ("Map passée dans un studio", String::new())
+    };
+    log_activity(&st, mid, Some(u.id), "team", title, &detail).await?;
+    crate::access::notify(&st, mid, json!({ "t": "refresh", "what": "me" }));
+    Ok(Json(json!({ "ok": true, "studio_id": target, "reassigned": reassigned })))
+}
+
 #[derive(Deserialize)]
 pub struct InviteIn {
     email: String,
@@ -211,6 +302,9 @@ pub struct InviteIn {
 pub async fn invite(State(st): State<AppState>, u: AuthUser, Path(sid): Path<i64>, Json(b): Json<InviteIn>) -> ApiResult<Value> {
     if studio_role(&st, &u, sid).await? < Role::Admin {
         return Err(AppError::Forbidden);
+    }
+    if is_personal(&st, sid).await? {
+        return Err(bad("Vos maps perso sont pour travailler seul. Pour inviter quelqu’un, passez la map dans un studio (Équipe → Travailler en équipe)."));
     }
     let role = Role::parse(&b.role).filter(|r| *r != Role::Owner).ok_or_else(|| bad("Rôle invalide."))?;
     check_len("E-mail", &b.email, 3, 200)?;

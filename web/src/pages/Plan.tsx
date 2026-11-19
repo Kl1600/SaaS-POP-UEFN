@@ -1,22 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, Trash2 } from 'lucide-react'
 import { addDays, api, frDate, ymd } from '../api'
 import { useApp, useLive, useLoad } from '../state'
-import { Avatar, CardHead, PageHead, Tabs, TAGS } from '../components/ui'
+import { Avatar, CardHead, PageHead, Tabs, TAGS, tagLabel } from '../components/ui'
 import { useMembers } from './Tasks'
+import { tr } from '../i18n/t'
+import { useNav } from '../routes'
 
 const GENRES: [string, string, string][] = [
-  ['cr', 'Gendarmes et voleurs', 'Équipes, braquages, boutique'], ['tycoon', 'Tycoon', 'Production, améliorations'], ['boxfight', 'Box fight / Zone wars', 'Manches courtes'],
-  ['deathrun', 'Deathrun / Parkour', 'Niveaux, checkpoints'], ['horreur', 'Horreur / Histoire', 'Narration, ambiance'], ['course', 'Course', 'Circuits, chronos'], ['party', 'Party game', 'Mini-jeux'],
+  ['cr', tr("Gendarmes et voleurs"), tr("Équipes, braquages, boutique")], ['tycoon', tr("Tycoon"), tr("Production, améliorations")], ['boxfight', tr("Box fight / Zone wars"), tr("Manches courtes")],
+  ['deathrun', tr("Deathrun / Parkour"), tr("Niveaux, checkpoints")], ['horreur', tr("Horreur / Histoire"), tr("Narration, ambiance")], ['course', tr("Course"), tr("Circuits, chronos")], ['party', tr("Party game"), tr("Mini-jeux")],
 ]
 
 export default function Plan() {
   const [tab, setTab] = useState<'timeline' | 'wizard' | 'seasons'>('timeline')
   return (
     <main className="content">
-      <PageHead title="Planifier" help="Découpez la map en tâches d'une heure, placez-les dans le temps et soyez prévenu en cas de retard." />
-      <Tabs value={tab} onChange={setTab} items={[['timeline', 'Planning'], ['wizard', 'Générateur de projet'], ['seasons', 'Saisons et mises à jour']]} />
+      <PageHead title={tr("Planifier")} help={tr("Découpez la map en tâches d'une heure, placez-les dans le temps et soyez prévenu en cas de retard.")} />
+      <Tabs value={tab} onChange={setTab} items={[['timeline', tr("Planning")], ['wizard', tr("Générateur de projet")], ['seasons', tr("Saisons et mises à jour")]]} />
       {tab === 'timeline' && <Timeline />}
       {tab === 'wizard' && <Wizard done={() => setTab('timeline')} />}
       {tab === 'seasons' && <Seasons />}
@@ -52,7 +53,7 @@ function Wizard({ done }: { done: () => void }) {
   }
   const apply = async () => {
     setBusy(true)
-    try { const r = await api.post(`/api/maps/${map!.id}/plan/apply`, { tasks: plan.tasks, milestones: plan.milestones }); toast(`${r.created} tâches créées`); done() } catch (e: any) { toast(e.message, true) } finally { setBusy(false) }
+    try { const r = await api.post(`/api/maps/${map!.id}/plan/apply`, { tasks: plan.tasks, milestones: plan.milestones }); toast(tr("{0} tâches créées", [r.created])); done() } catch (e: any) { toast(e.message, true) } finally { setBusy(false) }
   }
   const setT = (k: number, p: any) => setPlan({ ...plan, tasks: plan.tasks.map((t: any) => (t.key === k ? { ...t, ...p } : t)) })
   const lots = plan ? Array.from(new Set(plan.tasks.map((t: any) => t.lot))) as string[] : []
@@ -60,24 +61,24 @@ function Wizard({ done }: { done: () => void }) {
 
   if (plan) return <>
     <div className="tiles">
-      <div className="card"><div className="lab">Tâches d'1 heure</div><div className="num">{plan.stats.tasks}</div></div>
-      <div className="card"><div className="lab">Confiées à des agents IA</div><div className="num">{plan.stats.ai}</div></div>
-      <div className="card"><div className="lab">Dernière tâche prévue</div><div className="num">{frDate(plan.stats.end)}</div><div className="muted">{plan.stats.late ? 'après la date de soumission' : 'avant la soumission'}</div></div>
-      <div className="card"><div className="lab">Jalons</div><div className="num">{plan.milestones.length}</div><div className="muted">{plan.milestones.map((m: any) => m.title).join(' · ')}</div></div>
+      <div className="card"><div className="lab">{tr("Tâches d'1 heure")}</div><div className="num">{plan.stats.tasks}</div></div>
+      <div className="card"><div className="lab">{tr("Confiées à des agents IA")}</div><div className="num">{plan.stats.ai}</div></div>
+      <div className="card"><div className="lab">{tr("Dernière tâche prévue")}</div><div className="num">{frDate(plan.stats.end)}</div><div className="muted">{plan.stats.late ? tr("après la date de soumission") : tr("avant la soumission")}</div></div>
+      <div className="card"><div className="lab">{tr("Jalons")}</div><div className="num">{plan.milestones.length}</div><div className="muted">{plan.milestones.map((m: any) => m.title).join(' · ')}</div></div>
     </div>
-    <div className="row"><button className="btn" onClick={() => setPlan(null)}>Retour</button><span className="muted small">Tout est modifiable avant de valider.</span><span className="spacer" /><button className="btn pri" disabled={busy} onClick={apply}>Valider le plan</button></div>
+    <div className="row"><button className="btn" onClick={() => setPlan(null)}>{tr("Retour")}</button><span className="muted small">{tr("Tout est modifiable avant de valider.")}</span><span className="spacer" /><button className="btn pri" disabled={busy} onClick={apply}>{tr("Valider le plan")}</button></div>
     {lots.map(l => (
       <section key={l} className="card">
-        <CardHead title={l} sub={`${plan.tasks.filter((t: any) => t.lot === l).length} tâches`} />
-        <div style={{ overflowX: 'auto' }}><table className="tbl"><thead><tr><th>Tâche (1 h)</th><th>Étiquette</th><th>Jour prévu</th><th>Dépend de</th><th>Assigné suggéré</th><th /></tr></thead><tbody>
+        <CardHead title={l} sub={tr("{0} tâches", [plan.tasks.filter((t: any) => t.lot === l).length])} />
+        <div style={{ overflowX: 'auto' }}><table className="tbl"><thead><tr><th>{tr("Tâche (1 h)")}</th><th>{tr("Étiquette")}</th><th>{tr("Jour prévu")}</th><th>{tr("Dépend de")}</th><th>{tr("Assigné suggéré")}</th><th /></tr></thead><tbody>
           {plan.tasks.filter((t: any) => t.lot === l).map((t: any) => (
             <tr key={t.key}>
               <td><input className="field" style={{ width: '100%', minWidth: 220 }} value={t.title} onChange={e => setT(t.key, { title: e.target.value })} />{t.ai && <span className="badge" style={{ marginTop: 4 }}>IA</span>}</td>
-              <td><select className="field" value={t.tag} onChange={e => setT(t.key, { tag: e.target.value })}>{TAGS.map(x => <option key={x}>{x}</option>)}</select></td>
+              <td><select className="field" value={t.tag} onChange={e => setT(t.key, { tag: e.target.value })}>{TAGS.map(x => <option key={x} value={x}>{tagLabel(x)}</option>)}</select></td>
               <td><input className="field" type="date" value={t.planned_day ?? ''} onChange={e => setT(t.key, { planned_day: e.target.value })} /></td>
               <td className="muted small">{t.deps.map((d: number) => plan.tasks.find((x: any) => x.key === d)?.title).filter(Boolean).join(', ') || '—'}</td>
               <td><select className="field" value={t.assignee_id ?? ''} onChange={e => setT(t.key, { assignee_id: Number(e.target.value) })}>{mem?.members.map((m: any) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></td>
-              <td><button className="iconbtn" aria-label="Retirer" onClick={() => setPlan({ ...plan, tasks: plan.tasks.filter((x: any) => x.key !== t.key).map((x: any) => ({ ...x, deps: x.deps.filter((d: number) => d !== t.key) })) })}><Trash2 size={16} /></button></td>
+              <td><button className="iconbtn" aria-label={tr("Retirer")} onClick={() => setPlan({ ...plan, tasks: plan.tasks.filter((x: any) => x.key !== t.key).map((x: any) => ({ ...x, deps: x.deps.filter((d: number) => d !== t.key) })) })}><Trash2 size={16} /></button></td>
             </tr>
           ))}
         </tbody></table></div>
@@ -87,39 +88,39 @@ function Wizard({ done }: { done: () => void }) {
 
   return (
     <section className="card">
-      <CardHead title="Générateur de projet" sub={`Pour ${map?.name}`}>
-        <ol className="steps">{['Genre', 'Équipe', 'Agents IA', 'Sortie'].map((l, i) => <li key={l}><button className={'stp' + (step === i + 1 ? ' cur' : '')} onClick={() => setStep(i + 1)}><span className="stn">{i + 1}</span>{l}</button></li>)}</ol>
+      <CardHead title={tr("Générateur de projet")} sub={tr("Pour {0}", [map?.name])}>
+        <ol className="steps">{[tr("Genre"), tr("Équipe"), tr("Agents IA"), tr("Sortie")].map((l, i) => <li key={l}><button className={'stp' + (step === i + 1 ? ' cur' : '')} onClick={() => setStep(i + 1)}><span className="stn">{i + 1}</span>{l}</button></li>)}</ol>
       </CardHead>
       {step === 1 && <>
-        <h3 style={{ fontWeight: 500 }}>Quel genre de map ?</h3>
+        <h3 style={{ fontWeight: 500 }}>{tr("Quel genre de map ?")}</h3>
         <div className="opts">{GENRES.map(([k, l, h]) => <button key={k} className={'opt' + (genre === k ? ' sel' : '')} aria-pressed={genre === k} onClick={() => setGenre(k)}><b style={{ fontWeight: 500 }}>{l}</b><span className="small muted">{h}</span></button>)}</div>
-        <label className="row" style={{ marginTop: 16 }}><input type="checkbox" checked={fromBoard} onChange={e => setFromBoard(e.target.checked)} />Ajouter les post-it votés du tableau blanc</label>
+        <label className="row" style={{ marginTop: 16 }}><input type="checkbox" checked={fromBoard} onChange={e => setFromBoard(e.target.checked)} />{tr("Ajouter les post-it votés du tableau blanc")}</label>
       </>}
       {step === 2 && <>
-        <h3 style={{ fontWeight: 500 }}>Équipe : membres, rôles et heures par semaine</h3>
-        <table className="tbl"><thead><tr><th /><th>Membre</th><th>Rôle dans le projet</th><th>Heures / semaine</th></tr></thead><tbody>
+        <h3 style={{ fontWeight: 500 }}>{tr("Équipe : membres, rôles et heures par semaine")}</h3>
+        <table className="tbl"><thead><tr><th /><th>{tr("Membre")}</th><th>{tr("Rôle dans le projet")}</th><th>{tr("Heures / semaine")}</th></tr></thead><tbody>
           {mem?.members.map((m: any) => { const v = team[m.id] ?? { on: true, tag: 'code', hours: 10 }; return (
-            <tr key={m.id}><td><input type="checkbox" checked={v.on} onChange={e => setTeam({ ...team, [m.id]: { ...v, on: e.target.checked } })} aria-label={`Inclure ${m.name}`} /></td>
+            <tr key={m.id}><td><input type="checkbox" checked={v.on} onChange={e => setTeam({ ...team, [m.id]: { ...v, on: e.target.checked } })} aria-label={tr("Inclure {0}", [m.name])} /></td>
               <td><span className="row" style={{ gap: 8 }}><Avatar name={m.name} small />{m.name}</span></td>
-              <td><select className="field" value={v.tag} onChange={e => setTeam({ ...team, [m.id]: { ...v, tag: e.target.value } })}><option value="code">Code Verse</option><option value="carte">Carte</option><option value="conception">Conception</option><option value="test">Test</option></select></td>
+              <td><select className="field" value={v.tag} onChange={e => setTeam({ ...team, [m.id]: { ...v, tag: e.target.value } })}><option value="code">{tr("Code Verse")}</option><option value="carte">{tr("Carte")}</option><option value="conception">{tr("Conception")}</option><option value="test">{tr("Test")}</option></select></td>
               <td><input className="field" type="number" min={0} max={80} style={{ width: 90 }} value={v.hours} onChange={e => setTeam({ ...team, [m.id]: { ...v, hours: Number(e.target.value) } })} /></td></tr>
           ) })}
         </tbody></table>
       </>}
       {step === 3 && <>
-        <h3 style={{ fontWeight: 500 }}>Avec ou sans agents IA dans UEFN ?</h3>
+        <h3 style={{ fontWeight: 500 }}>{tr("Avec ou sans agents IA dans UEFN ?")}</h3>
         <div className="opts">
-          <button className={'opt' + (ai ? ' sel' : '')} onClick={() => setAi(true)}><b style={{ fontWeight: 500 }}>Avec</b><span className="small muted">Les tâches répétitives (textes, habillage, traductions) sont marquées IA et relues par un humain.</span></button>
-          <button className={'opt' + (!ai ? ' sel' : '')} onClick={() => setAi(false)}><b style={{ fontWeight: 500 }}>Sans</b><span className="small muted">Tout est planifié pour l'équipe.</span></button>
+          <button className={'opt' + (ai ? ' sel' : '')} onClick={() => setAi(true)}><b style={{ fontWeight: 500 }}>{tr("Avec")}</b><span className="small muted">{tr("Les tâches répétitives (textes, habillage, traductions) sont marquées IA et relues par un humain.")}</span></button>
+          <button className={'opt' + (!ai ? ' sel' : '')} onClick={() => setAi(false)}><b style={{ fontWeight: 500 }}>{tr("Sans")}</b><span className="small muted">{tr("Tout est planifié pour l'équipe.")}</span></button>
         </div>
       </>}
       {step === 4 && <>
-        <h3 style={{ fontWeight: 500 }}>Date de sortie</h3>
-        <input className="field" type="date" value={date} onChange={e => setDate(e.target.value)} aria-label="Date de sortie" />
+        <h3 style={{ fontWeight: 500 }}>{tr("Date de sortie")}</h3>
+        <input className="field" type="date" value={date} onChange={e => setDate(e.target.value)} aria-label={tr("Date de sortie")} />
       </>}
       <div className="row" style={{ justifyContent: 'space-between', marginTop: 24 }}>
-        <button className="btn" disabled={step === 1} onClick={() => setStep(step - 1)}>Précédent</button>
-        {step < 4 ? <button className="btn pri" onClick={() => setStep(step + 1)}>Suivant</button> : <button className="btn pri" disabled={busy} onClick={preview}>Générer le plan</button>}
+        <button className="btn" disabled={step === 1} onClick={() => setStep(step - 1)}>{tr("Précédent")}</button>
+        {step < 4 ? <button className="btn pri" onClick={() => setStep(step + 1)}>{tr("Suivant")}</button> : <button className="btn pri" disabled={busy} onClick={preview}>{tr("Générer le plan")}</button>}
       </div>
     </section>
   )
@@ -127,7 +128,7 @@ function Wizard({ done }: { done: () => void }) {
 
 function Timeline() {
   const { map, canEdit, toast } = useApp()
-  const nav = useNavigate()
+  const nav = useNav()
   const { data, reload } = useLoad<any>(map ? `/api/maps/${map.id}/plan/timeline` : null, [map?.id])
   const [alerts, setAlerts] = useState<string[]>([])
   const [shifted, setShifted] = useState<number[]>([])
@@ -167,11 +168,11 @@ function Timeline() {
 
   return <>
     {alerts.length > 0 && <div className="warn" role="alert"><AlertTriangle size={18} /><div>{alerts.map((a, i) => <div key={i}>{a}</div>)}</div></div>}
-    {shifted.length > 0 && alerts.length === 0 && <div className="warn"><span>Recalcul : #{shifted.join(', #')} décalées pour respecter les dépendances. Aucun jalon dépassé.</span></div>}
+    {shifted.length > 0 && alerts.length === 0 && <div className="warn"><span>{tr("Recalcul : #{0} décalées pour respecter les dépendances. Aucun jalon dépassé.", [shifted.join(', #')])}</span></div>}
     <section className="card">
-      <CardHead title="Chronologie" sub="Glissez une barre pour la déplacer : les tâches qui en dépendent et les jalons se recalculent.">
-        <label className="row small"><input type="checkbox" checked={hideDone} onChange={e => setHideDone(e.target.checked)} />Masquer les tâches faites</label>
-        {canEdit && <button className="btn" onClick={async () => { const r = await api.post(`/api/maps/${map!.id}/plan/recalc`); setAlerts(r.alerts); setShifted(r.shifted); reload() }}>Recalculer</button>}
+      <CardHead title={tr("Chronologie")} sub={tr("Glissez une barre pour la déplacer : les tâches qui en dépendent et les jalons se recalculent.")}>
+        <label className="row small"><input type="checkbox" checked={hideDone} onChange={e => setHideDone(e.target.checked)} />{tr("Masquer les tâches faites")}</label>
+        {canEdit && <button className="btn" onClick={async () => { const r = await api.post(`/api/maps/${map!.id}/plan/recalc`); setAlerts(r.alerts); setShifted(r.shifted); reload() }}>{tr("Recalculer")}</button>}
       </CardHead>
       <div className="gwrap">
         <div className="gantt" style={{ minWidth: Math.max(900, days.length * 26 + 250) }} onPointerMove={onMove} onPointerUp={onUp}>
@@ -184,40 +185,40 @@ function Timeline() {
                 <div className="gtrack">
                   {days.map((d, k) => <span key={d} className={'gcell' + ([0, 6].includes(new Date(d + 'T12:00').getDay()) ? ' we' : '')} style={{ left: `${k * W}%`, width: `${W}%` }} />)}
                   <span className="today gline" style={{ left: `${(pos(data.today) + 0.5) * W}%` }} />
-                  {i >= 0 && <div className={'gbar' + (t.critical ? ' crit' : '') + (t.status === 'done' ? ' done' : '')} style={{ left: `${i * W}%`, width: `max(${W}%, 26px)`, outline: shifted.includes(t.number) ? '2px dashed var(--text)' : undefined }}
-                    onPointerDown={e => onDown(e, t)} onDoubleClick={() => nav(`/taches?q=%23${t.number}`)} title={`${t.title} · ${t.assignee ?? '—'} · ${frDate(t.planned_day)}${t.deps.length ? ' · dépend de ' + t.deps.length + ' tâche(s)' : ''}`}>
+                  {i >= 0 && <div className={'gbar' + (t.critical ? ' crit' : '') + (t.status === 'done' ? ' done' : '')} style={{ left: `${i * W}%`, width: `max(${W}%, 26px)`, outline: shifted.includes(t.number) ? tr("2px dashed var(--text)") : undefined }}
+                    onPointerDown={e => onDown(e, t)} onDoubleClick={() => nav(`/taches?q=%23${t.number}`)} title={`${t.title} · ${t.assignee ?? '—'} · ${frDate(t.planned_day)}${t.deps.length ? tr(" · dépend de ") + t.deps.length + tr(" tâche(s)") : ''}`}>
                     {t.assignee && <span className="mono">{t.assignee.split(' ').map((w: string) => w[0]).join('')}</span>}
                   </div>}
                 </div>
               </div>
             )
           })}
-          <div className="grow" style={{ minHeight: 50 }}><span className="gname" style={{ fontWeight: 500 }}>Jalons</span><div className="gtrack">
+          <div className="grow" style={{ minHeight: 50 }}><span className="gname" style={{ fontWeight: 500 }}>{tr("Jalons")}</span><div className="gtrack">
             {data.milestones.map((m: any) => pos(m.date) >= 0 && <span key={m.id}><span className="diamond" style={{ left: `${(pos(m.date) + 0.5) * W}%` }} /><span className="dlab" style={{ left: `${(pos(m.date) + 0.5) * W}%` }}>{m.title}</span></span>)}
           </div></div>
         </div>
       </div>
-      <p className="small muted">Barres pleines : chemin critique. Ligne rouge : aujourd'hui. Double-clic sur une barre : ouvrir la tâche.</p>
+      <p className="small muted">{tr("Barres pleines : chemin critique. Ligne rouge : aujourd'hui. Double-clic sur une barre : ouvrir la tâche.")}</p>
     </section>
     <div className="two">
       <section className="card">
-        <CardHead title="Charge par personne · cette semaine" sub="Heures planifiées face aux heures déclarées" />
+        <CardHead title={tr("Charge par personne · cette semaine")} sub={tr("Heures planifiées face aux heures déclarées")} />
         <div className="stack">
           {data.load.map((l: any) => (
             <div key={l.id} className="row" style={{ flexWrap: 'wrap' }}>
               <span className="row" style={{ gap: 8, width: 170 }}><Avatar name={l.name} small />{l.name}</span>
               <div className="bar" style={{ flex: 1, height: 8 }}><span style={{ width: `${Math.min(100, (l.planned_h / Math.max(1, l.capacity_h)) * 100)}%` }} /></div>
               <span className="mono small" style={{ width: 70, textAlign: 'right' }}>{l.planned_h} / {l.capacity_h} h</span>
-              {l.overload ? <span className="badge b-r">Surcharge</span> : <span className="badge">OK</span>}
+              {l.overload ? <span className="badge b-r">{tr("Surcharge")}</span> : <span className="badge">OK</span>}
             </div>
           ))}
         </div>
       </section>
       <section className="card">
-        <CardHead title="Jalons" sub="Fin d'étape, tests à plusieurs, soumission, sortie" />
-        <div className="list">{data.milestones.map((m: any) => <div key={m.id} className="li"><span className="mono small" style={{ width: 90 }}>{frDate(m.date)}</span><span style={{ flex: 1 }}>{m.title}</span>{canEdit && <button className="iconbtn" aria-label="Supprimer" onClick={async () => { await api.del(`/api/milestones/${m.id}`); reload() }}><Trash2 size={16} /></button>}</div>)}</div>
+        <CardHead title={tr("Jalons")} sub={tr("Fin d'étape, tests à plusieurs, soumission, sortie")} />
+        <div className="list">{data.milestones.map((m: any) => <div key={m.id} className="li"><span className="mono small" style={{ width: 90 }}>{frDate(m.date)}</span><span style={{ flex: 1 }}>{m.title}</span>{canEdit && <button className="iconbtn" aria-label={tr("Supprimer")} onClick={async () => { await api.del(`/api/milestones/${m.id}`); reload() }}><Trash2 size={16} /></button>}</div>)}</div>
         {canEdit && <form className="row" style={{ marginTop: 12, flexWrap: 'wrap' }} onSubmit={async e => { e.preventDefault(); try { await api.post(`/api/maps/${map!.id}/milestones`, ms); setMs({ title: '', date: '' }); reload() } catch (er: any) { toast(er.message, true) } }}>
-          <input className="field" placeholder="Nouveau jalon" value={ms.title} onChange={e => setMs({ ...ms, title: e.target.value })} required /><input className="field" type="date" value={ms.date} onChange={e => setMs({ ...ms, date: e.target.value })} required /><button className="btn">Ajouter</button>
+          <input className="field" placeholder={tr("Nouveau jalon")} value={ms.title} onChange={e => setMs({ ...ms, title: e.target.value })} required /><input className="field" type="date" value={ms.date} onChange={e => setMs({ ...ms, date: e.target.value })} required /><button className="btn">{tr("Ajouter")}</button>
         </form>}
       </section>
     </div>
@@ -232,13 +233,13 @@ function Seasons() {
     data?.forEach(e => { const k = e.date.slice(0, 7); m.set(k, [...(m.get(k) ?? []), e]) })
     return [...m.entries()]
   }, [data])
-  const label: Record<string, [string, string]> = { map: ['Votre map', ''], aim: ['À viser', 'b-g'], avoid: ['À éviter', 'b-r'], money: ['Impact revenus', 'b-o'] }
+  const label: Record<string, [string, string]> = { map: [tr("Votre map"), ''], aim: [tr("À viser"), 'b-g'], avoid: [tr("À éviter"), 'b-r'], money: [tr("Impact revenus"), 'b-o'] }
   return (
     <section className="card">
-      <CardHead title="Calendrier des mises à jour et des saisons" sub="Vos jalons face aux dates Fortnite à viser ou à éviter. Les dates Epic sont indicatives : vérifiez les annonces officielles." />
-      <div className="grid2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+      <CardHead title={tr("Calendrier des mises à jour et des saisons")} sub={tr("Vos jalons face aux dates Fortnite à viser ou à éviter. Les dates Epic sont indicatives : vérifiez les annonces officielles.")} />
+      <div className="grid2" style={{ gridTemplateColumns: tr("repeat(auto-fit, minmax(220px, 1fr))") }}>
         {months.map(([k, evs]) => (
-          <div key={k} style={{ border: '1px solid var(--border)', borderRadius: 14, padding: 14 }}>
+          <div key={k} style={{ border: tr("1px solid var(--border)"), borderRadius: 14, padding: 14 }}>
             <div style={{ fontWeight: 500, marginBottom: 10 }}>{frDate(k + '-01', { month: 'long', year: 'numeric' })}</div>
             <div className="stack" style={{ gap: 8 }}>{evs.map((e, i) => <div key={i}><div className="row" style={{ gap: 6 }}><span className="mono small">{frDate(e.date)}</span><span className={'badge ' + label[e.kind][1]}>{label[e.kind][0]}</span></div><div>{e.title}</div></div>)}</div>
           </div>
