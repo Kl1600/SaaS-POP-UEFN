@@ -2462,5 +2462,12 @@ const EN: Record<string, string> = {
   "Ce compte est déjà activé.": "This account is already activated.",
   "Admin : lien d’activation renvoyé": "Admin: activation link resent",
   "Compte activé": "Account activated",
+  "Note interne (visible seulement par les admins et modérateurs)": "Internal note (visible only to admins and moderators)",
+  "Modérateur": "Moderator",
+  "Retirer le rôle modérateur": "Remove moderator role",
+  "Rendre modérateur": "Make moderator",
+  "Retirer le rôle modérateur de {0} ?": "Remove the moderator role from {0}?",
+  "Rendre {0} modérateur ? Il pourra gérer la liste d’attente, débloquer les comptes et leur envoyer un lien de mot de passe.": "Make {0} a moderator? They will be able to manage the waitlist, unlock accounts and send them a password link.",
+  "Rôle mis à jour": "Role updated",
 }
 export default EN

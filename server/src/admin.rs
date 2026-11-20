@@ -1,6 +1,7 @@
 //! Administration de la plateforme POP : liste d'attente de la bêta, utilisateurs, vue générale.
 //! Réservé aux comptes `is_admin` (nommés par `pop-server admin ajouter <e-mail>`, le compte de test « kl »),
-//! ou dont l'adresse est dans POP_ADMIN_EMAILS.
+//! ou dont l'adresse est dans POP_ADMIN_EMAILS. Les modérateurs (#65) ont une partie : liste d'attente, dépannage
+//! des comptes ordinaires (déblocage, lien de mot de passe) et consultation des comptes.
 use crate::{
     auth::{random_token, rate_limit, sha256_hex, AuthUser},
     error::{bad, ApiResult, AppError},
@@ -35,8 +36,34 @@ pub async fn is_admin(st: &AppState, uid: i64) -> Result<bool, AppError> {
             .map(|e| e.trim().to_lowercase())
             .any(|e| !e.is_empty() && e == email.to_lowercase()))
 }
+/// Rôle dans l'équipe POP. L'ordre compte : un administrateur peut tout ce que peut un modérateur.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Staff {
+    None,
+    Moderator,
+    Admin,
+}
+
+/// Le rôle du compte : administrateur, modérateur (`is_moderator`, adresse vérifiée, compte actif) ou rien.
+pub async fn staff(st: &AppState, uid: i64) -> Result<Staff, AppError> {
+    if is_admin(st, uid).await? {
+        return Ok(Staff::Admin);
+    }
+    let m: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM users WHERE id = ? AND is_moderator = 1 AND disabled = 0 AND email_verified_at IS NOT NULL",
+    )
+    .bind(uid)
+    .fetch_one(&st.db)
+    .await?;
+    Ok(if m > 0 { Staff::Moderator } else { Staff::None })
+}
+
 async fn require(st: &AppState, u: &AuthUser) -> Result<(), AppError> {
     crate::security::require_admin(st, u).await
+}
+/// Routes ouvertes aussi aux modérateurs (#65). Renvoie le rôle de l'appelant.
+async fn require_mod(st: &AppState, u: &AuthUser) -> Result<Staff, AppError> {
+    crate::security::require_staff(st, u, Staff::Moderator).await
 }
 async fn log(st: &AppState, u: &AuthUser, action: &str, detail: &str) {
     crate::security::audit(st, Some(u.id), action, detail, "").await;
@@ -331,7 +358,7 @@ pub async fn waitlist(
     u: AuthUser,
     Query(q): Query<ListQ>,
 ) -> ApiResult<Value> {
-    require(&st, &u).await?;
+    require_mod(&st, &u).await?;
     let status = q.status.unwrap_or_else(|| "pending".into());
     let rows: Vec<(i64, String, String, String, String, String, String, String, String, String, String, Option<String>, Option<String>, i64)> = sqlx::query_as(
         "SELECT w.id, w.email, w.name, w.studio, w.team, w.experience, w.links, w.message, w.status, w.note, w.created_at, w.decided_at, d.name,
@@ -371,7 +398,7 @@ pub async fn approve(
     u: AuthUser,
     Path(id): Path<i64>,
 ) -> ApiResult<Value> {
-    require(&st, &u).await?;
+    require_mod(&st, &u).await?;
     Ok(Json(grant(&st, &u, id).await?))
 }
 
@@ -380,7 +407,7 @@ pub async fn refuse(
     u: AuthUser,
     Path(id): Path<i64>,
 ) -> ApiResult<Value> {
-    require(&st, &u).await?;
+    require_mod(&st, &u).await?;
     log(&st, &u, "admin_demande_refusée", &id.to_string()).await;
     sqlx::query("UPDATE waitlist SET status = 'refused', token_hash = NULL, decided_at = datetime('now'), decided_by = ? WHERE id = ? AND status != 'registered'").bind(u.id).bind(id).execute(&st.db).await?;
     Ok(Json(json!({ "ok": true })))
@@ -391,7 +418,7 @@ pub async fn reopen(
     u: AuthUser,
     Path(id): Path<i64>,
 ) -> ApiResult<Value> {
-    require(&st, &u).await?;
+    require_mod(&st, &u).await?;
     sqlx::query("UPDATE waitlist SET status = 'pending', token_hash = NULL, decided_at = NULL, decided_by = NULL WHERE id = ? AND status != 'registered'").bind(id).execute(&st.db).await?;
     Ok(Json(json!({ "ok": true })))
 }
@@ -420,7 +447,7 @@ pub async fn note(
     Path(id): Path<i64>,
     Json(b): Json<NoteIn>,
 ) -> ApiResult<Value> {
-    require(&st, &u).await?;
+    require_mod(&st, &u).await?;
     sqlx::query("UPDATE waitlist SET note = ? WHERE id = ?")
         .bind(b.note.chars().take(1000).collect::<String>())
         .bind(id)
@@ -465,10 +492,10 @@ pub async fn invite(
 }
 
 pub async fn users(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
-    require(&st, &u).await?;
+    require_mod(&st, &u).await?;
     #[allow(clippy::type_complexity)]
-    let rows: Vec<(i64, String, String, String, Option<String>, i64, i64, i64, i64, Option<String>, i64, String, Option<String>, i64, Option<String>)> = sqlx::query_as(
-        "SELECT u.id, u.email, u.name, u.created_at, u.last_seen, u.is_admin, u.disabled,
+    let rows: Vec<(i64, String, String, String, Option<String>, i64, i64, i64, i64, i64, Option<String>, i64, String, Option<String>, i64, Option<String>)> = sqlx::query_as(
+        "SELECT u.id, u.email, u.name, u.created_at, u.last_seen, u.is_admin, u.disabled, u.is_moderator,
                 (SELECT COUNT(*) FROM memberships m WHERE m.user_id = u.id),
                 (SELECT COUNT(*) FROM tasks t WHERE t.assignee_id = u.id AND t.status = 'done'), u.username, u.must_change_password, u.plan,
                 CASE WHEN u.locked_until > datetime('now') THEN u.locked_until END,
@@ -476,15 +503,16 @@ pub async fn users(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> 
          FROM users u ORDER BY u.created_at DESC LIMIT 2000",
     ).fetch_all(&st.db).await?;
     Ok(Json(json!(rows.into_iter().map(|r| json!({
-        "id": r.0, "email": r.1, "name": r.2, "created_at": r.3, "last_seen": r.4, "is_admin": r.5 == 1, "disabled": r.6 == 1, "studios": r.7, "tasks_done": r.8,
-        "username": r.9, "must_change": r.10 == 1, "plan": r.11, "locked_until": r.12, "me": r.0 == u.id,
-        "activation_pending": r.13 == 1, "activation_sent_at": r.14,
+        "id": r.0, "email": r.1, "name": r.2, "created_at": r.3, "last_seen": r.4, "is_admin": r.5 == 1, "disabled": r.6 == 1, "is_moderator": r.7 == 1,
+        "studios": r.8, "tasks_done": r.9, "username": r.10, "must_change": r.11 == 1, "plan": r.12, "locked_until": r.13, "me": r.0 == u.id,
+        "activation_pending": r.14 == 1, "activation_sent_at": r.15,
     })).collect::<Vec<_>>())))
 }
 
 #[derive(Deserialize)]
 pub struct UserPatch {
     is_admin: Option<bool>,
+    is_moderator: Option<bool>,
     disabled: Option<bool>,
 }
 pub async fn update_user(
@@ -502,14 +530,21 @@ pub async fn update_user(
         &u,
         "admin_compte_modifié",
         &format!(
-            "utilisateur {id} : admin={:?} désactivé={:?}",
-            b.is_admin, b.disabled
+            "utilisateur {id} : admin={:?} modérateur={:?} désactivé={:?}",
+            b.is_admin, b.is_moderator, b.disabled
         ),
     )
     .await;
     if let Some(a) = b.is_admin {
         sqlx::query("UPDATE users SET is_admin = ? WHERE id = ?")
             .bind(a as i64)
+            .bind(id)
+            .execute(&st.db)
+            .await?;
+    }
+    if let Some(m) = b.is_moderator {
+        sqlx::query("UPDATE users SET is_moderator = ? WHERE id = ?")
+            .bind(m as i64)
             .bind(id)
             .execute(&st.db)
             .await?;
@@ -618,9 +653,27 @@ pub async fn create_account(
     u: AuthUser,
     Json(b): Json<AccountIn>,
 ) -> ApiResult<Value> {
-    require(&st, &u).await?;
+    let role = require_mod(&st, &u).await?;
     let username = check_username(&b.username)?;
     let email = b.email.trim().to_lowercase();
+    // Un modérateur crée un compte seulement en acceptant une demande de la liste d'attente, pour l'adresse de
+    // cette demande, et sans choisir le plan (#65) ; la création libre reste aux administrateurs.
+    if role < Staff::Admin {
+        let asked: Option<String> = match b.waitlist_id {
+            Some(w) => {
+                sqlx::query_scalar(
+                    "SELECT email FROM waitlist WHERE id = ? AND status != 'registered'",
+                )
+                .bind(w)
+                .fetch_optional(&st.db)
+                .await?
+            }
+            None => None,
+        };
+        if asked.map(|a| a.trim().to_lowercase()) != Some(email.clone()) {
+            return Err(AppError::Forbidden);
+        }
+    }
     if !email.contains('@') || email.len() > 200 {
         return Err(bad("Adresse e-mail invalide."));
     }
@@ -646,7 +699,11 @@ pub async fn create_account(
             "Un compte existe déjà avec cette adresse e-mail.".into(),
         ));
     }
-    let plan = b.plan.as_deref().unwrap_or("pro");
+    let plan = if role < Staff::Admin {
+        "pro"
+    } else {
+        b.plan.as_deref().unwrap_or("pro")
+    };
     if !crate::billing::PLANS.contains(&plan) {
         return Err(bad("Plan inconnu."));
     }
@@ -717,8 +774,19 @@ pub async fn reset_password(
 // ---------- Dépannage d'un compte (#38) ----------
 
 /// Compte visé par une action de dépannage : verrou admin, jamais son propre compte. Renvoie (e-mail, nom).
-async fn target(st: &AppState, u: &AuthUser, id: i64) -> Result<(String, String), AppError> {
-    require(st, u).await?;
+/// Compte visé par une action de dépannage. `min` = le rôle demandé pour cette action. Un modérateur n'agit que
+/// sur les comptes ordinaires : jamais sur un administrateur ou un autre modérateur (sinon un lien de mot de passe
+/// lui donnerait leurs droits).
+async fn target(
+    st: &AppState,
+    u: &AuthUser,
+    id: i64,
+    min: Staff,
+) -> Result<(String, String), AppError> {
+    let me = crate::security::require_staff(st, u, min).await?;
+    if me < Staff::Admin && staff(st, id).await? > Staff::None {
+        return Err(AppError::Forbidden);
+    }
     if id == u.id {
         return Err(bad(
             "Vous ne pouvez pas faire cette action sur votre propre compte.",
@@ -738,7 +806,7 @@ pub async fn user_reset_link(
     u: AuthUser,
     Path(id): Path<i64>,
 ) -> ApiResult<Value> {
-    let (email, name) = target(&st, &u, id).await?;
+    let (email, name) = target(&st, &u, id, Staff::Moderator).await?;
     let link = format!(
         "{}{}",
         crate::mail::public_url(),
@@ -764,7 +832,7 @@ pub async fn unlock_user(
     u: AuthUser,
     Path(id): Path<i64>,
 ) -> ApiResult<Value> {
-    let (email, _) = target(&st, &u, id).await?;
+    let (email, _) = target(&st, &u, id, Staff::Moderator).await?;
     sqlx::query("UPDATE users SET failed_logins = 0, locked_until = NULL WHERE id = ?")
         .bind(id)
         .execute(&st.db)
@@ -786,7 +854,7 @@ pub async fn deletion_preview(
     u: AuthUser,
     Path(id): Path<i64>,
 ) -> ApiResult<Value> {
-    let (email, name) = target(&st, &u, id).await?;
+    let (email, name) = target(&st, &u, id, Staff::Admin).await?;
     let plan = crate::manage::deletion_plan(&st.db, id).await?;
     let mut v = plan_json(&plan);
     v["email"] = json!(email);
@@ -807,7 +875,7 @@ pub async fn delete_user(
     Path(id): Path<i64>,
     Json(b): Json<DeleteUserIn>,
 ) -> ApiResult<Value> {
-    let (email, _) = target(&st, &u, id).await?;
+    let (email, _) = target(&st, &u, id, Staff::Admin).await?;
     if !b.confirm.trim().eq_ignore_ascii_case(&email) {
         return Err(bad("L’adresse tapée ne correspond pas à celle du compte."));
     }
@@ -1169,5 +1237,153 @@ mod depannage_tests {
                 .unwrap();
         assert_eq!(role, "owner");
         assert!(audited(&st, "admin_compte_supprimé", admin.id).await);
+    }
+
+    /// Rôle modérateur (#65) : liste d'attente, dépannage des comptes ordinaires, consultation ; rien d'autre.
+    #[tokio::test]
+    async fn moderateur() {
+        let st = crate::test_state().await;
+        let s = || State(st.clone());
+        let admin = user(&st, "admin@exemple.com", true).await;
+        let moder = user(&st, "modo@exemple.com", false).await;
+        let other = user(&st, "modo2@exemple.com", false).await;
+        let member = user(&st, "x@exemple.com", false).await;
+        // Seul un administrateur donne le rôle.
+        let give = |who: &AuthUser, id: i64| {
+            update_user(
+                s(),
+                who.clone(),
+                Path(id),
+                Json(serde_json::from_value(json!({ "is_moderator": true })).unwrap()),
+            )
+        };
+        assert!(matches!(
+            give(&member, moder.id).await,
+            Err(AppError::Forbidden)
+        ));
+        let _ = give(&admin, moder.id).await.unwrap();
+        let _ = give(&admin, other.id).await.unwrap();
+        assert_eq!(staff(&st, moder.id).await.unwrap(), Staff::Moderator);
+        assert_eq!(staff(&st, member.id).await.unwrap(), Staff::None);
+
+        // Ce qu'il peut faire.
+        let wid: i64 = sqlx::query_scalar(
+            "INSERT INTO waitlist (email, name) VALUES ('w@exemple.com', 'W') RETURNING id",
+        )
+        .fetch_one(&st.db)
+        .await
+        .unwrap();
+        let q = || {
+            Query(ListQ {
+                status: Some("all".into()),
+            })
+        };
+        assert!(waitlist(s(), moder.clone(), q()).await.is_ok());
+        let nb = || Json(serde_json::from_value(json!({ "note": "à rappeler" })).unwrap());
+        assert!(note(s(), moder.clone(), Path(wid), nb()).await.is_ok());
+        assert!(refuse(s(), moder.clone(), Path(wid)).await.is_ok());
+        assert!(reopen(s(), moder.clone(), Path(wid)).await.is_ok());
+        assert!(approve(s(), moder.clone(), Path(wid)).await.is_ok());
+        // Accepter une demande crée le compte, pour l'adresse de la demande seulement.
+        let acc = |email: &str, w: Option<i64>| {
+            create_account(
+                s(),
+                moder.clone(),
+                Json(serde_json::from_value(json!({ "username": format!("compte-{}", email.split('@').next().unwrap()), "name": "W", "email": email, "waitlist_id": w, "plan": "starter" })).unwrap()),
+            )
+        };
+        assert!(matches!(
+            acc("autre@exemple.com", Some(wid)).await,
+            Err(AppError::Forbidden)
+        ));
+        assert!(matches!(
+            acc("libre@exemple.com", None).await,
+            Err(AppError::Forbidden)
+        ));
+        let made = acc("w@exemple.com", Some(wid)).await.unwrap();
+        let plan: String = sqlx::query_scalar("SELECT plan FROM users WHERE id = ?")
+            .bind(made.0["id"].as_i64().unwrap())
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        assert_eq!(plan, "pro", "le modérateur ne choisit pas le plan");
+        assert!(users(s(), moder.clone()).await.is_ok());
+        assert!(unlock_user(s(), moder.clone(), Path(member.id))
+            .await
+            .is_ok());
+        assert!(user_reset_link(s(), moder.clone(), Path(member.id))
+            .await
+            .is_ok());
+        assert!(audited(&st, "admin_compte_débloqué", moder.id).await);
+
+        // Ce qui lui est refusé.
+        let forbidden = |r: Result<(), AppError>, what: &str| {
+            assert!(
+                matches!(r, Err(AppError::Forbidden)),
+                "refusé au modérateur : {what} ({r:?})"
+            )
+        };
+        for (id, who) in [(admin.id, "admin"), (other.id, "autre modérateur")] {
+            forbidden(
+                unlock_user(s(), moder.clone(), Path(id)).await.map(|_| ()),
+                who,
+            );
+            forbidden(
+                user_reset_link(s(), moder.clone(), Path(id))
+                    .await
+                    .map(|_| ()),
+                who,
+            );
+        }
+        forbidden(give(&moder, member.id).await.map(|_| ()), "donner le rôle");
+        let off = Json(serde_json::from_value(json!({ "disabled": true })).unwrap());
+        forbidden(
+            update_user(s(), moder.clone(), Path(member.id), off)
+                .await
+                .map(|_| ()),
+            "désactiver",
+        );
+        forbidden(
+            deletion_preview(s(), moder.clone(), Path(member.id))
+                .await
+                .map(|_| ()),
+            "supprimer",
+        );
+        forbidden(
+            reset_password(s(), moder.clone(), Path(member.id))
+                .await
+                .map(|_| ()),
+            "mot de passe provisoire",
+        );
+        forbidden(
+            remove(s(), moder.clone(), Path(wid)).await.map(|_| ()),
+            "supprimer une demande",
+        );
+        forbidden(
+            overview(s(), moder.clone()).await.map(|_| ()),
+            "vue générale",
+        );
+        forbidden(
+            crate::security::admin_audit(s(), moder.clone())
+                .await
+                .map(|_| ()),
+            "sécurité",
+        );
+
+        // Comme l'administrateur, le rôle exige une adresse vérifiée, et il se perd avec le compte désactivé.
+        sqlx::query("UPDATE users SET email_verified_at = NULL WHERE id = ?")
+            .bind(other.id)
+            .execute(&st.db)
+            .await
+            .unwrap();
+        assert_eq!(staff(&st, other.id).await.unwrap(), Staff::None);
+        let rm = Json(serde_json::from_value(json!({ "is_moderator": false })).unwrap());
+        let _ = update_user(s(), admin.clone(), Path(moder.id), rm)
+            .await
+            .unwrap();
+        assert!(matches!(
+            users(s(), moder.clone()).await,
+            Err(AppError::Forbidden)
+        ));
     }
 }

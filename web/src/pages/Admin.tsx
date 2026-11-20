@@ -1,6 +1,6 @@
 // Panel administrateur de la plateforme POP : liste d'attente, création des comptes bêta, utilisateurs, vue générale.
 import { useEffect, useState } from 'react'
-import { Check, X, RotateCcw, Trash2, Copy, Mail, ShieldCheck, Ban, UserPlus, Lock, KeyRound, Link2, LockOpen } from 'lucide-react'
+import { Check, X, RotateCcw, Trash2, Copy, Mail, ShieldCheck, Ban, UserPlus, Lock, KeyRound, Link2, LockOpen, UserCog } from 'lucide-react'
 import { actionLabel } from '../components/Security'
 import { ago, api, frDate } from '../api'
 import { useApp, useLoad } from '../state'
@@ -63,7 +63,7 @@ function PlanSelect({ value, onChange }: { value: string; onChange: (e: React.Ch
 }
 
 function AccountForm({ init, waitlistId, onCreated, onCancel }: { init?: { name: string; email: string }; waitlistId?: number; onCreated: (s: Sent) => void; onCancel?: () => void }) {
-  const { toast } = useApp()
+  const { toast, me } = useApp()
   const [f, setF] = useState({ name: init?.name ?? '', email: init?.email ?? '', username: suggestUsername(init?.name ?? '', init?.email ?? ''), plan: 'pro' })
   const [touched, setTouched] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -83,7 +83,7 @@ function AccountForm({ init, waitlistId, onCreated, onCancel }: { init?: { name:
     </div>
     <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
       <label className="label" style={{ flex: '1 1 180px' }}>{tr("Identifiant")}<input className="field mono" required minLength={3} maxLength={32} pattern="[a-zA-Z0-9._\-]+" title={tr("Lettres sans accent, chiffres, points, tirets")} autoCapitalize="off" spellCheck={false} value={f.username} onChange={up('username')} /></label>
-      <label className="label" style={{ flex: '1 1 160px' }}>{tr("Plan")}<PlanSelect value={f.plan} onChange={up('plan')} /></label>
+      {me?.admin && <label className="label" style={{ flex: '1 1 160px' }}>{tr("Plan")}<PlanSelect value={f.plan} onChange={up('plan')} /></label>}
     </div>
     <div className="row" style={{ gap: 8 }}>
       {onCancel && <button type="button" className="btn" onClick={onCancel}>{tr("Annuler")}</button>}
@@ -121,7 +121,7 @@ function Overview() {
 }
 
 function Waitlist() {
-  const { toast, reload: reloadMe } = useApp()
+  const { toast, reload: reloadMe, me } = useApp()
   const [status, setStatus] = useState('pending')
   const { data, reload } = useLoad<any[]>(`/api/admin/waitlist?status=${status}`, [status])
   const [open, setOpen] = useState<number | null>(null)
@@ -142,12 +142,12 @@ function Waitlist() {
             {w.status !== 'registered' && !w.activation_pending && !creds[w.id] && <button className="btn pri" style={{ height: 34 }} onClick={() => setOpen(open === w.id ? null : w.id)}><Check size={15} />{tr("Accepter et créer le compte")}</button>}
             {w.status === 'pending' && <button className="btn" style={{ height: 34 }} onClick={() => act(() => api.post(`/api/admin/waitlist/${w.id}/refuse`), tr("Demande refusée"))}><X size={15} />{tr("Refuser")}</button>}
             {(w.status === 'refused' || w.status === 'approved') && <button className="iconbtn" data-tip={tr("Remettre en attente")} aria-label={tr("Remettre en attente")} onClick={() => act(() => api.post(`/api/admin/waitlist/${w.id}/reopen`), tr("Remise en attente"))}><RotateCcw size={16} /></button>}
-            <button className="iconbtn" data-tip={tr("Supprimer la demande")} aria-label={tr("Supprimer la demande")} onClick={() => { if (confirm(tr("Supprimer la demande de {0} ?", [w.name]))) act(() => api.del(`/api/admin/waitlist/${w.id}`), tr("Demande supprimée")) }}><Trash2 size={16} /></button>
+            {me?.admin && <button className="iconbtn" data-tip={tr("Supprimer la demande")} aria-label={tr("Supprimer la demande")} onClick={() => { if (confirm(tr("Supprimer la demande de {0} ?", [w.name]))) act(() => api.del(`/api/admin/waitlist/${w.id}`), tr("Demande supprimée")) }}><Trash2 size={16} /></button>}
           </div>
         </div>
         {w.links && <p className="small" style={{ margin: '8px 0 0' }}><span className="muted">{tr("Maps / réseaux :")}{' '}</span>{w.links}</p>}
         {w.message && <p style={{ margin: '8px 0 0', whiteSpace: 'pre-wrap' }}>{w.message}</p>}
-        <input className="field small" style={{ marginTop: 10, height: 32, width: '100%' }} placeholder={tr("Note interne (visible seulement par les admins)")} defaultValue={w.note}
+        <input className="field small" style={{ marginTop: 10, height: 32, width: '100%' }} placeholder={tr("Note interne (visible seulement par les admins et modérateurs)")} defaultValue={w.note}
           onBlur={e => { if (e.target.value !== w.note) api.post(`/api/admin/waitlist/${w.id}/note`, { note: e.target.value }).then(() => toast(tr("Note enregistrée"))).catch(er => toast(er.message, true)) }} />
         {open === w.id && !creds[w.id] && <AccountForm init={{ name: w.name, email: w.email }} waitlistId={w.id} onCancel={() => setOpen(null)} onCreated={c => { w.activation_pending = true; setCreds(x => ({ ...x, [w.id]: c })); setOpen(null); reloadMe() }} />}
         {creds[w.id] && <ActivationBox s={creds[w.id]} onClose={() => { setCreds(x => { const y = { ...x }; delete y[w.id]; return y }); reload() }} />}
@@ -202,7 +202,9 @@ function DeleteUser({ u, onClose, onDone }: { u: any; onClose: () => void; onDon
 }
 
 function Users() {
-  const { toast } = useApp()
+  const { toast, me } = useApp()
+  // Un modérateur (#65) voit les comptes et dépanne les comptes ordinaires : débloquer, lien de mot de passe.
+  const admin = !!me?.admin
   const { data, reload } = useLoad<any[]>('/api/admin/users')
   const [q, setQ] = useState('')
   const [cred, setCred] = useState<Cred | null>(null)
@@ -222,17 +224,20 @@ function Users() {
         <td><b style={{ fontWeight: 500 }}>{u.name}</b>{u.me && <span className="small muted"> {tr("(vous)")}</span>}{u.must_change && <span className="badge b-o" style={{ marginLeft: 6 }} title={tr("N’a pas encore choisi son mot de passe")}>{tr("Mot de passe provisoire")}</span>}{u.activation_pending && <span className="badge b-o" style={{ marginLeft: 6 }} title={u.activation_sent_at ? tr("Lien envoyé le {0}", [frDate(u.activation_sent_at)]) : undefined}>{tr("En attente d’activation")}</span>}{u.activation_pending && u.activation_sent_at && <div className="small muted">{tr("Lien envoyé {0}", [ago(u.activation_sent_at)])}</div>}</td><td className="small mono">{u.username ?? '—'}</td><td className="small">{u.email}</td>
         <td className="small muted">{frDate(u.created_at)}</td><td className="small muted">{u.last_seen ? ago(u.last_seen) : '—'}</td>
         <td>{u.studios}</td><td>{u.tasks_done}</td>
-        <td><PlanSelect value={u.plan ?? 'starter'} onChange={async e => { try { await api.post(`/api/admin/users/${u.id}/plan`, { plan: e.target.value }); toast(tr("Plan mis à jour")); reload() } catch (er: any) { toast(er.message, true) } }} /></td>
-        <td><div className="row" style={{ gap: 4, flexWrap: 'wrap' }}>{u.disabled ? <span className="badge b-r">{tr("Désactivé")}</span> : u.is_admin ? <span className="badge b-v">{tr("Admin")}</span> : <span className="badge">{tr("Utilisateur")}</span>}
+        <td>{!admin ? <span className="small">{u.plan === 'pro' ? 'Pro' : 'Starter'}</span> : <PlanSelect value={u.plan ?? 'starter'} onChange={async e => { try { await api.post(`/api/admin/users/${u.id}/plan`, { plan: e.target.value }); toast(tr("Plan mis à jour")); reload() } catch (er: any) { toast(er.message, true) } }} />}</td>
+        <td><div className="row" style={{ gap: 4, flexWrap: 'wrap' }}>{u.disabled ? <span className="badge b-r">{tr("Désactivé")}</span> : u.is_admin ? <span className="badge b-v">{tr("Admin")}</span> : u.is_moderator ? <span className="badge b-g">{tr("Modérateur")}</span> : <span className="badge">{tr("Utilisateur")}</span>}
           {u.locked_until && <span className="badge b-o" title={tr("Trop de mots de passe faux")}>{tr("Bloqué jusqu’à {0}", [hhmm(u.locked_until)])}</span>}</div></td>
-        <td>{!u.me && <div className="row" style={{ gap: 4, justifyContent: 'flex-end' }}>
-          {u.activation_pending && <button className="btn" style={{ height: 32 }} title={tr("Nouveau lien d’activation : l’ancien ne marchera plus")} onClick={async () => { try { const r = await api.post(`/api/admin/users/${u.id}/activation`); setSent({ ...r, username: u.username }); toast(r.mailed ? tr("Lien renvoyé par e-mail") : tr("Lien créé : copiez-le")); reload() } catch (e: any) { toast(e.message, true) } }}><Mail size={15} />{tr("Renvoyer le lien")}</button>}
+        <td>{!u.me && (admin || !(u.is_admin || u.is_moderator)) && <div className="row" style={{ gap: 4, justifyContent: 'flex-end' }}>
+          {admin && u.activation_pending && <button className="btn" style={{ height: 32 }} title={tr("Nouveau lien d’activation : l’ancien ne marchera plus")} onClick={async () => { try { const r = await api.post(`/api/admin/users/${u.id}/activation`); setSent({ ...r, username: u.username }); toast(r.mailed ? tr("Lien renvoyé par e-mail") : tr("Lien créé : copiez-le")); reload() } catch (e: any) { toast(e.message, true) } }}><Mail size={15} />{tr("Renvoyer le lien")}</button>}
           {u.locked_until && <button className="iconbtn" data-tip={tr("Débloquer")} aria-label={tr("Débloquer")} onClick={() => run(() => api.post(`/api/admin/users/${u.id}/unlock`), tr("Compte débloqué"))}><LockOpen size={16} /></button>}
           <button className="iconbtn" data-tip={tr("Lien de nouveau mot de passe")} aria-label={tr("Lien de nouveau mot de passe")} onClick={async () => { try { const r = await api.post(`/api/admin/users/${u.id}/reset-link`); setLink(r); toast(r.mailed ? tr("Lien envoyé par e-mail") : tr("Lien créé : copiez-le")) } catch (e: any) { toast(e.message, true) } }}><Link2 size={16} /></button>
-          {!u.activation_pending && <button className="iconbtn" data-tip={tr("Nouveau mot de passe provisoire")} aria-label={tr("Nouveau mot de passe provisoire")} onClick={async () => { if (!confirm(tr("Donner un nouveau mot de passe provisoire à {0} ? Son mot de passe actuel ne marchera plus et il sera déconnecté.", [u.name]))) return; try { const r = await api.post(`/api/admin/users/${u.id}/password`); setCred({ ...r, name: u.name }); reload() } catch (e: any) { toast(e.message, true) } }}><KeyRound size={16} /></button>}
+          {admin && !u.activation_pending && <button className="iconbtn" data-tip={tr("Nouveau mot de passe provisoire")} aria-label={tr("Nouveau mot de passe provisoire")} onClick={async () => { if (!confirm(tr("Donner un nouveau mot de passe provisoire à {0} ? Son mot de passe actuel ne marchera plus et il sera déconnecté.", [u.name]))) return; try { const r = await api.post(`/api/admin/users/${u.id}/password`); setCred({ ...r, name: u.name }); reload() } catch (e: any) { toast(e.message, true) } }}><KeyRound size={16} /></button>}
+          {admin && <>
+          {!u.is_admin && <button className="iconbtn" data-tip={u.is_moderator ? tr("Retirer le rôle modérateur") : tr("Rendre modérateur")} aria-label={u.is_moderator ? tr("Retirer le rôle modérateur") : tr("Rendre modérateur")} onClick={() => { if (confirm(u.is_moderator ? tr("Retirer le rôle modérateur de {0} ?", [u.name]) : tr("Rendre {0} modérateur ? Il pourra gérer la liste d’attente, débloquer les comptes et leur envoyer un lien de mot de passe.", [u.name]))) set(u.id, { is_moderator: !u.is_moderator }, tr("Rôle mis à jour")) }}><UserCog size={16} /></button>}
           <button className="iconbtn" data-tip={u.is_admin ? tr("Retirer les droits admin") : tr("Rendre admin")} aria-label={u.is_admin ? tr("Retirer les droits admin") : tr("Rendre admin")} onClick={() => { if (confirm(u.is_admin ? tr("Retirer les droits admin de {0} ?", [u.name]) : tr("Donner les droits admin à {0} ? Il pourra gérer la liste d’attente et les comptes.", [u.name]))) set(u.id, { is_admin: !u.is_admin }, tr("Droits mis à jour")) }}><ShieldCheck size={16} /></button>
           <button className="iconbtn" data-tip={u.disabled ? tr("Réactiver") : tr("Désactiver le compte")} aria-label={u.disabled ? tr("Réactiver") : tr("Désactiver le compte")} onClick={() => { if (confirm(u.disabled ? tr("Réactiver le compte de {0} ?", [u.name]) : tr("Désactiver le compte de {0} ? Il sera déconnecté et ne pourra plus se connecter.", [u.name]))) set(u.id, { disabled: !u.disabled }, u.disabled ? tr("Compte réactivé") : tr("Compte désactivé")) }}><Ban size={16} /></button>
           <button className="iconbtn" data-tip={tr("Supprimer le compte")} aria-label={tr("Supprimer le compte")} onClick={() => setDel(u)}><Trash2 size={16} /></button>
+          </>}
         </div>}</td>
       </tr>)}</tbody></table></div>
     {del && <DeleteUser u={del} onClose={() => setDel(null)} onDone={() => { setDel(null); reload() }} />}
@@ -264,18 +269,21 @@ function Gate({ code, msg, onOk }: { code: string; msg: string; onOk: () => void
 
 export default function Admin() {
   const { me } = useApp()
-  const [tab, setTab] = useState<'overview' | 'waitlist' | 'create' | 'users' | 'audit' | 'money' | 'legal'>(me?.admin_pending ? 'waitlist' : 'overview')
+  // Modérateur (#65) : seulement la liste d'attente et les utilisateurs.
+  const staff = !!(me?.admin || me?.moderator)
+  const mod = staff && !me?.admin
+  const [tab, setTab] = useState<'overview' | 'waitlist' | 'create' | 'users' | 'audit' | 'money' | 'legal'>(mod || me?.admin_pending ? 'waitlist' : 'overview')
   const [gate, setGate] = useState<{ code: string; msg: string } | null | 'ok'>(null)
-  const check = () => api.get('/api/admin/overview').then(() => setGate('ok')).catch((e: any) => setGate({ code: e.code ?? 'forbidden', msg: e.message }))
-  useEffect(() => { if (me?.admin) check() }, [me?.admin])
-  if (!me?.admin) return <main className="content"><PageHead title={tr("Administration")} help={tr("Réservé aux administrateurs de POP.")} /><section className="card"><Empty text={tr("Vous n’avez pas accès à cette page.")} /></section></main>
+  const check = () => api.get(mod ? '/api/admin/waitlist?status=pending' : '/api/admin/overview').then(() => setGate('ok')).catch((e: any) => setGate({ code: e.code ?? 'forbidden', msg: e.message }))
+  useEffect(() => { if (staff) check() }, [staff])
+  if (!me || !staff) return <main className="content"><PageHead title={tr("Administration")} help={tr("Réservé aux administrateurs de POP.")} /><section className="card"><Empty text={tr("Vous n’avez pas accès à cette page.")} /></section></main>
   return <main className="content">
     <PageHead title={tr("Administration")} help={tr("Gérer la plateforme POP : demandes d’accès à la bêta, comptes des bêta-testeurs et utilisateurs.")}>
       {gate === 'ok' && <button className="btn" onClick={async () => { await api.post('/api/admin/lock'); setGate(null); check() }}><Lock size={15} />{tr("Verrouiller")}</button>}
     </PageHead>
     {gate === null ? null : gate !== 'ok' ? <Gate code={gate.code} msg={gate.msg} onOk={() => { setGate(null); check() }} /> : <>
       <div className="tabs" role="tablist" style={{ alignSelf: 'flex-start' }}>
-        {([['overview', tr("Vue générale")], ['waitlist', tr("Liste d’attente{0}", [me.admin_pending ? ` (${me.admin_pending})` : ''])], ['create', tr("Créer un compte")], ['users', tr("Utilisateurs")], ['audit', tr("Sécurité")], ['money', tr("Paiements et IA")], ['legal', tr("Infos légales")]] as const).map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}
+        {([['overview', tr("Vue générale")], ['waitlist', tr("Liste d’attente{0}", [me.admin_pending ? ` (${me.admin_pending})` : ''])], ['create', tr("Créer un compte")], ['users', tr("Utilisateurs")], ['audit', tr("Sécurité")], ['money', tr("Paiements et IA")], ['legal', tr("Infos légales")]] as const).filter(([k]) => !mod || k === 'waitlist' || k === 'users').map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}
       </div>
       {tab === 'overview' && <Overview />}
       {tab === 'waitlist' && <Waitlist />}
