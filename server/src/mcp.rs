@@ -132,6 +132,8 @@ fn tools() -> Value {
         tool("create_task", "Crée une tâche d'environ une heure. tag : code, carte, conception ou test. depends_on : numéros de tâches. assign_to_me : vous l'assigner.", json!({ "title": { "type": "string" }, "description": { "type": "string" }, "tag": { "type": "string" }, "planned_day": { "type": "string", "description": "AAAA-MM-JJ" }, "depends_on": { "type": "array", "items": { "type": "integer" } }, "assign_to_me": { "type": "boolean" } }), &["title"]),
         tool("set_task_status", "Change le statut d'une tâche : todo (à faire), doing (en cours), blocked (bloquée), done (faite). Passer en cours exige que ses dépendances soient faites. note : commentaire facultatif (ce qui a été fait, ce qui bloque).", json!({ "number": { "type": "integer" }, "status": { "type": "string", "enum": ["todo", "doing", "blocked", "done"] }, "note": { "type": "string" } }), &["number", "status"]),
         tool("comment_task", "Ajoute un commentaire à une tâche.", json!({ "number": { "type": "integer" }, "text": { "type": "string" } }), &["number", "text"]),
+        tool("search_library", "Cherche dans la bibliothèque Verse du studio (modules prêts : économie, équipes, minuteur, HUD, sauvegarde…). À faire AVANT d'écrire du Verse neuf : réutilisez un module existant quand il convient. Filtres facultatifs : query (texte du nom ou de la description), category (economie, equipes, minuteur, hud, sauvegarde, interface, jeu, outils, autre).", json!({ "query": { "type": "string" }, "category": { "type": "string" } }), &[]),
+        tool("get_library_module", "Lit un module de la bibliothèque Verse du studio : code complet, appareils requis, version.", json!({ "id": { "type": "integer" } }), &["id"]),
         tool("undo_action", "Annule une action du journal par son identifiant.", json!({ "id": { "type": "integer" } }), &["id"]),
     ])
 }
@@ -146,6 +148,8 @@ const READ_TOOLS: &[&str] = &[
     "list_tasks",
     "get_task",
     "next_task",
+    "search_library",
+    "get_library_module",
 ];
 
 fn rpc_ok(id: Value, result: Value) -> Response {
@@ -279,6 +283,19 @@ async fn call(
     };
     match name {
         "check_level" => crate::checks::rapport(st, mid).await,
+        "search_library" => {
+            let q = crate::library::SearchQ {
+                q: a["query"].as_str().map(String::from),
+                category: a["category"].as_str().map(String::from),
+            };
+            Ok(json!(crate::library::search(st, ctx.studio_id, &q).await?))
+        }
+        "get_library_module" => {
+            let id = a["id"]
+                .as_i64()
+                .ok_or_else(|| crate::error::bad("Identifiant du module manquant."))?;
+            crate::library::module(st, ctx.studio_id, id).await
+        }
         "list_tasks" => {
             let rows: Vec<(i64, String, String, String, Option<String>, Option<i64>, Option<String>, i64)> = sqlx::query_as(
                 "SELECT t.number, t.title, t.status, t.tag, u.name, t.assignee_id, t.planned_day, t.id FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id WHERE t.map_id = ? ORDER BY t.status = 'done', t.planned_day IS NULL, t.planned_day, t.number",
@@ -492,5 +509,63 @@ async fn call(
                 .map(|j| j.0)
         }
         _ => Err(bad("Outil inconnu.")),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Une IA connectée cherche dans la bibliothèque Verse de son studio, puis lit un module (#85).
+    #[tokio::test]
+    async fn bibliotheque_par_mcp() {
+        let st = crate::test_state().await;
+        let sid: i64 =
+            sqlx::query_scalar("INSERT INTO studios (name) VALUES ('Studio') RETURNING id")
+                .fetch_one(&st.db)
+                .await
+                .unwrap();
+        let mid: i64 =
+            sqlx::query_scalar("INSERT INTO maps (studio_id, name) VALUES (?, 'Map') RETURNING id")
+                .bind(sid)
+                .fetch_one(&st.db)
+                .await
+                .unwrap();
+        let uid: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash) VALUES ('ia@a.fr', 'IA', 'x') RETURNING id")
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO memberships (studio_id, user_id, role) VALUES (?, ?, 'member')")
+            .bind(sid)
+            .bind(uid)
+            .execute(&st.db)
+            .await
+            .unwrap();
+        let id: i64 = sqlx::query_scalar("INSERT INTO verse_modules (studio_id, name, category, content) VALUES (?, 'Banque de pièces', 'economie', 'banque := class:') RETURNING id")
+            .bind(sid)
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        let u = AuthUser {
+            id: uid,
+            email: "ia@a.fr".into(),
+            name: "IA".into(),
+            sid: String::new(),
+        };
+        let r = call(&st, &u, mid, "search_library", json!({ "query": "pièces" }))
+            .await
+            .unwrap();
+        assert_eq!(r[0]["id"], id);
+        let r = call(&st, &u, mid, "search_library", json!({ "category": "hud" }))
+            .await
+            .unwrap();
+        assert_eq!(r.as_array().unwrap().len(), 0);
+        let m = call(&st, &u, mid, "get_library_module", json!({ "id": id }))
+            .await
+            .unwrap();
+        assert_eq!(m["content"], "banque := class:");
+        assert!(
+            READ_TOOLS.contains(&"search_library") && READ_TOOLS.contains(&"get_library_module")
+        );
     }
 }
