@@ -30,3 +30,4 @@ fixes ; si une demande ou une issue semble en contredire une, arrêtez-vous et d
 | 20/11 | Forge est réservé à un nouveau plan au-dessus de Pro (nom et prix à décider plus tard), ouvert aux comptes bêta pendant M4 | Kl1600 |
 | 20/11 | Assets de Forge, v1 : assets de l'équipe POP et assets déposés par un studio pour lui-même (déclaration de droits à l'envoi), fichiers dans un stockage objet compatible S3 hors du serveur, taille maximale par fichier et par studio ; fournisseur à choisir par l'équipe (#91) | Kl1600 |
 | 20/11 | CI de Forge : build Windows seulement quand `forge/` ou `link/` change ; versions publiées sur étiquette `forge-v*` | Kl1600 |
+| 20/11 | POP Forge a sa propre interface, centrée sur la construction de la map et le travail des IA (modèle : VibeStarter) ; le site POP reste la gestion (kanban, planning, équipe), ouvert depuis Forge par « Ouvrir POP » (#78) | Kl1600 |
