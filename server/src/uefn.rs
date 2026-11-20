@@ -884,6 +884,43 @@ async fn prepare(
                 ),
             ))
         }
+        "actor_spawn" => {
+            // Poser un appareil (#81) : depuis un asset du Content Browser, ou sur le modèle d'un acteur du niveau.
+            let asset = args["asset"].as_str().unwrap_or("").trim().to_string();
+            let like = args["like"].as_str().unwrap_or("").trim().to_string();
+            let modele = if like.is_empty() {
+                if !asset.starts_with('/') || asset.len() > 400 {
+                    return Err(bad("Indiquez l’asset de l’appareil (chemin du Content Browser, ex. /Game/…) ou un appareil modèle du niveau."));
+                }
+                asset.rsplit('/').next().unwrap_or(&asset).to_string()
+            } else {
+                let a = by_id(&like)
+                    .ok_or_else(|| bad(format!("Appareil modèle introuvable : {like}")))?;
+                a["name"].as_str().unwrap_or(&like).to_string()
+            };
+            let nom = args["name"].as_str().unwrap_or("").trim().to_string();
+            check_len("Nom", &nom, 0, 120)?;
+            if let Some(f) = args["folder"].as_str().filter(|f| !f.is_empty()) {
+                check_len("Dossier", f, 1, 200)?;
+                check_lock(f)?;
+            }
+            for (k, n) in [("location", 3), ("rotation", 3)] {
+                if !args[k].is_null()
+                    && !args[k]
+                        .as_array()
+                        .map(|v| v.len() == n && v.iter().all(|x| x.is_number()))
+                        .unwrap_or(false)
+                {
+                    return Err(bad(format!("{k} : trois nombres attendus.")));
+                }
+            }
+            let quoi = if nom.is_empty() {
+                modele
+            } else {
+                format!("{nom} ({modele})")
+            };
+            Ok((format!("Pose : {quoi}"), Value::Null, None))
+        }
         "actor_duplicate" | "actor_delete" => {
             let ids: Vec<String> = args["ids"]
                 .as_array()
@@ -1077,9 +1114,9 @@ async fn run_action(
                 notify(st, mid, json!({ "t": "uefn", "what": "actors" }));
             }
             if let Some(id) = aid {
-                // Une duplication s'annule en supprimant les copies créées.
+                // Une duplication ou une pose s'annule en supprimant les acteurs créés.
                 let mut extra_undo = None;
-                if action == "actor_duplicate" {
+                if action == "actor_duplicate" || action == "actor_spawn" {
                     if let Some(ids) = data.get("created_ids") {
                         extra_undo = Some(
                             json!({ "action": "actor_delete", "args": { "ids": ids } }).to_string(),
