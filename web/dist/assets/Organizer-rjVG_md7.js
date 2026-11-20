@@ -1,4 +1,8 @@
+<<<<<<<< HEAD:web/dist/assets/Organizer-rjVG_md7.js
 import{c as I,m as Y,q as X,r as N,N as se,j as e,n as ge,O as oe,g as de,Q as ue,t as s,V as be,T as ie,w as te,C as Ne,p as U,D as ke,Y as we,X as J,Z as pe,_ as Ce,I as ze,$ as Se,a0 as re,y as he,a1 as Ee,e as _e,a2 as Me,a3 as Le,o as ae,s as Pe,x as Te,a4 as ce}from"./index-DF4H6y6B.js";/**
+========
+import{c as I,m as Y,q as X,r as N,N as se,j as e,n as ge,O as oe,g as de,Q as ue,t as s,V as be,T as ie,w as te,C as Ne,p as U,D as ke,Y as we,X as J,Z as pe,_ as Ce,I as ze,$ as Se,a0 as re,y as he,a1 as Ee,e as _e,a2 as Me,a3 as Le,o as ae,s as Pe,x as Te,a4 as ce}from"./index-COhdLVaL.js";/**
+>>>>>>>> abb95e4 (#70 : l'IA garde ses prédictions, les vérifie après coup et suit sa précision jour par jour):web/dist/assets/Organizer-DVERoONu.js
  * @license lucide-react v0.460.0 - ISC
  *
  * This source code is licensed under the ISC license.

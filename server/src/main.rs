@@ -284,6 +284,7 @@ fn api() -> Router<AppState> {
             "/api/admin/model",
             get(model::admin_status).post(model::admin_refresh),
         )
+        .route("/api/admin/ia", get(model::admin_learning))
         .route("/api/ideas", get(ideas::list))
         .route("/api/ideas/niches", get(ideas::all_niches))
         .route(

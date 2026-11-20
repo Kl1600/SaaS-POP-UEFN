@@ -282,7 +282,7 @@ export default function Admin() {
   // Modérateur (#65) : seulement la liste d'attente et les utilisateurs.
   const staff = !!(me?.admin || me?.moderator)
   const mod = staff && !me?.admin
-  const [tab, setTab] = useState<'overview' | 'waitlist' | 'create' | 'users' | 'audit' | 'money' | 'legal' | 'announce'>(mod || me?.admin_pending ? 'waitlist' : 'overview')
+  const [tab, setTab] = useState<'overview' | 'waitlist' | 'create' | 'users' | 'ia' | 'audit' | 'money' | 'legal' | 'announce'>(mod || me?.admin_pending ? 'waitlist' : 'overview')
   const [gate, setGate] = useState<{ code: string; msg: string } | null | 'ok'>(null)
   const check = () => api.get(mod ? '/api/admin/waitlist?status=pending' : '/api/admin/overview').then(() => setGate('ok')).catch((e: any) => setGate({ code: e.code ?? 'forbidden', msg: e.message }))
   useEffect(() => { if (staff) check() }, [staff])
@@ -293,12 +293,13 @@ export default function Admin() {
     </PageHead>
     {gate === null ? null : gate !== 'ok' ? <Gate code={gate.code} msg={gate.msg} onOk={() => { setGate(null); check() }} /> : <>
       <div className="tabs" role="tablist" style={{ alignSelf: 'flex-start' }}>
-        {([['overview', tr("Vue générale")], ['waitlist', tr("Liste d’attente{0}", [me.admin_pending ? ` (${me.admin_pending})` : ''])], ['create', tr("Créer un compte")], ['users', tr("Utilisateurs")], ['audit', tr("Sécurité")], ['money', tr("Paiements et IA")], ['legal', tr("Infos légales")], ['announce', tr("Annonce")]] as const).filter(([k]) => !mod || k === 'waitlist' || k === 'users').map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}
+        {([['overview', tr("Vue générale")], ['waitlist', tr("Liste d’attente{0}", [me.admin_pending ? ` (${me.admin_pending})` : ''])], ['create', tr("Créer un compte")], ['users', tr("Utilisateurs")], ['ia', tr("Apprentissage de l’IA")], ['audit', tr("Sécurité")], ['money', tr("Paiements et IA")], ['legal', tr("Infos légales")], ['announce', tr("Annonce")]] as const).filter(([k]) => !mod || k === 'waitlist' || k === 'users').map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}
       </div>
       {tab === 'overview' && <Overview />}
       {tab === 'waitlist' && <Waitlist />}
       {tab === 'create' && <CreateAccount />}
       {tab === 'users' && <Users />}
+      {tab === 'ia' && <Learning />}
       {tab === 'audit' && <Audit />}
       {tab === 'money' && <Money />}
       {tab === 'legal' && <LegalInfo />}
@@ -399,5 +400,51 @@ function Money() {
         <button className="btn pri" disabled={!+uid || !+cr} onClick={async () => { try { await api.post(`/api/admin/users/${+uid}/credits`, { credits: +cr }); toast(tr("Crédits mis à jour")); setCr('') } catch (e: any) { toast(e.message, true) } }}>{tr("Appliquer")}</button>
       </div>
     </section>
+  </>
+}
+
+const pct = (v?: number | null) => v == null ? '—' : `${Math.round(v * 100)} %`
+
+/** Apprentissage de l'IA (#70) : versions du modèle « chance de percer », précision mesurée sur des maps qu'il n'a
+ * jamais vues, et prédictions vérifiées après les 14 jours de test d'Epic. */
+function Learning() {
+  const { data } = useLoad<any>('/api/admin/ia')
+  if (!data) return null
+  const models = [...data.models].reverse()
+  const last = data.models[0]
+  const W = 640, H = 160, P = 28
+  const x = (i: number) => P + (models.length < 2 ? (W - 2 * P) / 2 : (i * (W - 2 * P)) / (models.length - 1))
+  const yv = (v: number) => H - P - (Math.max(0.5, Math.min(1, v)) - 0.5) * 2 * (H - 2 * P)
+  return <>
+    <div className="tiles">
+      <div className="card"><div className="lab">{tr("Précision sur l’avenir")}</div><div className="num">{last ? pct(last.auc) : '—'}</div><div className="muted">{tr("50 % = au hasard, 100 % = parfait")}</div></div>
+      <div className="card"><div className="lab">{tr("Maps apprises")}</div><div className="num">{last ? n(last.n) : 0}</div><div className="muted">{last ? tr("dont {0} qui ont percé", [n(last.positives)]) : tr("pas encore assez")}</div></div>
+      <div className="card"><div className="lab">{tr("Prédictions gardées")}</div><div className="num">{n(data.predictions)}</div><div className="muted">{tr("{0} déjà vérifiées", [n(data.graded)])}</div></div>
+      <div className="card"><div className="lab">{tr("Dernier entraînement")}</div><div className="num" style={{ fontSize: 22 }}>{last ? ago(last.at) : '—'}</div><div className="muted">{tr("chaque jour, automatiquement")}</div></div>
+    </div>
+    <section className="card">
+      <CardHead title={tr("Précision jour après jour")} sub={tr("Chaque jour, l’IA apprend sur les maps les plus anciennes et se teste sur les plus récentes, qu’elle n’a jamais vues. « Percer » = dépasser {0} joueurs par jour pendant les 14 jours de test d’Epic.", [n(data.threshold)])} />
+      {models.length === 0 ? <Empty text={tr("Pas encore de version entraînée : il faut au moins 40 nouvelles maps sorties depuis plus de 15 jours, dont 5 qui ont percé.")} /> :
+        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', maxWidth: W, height: 'auto' }} role="img" aria-label={tr("Précision de l’IA à chaque entraînement")}>
+          {[0.5, 0.75, 1].map(v => <g key={v}><line x1={P} x2={W - P} y1={yv(v)} y2={yv(v)} stroke="var(--border)" /><text x={2} y={yv(v) + 4} fontSize="11" fill="var(--text2)">{Math.round(v * 100)}</text></g>)}
+          <polyline fill="none" stroke="var(--text)" strokeWidth="2" points={models.map((m: any, i: number) => `${x(i)},${yv(m.auc ?? 0.5)}`).join(' ')} />
+          {models.map((m: any, i: number) => <circle key={m.id} cx={x(i)} cy={yv(m.auc ?? 0.5)} r="3.5" fill="var(--text)"><title>{`${frDate(m.at)} : ${pct(m.auc)} (${m.n} maps)`}</title></circle>)}
+          {models.length > 0 && <><text x={P} y={H - 6} fontSize="11" fill="var(--text2)">{frDate(models[0].at)}</text><text x={W - P} y={H - 6} fontSize="11" fill="var(--text2)" textAnchor="end">{frDate(models[models.length - 1].at)}</text></>}
+        </svg>}
+    </section>
+    <div className="grid2">
+      <section className="card"><CardHead title={tr("Prédictions vérifiées, par semaine")} sub={tr("Chance annoncée au 3e jour de la map, comparée à ce qui s’est passé.")} />
+        {data.weeks.length === 0 ? <p className="small muted">{tr("Les premières prédictions seront vérifiées 15 jours après leur enregistrement.")}</p> :
+          <table className="tbl"><thead><tr><th>{tr("Semaine")}</th><th>{tr("Maps")}</th><th>{tr("Bonnes réponses")}</th><th>{tr("Précision")}</th></tr></thead>
+            <tbody>{[...data.weeks].reverse().map((w: any) => <tr key={w.week}><td>{w.week.replace('-', ' · S')}</td><td>{w.n}</td><td>{pct(w.accuracy)}</td><td>{pct(w.auc)}</td></tr>)}</tbody></table>}
+      </section>
+      <section className="card"><CardHead title={tr("Dernières prédictions vérifiées")} />
+        {data.recent.length === 0 ? <p className="small muted">{tr("Rien pour l’instant.")}</p> :
+          <div className="list">{data.recent.map((r: any) => <div key={r.code} className="li">
+            <span style={{ flex: 1, minWidth: 0 }}><b style={{ fontWeight: 500 }}>{r.title || r.code}</b><span className="small muted">{' '}{tr("annoncée {0}, max {1} joueurs", [pct(r.prob), n(r.best ?? 0)])}</span></span>
+            {r.outcome == null ? <span className="badge">{tr("Non mesurée")}</span> : (r.prob >= 0.5) === (r.outcome === 1) ? <span className="badge b-g">{tr("Juste")}</span> : <span className="badge b-o">{tr("Fausse")}</span>}
+          </div>)}</div>}
+      </section>
+    </div>
   </>
 }
