@@ -26,7 +26,46 @@ $('f').addEventListener('submit', async (e) => {
   }
 });
 
+// ---- Relier un projet UEFN (UEFN Link dans Forge) ----
+async function relierEcran() {
+  $('intro').textContent = 'Reliez un projet UEFN à votre map POP.';
+  $('r').hidden = false;
+  $('etat').textContent = 'Relais : ' + await invoke('etat_relais');
+  const liste = await invoke('projets');
+  const sel = $('projet');
+  for (const p of liste) sel.add(new Option(p.split(/[\\/]/).pop() + ' — ' + p, p));
+  sel.add(new Option('Autre dossier…', ''));
+  const autre = () => { $('autre').hidden = sel.value !== ''; };
+  sel.addEventListener('change', autre);
+  autre();
+  $('code').focus();
+  setInterval(async () => { $('etat').textContent = 'Relais : ' + await invoke('etat_relais'); }, 2000);
+}
+
+$('r').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('okr').disabled = true;
+  $('okr').textContent = 'Liaison…';
+  $('erreurr').textContent = '';
+  const projet = $('projet').value || $('autre').value;
+  try {
+    const etat = await invoke('relier', { code: $('code').value, projet });
+    $('etat').textContent = 'Relais : ' + etat;
+    $('okr').textContent = 'Relié';
+  } catch (err) {
+    $('erreurr').textContent = String(err);
+    $('okr').disabled = false;
+    $('okr').textContent = 'Relier ce projet';
+  }
+});
+
+$('retour').addEventListener('click', async () => {
+  const r = await invoke('start', { change: false });
+  if (r.error) $('erreurr').textContent = r.error;
+});
+
 (async () => {
+  if (new URLSearchParams(location.search).has('relier')) return relierEcran();
   const changer = new URLSearchParams(location.search).has('changer');
   try {
     const r = await invoke('start', { change: changer });

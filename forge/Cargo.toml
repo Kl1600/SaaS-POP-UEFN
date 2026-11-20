@@ -12,4 +12,7 @@ tauri = { version = "2", features = [] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 url = "2"
+tokio = { version = "1", features = ["time"] }
+# UEFN Link (#77) : le relais tourne dans Forge.
+pop-link = { path = "../link" }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }

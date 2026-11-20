@@ -398,6 +398,18 @@ impl Handle {
         }
     }
 
+    /// Sert la page d'état locale sur un port déjà réservé par l'appelant (POP Forge le réserve avant de
+    /// démarrer, pour ne pas lancer un second relais à côté d'un `pop-link.exe` ouvert).
+    pub fn serve_status(&self, l: std::net::TcpListener) -> tokio::task::JoinHandle<()> {
+        let uis = self.uis.clone();
+        tokio::spawn(async move {
+            l.set_nonblocking(true).ok();
+            if let Ok(l) = tokio::net::TcpListener::from_std(l) {
+                let _ = axum::serve(l, status_router(uis)).await;
+            }
+        })
+    }
+
     /// Vrai quand plus aucune liaison ne tourne (après [`Handle::stop`]).
     pub fn stopped(&self) -> bool {
         self.tasks.iter().all(|t| t.is_finished())
@@ -653,18 +665,21 @@ async fn sync(link: &mut Link, tx: &mpsc::UnboundedSender<Value>, full: bool) {
 
 // ---------- Page d'état locale ----------
 
-async fn local_page(uis: Vec<Shared>, port: u16) {
+fn status_router(uis: Vec<Shared>) -> axum::Router {
     use axum::{routing::get, Router};
-    let app = Router::new().route(
+    Router::new().route(
         "/",
         get(move || {
             let list: Vec<Ui> = uis.iter().map(|u| u.lock().unwrap().clone()).collect();
             async move { axum::response::Html(list.iter().map(page).collect::<Vec<_>>().join("")) }
         }),
-    );
+    )
+}
+
+async fn local_page(uis: Vec<Shared>, port: u16) {
     match tokio::net::TcpListener::bind(("127.0.0.1", port)).await {
         Ok(l) => {
-            let _ = axum::serve(l, app).await;
+            let _ = axum::serve(l, status_router(uis)).await;
         }
         Err(e) => println!(
             "Page d'état indisponible ({e}) : un autre pop-link est peut-être déjà ouvert."
