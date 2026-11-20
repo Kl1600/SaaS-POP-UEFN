@@ -5,6 +5,7 @@ L'espace de travail des créateurs de maps Fortnite (UEFN) : pages, tableau blan
 - `server/` : serveur Rust (Axum + SQLite). API, sessions, temps réel (WebSocket).
 - `web/` : interface React + TypeScript (Vite).
 - `link/` : relais Windows `pop-link.exe` entre UEFN et POP.
+- `forge/` : POP Forge, application de bureau Windows (Tauri 2) qui affiche POP ; installateur construit par le CI (artefact « pop-forge-installateur »).
 
 ## Travailler sur POP (humains et agents IA)
 

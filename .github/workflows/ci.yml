@@ -30,6 +30,7 @@ jobs:
     outputs:
       serveur: ${{ steps.f.outputs.serveur }}
       relais: ${{ steps.f.outputs.relais }}
+      forge: ${{ steps.f.outputs.forge }}
       web: ${{ steps.f.outputs.web }}
       migrations: ${{ steps.f.outputs.migrations }}
       audit: ${{ steps.f.outputs.audit }}
@@ -66,6 +67,8 @@ jobs:
           out() { if touche "$2"; then echo "$1=1"; else echo "$1=0"; fi >> "$GITHUB_OUTPUT"; }
           out serveur '^server/'
           out relais '^link/'
+          # Forge embarque le relais (#77) : il se reconstruit aussi quand link/ change.
+          out forge '^(forge|link)/'
           out web '^web/'
           out migrations '^server/migrations/'
           if [ "$EVENT" = schedule ]; then echo "audit=1" >> "$GITHUB_OUTPUT"
@@ -113,6 +116,36 @@ jobs:
         working-directory: link
       - run: cargo test --locked
         working-directory: link
+
+  # POP Forge (#76) : application Windows, construite seulement quand forge/ ou link/ change (minutes Windows
+  # comptées double). L'installateur non signé (bêta) est gardé en artefact de l'exécution.
+  forge:
+    name: forge (Windows, build + installateur)
+    needs: changements
+    if: needs.changements.outputs.forge == '1'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: forge
+      - run: cargo fmt --check
+        working-directory: forge
+      - run: cargo test --locked
+        working-directory: forge
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npx --yes @tauri-apps/cli@2 build --bundles nsis -- --locked
+        working-directory: forge
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pop-forge-installateur
+          path: forge/target/release/bundle/nsis/*.exe
+          retention-days: 14
 
   web:
     name: web (types + build + dist à jour)
