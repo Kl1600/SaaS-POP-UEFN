@@ -1,9 +1,7 @@
 //! UEFN Link : relais local entre UEFN (sur le PC du créateur) et POP.
 //!
-//!   pop-link                      (double-clic : appairage guidé la première fois, puis connexion)
-//!   pop-link pair <adresse POP> <code> <dossier du projet UEFN> [--name "PC de Yanis"]
-//!   pop-link run [--port 47800]
-//!   pop-link diagnostic           (vérifie UEFN MCP et liste ses outils)
+//! Bibliothèque utilisée par `pop-link.exe` (`main.rs`, ligne de commande) et par POP Forge, qui fait tourner le
+//! relais dans son propre processus : [`start`] démarre le relais et rend une [`Handle`] (état, journal, arrêt).
 mod digest;
 mod files;
 mod mcpdriver;
@@ -22,35 +20,35 @@ use tokio::sync::mpsc;
 use tokio_tungstenite::tungstenite::{client::IntoClientRequest, Message};
 
 #[derive(Serialize, Deserialize, Clone, Default)]
-struct Config {
-    server: String,
-    token: String,
-    project: String,
-    map: String,
+pub struct Config {
+    pub server: String,
+    pub token: String,
+    pub project: String,
+    pub map: String,
     #[serde(default)]
-    digests_dir: Option<String>,
+    pub digests_dir: Option<String>,
     #[serde(default)]
-    uefn_mcp_url: Option<String>,
+    pub uefn_mcp_url: Option<String>,
     /// Commande d'archivage Lore, ex. « lore commit -m {message} » (le message reste un seul argument).
     #[serde(default)]
-    lore_cmd: Option<String>,
+    pub lore_cmd: Option<String>,
     /// Noms d'outils MCP imposés si la détection automatique se trompe : python, compile, push.
     #[serde(default)]
-    tools: HashMap<String, String>,
+    pub tools: HashMap<String, String>,
     /// Liaison simplifiée : un projet UEFN = une map POP, chacun avec son jeton.
     #[serde(default)]
-    links: Vec<ProjLink>,
+    pub links: Vec<ProjLink>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Default)]
-struct ProjLink {
-    project: String,
-    map: String,
-    token: String,
+pub struct ProjLink {
+    pub project: String,
+    pub map: String,
+    pub token: String,
 }
 
 /// Adresse de POP et code intégrés à la fin de pop-link.exe quand il est téléchargé depuis POP.
-fn embedded() -> Option<Value> {
+pub fn embedded() -> Option<Value> {
     let exe = std::fs::read(std::env::current_exe().ok()?).ok()?;
     let tail = &exe[exe.len().saturating_sub(4096)..];
     let txt = String::from_utf8_lossy(tail);
@@ -96,7 +94,7 @@ fn newest_mtime(dir: &std::path::Path, depth: usize) -> std::time::SystemTime {
     best
 }
 
-fn config_path() -> PathBuf {
+pub fn config_path() -> PathBuf {
     if let Ok(p) = std::env::var("POP_LINK_CONFIG") {
         return PathBuf::from(p);
     }
@@ -117,30 +115,34 @@ fn config_path() -> PathBuf {
     base.join("pop-link").join("config.json")
 }
 
-fn load() -> Result<Config> {
+pub fn load() -> Result<Config> {
     let p = config_path();
     let s = std::fs::read_to_string(&p).with_context(|| format!("Pas encore appairé ({}). Lancez d'abord : pop-link pair <adresse POP> <code> <dossier du projet>", p.display()))?;
     Ok(serde_json::from_str(&s)?)
 }
 
-fn save(c: &Config) -> Result<()> {
+pub fn save(c: &Config) -> Result<()> {
     let p = config_path();
     std::fs::create_dir_all(p.parent().unwrap())?;
     std::fs::write(&p, serde_json::to_string_pretty(c)?)?;
     Ok(())
 }
 
-// ---------- État partagé (page locale) ----------
+// ---------- État partagé (page locale, Forge) ----------
 
+/// État d'un projet relié, tel que l'affichent la page locale et POP Forge.
 #[derive(Default, Clone, Serialize)]
-struct Ui {
-    relay: String,
-    uefn: String,
-    project: String,
-    map: String,
-    mcp_url: String,
-    journal: Vec<(String, String, String)>, // (heure, action, résultat)
-    tools: Vec<String>,
+pub struct Ui {
+    /// Liaison avec POP : « connexion… », « connecté », « hors ligne ».
+    pub relay: String,
+    /// UEFN : « ? », « connecté », « fermé ».
+    pub uefn: String,
+    pub project: String,
+    pub map: String,
+    pub mcp_url: String,
+    /// Le plus récent d'abord, 100 au plus : (heure, action, résultat).
+    pub journal: Vec<(String, String, String)>,
+    pub tools: Vec<String>,
 }
 
 type Shared = Arc<Mutex<Ui>>;
@@ -377,8 +379,40 @@ impl Link {
 
 // ---------- Boucle principale ----------
 
-async fn run(port: u16) -> Result<()> {
-    let cfg = load()?;
+/// Relais démarré par [`start`] : un état par projet relié, et l'arrêt.
+pub struct Handle {
+    uis: Vec<Shared>,
+    tasks: Vec<tokio::task::JoinHandle<()>>,
+}
+
+impl Handle {
+    /// Copie de l'état de chaque projet relié (relais, UEFN, journal…).
+    pub fn status(&self) -> Vec<Ui> {
+        self.uis.iter().map(|u| u.lock().unwrap().clone()).collect()
+    }
+
+    /// Arrête le relais : coupe la liaison avec POP et ne pilote plus UEFN.
+    pub fn stop(&self) {
+        for t in &self.tasks {
+            t.abort();
+        }
+    }
+
+    /// Vrai quand plus aucune liaison ne tourne (après [`Handle::stop`]).
+    pub fn stopped(&self) -> bool {
+        self.tasks.iter().all(|t| t.is_finished())
+    }
+}
+
+impl Drop for Handle {
+    fn drop(&mut self) {
+        self.stop();
+    }
+}
+
+/// Démarre le relais pour chaque projet de la configuration (à appeler dans un runtime tokio).
+/// Ne sert pas la page d'état locale : c'est le rôle de [`run`] (ligne de commande).
+pub fn start(cfg: Config) -> Result<Handle> {
     // Liste des projets reliés : liaison simplifiée (plusieurs) ou appairage classique (un seul).
     let links: Vec<ProjLink> = if cfg.links.is_empty() {
         vec![ProjLink {
@@ -392,6 +426,7 @@ async fn run(port: u16) -> Result<()> {
     let all: Vec<String> = links.iter().map(|l| l.project.clone()).collect();
     let open: Open = Default::default();
     let mut uis = vec![];
+    let mut tasks = vec![];
     println!(
         "UEFN Link · {} projet(s) relié(s) à {}",
         links.len(),
@@ -428,7 +463,7 @@ async fn run(port: u16) -> Result<()> {
             last_actors: String::new(),
             ui: ui.clone(),
         };
-        tokio::spawn(async move {
+        tasks.push(tokio::spawn(async move {
             let mut backoff = 1;
             loop {
                 match session(&mut link).await {
@@ -441,7 +476,7 @@ async fn run(port: u16) -> Result<()> {
                 tokio::time::sleep(Duration::from_secs(backoff)).await;
                 backoff = (backoff * 2).min(30);
             }
-        });
+        }));
     }
     if uis.is_empty() {
         bail!(
@@ -449,8 +484,14 @@ async fn run(port: u16) -> Result<()> {
             config_path().display()
         );
     }
+    Ok(Handle { uis, tasks })
+}
+
+/// `pop-link run` : relais et page d'état locale, jusqu'à la fermeture de la fenêtre.
+pub async fn run(port: u16) -> Result<()> {
+    let h = start(load()?)?;
     println!("Page d'état : http://127.0.0.1:{port}  (laissez cette fenêtre ouverte)");
-    local_page(uis, port).await;
+    local_page(h.uis.clone(), port).await;
     futures::future::pending::<()>().await;
     Ok(())
 }
@@ -678,9 +719,9 @@ h1{{font-weight:500;margin:0 0 8px}}.muted{{color:#a3a3a3}}table{{width:100%;bor
     )
 }
 
-// ---------- Ligne de commande ----------
+// ---------- Appairage et diagnostic (ligne de commande, Forge) ----------
 
-async fn pair(server: &str, code: &str, project: &str, name: &str) -> Result<()> {
+pub async fn pair(server: &str, code: &str, project: &str, name: &str) -> Result<()> {
     let server = server.trim_end_matches('/').to_string();
     let r: Value = reqwest::Client::new()
         .post(format!("{server}/api/relay/pair"))
@@ -704,7 +745,7 @@ async fn pair(server: &str, code: &str, project: &str, name: &str) -> Result<()>
     Ok(())
 }
 
-fn ask(q: &str) -> String {
+pub fn ask(q: &str) -> String {
     use std::io::Write;
     print!("{q} ");
     std::io::stdout().flush().ok();
@@ -714,7 +755,7 @@ fn ask(q: &str) -> String {
 }
 
 /// Projets UEFN du dossier « Documents/Fortnite Projects ».
-fn find_projects() -> Vec<PathBuf> {
+pub fn find_projects() -> Vec<PathBuf> {
     let home = std::env::var("USERPROFILE")
         .or_else(|_| std::env::var("HOME"))
         .unwrap_or_default();
@@ -752,7 +793,7 @@ fn find_projects() -> Vec<PathBuf> {
 }
 
 /// pop-link.exe téléchargé depuis POP : tout est automatique (adresse et code intégrés).
-async fn auto_pair(emb: &Value) -> Result<()> {
+pub async fn auto_pair(emb: &Value) -> Result<()> {
     let server = emb["server"]
         .as_str()
         .unwrap_or("")
@@ -813,7 +854,7 @@ async fn auto_pair(emb: &Value) -> Result<()> {
 }
 
 /// Premier lancement par double-clic : questions simples dans la console.
-async fn guided_pair() -> Result<()> {
+pub async fn guided_pair() -> Result<()> {
     println!("UEFN Link · première configuration\n");
     let server =
         ask("Adresse de POP (ex. https://pop.mon-studio.fr ou http://192.168.1.20:8080) :");
@@ -836,7 +877,7 @@ async fn guided_pair() -> Result<()> {
     pair(&server, &code, &project, &name).await
 }
 
-async fn diagnostic() -> Result<()> {
+pub async fn diagnostic() -> Result<()> {
     let cfg = load().ok();
     let root = cfg
         .as_ref()
@@ -883,62 +924,64 @@ async fn diagnostic() -> Result<()> {
     Ok(())
 }
 
-fn pause() {
+pub fn pause() {
     if cfg!(windows) {
         ask("\nAppuyez sur Entrée pour fermer.");
     }
 }
 
-#[tokio::main]
-async fn main() {
-    let args: Vec<String> = std::env::args().collect();
-    let flag = |f: &str| {
-        args.iter()
-            .position(|a| a == f)
-            .and_then(|i| args.get(i + 1))
-            .cloned()
-    };
-    let port = flag("--port").and_then(|p| p.parse().ok()).unwrap_or(47800);
-    let r = match args.get(1).map(String::as_str) {
-        Some("pair") if args.len() >= 5 => {
-            pair(
-                &args[2],
-                &args[3],
-                &args[4],
-                &flag("--name").unwrap_or_else(|| "UEFN Link".into()),
-            )
-            .await
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn cfg(project: &str) -> Config {
+        Config {
+            // Port 1 : aucun POP n'y répond, la liaison échoue tout de suite.
+            server: "http://127.0.0.1:1".into(),
+            token: "pop_test".into(),
+            project: project.into(),
+            map: "Map de test".into(),
+            ..Default::default()
         }
-        Some("diagnostic") => {
-            let r = diagnostic().await;
-            if let Err(e) = &r {
-                println!("{e:#}")
+    }
+
+    #[tokio::test]
+    async fn start_status_stop() {
+        let dir = std::env::temp_dir().join(format!("pop-link-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let h = start(cfg(&dir.to_string_lossy())).unwrap();
+        let st = h.status();
+        assert_eq!(st.len(), 1);
+        assert_eq!(st[0].map, "Map de test");
+        // POP injoignable : le relais passe « hors ligne » et le note dans le journal.
+        let mut ok = false;
+        for _ in 0..50 {
+            let s = &h.status()[0];
+            if s.relay == "hors ligne" && s.journal.iter().any(|(_, a, _)| a == "connexion") {
+                ok = true;
+                break;
             }
-            pause();
-            Ok(())
+            tokio::time::sleep(Duration::from_millis(100)).await;
         }
-        Some("run") => run(port).await,
-        None => {
-            if load().is_err() {
-                let r = match embedded() {
-                    Some(emb) => auto_pair(&emb).await,
-                    None => guided_pair().await,
-                };
-                if let Err(e) = r {
-                    println!("\nLiaison impossible : {e:#}");
-                    pause();
-                    return;
-                }
+        assert!(
+            ok,
+            "le relais devrait être hors ligne avec une ligne de journal"
+        );
+        assert!(!h.stopped());
+        h.stop();
+        for _ in 0..50 {
+            if h.stopped() {
+                break;
             }
-            run(port).await
+            tokio::time::sleep(Duration::from_millis(20)).await;
         }
-        _ => {
-            println!("UEFN Link\n  pop-link                 appairage guidé puis connexion\n  pop-link pair <adresse POP> <code> <dossier du projet UEFN> [--name \"PC de Yanis\"]\n  pop-link run [--port 47800]\n  pop-link diagnostic      vérifie UEFN MCP");
-            Ok(())
-        }
-    };
-    if let Err(e) = r {
-        println!("Erreur : {e:#}");
-        pause();
+        assert!(h.stopped());
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn start_refuse_sans_projet() {
+        let e = start(cfg("/dossier/qui/n/existe/pas")).err().unwrap();
+        assert!(format!("{e}").contains("Aucun projet UEFN valide"));
     }
 }
