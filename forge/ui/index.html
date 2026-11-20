@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>POP Forge</title>
+<style>
+  :root { --fond:#f4f4f4; --carte:#fff; --texte:#0a0a0a; --doux:#6b6b6b; --bord:#e2e2e2; --btn:#0a0a0a; --btn-texte:#fff; --err:#b00020; }
+  @media (prefers-color-scheme: dark) {
+    :root { --fond:#000; --carte:#0f0f0f; --texte:#fafafa; --doux:#a3a3a3; --bord:#262626; --btn:#fafafa; --btn-texte:#0a0a0a; --err:#ff6b6b; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center; background:var(--fond);
+         color:var(--texte); font-family:system-ui,-apple-system,"Segoe UI",sans-serif; }
+  .carte { width:min(460px,92vw); background:var(--carte); border:1px solid var(--bord); border-radius:20px; padding:32px; }
+  .logo { width:44px; height:44px; border-radius:12px; background:var(--texte); color:var(--fond); display:flex;
+          align-items:center; justify-content:center; font-weight:700; font-size:24px; margin-bottom:20px; }
+  h1 { font-size:22px; font-weight:600; margin:0 0 6px; }
+  p { color:var(--doux); margin:0 0 20px; line-height:1.45; font-size:14px; }
+  label { display:block; font-size:13px; font-weight:500; margin-bottom:6px; }
+  input { width:100%; height:42px; border:1px solid var(--bord); border-radius:10px; padding:0 12px; font-size:15px;
+          background:transparent; color:var(--texte); }
+  input:focus { outline:2px solid var(--texte); outline-offset:1px; }
+  button { margin-top:16px; width:100%; height:42px; border:0; border-radius:10px; background:var(--btn);
+           color:var(--btn-texte); font-size:15px; font-weight:500; cursor:pointer; }
+  button:disabled { opacity:.5; cursor:default; }
+  .erreur { color:var(--err); font-size:14px; margin:14px 0 0; min-height:1em; }
+  .petit { font-size:12px; margin:16px 0 0; }
+</style>
+</head>
+<body>
+<main class="carte">
+  <div class="logo">P</div>
+  <h1>POP Forge</h1>
+  <p id="intro">Connexion à POP…</p>
+  <form id="f" hidden>
+    <label for="adresse">Adresse de POP</label>
+    <input id="adresse" autocomplete="url" spellcheck="false" placeholder="pop.mon-studio.fr ou http://192.168.1.20:8080">
+    <button id="ok" type="submit">Se connecter</button>
+    <div class="erreur" id="erreur" role="alert"></div>
+    <p class="petit">L'adresse est retenue. Pour la changer plus tard : menu POP Forge → Changer l'adresse de POP.</p>
+  </form>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Page locale de Forge seulement : l'interface POP (adresse distante) n'a aucun accès aux commandes de Forge.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}
