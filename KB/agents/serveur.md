@@ -11,6 +11,10 @@ EN COURS | #85 Forge F11 · Serveur : bibliothèque de modules Verse du studio |
 Owner : Kl1600 | Sur la tâche : Claude Code, pour Kl1600
 Fait : migration 0027 verse_modules, library.rs (API, rôles), MCP search_library / get_library_module, tests
 Reste : validation par Kl1600
+EN COURS | #93 Forge F19 · Serveur : registre des agents IA et attribution des tâches | 21/11 01:20
+Owner : Kl1600 | Sur la tâche : Claude Code, pour Kl1600
+Fait : migration 0028, agents.rs (liste, claim_task, release_task, fichiers Verse par agent), journal par agent, tests
+Reste : validation par Kl1600 ; fusionner #85 (migration 0027) avant
 Bloque : rien
 ```
 

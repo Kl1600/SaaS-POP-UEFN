@@ -2,6 +2,7 @@ mod access;
 mod account;
 mod activation;
 mod admin;
+mod agents;
 mod aiplan;
 mod aipop;
 mod analytics;
@@ -530,6 +531,7 @@ fn api() -> Router<AppState> {
         .route("/api/maps/{mid}/uefn/action", post(uefn::action))
         .route("/api/maps/{mid}/uefn/journal", get(uefn::journal))
         .route("/api/maps/{mid}/checks", get(checks::get))
+        .route("/api/maps/{mid}/agents", get(agents::list))
         .route("/api/uefn-actions/{id}/undo", post(uefn::undo))
         .route("/api/approvals/{id}/{verdict}", post(uefn::decide))
         .route(
