@@ -135,7 +135,7 @@ export default function Layout() {
                 <button onClick={() => { setAcct(false); openCreate({ kind: 'studio' }) }}><Plus size={16} />{tr("Nouveau studio")}</button>
                 <div className="acct-plan small">{app.me?.trial_until ? tr("Essai Pro jusqu’au {0}", [new Date(app.me.trial_until.replace(' ', 'T') + 'Z').toLocaleDateString(LOCALE, { day: 'numeric', month: 'long' })]) : app.me?.plan === 'pro' ? tr("Plan Pro") : tr("Plan Starter")}</div>
                 <button onClick={() => { setAcct(false); nav('/parametres') }}><Settings size={16} />{tr("Paramètres")}</button>
-                {app.me?.admin && <button onClick={() => { setAcct(false); nav('/admin') }}><ShieldCheck size={16} />{tr("Administration")}{!!app.me.admin_pending && <span className="nav-count">{app.me.admin_pending}</span>}</button>}
+                {(app.me?.admin || app.me?.moderator) && <button onClick={() => { setAcct(false); nav('/admin') }}><ShieldCheck size={16} />{tr("Administration")}{!!app.me.admin_pending && <span className="nav-count">{app.me.admin_pending}</span>}</button>}
                 <button onClick={async () => { await api.post('/api/auth/logout'); location.href = '/' }}><LogOut size={16} />{tr("Se déconnecter")}</button>
               </div>
             )}

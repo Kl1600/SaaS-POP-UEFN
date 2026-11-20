@@ -3,6 +3,14 @@
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
 ```
+FAIT | #65 Administration : rôle modérateur (liste d'attente, dépannage, consultation des comptes) | 20/11 18:20
+Owner : Kl1600 | Sur la tâche : Claude Code, pour Kl1600
+Fait : migration 0026, admin::staff et security::require_staff, routes modérateur dans admin.rs, Admin.tsx et Layout.tsx
+Reste : rien
+Bloque : rien
+```
+
+```
 FAIT | #52 Déploiement : construire l'image Docker seulement au déploiement, plus à chaque fusion sur main | 19/11 19:40
 Owner : benybens | Sur la tâche : Claude Code, pour Yassine
 Fait : deployer.yml construit sha-… si absente (publier-image en workflow_call), latest = image déployée ; 5 essais en prod

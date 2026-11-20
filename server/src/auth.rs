@@ -335,8 +335,10 @@ pub async fn me(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
         .bind(u.id)
         .execute(&st.db)
         .await;
-    let admin = crate::admin::is_admin(&st, u.id).await?;
-    let pending: i64 = if admin {
+    let staff = crate::admin::staff(&st, u.id).await?;
+    let admin = staff == crate::admin::Staff::Admin;
+    let moderator = staff == crate::admin::Staff::Moderator;
+    let pending: i64 = if staff > crate::admin::Staff::None {
         sqlx::query_scalar("SELECT COUNT(*) FROM waitlist WHERE status = 'pending'")
             .fetch_one(&st.db)
             .await?
@@ -364,7 +366,7 @@ pub async fn me(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
     }
     let email_verified = crate::verify::is_verified(&st, u.id).await?;
     Ok(Json(
-        json!({ "user": u, "credits": credits, "studios": out, "admin": admin, "admin_pending": pending, "username": username, "must_change_password": must_change == 1, "email_verified": email_verified,
+        json!({ "user": u, "credits": credits, "studios": out, "admin": admin, "moderator": moderator, "admin_pending": pending, "username": username, "must_change_password": must_change == 1, "email_verified": email_verified,
         "plan": crate::billing::user_plan(&st, u.id).await?, "trial_until": crate::billing::trial_until(&st, u.id).await?, "billing_state": crate::stripe::access_state(&st, u.id).await?, "ai_credits": sqlx::query_scalar::<_, i64>("SELECT ai_credits FROM users WHERE id = ?").bind(u.id).fetch_one(&st.db).await?, "analyse": crate::billing::user_analyse(&st, u.id).await? }),
     ))
 }

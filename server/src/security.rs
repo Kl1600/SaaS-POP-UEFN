@@ -187,7 +187,19 @@ pub async fn revoke_others(
 /// Garde des routes d'administration. Refuse avec le code `sudo` (confirmer son mot de passe, valable 30 minutes),
 /// que l'interface sait traiter.
 pub async fn require_admin(st: &AppState, u: &AuthUser) -> Result<(), AppError> {
-    if !crate::admin::is_admin(st, u.id).await? {
+    require_staff(st, u, crate::admin::Staff::Admin)
+        .await
+        .map(|_| ())
+}
+
+/// Comme `require_admin`, pour un rôle minimal (modérateur ou administrateur, #65). Renvoie le rôle de l'appelant.
+pub async fn require_staff(
+    st: &AppState,
+    u: &AuthUser,
+    min: crate::admin::Staff,
+) -> Result<crate::admin::Staff, AppError> {
+    let role = crate::admin::staff(st, u.id).await?;
+    if role < min || role == crate::admin::Staff::None {
         return Err(AppError::Forbidden);
     }
     let sudo: i64 = sqlx::query_scalar(
@@ -204,7 +216,7 @@ pub async fn require_admin(st: &AppState, u: &AuthUser) -> Result<(), AppError> 
                 .into(),
         ));
     }
-    Ok(())
+    Ok(role)
 }
 
 #[derive(Deserialize)]
@@ -219,7 +231,7 @@ pub async fn unlock_admin(
     Json(b): Json<UnlockIn>,
 ) -> ApiResult<Value> {
     crate::auth::rate_limit(&st, &format!("sudo:{}", u.id))?;
-    if !crate::admin::is_admin(&st, u.id).await? {
+    if crate::admin::staff(&st, u.id).await? == crate::admin::Staff::None {
         return Err(AppError::Forbidden);
     }
     let hash: String = sqlx::query_scalar("SELECT password_hash FROM users WHERE id = ?")
