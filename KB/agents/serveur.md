@@ -3,6 +3,14 @@
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
 ```
+EN COURS | #96 Forge F22 · Serveur : vérifications automatiques du niveau | 21/11 01:00
+Owner : Kl1600 | Sur la tâche : Claude Code, pour Kl1600
+Fait : checks.rs (lien cassé, réglage vide, option sans effet, tags Verse), GET /api/maps/{mid}/checks, MCP check_level, tests
+Reste : test avec le vrai UEFN ; liens d'événements non lisibles par UEFN MCP
+Bloque : rien
+```
+
+```
 FAIT | #65 Administration : rôle modérateur (liste d'attente, dépannage, consultation des comptes) | 20/11 18:20
 Owner : Kl1600 | Sur la tâche : Claude Code, pour Kl1600
 Fait : migration 0026, admin::staff et security::require_staff, routes modérateur dans admin.rs, Admin.tsx et Layout.tsx

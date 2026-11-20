@@ -118,6 +118,7 @@ fn tools() -> Value {
         tool("update_actors", "Modifie un ou plusieurs acteurs. changes peut contenir name, folder, hidden, transform {location,rotation,scale}, options {clé: valeur}, props {clé: valeur}, tags_add, tags_remove, events.", json!({ "ids": ids, "changes": { "type": "object" }, "task": task }), &["ids", "changes"]),
         tool("duplicate_actors", "Duplique des acteurs.", json!({ "ids": ids }), &["ids"]),
         tool("delete_actors", "Demande la suppression d'acteurs. Un humain doit valider dans POP avant l'exécution.", json!({ "ids": ids }), &["ids"]),
+        tool("check_level", "Vérifie le niveau sur le dernier état connu : références d'appareils vers un acteur absent (bloquant), réglages non reliés, options réglées sans effet, tags Verse inutilisés. Chaque problème a sa gravité, l'acteur et une explication.", json!({}), &[]),
         tool("list_verse_files", "Liste les fichiers .verse du projet.", json!({}), &[]),
         tool("read_verse_file", "Lit un fichier .verse.", json!({ "path": { "type": "string" } }), &["path"]),
         tool("write_verse_file", "Écrit un fichier .verse dans le projet (crée ou remplace).", json!({ "path": { "type": "string" }, "content": { "type": "string" }, "task": task }), &["path", "content"]),
@@ -137,6 +138,7 @@ fn tools() -> Value {
 
 const READ_TOOLS: &[&str] = &[
     "uefn_status",
+    "check_level",
     "list_actors",
     "get_actor",
     "list_verse_files",
@@ -276,6 +278,7 @@ async fn call(
             .ok_or_else(|| crate::error::bad(&format!("Tâche #{n} introuvable dans cette map.")))
     };
     match name {
+        "check_level" => crate::checks::rapport(st, mid).await,
         "list_tasks" => {
             let rows: Vec<(i64, String, String, String, Option<String>, Option<i64>, Option<String>, i64)> = sqlx::query_as(
                 "SELECT t.number, t.title, t.status, t.tag, u.name, t.assignee_id, t.planned_day, t.id FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id WHERE t.map_id = ? ORDER BY t.status = 'done', t.planned_day IS NULL, t.planned_day, t.number",
