@@ -26,6 +26,9 @@ const KNOWN: &[(&str, &str, &str)] = &[
     ("compile", "verse", "BuildAll"),
     ("push", "session", "PushChanges"),
     ("session_status", "session", "GetSessionStatus"),
+    ("session_start", "session", "StartSession"),
+    ("session_stop", "session", "StopSession"),
+    ("session_output", "session", "GetVerseOutput"),
     ("props_get", "device", "ListClassicDeviceOptions"),
     ("props_set", "device", "SetClassicDeviceOption"),
     ("verse_props_list", "device", "ListDeviceProperties"),
@@ -700,6 +703,16 @@ impl Mcp {
     }
 
     /// Outils retenus pour chaque rôle (affiché dans le diagnostic et dans POP).
+    /// Outil de session d'UEFN (`SessionToolset`) : démarrer, arrêter, lire la sortie Verse (#82).
+    /// Le résultat est rendu en JSON quand UEFN en renvoie, sinon en texte.
+    pub async fn session(&mut self, role: &str, args: Value) -> Result<Value> {
+        let t = self.known(role).ok_or_else(|| {
+            anyhow!("Outil de session introuvable dans UEFN ({role}) : vérifiez avec « pop-link diagnostic ».")
+        })?;
+        let out = self.call_tool(&t, args).await?;
+        Ok(serde_json::from_str(&out).unwrap_or(Value::String(out)))
+    }
+
     pub fn roles(&self) -> Value {
         let name = |t: Option<Value>| {
             t.and_then(|t| t["name"].as_str().map(String::from))

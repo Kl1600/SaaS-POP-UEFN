@@ -7,6 +7,10 @@ EN COURS | #81 Forge F7 · Relais et serveur : poser un appareil classique | 21/
 Owner : Kl1600 | Sur la tâche : Claude Code, pour Kl1600
 Fait : action actor_spawn (asset ou modèle du niveau), MCP place_device, annulation par IA soumise à validation
 Reste : test avec le vrai UEFN (chemin d'asset d'un appareil, spawn_actor_from_object)
+EN COURS | #82 Forge F8 · Session de test pilotable par les IA (démarrer, arrêter, lire la sortie) | 21/11 02:00
+Owner : Kl1600 | Sur la tâche : Claude Code, pour Kl1600
+Fait : actions relais start/stop_session et session_output (GetVerseOutput), outils MCP, aide du moteur sur compile_verse
+Reste : test avec le vrai UEFN (noms d'arguments de StartSession à confirmer)
 Bloque : rien
 ```
 
