@@ -1,6 +1,6 @@
 // Panel administrateur de la plateforme POP : liste d'attente, création des comptes bêta, utilisateurs, vue générale.
 import { useEffect, useState } from 'react'
-import { Check, X, RotateCcw, Trash2, Copy, Mail, ShieldCheck, Ban, UserPlus, Lock, KeyRound, Link2, LockOpen, UserCog } from 'lucide-react'
+import { Check, X, RotateCcw, Trash2, Copy, Mail, Ban, UserPlus, Lock, KeyRound, Link2, LockOpen } from 'lucide-react'
 import { actionLabel } from '../components/Security'
 import { ago, api, frDate } from '../api'
 import { useApp, useLoad } from '../state'
@@ -58,6 +58,15 @@ function ActivationBox({ s, onClose }: { s: Sent; onClose?: () => void }) {
 /** Formulaire de création d'un compte bêta (depuis une demande ou à la main). */
 const PLANS: [string, string][] = [['starter', 'Starter (12,99 €)'], ['pro', 'Pro (24,99 €)']]
 /** Plan d'un compte. Analyse est comprise dans le plan Pro. */
+/** Rôle d'un compte (#65) : choisi par un administrateur dans Utilisateurs. */
+const ROLES: [string, string][] = [['user', "Utilisateur"], ['moderator', "Modérateur"], ['admin', "Admin"]]
+const roleOf = (u: any) => u.is_admin ? 'admin' : u.is_moderator ? 'moderator' : 'user'
+const ROLE_ASK: Record<string, string> = {
+  user: "Remettre {0} en simple utilisateur ? Il perdra l’accès à l’administration.",
+  moderator: "Rendre {0} modérateur ? Il pourra gérer la liste d’attente, débloquer les comptes et leur envoyer un lien de mot de passe.",
+  admin: "Donner les droits admin à {0} ? Il pourra tout gérer : comptes, plans, paiements, liste d’attente.",
+}
+
 function PlanSelect({ value, onChange }: { value: string; onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void }) {
   return <select className="field" value={value} onChange={onChange} title={tr("Analyse est comprise dans le plan Pro")}>{PLANS.map(([v, l]) => <option key={v} value={v}>{tr(l)}</option>)}</select>
 }
@@ -225,7 +234,10 @@ function Users() {
         <td className="small muted">{frDate(u.created_at)}</td><td className="small muted">{u.last_seen ? ago(u.last_seen) : '—'}</td>
         <td>{u.studios}</td><td>{u.tasks_done}</td>
         <td>{!admin ? <span className="small">{u.plan === 'pro' ? 'Pro' : 'Starter'}</span> : <PlanSelect value={u.plan ?? 'starter'} onChange={async e => { try { await api.post(`/api/admin/users/${u.id}/plan`, { plan: e.target.value }); toast(tr("Plan mis à jour")); reload() } catch (er: any) { toast(er.message, true) } }} />}</td>
-        <td><div className="row" style={{ gap: 4, flexWrap: 'wrap' }}>{u.disabled ? <span className="badge b-r">{tr("Désactivé")}</span> : u.is_admin ? <span className="badge b-v">{tr("Admin")}</span> : u.is_moderator ? <span className="badge b-g">{tr("Modérateur")}</span> : <span className="badge">{tr("Utilisateur")}</span>}
+        <td><div className="row" style={{ gap: 4, flexWrap: 'wrap' }}>{admin && !u.me
+          ? <select className="field" style={{ width: 'auto' }} aria-label={tr("Rôle de {0}", [u.name])} value={roleOf(u)} onChange={e => { const r = e.target.value; if (confirm(tr(ROLE_ASK[r], [u.name]))) set(u.id, { is_admin: r === 'admin', is_moderator: r === 'moderator' }, tr("Rôle mis à jour")); else e.target.value = roleOf(u) }}>{ROLES.map(([v, l]) => <option key={v} value={v}>{tr(l)}</option>)}</select>
+          : u.is_admin ? <span className="badge b-v">{tr("Admin")}</span> : u.is_moderator ? <span className="badge b-g">{tr("Modérateur")}</span> : <span className="badge">{tr("Utilisateur")}</span>}
+          {u.disabled && <span className="badge b-r">{tr("Désactivé")}</span>}
           {u.locked_until && <span className="badge b-o" title={tr("Trop de mots de passe faux")}>{tr("Bloqué jusqu’à {0}", [hhmm(u.locked_until)])}</span>}</div></td>
         <td>{!u.me && (admin || !(u.is_admin || u.is_moderator)) && <div className="row" style={{ gap: 4, justifyContent: 'flex-end' }}>
           {admin && u.activation_pending && <button className="btn" style={{ height: 32 }} title={tr("Nouveau lien d’activation : l’ancien ne marchera plus")} onClick={async () => { try { const r = await api.post(`/api/admin/users/${u.id}/activation`); setSent({ ...r, username: u.username }); toast(r.mailed ? tr("Lien renvoyé par e-mail") : tr("Lien créé : copiez-le")); reload() } catch (e: any) { toast(e.message, true) } }}><Mail size={15} />{tr("Renvoyer le lien")}</button>}
@@ -233,8 +245,6 @@ function Users() {
           <button className="iconbtn" data-tip={tr("Lien de nouveau mot de passe")} aria-label={tr("Lien de nouveau mot de passe")} onClick={async () => { try { const r = await api.post(`/api/admin/users/${u.id}/reset-link`); setLink(r); toast(r.mailed ? tr("Lien envoyé par e-mail") : tr("Lien créé : copiez-le")) } catch (e: any) { toast(e.message, true) } }}><Link2 size={16} /></button>
           {admin && !u.activation_pending && <button className="iconbtn" data-tip={tr("Nouveau mot de passe provisoire")} aria-label={tr("Nouveau mot de passe provisoire")} onClick={async () => { if (!confirm(tr("Donner un nouveau mot de passe provisoire à {0} ? Son mot de passe actuel ne marchera plus et il sera déconnecté.", [u.name]))) return; try { const r = await api.post(`/api/admin/users/${u.id}/password`); setCred({ ...r, name: u.name }); reload() } catch (e: any) { toast(e.message, true) } }}><KeyRound size={16} /></button>}
           {admin && <>
-          {!u.is_admin && <button className="iconbtn" data-tip={u.is_moderator ? tr("Retirer le rôle modérateur") : tr("Rendre modérateur")} aria-label={u.is_moderator ? tr("Retirer le rôle modérateur") : tr("Rendre modérateur")} onClick={() => { if (confirm(u.is_moderator ? tr("Retirer le rôle modérateur de {0} ?", [u.name]) : tr("Rendre {0} modérateur ? Il pourra gérer la liste d’attente, débloquer les comptes et leur envoyer un lien de mot de passe.", [u.name]))) set(u.id, { is_moderator: !u.is_moderator }, tr("Rôle mis à jour")) }}><UserCog size={16} /></button>}
-          <button className="iconbtn" data-tip={u.is_admin ? tr("Retirer les droits admin") : tr("Rendre admin")} aria-label={u.is_admin ? tr("Retirer les droits admin") : tr("Rendre admin")} onClick={() => { if (confirm(u.is_admin ? tr("Retirer les droits admin de {0} ?", [u.name]) : tr("Donner les droits admin à {0} ? Il pourra gérer la liste d’attente et les comptes.", [u.name]))) set(u.id, { is_admin: !u.is_admin }, tr("Droits mis à jour")) }}><ShieldCheck size={16} /></button>
           <button className="iconbtn" data-tip={u.disabled ? tr("Réactiver") : tr("Désactiver le compte")} aria-label={u.disabled ? tr("Réactiver") : tr("Désactiver le compte")} onClick={() => { if (confirm(u.disabled ? tr("Réactiver le compte de {0} ?", [u.name]) : tr("Désactiver le compte de {0} ? Il sera déconnecté et ne pourra plus se connecter.", [u.name]))) set(u.id, { disabled: !u.disabled }, u.disabled ? tr("Compte réactivé") : tr("Compte désactivé")) }}><Ban size={16} /></button>
           <button className="iconbtn" data-tip={tr("Supprimer le compte")} aria-label={tr("Supprimer le compte")} onClick={() => setDel(u)}><Trash2 size={16} /></button>
           </>}
