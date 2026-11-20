@@ -25,6 +25,10 @@
   button:disabled { opacity:.5; cursor:default; }
   .erreur { color:var(--err); font-size:14px; margin:14px 0 0; min-height:1em; }
   .petit { font-size:12px; margin:16px 0 0; }
+  select { width:100%; height:42px; border:1px solid var(--bord); border-radius:10px; padding:0 8px; font-size:14px;
+           background:var(--carte); color:var(--texte); margin-bottom:12px; }
+  .lien { background:transparent; color:var(--texte); border:1px solid var(--bord); }
+  .etat { font-size:13px; padding:8px 12px; border:1px solid var(--bord); border-radius:999px; display:inline-block; margin-bottom:16px; }
 </style>
 </head>
 <body>
@@ -38,6 +42,18 @@
     <button id="ok" type="submit">Se connecter</button>
     <div class="erreur" id="erreur" role="alert"></div>
     <p class="petit">L'adresse est retenue. Pour la changer plus tard : menu POP Forge → Changer l'adresse de POP.</p>
+  </form>
+  <form id="r" hidden>
+    <div class="etat" id="etat">État du relais…</div>
+    <label for="code">Code d'appairage</label>
+    <input id="code" inputmode="numeric" autocomplete="off" placeholder="POP → Organiseur → UEFN Link → « Obtenir un code »" style="margin-bottom:12px">
+    <label for="projet">Projet UEFN</label>
+    <select id="projet"></select>
+    <input id="autre" hidden spellcheck="false" placeholder="Chemin complet du dossier du projet UEFN">
+    <button id="okr" type="submit">Relier ce projet</button>
+    <button id="retour" class="lien" type="button">Retour à POP</button>
+    <div class="erreur" id="erreurr" role="alert"></div>
+    <p class="petit">Forge fait tourner UEFN Link lui-même : plus besoin de lancer pop-link.exe. Dans UEFN, démarrez le serveur MCP (Édition → Préférences de l'éditeur → Agentic Workflows → Model Context Protocol → Start Server).</p>
   </form>
 </main>
 <script src="app.js"></script>

@@ -4,13 +4,18 @@
 //! habituel, session gardée par WebView2 d'un lancement à l'autre. Au premier lancement (ou si POP ne répond pas),
 //! la page locale `ui/index.html` demande l'adresse. L'interface POP n'a aucun accès aux commandes de Forge
 //! (`capabilities/default.json` : page locale seulement).
+//!
+//! UEFN Link tourne dans Forge (`relay.rs`) : son état s'affiche dans le titre de la fenêtre, le menu
+//! « UEFN Link » relie un projet UEFN et ouvre la page d'état du relais.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
+mod relay;
 
 use serde::{Deserialize, Serialize};
 use std::{path::PathBuf, sync::Mutex, time::Duration};
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem, Submenu},
-    AppHandle, Manager, Url, WebviewWindow,
+    AppHandle, Manager, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
 };
 use url::Host;
 
@@ -155,6 +160,42 @@ async fn connect(app: AppHandle, address: String) -> Result<(), String> {
     main_window(&app)?.navigate(u).map_err(|e| e.to_string())
 }
 
+/// Projets UEFN trouvés dans `Documents\Fortnite Projects`.
+#[tauri::command]
+fn projets() -> Vec<String> {
+    pop_link::find_projects()
+        .into_iter()
+        .map(|p| p.to_string_lossy().to_string())
+        .collect()
+}
+
+/// État du relais en quelques mots.
+#[tauri::command]
+fn etat_relais(app: AppHandle) -> String {
+    relay::libelle(&app)
+}
+
+/// Relie un projet UEFN à une map POP avec le code de l'Organiseur, puis redémarre le relais.
+#[tauri::command]
+async fn relier(app: AppHandle, code: String, projet: String) -> Result<String, String> {
+    let server = load(&app)
+        .server
+        .ok_or("Indiquez d'abord l'adresse de POP.")?;
+    let (code, projet) = (code.trim().to_string(), projet.trim().to_string());
+    if code.is_empty() || projet.is_empty() {
+        return Err("Indiquez le code et le projet UEFN.".into());
+    }
+    if !std::path::Path::new(&projet).is_dir() {
+        return Err(format!("Dossier introuvable : {projet}"));
+    }
+    let device = std::env::var("COMPUTERNAME").unwrap_or_else(|_| "POP Forge".into());
+    pop_link::pair(&server, &code, &projet, &device)
+        .await
+        .map_err(|e| format!("Liaison refusée : {e:#}"))?;
+    relay::demarrer(&app).await;
+    Ok(relay::libelle(&app))
+}
+
 fn menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     let change = MenuItem::with_id(
         app,
@@ -176,17 +217,34 @@ fn menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
             &quit,
         ],
     )?;
-    Menu::with_items(app, &[&forge])
+    let relier = MenuItem::with_id(app, "relier", "Relier un projet UEFN…", true, None::<&str>)?;
+    let etat = MenuItem::with_id(app, "etat", "Page d'état du relais", true, None::<&str>)?;
+    let link = Submenu::with_items(app, "UEFN Link", true, &[&relier, &etat])?;
+    Menu::with_items(app, &[&forge, &link])
 }
 
 fn on_menu(app: &AppHandle, id: &str) {
     let Ok(w) = main_window(app) else { return };
     match id {
-        "changer" => {
+        "changer" | "relier" => {
             let home = app.state::<Home>().0.lock().unwrap().clone();
             if let Some(mut h) = home {
-                h.set_query(Some("changer=1"));
+                h.set_query(Some(if id == "changer" {
+                    "changer=1"
+                } else {
+                    "relier=1"
+                }));
                 let _ = w.navigate(h);
+            }
+        }
+        "etat" => {
+            if let Some(e) = app.get_webview_window("etat") {
+                let _ = e.set_focus();
+            } else if let Ok(u) = format!("http://127.0.0.1:{}/", relay::PORT).parse() {
+                let _ = WebviewWindowBuilder::new(app, "etat", WebviewUrl::External(u))
+                    .title("UEFN Link · état du relais")
+                    .inner_size(960.0, 720.0)
+                    .build();
             }
         }
         "recharger" => {
@@ -199,13 +257,23 @@ fn on_menu(app: &AppHandle, id: &str) {
 fn main() {
     tauri::Builder::default()
         .manage(Home(Mutex::new(None)))
-        .invoke_handler(tauri::generate_handler![start, connect])
+        .manage(relay::Relay::default())
+        .invoke_handler(tauri::generate_handler![
+            start,
+            connect,
+            projets,
+            etat_relais,
+            relier
+        ])
         .menu(menu)
         .on_menu_event(|app, e| on_menu(app, e.id().as_ref()))
         .setup(|app| {
             if let Some(w) = app.get_webview_window("main") {
                 *app.state::<Home>().0.lock().unwrap() = w.url().ok();
             }
+            let h = app.handle().clone();
+            tauri::async_runtime::spawn(async move { relay::demarrer(&h).await });
+            relay::suivre(app.handle().clone());
             Ok(())
         })
         .run(tauri::generate_context!())

@@ -3,10 +3,18 @@
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
 ```
-EN COURS | #76 Forge F2 · Squelette de l'application Windows (Tauri 2) qui ouvre POP | 20/11 22:40
+EN COURS | #77 Forge F3 · UEFN Link intégré à Forge | 20/11 23:30
 Owner : Kl1600 | Sur la tâche : Claude Code, pour Kl1600
-Fait : forge/ (page d'adresse, vérification de POP, menu), job CI Windows avec installateur
-Reste : test sur Windows (PC de benybens)
+Fait : relais dans Forge (config de pop-link), menu UEFN Link, état dans le titre, conflit pop-link.exe
+Reste : test avec le vrai UEFN sur Windows
+Bloque : rien
+```
+
+```
+FAIT | #76 Forge F2 · Squelette de l'application Windows (Tauri 2) qui ouvre POP | 20/11 22:58
+Owner : Kl1600 | Sur la tâche : Claude Code, pour Kl1600
+Fait : forge/ Tauri 2, page d'adresse, job CI Windows ; validé par Kl1600 sur Windows
+Reste : rien
 Bloque : rien
 ```
 
