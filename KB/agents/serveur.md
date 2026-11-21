@@ -70,3 +70,7 @@ Bloque : rien
 ### 2026-11-21 · #17 · ne plus révéler qui a un compte
 - Fait : demande d'accès avec une adresse qui a un compte → même réponse `{ok:true}` qu'une adresse inconnue, rien n'est enregistré, et un e-mail « vous avez déjà un compte » part (si SMTP configuré). Inscription : « compte existe déjà » seulement après le contrôle d'accès (invitation ou lien d'accès).
 - Vérifié : `cargo test` (test `demande_acces_ne_revele_pas_les_comptes`). Reste visible avec `POP_OPEN_SIGNUP=1` (inscription libre) : il faut bien dire à la personne que son adresse est prise.
+### 2026-11-21 · #121 F17a · accès au stockage R2
+- Fait : `server/src/s3.rs` (config `POP_S3_*`, liens signés SigV4 par chemin, sans dépendance nouvelle) ; variables dans `deploy/env.exemple` et `docker-compose.yml` (CORS du bucket, tailles max).
+- Vérifié : `cargo test` (signature = exemple officiel AWS ; lien R2 sans le secret).
+- Suite : #91 (API de la bibliothèque) se reprend sur `main` après fusion, sans `s3.rs` en double.
