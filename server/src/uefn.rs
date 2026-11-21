@@ -921,6 +921,45 @@ async fn prepare(
             };
             Ok((format!("Pose : {quoi}"), Value::Null, None))
         }
+
+        "actor_organize" => {
+            // Rangement du niveau (#84) : nom et dossier propres à chaque acteur, en une action annulable.
+            let patches = args["patches"].as_array().cloned().unwrap_or_default();
+            if patches.is_empty() || patches.len() > 5000 {
+                return Err(bad("Rien à ranger (5 000 acteurs au plus)."));
+            }
+            let mut before = vec![];
+            let mut undo = vec![];
+            let mut propres = vec![];
+            for p in &patches {
+                let id = p["id"].as_str().unwrap_or("");
+                check_lock(id)?;
+                let a = by_id(id).ok_or_else(|| bad(format!("Acteur introuvable : {id}")))?;
+                let mut c = json!({});
+                let mut old = json!({});
+                if let Some(n) = p["changes"]["name"].as_str() {
+                    check_len("Nom", n, 1, 120)?;
+                    c["name"] = json!(n.trim());
+                    old["name"] = a["name"].clone();
+                }
+                if let Some(f) = p["changes"]["folder"].as_str() {
+                    check_len("Dossier", f, 0, 200)?;
+                    c["folder"] = json!(f.trim());
+                    old["folder"] = a["folder"].clone();
+                }
+                propres.push(json!({ "id": id, "changes": c }));
+                undo.push(json!({ "id": id, "changes": old }));
+                before.push(a);
+            }
+            *args = json!({ "patches": propres });
+            Ok((
+                format!("Rangement du niveau : {} acteur(s)", propres.len()),
+                json!(before),
+                Some(
+                    json!({ "action": "actor_update_raw", "args": { "ids": propres.iter().map(|p| p["id"].clone()).collect::<Vec<_>>(), "patches": undo } }),
+                ),
+            ))
+        }
         "actor_duplicate" | "actor_delete" => {
             let ids: Vec<String> = args["ids"]
                 .as_array()
@@ -1123,7 +1162,10 @@ async fn run_action(
     match &res {
         Ok(data) => {
             if let Some(actors) = data.get("actors").filter(|a| a.is_array()) {
-                let patches = if matches!(action, "actor_update" | "actor_update_raw") {
+                let patches = if matches!(
+                    action,
+                    "actor_update" | "actor_update_raw" | "actor_organize"
+                ) {
                     Some(&args["patches"])
                 } else {
                     None
@@ -1614,5 +1656,78 @@ mod tests {
             french_option_error("Relais hors ligne."),
             "Relais hors ligne."
         );
+    }
+}
+
+#[cfg(test)]
+mod tests_rangement {
+    use super::*;
+
+    /// Rangement du niveau (#84) : une action, annulable ; un acteur verrouillé par un autre est refusé.
+    #[tokio::test]
+    async fn ranger() {
+        let st = crate::test_state().await;
+        let sid: i64 = sqlx::query_scalar("INSERT INTO studios (name) VALUES ('S') RETURNING id")
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        let mid: i64 =
+            sqlx::query_scalar("INSERT INTO maps (studio_id, name) VALUES (?, 'M') RETURNING id")
+                .bind(sid)
+                .fetch_one(&st.db)
+                .await
+                .unwrap();
+        let uid: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash) VALUES ('moi@a.fr', 'Moi', 'x') RETURNING id").fetch_one(&st.db).await.unwrap();
+        sqlx::query("INSERT INTO memberships (studio_id, user_id, role) VALUES (?, ?, 'member')")
+            .bind(sid)
+            .bind(uid)
+            .execute(&st.db)
+            .await
+            .unwrap();
+        let u = AuthUser {
+            id: uid,
+            email: "moi@a.fr".into(),
+            name: "Moi".into(),
+            sid: String::new(),
+        };
+        snapshot(&st, mid).await.unwrap();
+        let acteurs = json!([
+            { "id": "L.A", "name": "Button2", "type": "device", "class": "Button_C", "folder": "", "tags": [], "options": {}, "props": {} },
+            { "id": "L.B", "name": "Arbre", "type": "prop", "class": "BP_Arbre_C", "folder": "Decor", "tags": [], "options": {}, "props": {} },
+        ]);
+        sqlx::query("UPDATE uefn_state SET actors = ?, locks = ? WHERE map_id = ?")
+            .bind(acteurs.to_string())
+            .bind(json!([{ "target": "L.B", "by": "autre@a.fr" }]).to_string())
+            .bind(mid)
+            .execute(&st.db)
+            .await
+            .unwrap();
+        let ctx = map_ctx(&st, &u, mid).await.unwrap();
+        let o = || Origin {
+            ctx: &ctx,
+            source: "web",
+            task: None,
+            agent: None,
+        };
+        // L'acteur verrouillé par un autre fait refuser le rangement.
+        let p = json!({ "patches": [{ "id": "L.B", "changes": { "name": "Arbre_1", "folder": "Accessoires/Arbre" } }] });
+        assert!(matches!(
+            exec(&st, o(), "actor_organize", p).await,
+            Err(AppError::Conflict(_))
+        ));
+        // Rangement valide : une seule action journalisée, avec son annulation (ancien nom et dossier).
+        let p = json!({ "patches": [{ "id": "L.A", "changes": { "name": "Bouton_1", "folder": "Appareils/Bouton" } }] });
+        exec(&st, o(), "actor_organize", p).await.unwrap();
+        let (resume, undo): (String, String) = sqlx::query_as(
+            "SELECT summary, undo FROM uefn_actions WHERE action = 'actor_organize'",
+        )
+        .fetch_one(&st.db)
+        .await
+        .unwrap();
+        assert_eq!(resume, "Rangement du niveau : 1 acteur(s)");
+        let undo: Value = serde_json::from_str(&undo).unwrap();
+        assert_eq!(undo["action"], "actor_update_raw");
+        assert_eq!(undo["args"]["patches"][0]["changes"]["name"], "Button2");
+        assert_eq!(undo["args"]["patches"][0]["changes"]["folder"], "");
     }
 }

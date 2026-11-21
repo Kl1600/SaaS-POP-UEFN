@@ -251,7 +251,7 @@ impl Link {
                 a["path"].as_str().unwrap_or(""),
                 a["to"].as_str().unwrap_or(""),
             )?,
-            "actor_update" | "actor_update_raw" => {
+            "actor_update" | "actor_update_raw" | "actor_organize" => {
                 self.need_uefn()?;
                 self.mcp.patch(&a["patches"]).await?;
                 out["actors"] = json!(self.mcp.list_actors().await?);

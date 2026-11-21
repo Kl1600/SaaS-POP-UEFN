@@ -7,6 +7,7 @@ import { useApp, useLive, useLoad } from '../state'
 import { CardHead, PageHead, Tabs } from '../components/ui'
 import { STATUS_LABEL } from '../uefnState'
 import { tr, tx } from '../i18n/t'
+import { RangementModal } from '../components/Rangement'
 
 type Actor = {
   id: string; name: string; type: string; class: string; folder: string; hidden: boolean; kind_label?: string; icon?: string; locked_by?: string
@@ -337,10 +338,11 @@ function TopView({ actors, sel, setSel, update, canEdit, hasImage, bounds, refre
 }
 
 function Journal({ st, task, setTask, tasks, act, reload }: { st: any; task: number | ''; setTask: (t: number | '') => void; tasks: any[]; act: (a: string, args: any, ok?: string) => Promise<any>; reload: () => void }) {
-  const { map, canEdit, toast } = useApp()
+  const { map, me, canEdit, toast } = useApp()
   const { data, reload: reloadJ } = useLoad<any[]>(map ? `/api/maps/${map.id}/uefn/journal` : null, [map?.id])
   useLive(['uefn'], reloadJ)
   const [msg, setMsg] = useState('')
+  const [ranger, setRanger] = useState(false)
   const S: Record<string, [string, string]> = { done: [tr("Fait"), 'b-g'], queued: [tr("En attente"), 'b-o'], sent: [tr("Envoyé"), ''], failed: [tr("Échec"), 'b-r'], undone: [tr("Annulé"), ''] }
   return <div className="stack">
     <div className="tiles" style={{ gridTemplateColumns: tr("repeat(2, minmax(0, 1fr))") }}>
@@ -349,10 +351,13 @@ function Journal({ st, task, setTask, tasks, act, reload }: { st: any; task: num
     </div>
     <div className="row" style={{ flexWrap: 'wrap' }}>
       <select className="field" value={task} onChange={e => setTask(e.target.value ? Number(e.target.value) : '')} aria-label={tr("Tâche")}><option value="">{tr("Sans tâche")}</option>{tasks.filter(t => t.status !== 'done').map(t => <option key={t.id} value={t.number}>#{t.number} {t.title}</option>)}</select>
+      <button className="btn" disabled={!canEdit || !(st.actors?.length)} onClick={() => setRanger(true)}><FolderInput size={16} />{tr("Ranger le niveau")}</button>
       <button className="btn" disabled={!canEdit} onClick={() => act('save_level', {}, tr("Niveau enregistré"))}><Save size={16} />{tr("Enregistrer le niveau")}</button>
       <input className="field" placeholder={tr("Message Lore")} value={msg} onChange={e => setMsg(e.target.value)} />
       <button className="btn pri" disabled={!canEdit} onClick={() => act('lore_checkin', { message: `${task ? `#${task} ` : ''}${msg || tr("Organisation du niveau")}` }, tr("Archivé dans Lore"))}><Archive size={16} />{tr("Archiver dans Lore")}</button>
     </div>
+    {ranger && <RangementModal actors={st.actors ?? []} me={me?.user.email ?? ''} onClose={() => setRanger(false)}
+      onApply={async patches => { await act('actor_organize', { patches }, tr("Niveau rangé : {0} acteur(s)", [patches.length])); reloadJ() }} />}
     <p className="small muted">{tr("La publication de l’île pour les joueurs (nouvelle version, certification) se fait dans le portail créateur d’Epic. POP prépare la checklist et les notes de version (Lancer et suivre).")}</p>
     <div style={{ overflowX: 'auto' }}><table className="tbl"><thead><tr><th>{tr("Quand")}</th><th>{tr("Qui")}</th><th>{tr("Changement (avant → après)")}</th><th>{tr("Tâche")}</th><th>{tr("État")}</th><th /></tr></thead><tbody>
       {data?.map(r => <tr key={r.id}>
