@@ -1,8 +1,4 @@
-<<<<<<<< HEAD:web/dist/assets/Landing-BuqgLrtT.js
-import{c as f,u as E,a as T,r as m,b as A,j as s,L as F,S as P,A as v,M as y,C as g,P as w,d as S,B as C,e as M,W as B,f as D,F as U,U as R,g as _,h as I,R as H,i as O,k as V,l as G,T as W}from"./index-DF4H6y6B.js";/**
-========
-import{c as f,u as E,a as T,r as m,b as A,j as s,L as F,S as P,A as v,M as y,C as g,P as w,d as S,B as C,e as M,W as B,f as D,F as U,U as R,g as _,h as I,R as H,i as O,k as V,l as G,T as W}from"./index-COhdLVaL.js";/**
->>>>>>>> abb95e4 (#70 : l'IA garde ses prédictions, les vérifie après coup et suit sa précision jour par jour):web/dist/assets/Landing-BE9BbLYY.js
+import{c as f,u as E,a as T,r as m,b as A,j as s,L as F,S as P,A as v,M as y,C as g,P as w,d as S,B as C,e as M,W as B,f as D,F as U,U as R,g as _,h as I,R as H,i as O,k as V,l as G,T as W}from"./index-CGBeFiYr.js";/**
  * @license lucide-react v0.460.0 - ISC
  *
  * This source code is licensed under the ISC license.
