@@ -427,6 +427,33 @@ impl Mcp {
             .ok_or_else(|| anyhow!("UEFN n'a pas confirmé la pose : {}", out.trim()))
     }
 
+    /// Importe `file` (fichier sur ce PC) dans le dossier `folder` du projet ; rend les chemins des assets créés.
+    pub async fn import(&mut self, file: &str, folder: &str, project: &str) -> Result<Vec<String>> {
+        let args = json!({ "file": file, "folder": folder, "project": project }).to_string();
+        let code = format!("ARGS = {}\n{}", serde_json::to_string(&args)?, PY_IMPORT);
+        let out = self.python(&code).await?;
+        let line = out
+            .lines()
+            .rev()
+            .find_map(|l| l.trim().strip_prefix("IMPORTED=").map(String::from))
+            .ok_or_else(|| anyhow!("UEFN n'a pas confirmé l'import : {}", out.trim()))?;
+        Ok(serde_json::from_str(&line)?)
+    }
+
+    /// Retire des assets du projet s'ils ne sont pas utilisés.
+    pub async fn delete_assets(&mut self, paths: &[String]) -> Result<()> {
+        let args = serde_json::to_string(paths)?;
+        let code = format!("ARGS = {}\n{}", serde_json::to_string(&args)?, PY_ASSET_DEL);
+        // Le refus « utilisé » est un message pour l'humain : sans la trace Python d'UEFN.
+        self.python(&code).await.map(|_| ()).map_err(|e| {
+            let t = format!("{e:#}");
+            match t.split_once("POP: ") {
+                Some((_, m)) => anyhow!("{}", m.split("\nTraceback").next().unwrap_or(m).trim()),
+                None => e,
+            }
+        })
+    }
+
     pub async fn duplicate(&mut self, ids: &[String]) -> Result<Vec<String>> {
         let code = format!("IDS = {}\n{}", serde_json::to_string(ids)?, PY_DUP);
         let out = self.python(&code).await?;
@@ -1073,6 +1100,53 @@ if rot: act.set_actor_rotation(unreal.Rotator(roll=rot[2], pitch=rot[0], yaw=rot
 if A.get('name'): act.set_actor_label(A['name'])
 if A.get('folder'): act.set_folder_path(A['folder'])
 print('SPAWNED=' + act.get_path_name())
+"#;
+
+/// Importe un fichier dans le projet (#90) : AssetImportTask automatique, sans remplacer un asset existant.
+const PY_IMPORT: &str = r#"import unreal, json, os
+A = json.loads(ARGS)
+folder = A.get('folder') or ''
+if not folder:
+    # Le contenu du projet est monté sous le nom du monde ouvert (souvent un identifiant), pas sous le nom du dossier.
+    w = unreal.EditorLevelLibrary.get_editor_world()
+    racine = w.get_path_name().split('/')[1] if w else ''
+    folder = '/' + (racine or os.path.basename(os.path.normpath(A['project']))) + '/POP'
+t = unreal.AssetImportTask()
+t.set_editor_property('filename', A['file'])
+t.set_editor_property('destination_path', folder)
+t.set_editor_property('automated', True)
+t.set_editor_property('save', True)
+t.set_editor_property('replace_existing', False)
+unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks([t])
+paths = [str(p) for p in (t.get_editor_property('imported_object_paths') or [])]
+if not paths: raise Exception('UEFN n\'a rien importé depuis ' + A['file'] + ' vers ' + folder)
+print('IMPORTED=' + json.dumps(paths))
+"#;
+
+/// Retire des assets importés, seulement s'ils ne sont utilisés nulle part (annulation d'un import).
+const PY_ASSET_DEL: &str = r#"import unreal, json
+lib = unreal.EditorAssetLibrary
+pkgs = [p.split('.')[0] for p in json.loads(ARGS)]
+# Les assets d'un même import se référencent entre eux (un mesh FBX et ses matériaux) : seuls comptent les autres.
+for pkg in pkgs:
+    refs = [str(r) for r in (lib.find_package_referencers_for_asset(pkg, False) or []) if str(r) not in pkgs]
+    niveau = [r for r in refs if '/__ExternalActors__/' in r or '/__ExternalObjects__/' in r]
+    autres = [r for r in refs if r not in niveau]
+    if refs:
+        nom = pkg.split('/')[-1]
+        raise Exception('POP: Annulation refusée : « ' + nom + ' » est encore utilisé'
+            + (' dans le niveau (' + str(len(niveau)) + ' acteur(s))' if niveau else '')
+            + (' par ' + ', '.join(a.split('/')[-1] for a in autres[:5]) if autres else '')
+            + '. Retirez-le d’abord, puis réessayez.')
+# D'abord ceux que personne d'autre du lot n'utilise (le mesh), puis ce qu'ils utilisaient (les matériaux).
+reste = [p for p in pkgs if lib.does_asset_exist(p)]
+while reste:
+    libres = [p for p in reste if not [r for r in (lib.find_package_referencers_for_asset(p, False) or []) if str(r) in reste and str(r) != p]]
+    for p in (libres or reste): lib.delete_asset(p)
+    apres = [p for p in reste if lib.does_asset_exist(p)]
+    if len(apres) == len(reste): raise Exception('UEFN refuse de retirer : ' + ', '.join(reste[:5]))
+    reste = apres
+print('DELETED')
 "#;
 
 const PY_DUP: &str = r#"import unreal, json

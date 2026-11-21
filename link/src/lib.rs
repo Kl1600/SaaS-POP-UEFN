@@ -261,6 +261,34 @@ impl Link {
                 out["created_ids"] = json!([self.mcp.spawn(a).await?]);
                 out["actors"] = json!(self.mcp.list_actors().await?);
             }
+
+            "asset_import" => {
+                self.need_uefn()?;
+                let (file, temp) = fichier_a_importer(&self.cfg.server, a).await?;
+                let r = self
+                    .mcp
+                    .import(
+                        &file.to_string_lossy(),
+                        a["folder"].as_str().unwrap_or(""),
+                        &self.cfg.project,
+                    )
+                    .await;
+                if temp {
+                    std::fs::remove_file(&file).ok();
+                }
+                out["imported"] = json!(r?);
+            }
+            "asset_delete" => {
+                self.need_uefn()?;
+                let paths: Vec<String> = a["paths"]
+                    .as_array()
+                    .cloned()
+                    .unwrap_or_default()
+                    .iter()
+                    .filter_map(|x| x.as_str().map(String::from))
+                    .collect();
+                self.mcp.delete_assets(&paths).await?;
+            }
             "actor_duplicate" => {
                 self.need_uefn()?;
                 out["created_ids"] = json!(self.mcp.duplicate(&ids).await?);
@@ -402,6 +430,70 @@ impl Link {
         }
         Ok(out)
     }
+}
+
+/// Types de fichiers qu'on importe dans UEFN (#90).
+pub const IMPORT_EXT: &[&str] = &[
+    "fbx", "obj", "png", "jpg", "jpeg", "tga", "wav", "ogg", "mp3",
+];
+const IMPORT_MAX: u64 = 200 * 1024 * 1024;
+
+/// Fichier à importer : `local_path` (fichier de ce PC) ou `url` du serveur POP lui-même (jamais d'un autre site),
+/// téléchargé dans un dossier temporaire. Rend (chemin, fichier temporaire à effacer après).
+async fn fichier_a_importer(server: &str, a: &Value) -> Result<(PathBuf, bool)> {
+    let ext_ok = |n: &str| {
+        let e = n.rsplit('.').next().unwrap_or("").to_lowercase();
+        n.contains('.') && IMPORT_EXT.contains(&e.as_str())
+    };
+    if let Some(p) = a["local_path"].as_str().filter(|p| !p.is_empty()) {
+        let path = PathBuf::from(p);
+        if !ext_ok(p) {
+            bail!(
+                "Type de fichier non importé ({p}) : {}.",
+                IMPORT_EXT.join(", ")
+            );
+        }
+        let m = std::fs::metadata(&path).with_context(|| format!("Fichier introuvable : {p}"))?;
+        if !m.is_file() || m.len() > IMPORT_MAX {
+            bail!("Fichier absent ou trop gros (200 Mo au plus) : {p}");
+        }
+        return Ok((path, false));
+    }
+    let url = a["url"].as_str().unwrap_or("");
+    let base = server.trim_end_matches('/');
+    if url.is_empty() || !url.starts_with(&format!("{base}/")) {
+        bail!("Import refusé : le fichier doit venir de ce PC ou du serveur POP ({base}).");
+    }
+    let name = a["filename"]
+        .as_str()
+        .filter(|n| !n.is_empty())
+        .unwrap_or_else(|| url.rsplit('/').next().unwrap_or(""));
+    let name: String = name
+        .chars()
+        .filter(|c| c.is_alphanumeric() || "._- ".contains(*c))
+        .collect();
+    if !ext_ok(&name) {
+        bail!(
+            "Type de fichier non importé ({name}) : {}.",
+            IMPORT_EXT.join(", ")
+        );
+    }
+    let r = reqwest::get(url).await.context("POP injoignable")?;
+    if !r.status().is_success() {
+        bail!("Téléchargement refusé par POP ({}).", r.status());
+    }
+    if r.content_length().unwrap_or(0) > IMPORT_MAX {
+        bail!("Fichier trop gros (200 Mo au plus).");
+    }
+    let bytes = r.bytes().await?;
+    if bytes.len() as u64 > IMPORT_MAX {
+        bail!("Fichier trop gros (200 Mo au plus).");
+    }
+    let dir = std::env::temp_dir().join("pop-link-import");
+    std::fs::create_dir_all(&dir)?;
+    let path = dir.join(name);
+    std::fs::write(&path, &bytes)?;
+    Ok((path, true))
 }
 
 // ---------- Boucle principale ----------
@@ -1019,6 +1111,32 @@ mod tests {
         }
         assert!(h.stopped());
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn import_sur() {
+        let pop = "http://127.0.0.1:8080";
+        // Un autre site : refusé, rien n'est téléchargé.
+        let e = fichier_a_importer(pop, &json!({ "url": "https://exemple.com/x.fbx" })).await;
+        assert!(format!("{:#}", e.unwrap_err()).contains("ce PC ou du serveur POP"));
+        let e = fichier_a_importer(
+            pop,
+            &json!({ "url": "http://127.0.0.1:8080.exemple.com/x.fbx" }),
+        )
+        .await;
+        assert!(e.is_err());
+        // Type non prévu : refusé.
+        let e = fichier_a_importer(pop, &json!({ "local_path": "C:/x/script.exe" })).await;
+        assert!(format!("{:#}", e.unwrap_err()).contains("Type de fichier"));
+        // Fichier local valide : accepté tel quel (pas de copie temporaire).
+        let f = std::env::temp_dir().join(format!("pop-import-{}.png", std::process::id()));
+        std::fs::write(&f, b"png").unwrap();
+        let (p, temp) = fichier_a_importer(pop, &json!({ "local_path": f.to_string_lossy() }))
+            .await
+            .unwrap();
+        assert_eq!(p, f);
+        assert!(!temp);
+        std::fs::remove_file(&f).ok();
     }
 
     #[tokio::test]
