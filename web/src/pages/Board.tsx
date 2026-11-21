@@ -12,6 +12,7 @@ import { useMembers } from './Tasks'
 import { FormatBar, PenBar, Rich, RichEdit, ShapeSvg, textStyle, vAlign, strokeColor, FONTS } from './BoardFormat'
 import { tr } from '../i18n/t'
 import { useNav } from '../routes'
+import { cssRect, uiScale } from '../zoom'
 
 type Obj = { id: string; kind: string; x: number; y: number; w?: number; h?: number; text?: string; shade?: number; votes?: Record<string, number>; author?: string; author_id?: number; task_id?: number; task_number?: number; from?: string; to?: string; style?: string; dashed?: boolean; arrow?: boolean; points?: number[][]; color?: string; width?: number; shape?: string; url?: string; locked?: boolean; reactions?: number } & Record<string, any>
 
@@ -111,7 +112,7 @@ function Canvas({ id }: { id: number }) {
     if (m.t === 'cursor' && m.place === `board:${id}` && m.uid !== app.me?.user.id) setCursors(c => ({ ...c, [m.uid]: { name: m.name, x: m.x, y: m.y, t: Date.now() } }))
     if (m.t === 'refresh' && m.what === 'tasks') reloadTasks()
   }), [id, app.subscribe])
-  useEffect(() => { if (follow && cursors[follow] && box.current) { const r = box.current.getBoundingClientRect(); setView(v => ({ ...v, x: r.width / 2 - cursors[follow].x * v.z, y: r.height / 2 - cursors[follow].y * v.z })) } }, [follow, cursors])
+  useEffect(() => { if (follow && cursors[follow] && box.current) { const r = cssRect(box.current); setView(v => ({ ...v, x: r.width / 2 - cursors[follow].x * v.z, y: r.height / 2 - cursors[follow].y * v.z })) } }, [follow, cursors])
 
   // Historique local : chaque changement garde l'état précédent des objets touchés (Ctrl+Z / Ctrl+Maj+Z).
   const record = (entries: [string, Obj | null][]) => { hist.current.undo.push(entries); if (hist.current.undo.length > 200) hist.current.undo.shift(); hist.current.redo = [] }
@@ -202,8 +203,8 @@ function Canvas({ id }: { id: number }) {
   useEffect(() => { document.body.classList.toggle('wb-fs', fs); return () => document.body.classList.remove('wb-fs') }, [fs])
   const setMetaOp = (p: any) => app.send({ t: 'board', board: id, op: 'meta', ...p })
 
-  const toWorld = (cx: number, cy: number) => { const r = box.current!.getBoundingClientRect(); return { x: (cx - r.left - view.x) / view.z, y: (cy - r.top - view.y) / view.z } }
-  const center = () => { const r = box.current!.getBoundingClientRect(); return { x: (r.width / 2 - view.x) / view.z, y: (r.height / 2 - view.y) / view.z } }
+  const toWorld = (cx: number, cy: number) => { const r = cssRect(box.current!); return { x: (cx / r.k - r.left - view.x) / view.z, y: (cy / r.k - r.top - view.y) / view.z } }
+  const center = () => { const r = cssRect(box.current!); return { x: (r.width / 2 - view.x) / view.z, y: (r.height / 2 - view.y) / view.z } }
   const add = (o: Partial<Obj>) => { const c = center(); const n = { id: uid(), x: snap(c.x - 80, gridOn), y: snap(c.y - 60, gridOn), ...o } as Obj; push([n]); setSel([n.id]); return n }
 
   const list = Object.values(objs)
@@ -253,13 +254,13 @@ function Canvas({ id }: { id: number }) {
       ;(e.target as HTMLElement).setPointerCapture?.(e.pointerId)
     }
   }
-  const startPan = (e: React.PointerEvent) => { drag.current = { mode: 'pan', sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y } }
+  const startPan = (e: React.PointerEvent) => { const k = uiScale(); drag.current = { mode: 'pan', sx: e.clientX / k, sy: e.clientY / k, vx: view.x, vy: view.y } }
   const onMove = (e: React.PointerEvent) => {
     const p = toWorld(e.clientX, e.clientY)
     if (Date.now() - lastSend.current > 60) { lastSend.current = Date.now(); app.send({ t: 'cursor', place: `board:${id}`, x: p.x, y: p.y }) }
     const d = drag.current
     if (!d) return
-    if (d.mode === 'pan') setView(v => ({ ...v, x: d.vx + e.clientX - d.sx, y: d.vy + e.clientY - d.sy }))
+    if (d.mode === 'pan') { const k = uiScale(); setView(v => ({ ...v, x: d.vx + e.clientX / k - d.sx, y: d.vy + e.clientY / k - d.sy })) }
     if (d.mode === 'resize') {
       const o = d.orig; const nw = Math.max(30, snap((o.w ?? 40) + p.x - d.start.x, gridOn)), nh = Math.max(24, snap((o.h ?? 40) + p.y - d.start.y, gridOn))
       const r = e.shiftKey && o.w && o.h ? { w: nw, h: Math.round(nw * o.h / o.w) } : { w: nw, h: nh }
@@ -298,8 +299,8 @@ function Canvas({ id }: { id: number }) {
     if (!el) return
     const h = (e: WheelEvent) => {
       e.preventDefault()
-      const r = el.getBoundingClientRect()
-      const mx = e.clientX - r.left, my = e.clientY - r.top
+      const r = cssRect(el)
+      const mx = e.clientX / r.k - r.left, my = e.clientY / r.k - r.top
       const mouse = e.deltaMode !== 0 || (e.deltaX === 0 && Math.abs(e.deltaY) >= 40 && Number.isInteger(e.deltaY))
       if (e.ctrlKey || e.metaKey || mouse) {
         const k = Math.exp(-(e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY) * (e.ctrlKey && !mouse ? 0.012 : 0.0022))
@@ -312,17 +313,17 @@ function Canvas({ id }: { id: number }) {
     return () => el.removeEventListener('wheel', h)
   }, [])
   // Zoom des boutons : centré sur le milieu de l'écran.
-  const zoom = (k: number) => { const r = box.current?.getBoundingClientRect(); const mx = (r?.width ?? 0) / 2, my = (r?.height ?? 0) / 2; setView(v => { const z = Math.min(4, Math.max(0.1, v.z * k)); return { z, x: mx - ((mx - v.x) / v.z) * z, y: my - ((my - v.y) / v.z) * z } }) }
+  const zoom = (k: number) => { const r = box.current ? cssRect(box.current) : undefined; const mx = (r?.width ?? 0) / 2, my = (r?.height ?? 0) / 2; setView(v => { const z = Math.min(4, Math.max(0.1, v.z * k)); return { z, x: mx - ((mx - v.x) / v.z) * z, y: my - ((my - v.y) / v.z) * z } }) }
   const fit = () => {
     if (!list.length || !box.current) return
     const xs = list.filter(o => o.kind !== 'connector').flatMap(o => [o.x, o.x + (o.w ?? 40)]), ys = list.filter(o => o.kind !== 'connector').flatMap(o => [o.y, o.y + (o.h ?? 40)])
-    const r = box.current.getBoundingClientRect(); const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)]
+    const r = cssRect(box.current); const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)]
     const z = Math.min(1.5, Math.min(r.width / (x1 - x0 + 120), r.height / (y1 - y0 + 120)))
     setView({ z, x: (r.width - (x1 - x0) * z) / 2 - x0 * z, y: (r.height - (y1 - y0) * z) / 2 - y0 * z })
   }
   const goFrame = (i: number) => {
     const f = frames[i]; if (!f || !box.current) return
-    const r = box.current.getBoundingClientRect(); const z = Math.min(r.width / ((f.w ?? 400) + 80), r.height / ((f.h ?? 300) + 80))
+    const r = cssRect(box.current); const z = Math.min(r.width / ((f.w ?? 400) + 80), r.height / ((f.h ?? 300) + 80))
     setView({ z, x: (r.width - (f.w ?? 0) * z) / 2 - f.x * z, y: (r.height - (f.h ?? 0) * z) / 2 - f.y * z }); setPresent(i)
   }
 
@@ -617,7 +618,7 @@ function MiniMap({ objs, view, box }: { objs: Obj[]; view: { x: number; y: numbe
   const xs = items.flatMap(o => [o.x, o.x + (o.w ?? 40)]), ys = items.flatMap(o => [o.y, o.y + (o.h ?? 40)])
   const [x0, y0] = [Math.min(...xs) - 50, Math.min(...ys) - 50], [w, h] = [Math.max(...xs) - x0 + 50, Math.max(...ys) - y0 + 50]
   const k = Math.min(180 / w, 110 / h)
-  const r = box.current.getBoundingClientRect()
+  const r = cssRect(box.current)
   return (
     <div className="minimap" aria-hidden="true">
       {items.map(o => <div key={o.id} style={{ position: 'absolute', left: (o.x - x0) * k, top: (o.y - y0) * k, width: Math.max(2, (o.w ?? 30) * k), height: Math.max(2, (o.h ?? 30) * k), background: o.kind === 'frame' ? 'transparent' : 'var(--text3)', border: o.kind === 'frame' ? tr("1px solid var(--text3)") : 0 }} />)}

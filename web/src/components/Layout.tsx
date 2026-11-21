@@ -2,7 +2,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import {
   Home, FileText, PenTool, CalendarDays, KanbanSquare, Rocket, Coins, Users, Settings, LifeBuoy, PanelLeft,
-  Search, Moon, Sun, Bell, Plus, ChevronDown, Hexagon, LogOut, ListTree, Bot, ChartNoAxesCombined, Hash, Flame, Sparkle, Layers, LayoutGrid, Lock, Lightbulb,
+  Search, Bell, Plus, ChevronDown, Hexagon, LogOut, ListTree, Bot, ChartNoAxesCombined, Hash, Flame, Sparkle, Layers, LayoutGrid, Lock, Lightbulb,
 } from 'lucide-react'
 import { useApp, studioName } from '../state'
 import { ago, api } from '../api'
@@ -12,7 +12,6 @@ import { GuideDrawer } from './Guide'
 import { Compass, MailCheck, ShieldCheck } from 'lucide-react'
 import { useUefnStatus, STATUS_LABEL } from '../uefnState'
 import { tr, tx, LOCALE } from '../i18n/t'
-import LangPicker from './LangPicker'
 import { MapSwitcher, CreateHost, openCreate } from './MapSwitcher'
 import { useNav } from '../routes'
 import { IdeaPop } from '../pages/Ideas'
@@ -117,8 +116,6 @@ export default function Layout() {
           )}
           <button className={'upill ' + uefn.status} onClick={() => nav('/organiseur')} title={uefn.project ? tr("Projet {0}", [uefn.project]) : 'UEFN Link'}><span className="udot" />{STATUS_LABEL[uefn.status]}{uefn.pending ? ` · ${uefn.pending}` : ''}</button>
           <GlobalSearch />
-          <button className="iconbtn" aria-label={app.dark ? tr("Thème clair") : tr("Thème sombre")} onClick={app.toggleDark}>{app.dark ? <Sun size={20} strokeWidth={1.5} /> : <Moon size={20} strokeWidth={1.5} />}</button>
-          <LangPicker app />
           {app.map && <button className="iconbtn" aria-label={tr("Boussole, assistant intégré")} title={tr("Boussole : assistant intégré")} onClick={() => setGuide({})}><Compass size={20} strokeWidth={1.5} /></button>}
           <Notifications />
           {app.canEdit && <button className="btn pri" onClick={() => setNewTask(true)}><Plus size={18} strokeWidth={1.5} />{tr("Nouvelle tâche")}</button>}

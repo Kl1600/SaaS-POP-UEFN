@@ -7,6 +7,7 @@ import { useApp, useLive, useLoad } from '../state'
 import { CardHead, PageHead, Tabs } from '../components/ui'
 import { STATUS_LABEL } from '../uefnState'
 import { tr, tx } from '../i18n/t'
+import { cssRect, uiScale } from '../zoom'
 
 type Actor = {
   id: string; name: string; type: string; class: string; folder: string; hidden: boolean; kind_label?: string; icon?: string; locked_by?: string
@@ -304,7 +305,7 @@ function TopView({ actors, sel, setSel, update, canEdit, hasImage, bounds, refre
   const W = 900, H = Math.round(W * (b.y1 - b.y0) / (b.x1 - b.x0))
   const toPx = (x: number, y: number) => [((x - b.x0) / (b.x1 - b.x0)) * W, ((y - b.y0) / (b.y1 - b.y0)) * H]
   const toWorld = (px: number, py: number) => [b.x0 + (px / W) * (b.x1 - b.x0), b.y0 + (py / H) * (b.y1 - b.y0)]
-  const local = (e: React.PointerEvent) => { const r = box.current!.getBoundingClientRect(); return [(e.clientX - r.left - view.x) / view.z, (e.clientY - r.top - view.y) / view.z] }
+  const local = (e: React.PointerEvent) => { const r = cssRect(box.current!); return [(e.clientX / r.k - r.left - view.x) / view.z, (e.clientY / r.k - r.top - view.y) / view.z] }
   const toBoard = () => {
     if (!img?.image || !boards?.[0]) return
     send({ t: 'board', board: boards[0].id, op: 'upsert', objs: [{ id: 'plan-' + Date.now(), kind: 'image', x: -100, y: -100, w: W, h: H, url: img.image, locked: true }] })
@@ -318,8 +319,8 @@ function TopView({ actors, sel, setSel, update, canEdit, hasImage, bounds, refre
       <span className="spacer" /><button className="iconbtn" aria-label={tr("Zoomer")} onClick={() => setView(v => ({ ...v, z: Math.min(5, v.z * 1.25) }))}><Plus size={16} /></button><button className="iconbtn" aria-label={tr("Dézoomer")} onClick={() => setView(v => ({ ...v, z: Math.max(0.3, v.z / 1.25) }))}>−</button>
     </div>
     <div ref={box} className="otop" onWheel={e => { const z = Math.min(5, Math.max(0.3, view.z * (e.deltaY < 0 ? 1.1 : 0.9))); setView(v => ({ ...v, z })) }}
-      onPointerDown={e => { if ((e.target as HTMLElement).dataset.aid) return; pan.current = { sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y } }}
-      onPointerMove={e => { if (pan.current) setView(v => ({ ...v, x: pan.current.vx + e.clientX - pan.current.sx, y: pan.current.vy + e.clientY - pan.current.sy })); if (drag) { const [x, y] = local(e); setDrag({ ...drag, x, y }) } }}
+      onPointerDown={e => { if ((e.target as HTMLElement).dataset.aid) return; const k = uiScale(); pan.current = { sx: e.clientX / k, sy: e.clientY / k, vx: view.x, vy: view.y } }}
+      onPointerMove={e => { if (pan.current) { const k = uiScale(); setView(v => ({ ...v, x: pan.current.vx + e.clientX / k - pan.current.sx, y: pan.current.vy + e.clientY / k - pan.current.sy })) } if (drag) { const [x, y] = local(e); setDrag({ ...drag, x, y }) } }}
       onPointerUp={() => {
         pan.current = null
         if (drag) { const a = actors.find(x => x.id === drag.id)!; const [wx, wy] = toWorld(drag.x, drag.y); update([a.id], { transform: { location: [Math.round(wx), Math.round(wy), a.transform.location[2]] } }); setDrag(null) }

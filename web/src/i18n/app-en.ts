@@ -2462,5 +2462,8 @@ const EN: Record<string, string> = {
   "Ce compte est déjà activé.": "This account is already activated.",
   "Admin : lien d’activation renvoyé": "Admin: activation link resent",
   "Compte activé": "Account activated",
+  "Thème": "Theme",
+  "Clair": "Light",
+  "Sombre": "Dark",
 }
 export default EN
