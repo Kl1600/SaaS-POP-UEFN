@@ -11,6 +11,10 @@ EN COURS | #82 Forge F8 · Session de test pilotable par les IA (démarrer, arr�
 Owner : Kl1600 | Sur la tâche : Claude Code, pour Kl1600
 Fait : actions relais start/stop_session et session_output (GetVerseOutput), outils MCP, aide du moteur sur compile_verse
 Reste : test avec le vrai UEFN (noms d'arguments de StartSession à confirmer)
+EN COURS | #90 Forge F16 · Relais : importer un fichier dans le projet UEFN | 21/11 01:50
+Owner : Kl1600 | Sur la tâche : Claude Code, pour Kl1600
+Fait : actions asset_import (fichier du PC ou URL du serveur POP) et asset_delete, MCP import_asset, tests
+Reste : test avec le vrai UEFN (AssetImportTask, dossier par défaut /<projet>/POP)
 Bloque : rien
 ```
 

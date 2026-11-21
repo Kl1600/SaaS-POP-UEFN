@@ -709,7 +709,7 @@ pub struct Origin<'a> {
 
 fn role_for(action: &str) -> Role {
     match action {
-        "actor_delete" | "delete_file" => Role::Member,
+        "actor_delete" | "delete_file" | "asset_delete" => Role::Member,
         "refresh_actors" | "render_topview" | "session_output" => Role::Viewer,
         _ => Role::Freelance,
     }
@@ -960,6 +960,67 @@ async fn prepare(
                 ),
             ))
         }
+        "asset_import" => {
+            // Import d'un fichier dans le projet UEFN (#90) : fichier du PC ou adresse du serveur POP.
+            const EXT: &[&str] = &[
+                "fbx", "obj", "png", "jpg", "jpeg", "tga", "wav", "ogg", "mp3",
+            ];
+            let src = args["local_path"]
+                .as_str()
+                .filter(|s| !s.is_empty())
+                .or(args["url"].as_str().filter(|s| !s.is_empty()))
+                .ok_or_else(|| {
+                    bad("Indiquez le fichier à importer (chemin sur le PC ou adresse POP).")
+                })?
+                .to_string();
+            let nom = args["filename"]
+                .as_str()
+                .filter(|n| !n.is_empty())
+                .unwrap_or_else(|| src.rsplit(['/', '\\']).next().unwrap_or(&src))
+                .to_string();
+            let ext = nom.rsplit('.').next().unwrap_or("").to_lowercase();
+            if !nom.contains('.') || !EXT.contains(&ext.as_str()) {
+                return Err(bad(format!(
+                    "Type de fichier non importé ({nom}) : {}.",
+                    EXT.join(", ")
+                )));
+            }
+            let dossier = args["folder"].as_str().unwrap_or("").trim().to_string();
+            if !dossier.is_empty() {
+                if !dossier.starts_with('/') || dossier.len() > 200 || dossier.contains("..") {
+                    return Err(bad(
+                        "Dossier du Content Browser invalide (ex. /MonProjet/Assets).",
+                    ));
+                }
+                check_lock(&dossier)?;
+            }
+            let vers = if dossier.is_empty() {
+                "dossier POP du projet".to_string()
+            } else {
+                dossier
+            };
+            Ok((format!("Import : {nom} → {vers}"), Value::Null, None))
+        }
+        "asset_delete" => {
+            let paths: Vec<String> = args["paths"]
+                .as_array()
+                .cloned()
+                .unwrap_or_default()
+                .iter()
+                .filter_map(|x| x.as_str().map(String::from))
+                .collect();
+            if paths.is_empty() {
+                return Err(bad("Aucun asset."));
+            }
+            for p in &paths {
+                check_lock(p)?;
+            }
+            Ok((
+                format!("Retrait d’assets : {}", paths.join(", ")),
+                Value::Null,
+                None,
+            ))
+        }
         "actor_duplicate" | "actor_delete" => {
             let ids: Vec<String> = args["ids"]
                 .as_array()
@@ -1149,7 +1210,12 @@ async fn run_action(
     }
     let secs = if matches!(
         action,
-        "compile" | "push_session" | "render_topview" | "lore_checkin" | "stop_session"
+        "compile"
+            | "push_session"
+            | "render_topview"
+            | "lore_checkin"
+            | "stop_session"
+            | "asset_import"
     ) {
         120
     } else if action == "start_session" {
@@ -1177,6 +1243,14 @@ async fn run_action(
             if let Some(id) = aid {
                 // Une duplication ou une pose s'annule en supprimant les acteurs créés.
                 let mut extra_undo = None;
+                // Un import s'annule en retirant les assets créés (refusé par UEFN s'ils sont utilisés).
+                if action == "asset_import" {
+                    if let Some(p) = data.get("imported") {
+                        extra_undo = Some(
+                            json!({ "action": "asset_delete", "args": { "paths": p } }).to_string(),
+                        );
+                    }
+                }
                 if action == "actor_duplicate" || action == "actor_spawn" {
                     if let Some(ids) = data.get("created_ids") {
                         extra_undo = Some(

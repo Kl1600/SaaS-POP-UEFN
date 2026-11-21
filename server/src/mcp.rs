@@ -117,6 +117,7 @@ fn tools() -> Value {
         tool("get_actor", "Détails d'un acteur : transformation, tags, options, propriétés Verse, liens d'événements.", json!({ "id": { "type": "string" } }), &["id"]),
         tool("update_actors", "Modifie un ou plusieurs acteurs. changes peut contenir name, folder, hidden, transform {location,rotation,scale}, options {clé: valeur}, props {clé: valeur}, tags_add, tags_remove, events.", json!({ "ids": ids, "changes": { "type": "object" }, "task": task }), &["ids", "changes"]),
         tool("place_device", "Pose un appareil dans le niveau. Soit asset (chemin de l'appareil dans le Content Browser d'UEFN, ex. /Game/…), soit like (identifiant d'un appareil du niveau à copier avec ses réglages). Facultatifs : name, folder, location [x, y, z] et rotation [pitch, yaw, roll] en coordonnées du moteur. Journalisé et annulable (l'annulation demandée par une IA attend un humain).", json!({ "asset": { "type": "string" }, "like": { "type": "string" }, "name": { "type": "string" }, "folder": { "type": "string" }, "location": { "type": "array", "items": { "type": "number" } }, "rotation": { "type": "array", "items": { "type": "number" } }, "task": task }), &[]),
+        tool("import_asset", "Importe un fichier (FBX, OBJ, PNG, JPG, TGA, WAV, OGG, MP3 ; 200 Mo au plus) dans le projet UEFN ouvert. local_path : chemin du fichier sur le PC d'UEFN ; ou url : adresse sur le serveur POP. folder : dossier du Content Browser (facultatif, sinon /<projet>/POP). Journalisé ; l'annulation retire l'asset s'il n'est pas utilisé (demandée par une IA, elle attend un humain).", json!({ "local_path": { "type": "string" }, "url": { "type": "string" }, "filename": { "type": "string" }, "folder": { "type": "string" }, "task": task }), &[]),
         tool("duplicate_actors", "Duplique des acteurs.", json!({ "ids": ids }), &["ids"]),
         tool("delete_actors", "Demande la suppression d'acteurs. Un humain doit valider dans POP avant l'exécution.", json!({ "ids": ids }), &["ids"]),
         tool("check_level", "Vérifie le niveau sur le dernier état connu : références d'appareils vers un acteur absent (bloquant), réglages non reliés, options réglées sans effet, tags Verse inutilisés. Chaque problème a sa gravité, l'acteur et une explication.", json!({}), &[]),
@@ -468,6 +469,15 @@ async fn call_as(
             )
             .await
         }
+        "import_asset" => {
+            exec(
+                st,
+                o(),
+                "asset_import",
+                json!({ "local_path": a["local_path"], "url": a["url"], "filename": a["filename"], "folder": a["folder"] }),
+            )
+            .await
+        }
         "duplicate_actors" => exec(st, o(), "actor_duplicate", json!({ "ids": a["ids"] })).await,
         "delete_actors" => {
             ctx.require(Role::Member)?;
@@ -593,7 +603,7 @@ async fn call_as(
         "lore_checkin" => exec(st, o(), "lore_checkin", json!({ "message": a["message"] })).await,
         "undo_action" => {
             let id = a["id"].as_i64().ok_or_else(|| bad("id manquant"))?;
-            // Annuler une pose ou une duplication supprime des acteurs : demandé par une IA, cela attend un humain.
+            // Annuler une pose, une duplication ou un import supprime des acteurs ou des assets : demandé par une IA, cela attend un humain.
             let u: Option<(i64, Option<String>, String)> = sqlx::query_as(
                 "SELECT map_id, undo, summary FROM uefn_actions WHERE id = ? AND status = 'done'",
             )
@@ -602,10 +612,15 @@ async fn call_as(
             .await?;
             if let Some((m, Some(undo), resume)) = u.filter(|u| u.0 == mid) {
                 let undo: Value = serde_json::from_str(&undo).unwrap_or_default();
-                if undo["action"] == "actor_delete" {
-                    let summary = format!("L’IA de {} demande d’annuler « {resume} » (suppression des acteurs créés)", user.name);
-                    let aid: i64 = sqlx::query_scalar("INSERT INTO approvals (map_id, user_id, action, args, summary) VALUES (?, ?, 'actor_delete', ?, ?) RETURNING id")
-                        .bind(m).bind(user.id).bind(undo["args"].to_string()).bind(&summary).fetch_one(&st.db).await?;
+                let quoi = match undo["action"].as_str() {
+                    Some("actor_delete") => Some("suppression des acteurs créés"),
+                    Some("asset_delete") => Some("retrait des assets importés"),
+                    _ => None,
+                };
+                if let Some(quoi) = quoi {
+                    let summary = format!("L’IA de {} demande d’annuler « {resume} » ({quoi})", user.name);
+                    let aid: i64 = sqlx::query_scalar("INSERT INTO approvals (map_id, user_id, action, args, summary) VALUES (?, ?, ?, ?, ?) RETURNING id")
+                        .bind(m).bind(user.id).bind(undo["action"].as_str()).bind(undo["args"].to_string()).bind(&summary).fetch_one(&st.db).await?;
                     notify(st, mid, json!({ "t": "uefn", "what": "actors" }));
                     return Ok(json!({ "pending_approval": aid, "message": "Annulation en attente : un membre doit la valider dans l’Organiseur de POP." }));
                 }
@@ -894,5 +909,88 @@ mod tests_session {
                 .unwrap_or(false),
             "{r}"
         );
+    }
+}
+
+#[cfg(test)]
+mod tests_import {
+    use super::*;
+
+    /// Importer un fichier (#90) : contrôles, journal, et annulation par une IA soumise à un humain.
+    #[tokio::test]
+    async fn importer_et_annuler() {
+        let st = crate::test_state().await;
+        let sid: i64 = sqlx::query_scalar("INSERT INTO studios (name) VALUES ('S') RETURNING id")
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        let mid: i64 =
+            sqlx::query_scalar("INSERT INTO maps (studio_id, name) VALUES (?, 'M') RETURNING id")
+                .bind(sid)
+                .fetch_one(&st.db)
+                .await
+                .unwrap();
+        let uid: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash) VALUES ('ia@a.fr', 'Yanis', 'x') RETURNING id")
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO memberships (studio_id, user_id, role) VALUES (?, ?, 'member')")
+            .bind(sid)
+            .bind(uid)
+            .execute(&st.db)
+            .await
+            .unwrap();
+        let u = AuthUser {
+            id: uid,
+            email: "ia@a.fr".into(),
+            name: "Yanis".into(),
+            sid: String::new(),
+        };
+        for mauvais in [
+            json!({}),
+            json!({ "local_path": "C:/x/outil.exe" }),
+            json!({ "local_path": "C:/x/arbre.fbx", "folder": "../../Windows" }),
+        ] {
+            assert!(
+                call(&st, &u, mid, "import_asset", mauvais.clone())
+                    .await
+                    .is_err(),
+                "{mauvais}"
+            );
+        }
+        call(
+            &st,
+            &u,
+            mid,
+            "import_asset",
+            json!({ "local_path": "C:\\Assets\\arbre.fbx", "folder": "/Projet/Decor" }),
+        )
+        .await
+        .unwrap();
+        let (id, resume): (i64, String) =
+            sqlx::query_as("SELECT id, summary FROM uefn_actions WHERE action = 'asset_import'")
+                .fetch_one(&st.db)
+                .await
+                .unwrap();
+        assert_eq!(resume, "Import : arbre.fbx → /Projet/Decor");
+        sqlx::query("UPDATE uefn_actions SET status = 'done', undo = ? WHERE id = ?")
+            .bind(
+                json!({ "action": "asset_delete", "args": { "paths": ["/Projet/Decor/arbre"] } })
+                    .to_string(),
+            )
+            .bind(id)
+            .execute(&st.db)
+            .await
+            .unwrap();
+        let r = call(&st, &u, mid, "undo_action", json!({ "id": id }))
+            .await
+            .unwrap();
+        assert!(r["pending_approval"].is_i64(), "{r}");
+        let action: String = sqlx::query_scalar("SELECT action FROM approvals WHERE map_id = ?")
+            .bind(mid)
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        assert_eq!(action, "asset_delete");
     }
 }

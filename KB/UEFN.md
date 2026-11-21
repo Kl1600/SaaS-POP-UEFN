@@ -136,3 +136,15 @@ concernée ; corrigez une ligne fausse en le disant.
   `actor.get_editor_property('script')`** : pop-link la remonte dans `verse_class`.
 - Un appareil posé pendant une session n'apparaît en jeu qu'après un envoi **complet** (`PushChanges { bVerseOnly: false }`) :
   le compteur « Score 0 » s'affiche alors en haut de l'écran.
+
+## Importer un fichier (testé le 21/11/2026, projet TestPopHub, #90)
+
+- `AssetImportTask` (automated, `replace_existing=False`) : PNG → `Texture2D`, WAV → `SoundWave`, FBX → `StaticMesh`
+  **plus un matériau par matériau du fichier** (6 pour le cube de test), tous dans le dossier choisi.
+- Le contenu du projet est monté sous le **nom du monde** (`get_editor_world().get_path_name().split('/')[1]`), ici
+  un identifiant (`/44f07e39-…/`), pas sous le nom du dossier du projet : `/TestPopHub/POP` n'importe rien.
+- `find_package_referencers_for_asset` : un acteur posé dans le niveau apparaît comme
+  `/<projet>/__ExternalActors__/<map>/…` ; les matériaux d'un FBX sont « utilisés par » son mesh. Pour annuler un
+  import, on ignore les références internes au lot et on retire le mesh avant ses matériaux.
+- `EditorAssetLibrary.delete_directory` retire un dossier vide du Content Browser ; le dossier reste sur le disque
+  jusqu'à ce qu'on le supprime.
