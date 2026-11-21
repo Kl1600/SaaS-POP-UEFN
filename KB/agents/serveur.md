@@ -103,3 +103,7 @@ Bloque : rien
 - Fait : la route des vérifications du niveau (#96) passe à `GET /api/maps/{mid}/level-checks` (`/checks` reste la checklist de la page Lancer) ; test `routeur::routes_sans_doublon` qui construit le routeur complet.
 - Vérifié : `cargo test` ; serveur démarré en local, `/checks` et `/level-checks` répondent 200.
 - Leçon : `cargo test` ne construisait pas le routeur ; une route en double ne se voyait qu'au démarrage.
+### 2026-11-21 · #115 F29 · interface de jeu générée (create_widget)
+- Fait : `server/src/widgets.rs` (modèles texte, compteur, bouton → appareil Verse `POP_UI/pop_ui_<nom>.verse`, texte en liste blanche) ; outil MCP `create_widget` (via `write_file` : journalisé, annulable, verrou Lore) ; l'annulation est refusée si un acteur du niveau utilise encore la classe.
+- Vérifié : `cargo test` (contrôles, génération, utilisation). Le Verse généré n'est vérifié qu'à la lecture : à compiler dans le vrai UEFN.
+- Écart avec l'issue : pas de Widget Blueprint UMG (non pilotable depuis le Verse aujourd'hui, voir KB/UEFN.md).

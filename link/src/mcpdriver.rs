@@ -1003,6 +1003,14 @@ for a in sub.get_all_level_actors():
     t = a.get_actor_transform(); l = t.translation; r = t.rotation.rotator(); s = t.scale3d
     cls = a.get_class().get_name()
     kind = 'verse_device' if 'verse' in cls.lower() else ('device' if 'device' in cls.lower() else ('mesh' if 'StaticMesh' in cls else 'prop'))
+    vcls = ''
+    if kind == 'verse_device':
+        # La classe d'un appareil Verse posé est VerseDevice_C ; sa classe Verse est celle de l'objet « script ».
+        try:
+            sc = a.get_editor_property('script')
+            if sc: vcls = sc.get_class().get_name()
+        except Exception:
+            pass
     tags = [str(x) for x in a.tags]
     try:
         for comp in a.get_components_by_class(unreal.ActorComponent):
@@ -1012,7 +1020,7 @@ for a in sub.get_all_level_actors():
                     if n and n not in tags: tags.append(n)
     except Exception:
         pass
-    out.append({'id': a.get_path_name(), 'name': a.get_actor_label(), 'type': kind, 'class': cls, 'folder': str(a.get_folder_path()),
+    out.append({'id': a.get_path_name(), 'name': a.get_actor_label(), 'type': kind, 'class': cls, 'verse_class': vcls, 'folder': str(a.get_folder_path()),
                 'hidden': bool(a.is_temporarily_hidden_in_editor()), 'tags': tags,
                 'transform': {'location': [l.x, l.y, l.z], 'rotation': [r.pitch, r.yaw, r.roll], 'scale': [s.x, s.y, s.z]},
                 'options': {}, 'props': {}, 'events': []})

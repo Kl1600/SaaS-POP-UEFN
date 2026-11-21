@@ -123,6 +123,7 @@ fn tools() -> Value {
         tool("list_verse_files", "Liste les fichiers .verse du projet.", json!({}), &[]),
         tool("read_verse_file", "Lit un fichier .verse.", json!({ "path": { "type": "string" } }), &["path"]),
         tool("write_verse_file", "Écrit un fichier .verse dans le projet (crée ou remplace).", json!({ "path": { "type": "string" }, "content": { "type": "string" }, "task": task }), &["path", "content"]),
+        tool("create_widget", "Crée une interface de jeu (HUD ou menu) : un appareil Verse prêt à poser dans le niveau, écrit dans Content/POP_UI/pop_ui_<name>.verse. kind : texte (affiché à tous), compteur (libellé + nombre par joueur, +1 à chaque activation d'un déclencheur ; Ajouter/Definir depuis le Verse), bouton (s'ouvre par un déclencheur, un clic active un appareil Cible). position : haut, centre ou bas. Ensuite : compile_verse, puis place_device ou poser l'appareil à la main. Annulable tant qu'aucun acteur ne l'utilise.", json!({ "kind": { "type": "string", "enum": ["texte", "compteur", "bouton"] }, "name": { "type": "string", "description": "minuscules, chiffres, _ (ex. score)" }, "text": { "type": "string" }, "position": { "type": "string", "enum": ["haut", "centre", "bas"] }, "task": task }), &["kind", "name", "text"]),
         tool("compile_verse", "Compile le Verse dans UEFN et renvoie erreurs et avertissements.", json!({}), &[]),
         tool("start_session", "Démarre la session de test UEFN (peut prendre plusieurs minutes). Ensuite : push_to_session après une modification, session_output pour lire les Print et les erreurs.", json!({}), &[]),
         tool("stop_session", "Arrête la session de test UEFN.", json!({}), &[]),
@@ -547,6 +548,29 @@ async fn call_as(
                 json!({ "path": a["path"], "content": a["content"] }),
             )
             .await
+        }
+        "create_widget" => {
+            let w = crate::widgets::lire(&a).map_err(bad)?;
+            let path = w.chemin();
+            let deja: Option<(i64,)> =
+                sqlx::query_as("SELECT 1 FROM verse_files WHERE map_id = ? AND path = ?")
+                    .bind(mid)
+                    .bind(&path)
+                    .fetch_optional(&st.db)
+                    .await?;
+            if deja.is_some() {
+                return Err(bad(format!("{path} existe déjà : choisissez un autre name, ou modifiez le fichier avec write_verse_file.")));
+            }
+            let r = exec(
+                st,
+                o(),
+                "write_file",
+                json!({ "path": path, "content": crate::widgets::verse(&w) }),
+            )
+            .await?;
+            Ok(
+                json!({ "action": r, "path": path, "device": w.classe(), "next": "compile_verse, puis poser l'appareil dans le niveau et relier ses déclencheurs." }),
+            )
         }
         "compile_verse" => {
             let mut r = exec(st, o(), "compile", json!({})).await?;

@@ -115,3 +115,24 @@ concernée ; corrigez une ligne fausse en le disant.
   son `FortPlayerStartCreative`, que la suppression du Spawn Pad retire avec lui.
 - Annulation depuis le journal (humain) : l'appareil disparaît du niveau. Annulation par une IA (`undo_action`) :
   rien n'est supprimé avant la validation d'un humain (`/api/approvals/{id}/approve`).
+
+## Interface de jeu (HUD, menus) créée par une IA (recherche puis test du 21/11/2026, projet TestPopHub, #115)
+
+- Un Widget Blueprint (UMG) se crée par Python (`AssetTools.create_asset` + `WidgetBlueprintFactory`, à vérifier dans
+  UEFN) et s'affiche depuis le Verse par `Assets.digest.verse` (`PlayerUI.AddWidget(Dossier.WBP_X{})`), mais **ne se
+  pilote pas** : un champ ajouté par `VerseFieldsToolset.AddVerseField` (MCP ou Python) est listé mais n'arrive pas
+  dans la classe Verse générée (bug signalé sur le forum Epic, nov. 2026). Construire l'arbre de widgets par script
+  reste mal documenté.
+- Choix de POP : `create_widget` génère un **appareil Verse** (`Content/POP_UI/pop_ui_<nom>.verse`) qui construit l'interface
+  avec l'API UI de Verse (`canvas`, `text_block`, `button_loud`) : texte, compteur par joueur, bouton qui active un
+  appareil. Après compilation il est dans le Content Browser et se pose comme un appareil. À revoir quand les champs
+  Verse des widgets UMG marcheront.
+- À vérifier au premier test : compilation des trois modèles, le compteur qui monte, le bouton qui rend la souris
+  (`ui_input_mode.All`) puis la retire à la fermeture.
+- Testé : le Verse **hors de `Content/`** (ex. `POP_UI/` à la racine du projet) n'est pas compilé, sans aucune
+  erreur ; dans `Content/POP_UI/`, l'appareil apparaît comme `POP_UI-pop_ui_score` (`ListDeviceAssets`).
+- Un appareil Verse se pose par `DeviceToolset.PlaceDevice { assetPath: { refPath: "/<projet>/_Verse.POP_UI-pop_ui_score" } }`
+  (Python refuse). Posé, sa classe est `VerseDevice_C` ; **sa classe Verse est celle de
+  `actor.get_editor_property('script')`** : pop-link la remonte dans `verse_class`.
+- Un appareil posé pendant une session n'apparaît en jeu qu'après un envoi **complet** (`PushChanges { bVerseOnly: false }`) :
+  le compteur « Score 0 » s'affiche alors en haut de l'écran.
