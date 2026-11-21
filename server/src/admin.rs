@@ -128,10 +128,20 @@ pub async fn join(
         .bind(&email)
         .fetch_one(&st.db)
         .await?;
+    // Même réponse qu'une adresse inconnue : on ne révèle pas qui a un compte (#17). La personne est prévenue par e-mail.
     if has_account > 0 {
-        return Err(AppError::Conflict(
-            "Un compte existe déjà avec cette adresse : connectez-vous.".into(),
-        ));
+        if crate::mail::configured() {
+            let to = email.clone();
+            tokio::spawn(async move {
+                let body = format!("Bonjour,\n\nQuelqu'un (sans doute vous) a demandé l'accès à la bêta de POP avec cette adresse. Vous avez déjà un compte POP : connectez-vous ici :\n{}/connexion\n\nMot de passe oublié ? Utilisez « Mot de passe oublié » sur cette page.\n\nSi vous n'avez rien demandé, ignorez ce message.", crate::mail::public_url());
+                if let Err(e) =
+                    crate::mail::send(&to, "POP · vous avez déjà un compte", &body).await
+                {
+                    tracing::warn!("e-mail « compte existant » : {e:#}");
+                }
+            });
+        }
+        return Ok(Json(json!({ "ok": true })));
     }
     let existing: Option<String> =
         sqlx::query_scalar("SELECT status FROM waitlist WHERE email = ?")
@@ -1031,6 +1041,39 @@ mod depannage_tests {
             .await
             .map(|j| j.0),
         ]
+    }
+
+    /// #17 : une adresse qui a déjà un compte reçoit la même réponse qu'une adresse inconnue, et rien n'est enregistré.
+    #[tokio::test]
+    async fn demande_acces_ne_revele_pas_les_comptes() {
+        let st = crate::test_state().await;
+        user(&st, "deja@exemple.com", false).await;
+        let ask = |email: &str| WaitIn {
+            email: email.into(),
+            name: "Test".into(),
+            studio: None,
+            team: None,
+            experience: None,
+            links: None,
+            message: None,
+            pop_hp: String::new(),
+        };
+        let ip = |n: u8| crate::security::ClientIp(format!("10.0.0.{n}"));
+        let a = join(State(st.clone()), ip(1), Json(ask("deja@exemple.com")))
+            .await
+            .unwrap()
+            .0;
+        let b = join(State(st.clone()), ip(2), Json(ask("nouveau@exemple.com")))
+            .await
+            .unwrap()
+            .0;
+        assert_eq!(a, b);
+        let n: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM waitlist WHERE email = 'deja@exemple.com'")
+                .fetch_one(&st.db)
+                .await
+                .unwrap();
+        assert_eq!(n, 0);
     }
 
     #[tokio::test]

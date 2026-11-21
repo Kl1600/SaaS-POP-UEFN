@@ -66,3 +66,7 @@ Reste : validation humaine (plan de test de la PR), puis test derrière un vrai 
 Bloque : rien
 ```
 
+
+### 2026-11-21 · #17 · ne plus révéler qui a un compte
+- Fait : demande d'accès avec une adresse qui a un compte → même réponse `{ok:true}` qu'une adresse inconnue, rien n'est enregistré, et un e-mail « vous avez déjà un compte » part (si SMTP configuré). Inscription : « compte existe déjà » seulement après le contrôle d'accès (invitation ou lien d'accès).
+- Vérifié : `cargo test` (test `demande_acces_ne_revele_pas_les_comptes`). Reste visible avec `POP_OPEN_SIGNUP=1` (inscription libre) : il faut bien dire à la personne que son adresse est prise.
