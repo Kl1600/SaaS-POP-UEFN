@@ -26,6 +26,7 @@ mod money;
 mod pages;
 mod plan;
 mod privstats;
+mod s3;
 mod security;
 mod stripe;
 mod studio;

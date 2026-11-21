@@ -20,6 +20,13 @@ services:
       POP_SMTP_USER: ${POP_SMTP_USER:-}
       POP_SMTP_PASS: ${POP_SMTP_PASS:-}
       POP_SMTP_FROM: ${POP_SMTP_FROM:-}
+      POP_S3_ENDPOINT: ${POP_S3_ENDPOINT:-}
+      POP_S3_BUCKET: ${POP_S3_BUCKET:-}
+      POP_S3_REGION: ${POP_S3_REGION:-auto}
+      POP_S3_KEY_ID: ${POP_S3_KEY_ID:-}
+      POP_S3_SECRET: ${POP_S3_SECRET:-}
+      POP_ASSET_MAX_MB: ${POP_ASSET_MAX_MB:-200}
+      POP_ASSET_STUDIO_MB: ${POP_ASSET_STUDIO_MB:-2000}
     volumes:
       - pop-data:/data
     # Aucun port publié : seul Caddy joint POP, par le réseau interne de compose.
