@@ -116,6 +116,7 @@ fn tools() -> Value {
         tool("list_actors", "Liste les acteurs du niveau. Filtre facultatif : texte cherché dans le nom, le type, le dossier, les tags et les options.", json!({ "query": { "type": "string" } }), &[]),
         tool("get_actor", "Détails d'un acteur : transformation, tags, options, propriétés Verse, liens d'événements.", json!({ "id": { "type": "string" } }), &["id"]),
         tool("update_actors", "Modifie un ou plusieurs acteurs. changes peut contenir name, folder, hidden, transform {location,rotation,scale}, options {clé: valeur}, props {clé: valeur}, tags_add, tags_remove, events.", json!({ "ids": ids, "changes": { "type": "object" }, "task": task }), &["ids", "changes"]),
+        tool("place_device", "Pose un appareil dans le niveau. Soit asset (chemin de l'appareil dans le Content Browser d'UEFN, ex. /Game/…), soit like (identifiant d'un appareil du niveau à copier avec ses réglages). Facultatifs : name, folder, location [x, y, z] et rotation [pitch, yaw, roll] en coordonnées du moteur. Journalisé et annulable (l'annulation demandée par une IA attend un humain).", json!({ "asset": { "type": "string" }, "like": { "type": "string" }, "name": { "type": "string" }, "folder": { "type": "string" }, "location": { "type": "array", "items": { "type": "number" } }, "rotation": { "type": "array", "items": { "type": "number" } }, "task": task }), &[]),
         tool("duplicate_actors", "Duplique des acteurs.", json!({ "ids": ids }), &["ids"]),
         tool("delete_actors", "Demande la suppression d'acteurs. Un humain doit valider dans POP avant l'exécution.", json!({ "ids": ids }), &["ids"]),
         tool("check_level", "Vérifie le niveau sur le dernier état connu : références d'appareils vers un acteur absent (bloquant), réglages non reliés, options réglées sans effet, tags Verse inutilisés. Chaque problème a sa gravité, l'acteur et une explication.", json!({}), &[]),
@@ -453,6 +454,15 @@ async fn call_as(
             )
             .await
         }
+        "place_device" => {
+            exec(
+                st,
+                o(),
+                "actor_spawn",
+                json!({ "asset": a["asset"], "like": a["like"], "name": a["name"], "folder": a["folder"], "location": a["location"], "rotation": a["rotation"] }),
+            )
+            .await
+        }
         "duplicate_actors" => exec(st, o(), "actor_duplicate", json!({ "ids": a["ids"] })).await,
         "delete_actors" => {
             ctx.require(Role::Member)?;
@@ -540,6 +550,23 @@ async fn call_as(
         "lore_checkin" => exec(st, o(), "lore_checkin", json!({ "message": a["message"] })).await,
         "undo_action" => {
             let id = a["id"].as_i64().ok_or_else(|| bad("id manquant"))?;
+            // Annuler une pose ou une duplication supprime des acteurs : demandé par une IA, cela attend un humain.
+            let u: Option<(i64, Option<String>, String)> = sqlx::query_as(
+                "SELECT map_id, undo, summary FROM uefn_actions WHERE id = ? AND status = 'done'",
+            )
+            .bind(id)
+            .fetch_optional(&st.db)
+            .await?;
+            if let Some((m, Some(undo), resume)) = u.filter(|u| u.0 == mid) {
+                let undo: Value = serde_json::from_str(&undo).unwrap_or_default();
+                if undo["action"] == "actor_delete" {
+                    let summary = format!("L’IA de {} demande d’annuler « {resume} » (suppression des acteurs créés)", user.name);
+                    let aid: i64 = sqlx::query_scalar("INSERT INTO approvals (map_id, user_id, action, args, summary) VALUES (?, ?, 'actor_delete', ?, ?) RETURNING id")
+                        .bind(m).bind(user.id).bind(undo["args"].to_string()).bind(&summary).fetch_one(&st.db).await?;
+                    notify(st, mid, json!({ "t": "uefn", "what": "actors" }));
+                    return Ok(json!({ "pending_approval": aid, "message": "Annulation en attente : un membre doit la valider dans l’Organiseur de POP." }));
+                }
+            }
             crate::uefn::undo(State(st.clone()), user.clone(), Path(id))
                 .await
                 .map(|j| j.0)
@@ -603,5 +630,93 @@ mod tests {
         assert!(
             READ_TOOLS.contains(&"search_library") && READ_TOOLS.contains(&"get_library_module")
         );
+    }
+}
+
+#[cfg(test)]
+mod tests_pose {
+    use super::*;
+
+    /// Poser un appareil (#81) : contrôles, journal, et annulation par une IA soumise à un humain.
+    #[tokio::test]
+    async fn poser_et_annuler() {
+        let st = crate::test_state().await;
+        let sid: i64 = sqlx::query_scalar("INSERT INTO studios (name) VALUES ('S') RETURNING id")
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        let mid: i64 =
+            sqlx::query_scalar("INSERT INTO maps (studio_id, name) VALUES (?, 'M') RETURNING id")
+                .bind(sid)
+                .fetch_one(&st.db)
+                .await
+                .unwrap();
+        let uid: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash) VALUES ('ia@a.fr', 'Yanis', 'x') RETURNING id")
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO memberships (studio_id, user_id, role) VALUES (?, ?, 'member')")
+            .bind(sid)
+            .bind(uid)
+            .execute(&st.db)
+            .await
+            .unwrap();
+        let u = AuthUser {
+            id: uid,
+            email: "ia@a.fr".into(),
+            name: "Yanis".into(),
+            sid: String::new(),
+        };
+        // Sans asset ni modèle, ou avec une position invalide : refus.
+        assert!(call(&st, &u, mid, "place_device", json!({})).await.is_err());
+        assert!(call(
+            &st,
+            &u,
+            mid,
+            "place_device",
+            json!({ "asset": "/Game/Bouton", "location": [1, 2] })
+        )
+        .await
+        .is_err());
+        assert!(
+            call(&st, &u, mid, "place_device", json!({ "like": "L.Absent" }))
+                .await
+                .is_err()
+        );
+        // Pose valide : journalisée (en attente tant que le relais est absent).
+        call(&st, &u, mid, "place_device", json!({ "asset": "/Game/Devices/Bouton", "name": "Bouton départ", "location": [0, 100, 0] }))
+            .await
+            .unwrap();
+        let (id, resume): (i64, String) =
+            sqlx::query_as("SELECT id, summary FROM uefn_actions WHERE action = 'actor_spawn'")
+                .fetch_one(&st.db)
+                .await
+                .unwrap();
+        assert_eq!(resume, "Pose : Bouton départ (Bouton)");
+        // Pose réussie (comme après la réponse du relais) : l'annulation par l'IA attend un humain.
+        sqlx::query("UPDATE uefn_actions SET status = 'done', undo = ? WHERE id = ?")
+            .bind(json!({ "action": "actor_delete", "args": { "ids": ["L.Bouton"] } }).to_string())
+            .bind(id)
+            .execute(&st.db)
+            .await
+            .unwrap();
+        let r = call(&st, &u, mid, "undo_action", json!({ "id": id }))
+            .await
+            .unwrap();
+        assert!(r["pending_approval"].is_i64(), "{r}");
+        let (action, args): (String, String) =
+            sqlx::query_as("SELECT action, args FROM approvals WHERE map_id = ?")
+                .bind(mid)
+                .fetch_one(&st.db)
+                .await
+                .unwrap();
+        assert_eq!(action, "actor_delete");
+        assert!(args.contains("L.Bouton"));
+        let statut: String = sqlx::query_scalar("SELECT status FROM uefn_actions WHERE id = ?")
+            .bind(id)
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        assert_eq!(statut, "done", "rien n'est supprimé avant la validation");
     }
 }

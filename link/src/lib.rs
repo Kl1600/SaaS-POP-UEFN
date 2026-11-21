@@ -256,6 +256,11 @@ impl Link {
                 self.mcp.patch(&a["patches"]).await?;
                 out["actors"] = json!(self.mcp.list_actors().await?);
             }
+            "actor_spawn" => {
+                self.need_uefn()?;
+                out["created_ids"] = json!([self.mcp.spawn(a).await?]);
+                out["actors"] = json!(self.mcp.list_actors().await?);
+            }
             "actor_duplicate" => {
                 self.need_uefn()?;
                 out["created_ids"] = json!(self.mcp.duplicate(&ids).await?);

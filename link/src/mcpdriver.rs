@@ -410,6 +410,20 @@ impl Mcp {
         Ok(())
     }
 
+    /// Pose un appareil et rend l'identifiant de l'acteur créé.
+    pub async fn spawn(&mut self, args: &Value) -> Result<String> {
+        let code = format!(
+            "ARGS = {}\n{}",
+            serde_json::to_string(&args.to_string())?,
+            PY_SPAWN
+        );
+        let out = self.python(&code).await?;
+        out.lines()
+            .rev()
+            .find_map(|l| l.trim().strip_prefix("SPAWNED=").map(String::from))
+            .ok_or_else(|| anyhow!("UEFN n'a pas confirmé la pose : {}", out.trim()))
+    }
+
     pub async fn duplicate(&mut self, ids: &[String]) -> Result<Vec<String>> {
         let code = format!("IDS = {}\n{}", serde_json::to_string(ids)?, PY_DUP);
         let out = self.python(&code).await?;
@@ -1015,6 +1029,29 @@ with unreal.ScopedEditorTransaction('POP'):
             try: a.set_editor_property(k, v)
             except Exception as e: FAILED.append(k + ' : ' + str(e))
 print('FAILED=' + '|'.join(FAILED) if FAILED else 'ok')
+"#;
+
+/// Pose un appareil (#81) : depuis un asset du Content Browser, ou sur le modèle d'un acteur du niveau (copie avec
+/// ses réglages). Nom, dossier, position et rotation facultatifs ; rotation en [pitch, yaw, roll] comme la liste.
+const PY_SPAWN: &str = r#"import unreal, json
+sub = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+A = json.loads(ARGS)
+if A.get('like'):
+    src = [a for a in sub.get_all_level_actors() if a.get_path_name() == A['like']]
+    if not src: raise Exception('Appareil modèle introuvable dans le niveau : ' + A['like'])
+    act = sub.duplicate_actors(src, None, unreal.Vector(300, 0, 0))[0]
+else:
+    obj = unreal.EditorAssetLibrary.load_asset(A['asset'])
+    if obj is None: raise Exception('Asset introuvable : ' + A['asset'])
+    act = sub.spawn_actor_from_object(obj, unreal.Vector(0, 0, 0), unreal.Rotator(0, 0, 0))
+    if act is None: raise Exception('UEFN refuse de poser cet asset : ' + A['asset'])
+loc = A.get('location')
+if loc: act.set_actor_location(unreal.Vector(*loc), False, False)
+rot = A.get('rotation')
+if rot: act.set_actor_rotation(unreal.Rotator(roll=rot[2], pitch=rot[0], yaw=rot[1]), False)
+if A.get('name'): act.set_actor_label(A['name'])
+if A.get('folder'): act.set_folder_path(A['folder'])
+print('SPAWNED=' + act.get_path_name())
 "#;
 
 const PY_DUP: &str = r#"import unreal, json
