@@ -598,6 +598,9 @@ body.wb-fs .side,body.wb-fs .top{visibility:hidden}
 .mapsw-item.add{color:#EF8D46}
 .mapsw-foot{border-top:1px solid rgb(40,40,40);margin-top:4px;padding-top:4px}
 
+.mapsw-group.drop-ok{outline:1px dashed rgb(80,80,80);outline-offset:-2px;border-radius:10px}
+.mapsw-group.drop-over{outline:1.5px dashed #ED753E;background:rgba(237,117,62,.08)}
+.mapsw-item.dragging{opacity:.45}
 .mapsw-empty{padding:4px 10px 6px;font-size:13px;color:rgb(130,130,130)}
 .mapsw-choice{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .mapsw-opt{position:relative;display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid var(--border);border-radius:14px;cursor:pointer;transition:border-color .15s,background .15s}
