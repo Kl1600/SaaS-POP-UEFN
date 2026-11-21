@@ -104,3 +104,14 @@ concernée ; corrigez une ligne fausse en le disant.
 - « Revenir à cette version » réécrit le fichier sur le disque puis recompile dans UEFN.
 - Deux comptes dans le même fichier (onglets `127.0.0.1` et `localhost`, cookies séparés) : chacun voit la saisie de
   l'autre et sa présence dans l'onglet du fichier.
+
+## Poser un appareil (testé le 21/11/2026, projet TestPopHub, #81)
+
+- `place_device` par `asset` : `EditorAssetLibrary.load_asset` veut le chemin **de la classe** de l'appareil, avec
+  `_C` (ex. `/CRD_PlayerSpawn/BP_Creative_Player_Spawner_Prop.BP_Creative_Player_Spawner_Prop_C`) ; le chemin du
+  paquet seul (`/CRD_PlayerSpawn/BP_Creative_Player_Spawner_Prop`) répond « Asset introuvable ». Le chemin de classe
+  d'un acteur se lit par `a.get_class().get_path_name()`.
+- Par `like` (copie d'un appareil du niveau) : nom, dossier et position appliqués ; un Spawn Pad copié crée aussi
+  son `FortPlayerStartCreative`, que la suppression du Spawn Pad retire avec lui.
+- Annulation depuis le journal (humain) : l'appareil disparaît du niveau. Annulation par une IA (`undo_action`) :
+  rien n'est supprimé avant la validation d'un humain (`/api/approvals/{id}/approve`).
