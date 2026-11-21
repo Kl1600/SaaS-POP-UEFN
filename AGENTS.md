@@ -146,7 +146,8 @@ Une branche longue qui mélange plusieurs sujets ne se relit pas, ne se teste pa
 - **Sécurité** : requêtes SQL paramétrées ; chaque route vérifie l'appartenance au studio et le rôle ; en-tête
   anti-CSRF `x-pop: 1` sur toute requête autre que GET ; jamais de secret dans un fichier, une issue ou un commit.
 - **UEFN** : chaque action est journalisée et annulable ; rien sur un fichier ou un acteur verrouillé dans Lore par
-  un autre ; une suppression demandée par une IA attend la validation d'un humain.
+  un autre ; une suppression demandée par une IA s'exécute seule, journalisée avec une sauvegarde qui permet de
+  la restaurer (décision du 21/11, #165).
 - **Base de données** : une table ou une colonne = une **nouvelle** migration numérotée à la suite dans
   `server/migrations/`. On ne modifie jamais une migration existante (le CI le refuse).
 - **`web/dist` est versionné** : après un changement dans `web/`, reconstruisez (`npm run build`) et commitez
