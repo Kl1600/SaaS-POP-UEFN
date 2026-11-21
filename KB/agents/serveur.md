@@ -98,3 +98,8 @@ Bloque : rien
 - Fait : `server/src/s3.rs` (config `POP_S3_*`, liens signés SigV4 par chemin, sans dépendance nouvelle) ; variables dans `deploy/env.exemple` et `docker-compose.yml` (CORS du bucket, tailles max).
 - Vérifié : `cargo test` (signature = exemple officiel AWS ; lien R2 sans le secret).
 - Suite : #91 (API de la bibliothèque) se reprend sur `main` après fusion, sans `s3.rs` en double.
+
+### 2026-11-21 · #130 · route en double après #96
+- Fait : la route des vérifications du niveau (#96) passe à `GET /api/maps/{mid}/level-checks` (`/checks` reste la checklist de la page Lancer) ; test `routeur::routes_sans_doublon` qui construit le routeur complet.
+- Vérifié : `cargo test` ; serveur démarré en local, `/checks` et `/level-checks` répondent 200.
+- Leçon : `cargo test` ne construisait pas le routeur ; une route en double ne se voyait qu'au démarrage.
