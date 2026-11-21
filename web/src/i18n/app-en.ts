@@ -2288,6 +2288,7 @@ const EN: Record<string, string> = {
  "Préparez la sortie selon l’algorithme de Discover, suivez les 14 jours de test d’Epic, faites tester la map et préparez le jour J.": "Prepare the release for Discover’s algorithm, track Epic’s 14-day test, get playtests and plan launch day.",
  "{0} · {1} min · {2}{3}": "{0} · {1} min · {2}{3}",
  "Glissez la map vers un autre bloc pour la déplacer": "Drag the map to another block to move it",
+ "Glissez la map vers un autre groupe pour la déplacer": "Drag the map to another group to move it",
  "« {0} » est maintenant une map perso · {1} tâche(s) vous ont été réattribuées": "“{0}” is now a personal map · {1} task(s) reassigned to you",
  "« {0} » est maintenant une map perso": "“{0}” is now a personal map",
  "« {0} » est maintenant dans {1}": "“{0}” is now in {1}",

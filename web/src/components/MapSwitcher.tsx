@@ -6,6 +6,7 @@ import { api } from '../api'
 import { useApp, studioName } from '../state'
 import { Modal } from './ui'
 import { tr } from '../i18n/t'
+import { ConfirmMove, isAdmin, previewMove, type Drag, type Pending } from './MoveMap'
 
 type Create = { kind: 'map' | 'studio'; studioId?: number }
 
@@ -40,6 +41,16 @@ export function MapSwitcher() {
   }, [open])
   const studios = app.me?.studios ?? []
   const go = (fn: () => void) => { setOpen(false); fn() }
+  // Glisser une map vers un autre groupe la déplace (perso ↔ studio), après confirmation.
+  const [drag, setDrag] = useState<Drag | null>(null)
+  const [over, setOver] = useState<number | null>(null)
+  const [pending, setPending] = useState<Pending | null>(null)
+  const drop = async (to: number) => {
+    const d = drag; setDrag(null); setOver(null)
+    if (!d || d.from === to) return
+    setOpen(false)
+    try { setPending(await previewMove(d, to)) } catch (er: any) { app.toast(er.message, true) }
+  }
   return <div className="mapsw lbl">
     <span className="navsec" style={{ padding: '0 4px 2px' }}>{tr('Map')}</span>
     <button ref={btn} className="mapsw-btn" onClick={() => setOpen(o => !o)} aria-haspopup="menu" aria-expanded={open}>
@@ -47,19 +58,27 @@ export function MapSwitcher() {
       <ChevronsUpDown size={16} strokeWidth={1.75} />
     </button>
     {open && <div ref={pop} className="mapsw-pop" role="menu" style={{ top: pos.top, left: pos.left, width: pos.width }}>
-      {studios.map(s => <div key={s.id} className="mapsw-group">
+      {studios.map(s => { const canDrop = isAdmin(s) && !!drag && drag.from !== s.id; return <div key={s.id}
+        className={'mapsw-group' + (canDrop ? ' drop-ok' : '') + (canDrop && over === s.id ? ' drop-over' : '')}
+        onDragOver={e => { if (!canDrop) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (over !== s.id) setOver(s.id) }}
+        onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null) && over === s.id) setOver(null) }}
+        onDrop={e => { if (!canDrop) return; e.preventDefault(); drop(s.id) }}>
         <div className="mapsw-studio">{s.personal ? <User size={14} /> : <Building2 size={14} />}{studioName(s)}</div>
-        {s.maps.map(m => <button key={m.id} role="menuitem" className={'mapsw-item' + (m.id === app.map?.id ? ' on' : '')} onClick={() => go(() => openMap(m.id))}>
+        {s.maps.map(m => <button key={m.id} role="menuitem" className={'mapsw-item' + (m.id === app.map?.id ? ' on' : '') + (drag?.id === m.id ? ' dragging' : '')} onClick={() => go(() => openMap(m.id))}
+          draggable={isAdmin(s)} title={isAdmin(s) && studios.length > 1 ? tr('Glissez la map vers un autre groupe pour la déplacer') : undefined}
+          onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(m.id)); setDrag({ id: m.id, name: m.name, from: s.id }) }}
+          onDragEnd={() => { setDrag(null); setOver(null) }}>
           <span>{m.name}</span>{m.id === app.map?.id && <Check size={15} />}
         </button>)}
         {s.personal && s.maps.length === 0 && <div className="mapsw-empty">{tr('Les maps que vous faites seul.')}</div>}
         {(s.role === 'owner' || s.role === 'admin') && <button role="menuitem" className="mapsw-item add" onClick={() => go(() => openCreate({ kind: 'map', studioId: s.id }))}><Plus size={15} />{s.personal ? tr('Nouvelle map perso') : tr('Nouvelle map dans ce studio')}</button>}
-      </div>)}
+      </div> })}
       <div className="mapsw-foot">
         <button role="menuitem" className="mapsw-item add" onClick={() => go(() => openCreate({ kind: 'studio' }))}><Users size={15} />{tr('Créer un studio (équipe)')}</button>
         <button role="menuitem" className="mapsw-item" onClick={() => go(() => nav('/'))}><Settings2 size={15} />{tr('Toutes mes maps')}</button>
       </div>
     </div>}
+    {pending && app.me && <ConfirmMove p={pending} studios={app.me.studios} onClose={() => setPending(null)} />}
   </div>
 }
 

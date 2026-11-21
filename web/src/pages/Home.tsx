@@ -3,17 +3,14 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Building2, Plus, Settings2, User, Users, ArrowRight } from 'lucide-react'
-import { api, euros, frDate } from '../api'
+import { euros, frDate } from '../api'
 import { useApp, useLoad, studioName, type Studio } from '../state'
-import { PageHead, Modal } from '../components/ui'
+import { PageHead } from '../components/ui'
 import { openCreate } from '../components/MapSwitcher'
+import { ConfirmMove, isAdmin, previewMove, type Drag, type Pending } from '../components/MoveMap'
 import { tr } from '../i18n/t'
 
-type Drag = { id: number; name: string; from: number }
-type Pending = Drag & { to: number; reassigned: number }
 type DnD = { drag: Drag | null; setDrag: (d: Drag | null) => void; over: number | null; setOver: (id: number | null) => void; drop: (to: number) => void }
-
-const isAdmin = (s: Studio) => s.role === 'owner' || s.role === 'admin'
 
 function StudioBlock({ s, dnd }: { s: Studio; dnd: DnD }) {
   const nav = useNavigate()
@@ -53,40 +50,6 @@ function StudioBlock({ s, dnd }: { s: Studio; dnd: DnD }) {
   </section>
 }
 
-function ConfirmMove({ p, studios, onClose }: { p: Pending; studios: Studio[]; onClose: () => void }) {
-  const { reload, toast } = useApp()
-  const [busy, setBusy] = useState(false)
-  const from = studios.find(x => x.id === p.from), to = studios.find(x => x.id === p.to)
-  if (!from || !to) return null
-  const solo = !!to.personal
-  const go = async () => {
-    if (busy) return; setBusy(true)
-    try {
-      const r = await api.post(`/api/maps/${p.id}/move`, { studio_id: p.to })
-      await reload()
-      toast(solo
-        ? (r.reassigned > 0 ? tr("« {0} » est maintenant une map perso · {1} tâche(s) vous ont été réattribuées", [p.name, r.reassigned]) : tr("« {0} » est maintenant une map perso", [p.name]))
-        : tr("« {0} » est maintenant dans {1}", [p.name, to.name]))
-      onClose()
-    } catch (er: any) { toast(er.message, true); setBusy(false) }
-  }
-  return <Modal onClose={busy ? () => {} : onClose} label={tr("Déplacer la map")}>
-    <div className="stack">
-      <h2 style={{ margin: 0 }}>{tr("Déplacer « {0} » ?", [p.name])}</h2>
-      <p className="muted" style={{ margin: 0 }}>{tr("De {0} vers {1}. Tout le contenu suit : tâches, pages, tableaux, gains.", [studioName(from), studioName(to)])}</p>
-      {solo
-        ? <p style={{ margin: 0 }}>{p.reassigned > 0
-            ? tr("{0} tâche(s) attribuée(s) à d’autres membres vous seront réattribuées. Les membres de {1} n’auront plus accès à cette map.", [p.reassigned, from.name])
-            : tr("Les membres de {0} n’auront plus accès à cette map.", [from.name])}</p>
-        : <p style={{ margin: 0 }}>{tr("Les membres de {0} auront accès à cette map.", [to.name])}</p>}
-      <div className="row" style={{ justifyContent: 'flex-end' }}>
-        <button type="button" className="btn" onClick={onClose} disabled={busy}>{tr("Annuler")}</button>
-        <button type="button" className="btn pri" onClick={go} disabled={busy} autoFocus>{tr("Déplacer")}</button>
-      </div>
-    </div>
-  </Modal>
-}
-
 export default function Home() {
   const { me, toast } = useApp()
   const [drag, setDrag] = useState<Drag | null>(null)
@@ -96,10 +59,7 @@ export default function Home() {
   const drop = async (to: number) => {
     const d = drag; setDrag(null); setOver(null)
     if (!d || d.from === to) return
-    try {
-      const r = await api.post(`/api/maps/${d.id}/move`, { studio_id: to, preview: true })
-      setPending({ ...d, to, reassigned: r.reassigned ?? 0 })
-    } catch (er: any) { toast(er.message, true) }
+    try { setPending(await previewMove(d, to)) } catch (er: any) { toast(er.message, true) }
   }
   const dnd: DnD = { drag, setDrag, over, setOver, drop }
   return <main className="content">

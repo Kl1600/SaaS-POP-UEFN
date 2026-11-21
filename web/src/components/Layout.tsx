@@ -2,7 +2,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import {
   Home, FileText, PenTool, CalendarDays, KanbanSquare, Rocket, Coins, Users, Settings, LifeBuoy, PanelLeft,
-  Search, Moon, Sun, Bell, Plus, ChevronDown, Hexagon, LogOut, ListTree, Bot, ChartNoAxesCombined, Hash, Flame, Sparkle, Layers, LayoutGrid, Lock, Lightbulb,
+  Search, Moon, Sun, Bell, Plus, ChevronDown, Hexagon, LogOut, ListTree, Bot, ChartNoAxesCombined, Hash, Flame, Sparkle, Layers, Lock, Lightbulb,
 } from 'lucide-react'
 import { useApp, studioName } from '../state'
 import { ago, api } from '../api'
@@ -82,7 +82,6 @@ export default function Layout() {
       <aside className="side">
         <div className="brand"><img src="/logo.png" alt="POP" /></div>
         <nav className="nav" aria-label={tr("Accueil")}>
-          <NavLink to="/" end className={({ isActive }) => (isActive ? 'on' : '')}><LayoutGrid size={20} strokeWidth={1.5} /><span className="lbl">{tr("Accueil")}</span></NavLink>
         </nav>
         <MapSwitcher />
         <nav className="nav" aria-label={tr("Sections")}>
