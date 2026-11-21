@@ -107,3 +107,7 @@ Bloque : rien
 - Fait : `server/src/widgets.rs` (modèles texte, compteur, bouton → appareil Verse `POP_UI/pop_ui_<nom>.verse`, texte en liste blanche) ; outil MCP `create_widget` (via `write_file` : journalisé, annulable, verrou Lore) ; l'annulation est refusée si un acteur du niveau utilise encore la classe.
 - Vérifié : `cargo test` (contrôles, génération, utilisation). Le Verse généré n'est vérifié qu'à la lecture : à compiler dans le vrai UEFN.
 - Écart avec l'issue : pas de Widget Blueprint UMG (non pilotable depuis le Verse aujourd'hui, voir KB/UEFN.md).
+### 2026-11-21 · #127 · check-in Lore obligatoire pour les tâches UEFN
+- Fait : migration 0033 (`tasks.uefn`) ; `tasks::set_status_checked` exige un message « #N … » pour fermer une tâche UEFN, repris du `lore_checkin` de l'agent qui l'a réservée ; case et fenêtre dans Tâches ; MCP `uefn`, `checkin`.
+- Vérifié : `cargo test`, navigateur en local. Pas avec le vrai UEFN.
+- Leçon : sous Windows, `web/dist/index.html` sort en CRLF ; le commiter en LF sinon le CI échoue.
