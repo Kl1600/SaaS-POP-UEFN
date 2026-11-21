@@ -194,6 +194,12 @@ pub async fn register(
     }
     check_len("Nom", &b.name, 1, 80)?;
     crate::security::password_policy(&b.password, &email)?;
+    // Inscriptions sur liste d'attente : il faut une invitation de studio ou un lien d'accès validé.
+    let wid = crate::admin::signup_allowed(&st, &email, &ip, b.invite.as_deref(), b.access.as_deref()).await.map_err(|e| match e {
+        AppError::Forbidden => AppError::Conflict("Les inscriptions se font sur liste d’attente : demandez l’accès à la bêta depuis la page d’accueil.".into()),
+        other => other,
+    })?;
+    // Après le contrôle d'accès (#17) : sans invitation ni lien d'accès, on ne peut pas tester qui a un compte.
     let exists: Option<(i64,)> = sqlx::query_as("SELECT id FROM users WHERE email = ?")
         .bind(&email)
         .fetch_optional(&st.db)
@@ -203,11 +209,6 @@ pub async fn register(
             "Un compte existe déjà avec cette adresse.".into(),
         ));
     }
-    // Inscriptions sur liste d'attente : il faut une invitation de studio ou un lien d'accès validé.
-    let wid = crate::admin::signup_allowed(&st, &email, &ip, b.invite.as_deref(), b.access.as_deref()).await.map_err(|e| match e {
-        AppError::Forbidden => AppError::Conflict("Les inscriptions se font sur liste d’attente : demandez l’accès à la bêta depuis la page d’accueil.".into()),
-        other => other,
-    })?;
     let hash = hash_password(&b.password)?;
     // Jamais administrateur selon l'adresse IP : un en-tête ou un proxy mal réglé suffirait à se faire passer pour
     // l'ordinateur du serveur. Les administrateurs sont nommés par `pop-server admin ajouter <e-mail>` ou POP_ADMIN_EMAILS.
