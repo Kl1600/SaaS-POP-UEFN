@@ -33,6 +33,7 @@ le CPX02 (1 Go + 2 Go de swap) suffit pour la bêta. Passer au CPX12 (2 Go) depu
 | Connexion SSH | `ssh pop-admin@2.29.177.96` (connexion `root` refusée) |
 | Administrateurs | adresses de `POP_ADMIN_EMAILS` dans `/opt/pop/.env` |
 | Journal des connexions | site → Administration → Journal de sécurité (mot de passe redemandé, valable 30 min) |
+| Sauvegarde hors serveur | Litestream actif depuis le 21/11/2026 → Cloudflare R2, bucket `pop-sauvegarde` (compte Cloudflare personnel de l'humain). Clé « pop-prod litestream » : lecture et écriture sur ce seul bucket, utilisable seulement depuis les adresses de `pop-prod` |
 
 Le jeton GitHub `pop-serveur` (lecture de l'image) expire le 16/02/2027 : après, `docker compose pull` échoue.
 
@@ -144,6 +145,16 @@ Trois niveaux :
 **Activer Litestream** : créer un bucket (Cloudflare R2 ou Backblaze B2 : 10 Go gratuits) et une clé limitée à
 ce bucket, remplir les variables `LITESTREAM_*` de `.env`, décommenter `COMPOSE_PROFILES=sauvegarde`, puis
 `docker compose up -d`. Vérifier : `docker compose logs litestream` doit montrer « replicating » sans erreur.
+
+- `litestream.yml` doit être lisible par le conteneur (utilisateur 10001) : `chmod 644 /opt/pop/litestream.yml`.
+  Sinon Litestream redémarre en boucle avec `open /etc/litestream.yml: permission denied`. Le fichier ne contient
+  aucun secret.
+- La première copie complète prend environ une minute (base de 324 Mo, 77 Mo compressés, le 21/11/2026) :
+  `litestream generations` reste vide jusqu'au message « snapshot written ».
+- Contrôle de bout en bout, sans toucher à la vraie base :
+  `docker compose exec litestream sh -c "litestream restore -config /etc/litestream.yml -o /tmp/essai.db /data/pop.db && ls -l /tmp/essai.db; rm -f /tmp/essai.db*"`
+- Coût : environ 25 envois par minute, soit à peu près 1,1 million d'opérations de classe A par mois sur R2
+  (1 million gratuites), donc quelques centimes par mois.
 
 ### Restaurer la base
 
