@@ -710,7 +710,7 @@ pub struct Origin<'a> {
 fn role_for(action: &str) -> Role {
     match action {
         "actor_delete" | "delete_file" => Role::Member,
-        "refresh_actors" | "render_topview" => Role::Viewer,
+        "refresh_actors" | "render_topview" | "session_output" => Role::Viewer,
         _ => Role::Freelance,
     }
 }
@@ -1023,6 +1023,13 @@ async fn prepare(
             Value::Null,
             None,
         )),
+        "start_session" => Ok(("Démarrage de la session de test".into(), Value::Null, None)),
+        "stop_session" => Ok(("Arrêt de la session de test".into(), Value::Null, None)),
+        "session_output" => Ok((
+            "Lecture de la sortie de la session".into(),
+            Value::Null,
+            None,
+        )),
         "save_level" => Ok(("Enregistrement du niveau".into(), Value::Null, None)),
         "lore_checkin" => {
             check_len("Message", args["message"].as_str().unwrap_or(""), 1, 300)?;
@@ -1050,7 +1057,16 @@ pub async fn exec(
 ) -> Result<Value, AppError> {
     let (summary, before, undo) = prepare(st, &o, action, &mut args).await?;
     let mid = o.ctx.map_id;
-    let journal = !matches!(action, "refresh_actors" | "render_topview");
+    let journal = !matches!(
+        action,
+        "refresh_actors" | "render_topview" | "session_output"
+    );
+    // La session de test ne se met pas en attente : sans UEFN, rien n'est envoyé (#82).
+    if matches!(action, "start_session" | "stop_session") && !ready(st, mid, action) {
+        return Err(AppError::Conflict(
+            "UEFN n’est pas connecté : ouvrez le projet dans UEFN et démarrez son serveur MCP, puis réessayez.".into(),
+        ));
+    }
     let aid: Option<i64> = if journal {
         Some(sqlx::query_scalar("INSERT INTO uefn_actions (map_id, user_id, source, action, args, summary, before, undo, task_number, status, agent_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?) RETURNING id")
             .bind(mid).bind(o.ctx.user.id).bind(o.source).bind(action).bind(args.to_string()).bind(&summary).bind(before.to_string())
@@ -1094,9 +1110,12 @@ async fn run_action(
     }
     let secs = if matches!(
         action,
-        "compile" | "push_session" | "render_topview" | "lore_checkin"
+        "compile" | "push_session" | "render_topview" | "lore_checkin" | "stop_session"
     ) {
         120
+    } else if action == "start_session" {
+        // Démarrer une session peut prendre plusieurs minutes (chargement du niveau).
+        300
     } else {
         30
     };

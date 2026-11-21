@@ -124,6 +124,9 @@ fn tools() -> Value {
         tool("read_verse_file", "Lit un fichier .verse.", json!({ "path": { "type": "string" } }), &["path"]),
         tool("write_verse_file", "Écrit un fichier .verse dans le projet (crée ou remplace).", json!({ "path": { "type": "string" }, "content": { "type": "string" }, "task": task }), &["path", "content"]),
         tool("compile_verse", "Compile le Verse dans UEFN et renvoie erreurs et avertissements.", json!({}), &[]),
+        tool("start_session", "Démarre la session de test UEFN (peut prendre plusieurs minutes). Ensuite : push_to_session après une modification, session_output pour lire les Print et les erreurs.", json!({}), &[]),
+        tool("stop_session", "Arrête la session de test UEFN.", json!({}), &[]),
+        tool("session_output", "Lit la sortie Verse de la session de test : Print et erreurs, avec horodatage, fichier, ligne et runId de la partie. pattern : texte cherché (facultatif) ; max_results (100 par défaut) ; cursor : reprendre après la dernière lecture (renvoyé par l'appel précédent).", json!({ "pattern": { "type": "string" }, "max_results": { "type": "integer" }, "cursor": {} }), &[]),
         tool("push_to_session", "Pousse les changements dans la session de test.", json!({}), &[]),
         tool("save_level", "Enregistre le niveau dans UEFN.", json!({}), &[]),
         tool("lore_checkin", "Archive dans Lore avec un message (« #n ce qui a été fait »).", json!({ "message": { "type": "string" } }), &["message"]),
@@ -146,6 +149,7 @@ fn tools() -> Value {
 const READ_TOOLS: &[&str] = &[
     "uefn_status",
     "check_level",
+    "session_output",
     "list_actors",
     "get_actor",
     "list_verse_files",
@@ -544,7 +548,22 @@ async fn call_as(
             )
             .await
         }
-        "compile_verse" => exec(st, o(), "compile", json!({})).await,
+        "compile_verse" => {
+            let mut r = exec(st, o(), "compile", json!({})).await?;
+            aide_compilation(st, mid, &mut r).await;
+            Ok(r)
+        }
+        "start_session" => exec(st, o(), "start_session", json!({})).await,
+        "stop_session" => exec(st, o(), "stop_session", json!({})).await,
+        "session_output" => {
+            exec(
+                st,
+                o(),
+                "session_output",
+                json!({ "pattern": a["pattern"], "max_results": a["max_results"], "cursor": a["cursor"] }),
+            )
+            .await
+        }
         "push_to_session" => exec(st, o(), "push_session", json!({})).await,
         "save_level" => exec(st, o(), "save_level", json!({})).await,
         "lore_checkin" => exec(st, o(), "lore_checkin", json!({ "message": a["message"] })).await,
@@ -572,6 +591,48 @@ async fn call_as(
                 .map(|j| j.0)
         }
         _ => Err(bad("Outil inconnu.")),
+    }
+}
+
+/// Ajoute aux erreurs de compilation la fiche d'aide du moteur local (corrections par règles), quand elle existe.
+async fn aide_compilation(st: &AppState, mid: i64, r: &mut Value) {
+    let Some(diags) = r["diagnostics"].as_array().cloned() else {
+        return;
+    };
+    let mut fichiers: Vec<String> = diags
+        .iter()
+        .filter_map(|d| d["path"].as_str().map(String::from))
+        .collect();
+    fichiers.sort();
+    fichiers.dedup();
+    let projet = crate::engine::Project {
+        symbols: vec![],
+        tags: vec![],
+        devices: vec![],
+    };
+    let mut aide = serde_json::Map::new();
+    for f in fichiers.into_iter().take(20) {
+        let src: Option<String> =
+            sqlx::query_scalar("SELECT content FROM verse_files WHERE map_id = ? AND path = ?")
+                .bind(mid)
+                .bind(&f)
+                .fetch_optional(&st.db)
+                .await
+                .ok()
+                .flatten();
+        let Some(src) = src else { continue };
+        let d: Vec<Value> = diags
+            .iter()
+            .filter(|d| d["path"] == f.as_str())
+            .cloned()
+            .collect();
+        let (_, notes) = crate::engine::fix(&src, &d, &projet);
+        if !notes.is_empty() {
+            aide.insert(f, json!(notes));
+        }
+    }
+    if !aide.is_empty() {
+        r["aide"] = Value::Object(aide);
     }
 }
 
@@ -718,5 +779,96 @@ mod tests_pose {
             .await
             .unwrap();
         assert_eq!(statut, "done", "rien n'est supprimé avant la validation");
+    }
+}
+
+#[cfg(test)]
+mod tests_session {
+    use super::*;
+
+    async fn monde() -> (AppState, AuthUser, i64) {
+        let st = crate::test_state().await;
+        let sid: i64 = sqlx::query_scalar("INSERT INTO studios (name) VALUES ('S') RETURNING id")
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        let mid: i64 =
+            sqlx::query_scalar("INSERT INTO maps (studio_id, name) VALUES (?, 'M') RETURNING id")
+                .bind(sid)
+                .fetch_one(&st.db)
+                .await
+                .unwrap();
+        let uid: i64 = sqlx::query_scalar(
+            "INSERT INTO users (email, name, password_hash) VALUES ('ia@a.fr', 'IA', 'x') RETURNING id",
+        )
+        .fetch_one(&st.db)
+        .await
+        .unwrap();
+        sqlx::query("INSERT INTO memberships (studio_id, user_id, role) VALUES (?, ?, 'member')")
+            .bind(sid)
+            .bind(uid)
+            .execute(&st.db)
+            .await
+            .unwrap();
+        let u = AuthUser {
+            id: uid,
+            email: "ia@a.fr".into(),
+            name: "IA".into(),
+            sid: String::new(),
+        };
+        (st, u, mid)
+    }
+
+    /// Sans UEFN : refus clair, rien n'est mis en attente ni envoyé (#82).
+    #[tokio::test]
+    async fn session_sans_uefn() {
+        let (st, u, mid) = monde().await;
+        for outil in ["start_session", "stop_session"] {
+            match call(&st, &u, mid, outil, json!({})).await {
+                Err(AppError::Conflict(m)) => assert!(m.contains("UEFN n’est pas connecté"), "{m}"),
+                _ => panic!("{outil} devait être refusé sans UEFN"),
+            }
+        }
+        assert!(call(&st, &u, mid, "session_output", json!({}))
+            .await
+            .is_err());
+        let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM uefn_actions")
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        assert_eq!(n, 0, "rien ne doit être mis en attente");
+        assert!(READ_TOOLS.contains(&"session_output"));
+        let noms: Vec<String> = tools()
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|t| t["name"].as_str().unwrap().to_string())
+            .collect();
+        for t in ["start_session", "stop_session", "session_output"] {
+            assert!(noms.iter().any(|n| n == t), "outil MCP {t} manquant");
+        }
+    }
+
+    /// Une erreur de compilation reçoit la fiche d'aide du moteur local quand une règle s'applique.
+    #[tokio::test]
+    async fn aide_sur_erreur() {
+        let (st, _, mid) = monde().await;
+        sqlx::query(
+            "INSERT INTO verse_files (map_id, path, content, sha) VALUES (?, 'Content/jeu.verse', ?, 'x')",
+        )
+        .bind(mid)
+        .bind("jeu := class(creative_device):\n    OnBegin<override>()<suspends>:void =\n        Print(\"Bonjour\"\n")
+        .execute(&st.db)
+        .await
+        .unwrap();
+        let mut r = json!({ "diagnostics": [{ "path": "Content/jeu.verse", "line": 3, "code": "3100", "message": "expected ')'" }] });
+        aide_compilation(&st, mid, &mut r).await;
+        assert!(
+            r["aide"]["Content/jeu.verse"]
+                .as_array()
+                .map(|a| !a.is_empty())
+                .unwrap_or(false),
+            "{r}"
+        );
     }
 }

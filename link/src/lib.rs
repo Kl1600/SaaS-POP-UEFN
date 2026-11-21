@@ -337,6 +337,28 @@ impl Link {
                     .push_session(a["verse_only"].as_bool().unwrap_or(false))
                     .await?;
             }
+            "start_session" | "stop_session" => {
+                self.need_uefn()?;
+                let role = if action == "start_session" {
+                    "session_start"
+                } else {
+                    "session_stop"
+                };
+                out["result"] = self.mcp.session(role, json!({})).await?;
+            }
+            "session_output" => {
+                self.need_uefn()?;
+                // GetVerseOutput { pattern, maxResults, cursor } : Print et erreurs Verse de la session.
+                let mut q =
+                    json!({ "maxResults": a["max_results"].as_u64().unwrap_or(100).min(500) });
+                if let Some(p) = a["pattern"].as_str().filter(|p| !p.is_empty()) {
+                    q["pattern"] = json!(p);
+                }
+                if !a["cursor"].is_null() {
+                    q["cursor"] = a["cursor"].clone();
+                }
+                out["output"] = self.mcp.session("session_output", q).await?;
+            }
             "save_level" => {
                 self.need_uefn()?;
                 self.mcp.save_level().await?;
