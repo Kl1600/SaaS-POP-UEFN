@@ -9,7 +9,7 @@ import { ago, api } from '../api'
 import { Avatar } from './ui'
 import { NewTaskModal } from '../pages/Tasks'
 import { GuideDrawer } from './Guide'
-import { Compass, MailCheck, ShieldCheck } from 'lucide-react'
+import { Compass, MailCheck, ShieldCheck, Megaphone, AlertTriangle, X } from 'lucide-react'
 import { useUefnStatus, STATUS_LABEL } from '../uefnState'
 import { tr, tx, LOCALE } from '../i18n/t'
 import LangPicker from './LangPicker'
@@ -141,12 +141,25 @@ export default function Layout() {
             )}
           </div>
         </header>
-        <div className="scroll" id="contenu" tabIndex={-1}>{app.me?.email_verified === false && <VerifyBanner email={app.me.user.email} />}<Outlet /></div>
+        <div className="scroll" id="contenu" tabIndex={-1}>{app.me?.announcement && <Announcement a={app.me.announcement} />}{app.me?.email_verified === false && <VerifyBanner email={app.me.user.email} />}<Outlet /></div>
       </div>
       {guide && <GuideDrawer key={guide.ask ?? 'day'} ask={guide.ask} onClose={() => setGuide(false)} />}
       {newTask && <NewTaskModal onClose={() => setNewTask(false)} />}
       <CreateHost />
       <IdeaPop />
+    </div>
+  )
+}
+
+/** Annonce des administrateurs (#67) : en haut du contenu, sous la barre du haut ; fermée, elle ne revient pas. */
+function Announcement({ a }: { a: { id: number; text: string; level: string } }) {
+  const [closed, setClosed] = useState(false)
+  if (closed) return null
+  return (
+    <div className={'warn announce' + (a.level === 'important' ? ' important' : '')} role={a.level === 'important' ? 'alert' : 'status'} style={{ margin: '16px 24px 0' }}>
+      {a.level === 'important' ? <AlertTriangle size={18} /> : <Megaphone size={18} />}
+      <span style={{ flex: 1, overflowWrap: 'anywhere' }}>{a.text}</span>
+      <button className="iconbtn" aria-label={tr("Fermer l’annonce")} onClick={() => { setClosed(true); api.post(`/api/announcement/${a.id}/dismiss`).catch(() => {}) }}><X size={18} strokeWidth={1.5} /></button>
     </div>
   )
 }

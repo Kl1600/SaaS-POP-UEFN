@@ -282,7 +282,7 @@ export default function Admin() {
   // Modérateur (#65) : seulement la liste d'attente et les utilisateurs.
   const staff = !!(me?.admin || me?.moderator)
   const mod = staff && !me?.admin
-  const [tab, setTab] = useState<'overview' | 'waitlist' | 'create' | 'users' | 'audit' | 'money' | 'legal'>(mod || me?.admin_pending ? 'waitlist' : 'overview')
+  const [tab, setTab] = useState<'overview' | 'waitlist' | 'create' | 'users' | 'audit' | 'money' | 'legal' | 'announce'>(mod || me?.admin_pending ? 'waitlist' : 'overview')
   const [gate, setGate] = useState<{ code: string; msg: string } | null | 'ok'>(null)
   const check = () => api.get(mod ? '/api/admin/waitlist?status=pending' : '/api/admin/overview').then(() => setGate('ok')).catch((e: any) => setGate({ code: e.code ?? 'forbidden', msg: e.message }))
   useEffect(() => { if (staff) check() }, [staff])
@@ -293,7 +293,7 @@ export default function Admin() {
     </PageHead>
     {gate === null ? null : gate !== 'ok' ? <Gate code={gate.code} msg={gate.msg} onOk={() => { setGate(null); check() }} /> : <>
       <div className="tabs" role="tablist" style={{ alignSelf: 'flex-start' }}>
-        {([['overview', tr("Vue générale")], ['waitlist', tr("Liste d’attente{0}", [me.admin_pending ? ` (${me.admin_pending})` : ''])], ['create', tr("Créer un compte")], ['users', tr("Utilisateurs")], ['audit', tr("Sécurité")], ['money', tr("Paiements et IA")], ['legal', tr("Infos légales")]] as const).filter(([k]) => !mod || k === 'waitlist' || k === 'users').map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}
+        {([['overview', tr("Vue générale")], ['waitlist', tr("Liste d’attente{0}", [me.admin_pending ? ` (${me.admin_pending})` : ''])], ['create', tr("Créer un compte")], ['users', tr("Utilisateurs")], ['audit', tr("Sécurité")], ['money', tr("Paiements et IA")], ['legal', tr("Infos légales")], ['announce', tr("Annonce")]] as const).filter(([k]) => !mod || k === 'waitlist' || k === 'users').map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}
       </div>
       {tab === 'overview' && <Overview />}
       {tab === 'waitlist' && <Waitlist />}
@@ -302,6 +302,7 @@ export default function Admin() {
       {tab === 'audit' && <Audit />}
       {tab === 'money' && <Money />}
       {tab === 'legal' && <LegalInfo />}
+      {tab === 'announce' && <AnnounceAdmin />}
     </>}
   </main>
 }
@@ -337,6 +338,34 @@ function LegalInfo() {
     <form className="stack" onSubmit={async e => { e.preventDefault(); try { await api.put('/api/admin/legal', f); toast(tr("Informations légales enregistrées")) } catch (er: any) { toast(er.message, true) } }}>
       <div className="grid2">{LEGAL_FIELDS.map(([k, l, ph]) => <label key={k} className="label">{l}<input className="field" value={f[k]} placeholder={ph} maxLength={400} onChange={e => setF({ ...f, [k]: e.target.value })} /></label>)}</div>
       <div className="row" style={{ gap: 8 }}><button className="btn pri">{tr("Enregistrer")}</button><a className="btn" href="/mentions-legales" target="_blank" rel="noopener">{tr("Voir les pages légales")}</a></div>
+    </form>
+  </section>
+}
+
+/** Annonce en bandeau pour tous les comptes connectés (#67). Une seule à la fois : publier remplace l'ancienne. */
+function AnnounceAdmin() {
+  const { toast } = useApp()
+  const { data, reload } = useLoad<any>('/api/admin/announcement')
+  const [text, setText] = useState(''); const [level, setLevel] = useState('info'); const [end, setEnd] = useState('')
+  if (!data) return null
+  const a = data.announcement
+  return <section className="card">
+    <CardHead title={tr("Annonce")} sub={tr("Un bandeau en haut de POP pour tous les comptes connectés, au prochain chargement de page. Chacun peut le fermer.")} />
+    {a ? <div className="stack" style={{ marginBottom: 20 }}>
+      <div className={'warn announce' + (a.level === 'important' ? ' important' : '')}><span style={{ flex: 1, overflowWrap: 'anywhere' }}>{a.text}</span></div>
+      <span className="small muted">{tr("Publiée {0}", [ago(a.created_at)])}{a.ends_at ? ' · ' + tr("jusqu’au {0}", [new Date(a.ends_at.replace(' ', 'T') + 'Z').toLocaleString(LOCALE)]) : ''} · {tr("fermée par {0} compte(s)", [a.closed])}</span>
+      <div><button className="btn" onClick={async () => { try { await api.del('/api/admin/announcement'); toast(tr("Annonce retirée")); reload() } catch (er: any) { toast(er.message, true) } }}>{tr("Retirer l’annonce")}</button></div>
+    </div> : <p className="small muted" style={{ marginBottom: 20 }}>{tr("Aucune annonce en cours.")}</p>}
+    <form className="stack" onSubmit={async e => {
+      e.preventDefault()
+      try { await api.post('/api/admin/announcement', { text, level, ends_at: end ? new Date(end).toISOString() : null }); toast(tr("Annonce publiée")); setText(''); setEnd(''); reload() } catch (er: any) { toast(er.message, true) }
+    }}>
+      <label className="label">{a ? tr("Nouvelle annonce (remplace celle en cours)") : tr("Nouvelle annonce")}<textarea className="field" rows={2} maxLength={300} required value={text} onChange={e => setText(e.target.value)} placeholder={tr("Ex. : maintenance ce soir de 22 h à 23 h, POP sera indisponible.")} /></label>
+      <div className="grid2">
+        <label className="label">{tr("Niveau")}<select className="field" value={level} onChange={e => setLevel(e.target.value)}><option value="info">{tr("Information")}</option><option value="important">{tr("Important")}</option></select></label>
+        <label className="label">{tr("Fin (facultatif)")}<input className="field" type="datetime-local" value={end} onChange={e => setEnd(e.target.value)} /></label>
+      </div>
+      <div><button className="btn pri">{tr("Publier")}</button></div>
     </form>
   </section>
 }
