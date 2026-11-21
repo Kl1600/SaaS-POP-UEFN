@@ -2523,6 +2523,7 @@ const EN: Record<string, string> = {
   "Le niveau est déjà rangé.": "The level is already tidy.",
   "… et {0} autres.": "… and {0} more.",
   "Laissés tels quels (verrouillés dans Lore par un autre) : {0}": "Left as is (locked in Lore by someone else): {0}",
+  "Acteurs du moteur laissés tels quels : {0}": "Engine actors left as is: {0}",
   "Ranger {0} acteur(s)": "Tidy {0} actor(s)",
   "Niveau rangé : {0} acteur(s)": "Level tidied: {0} actor(s)",
   "Appareils": "Devices",

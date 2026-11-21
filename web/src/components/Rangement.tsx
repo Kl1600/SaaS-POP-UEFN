@@ -10,6 +10,17 @@ export type Patch = { id: string; changes: { name?: string; folder?: string } }
 
 const GROUPE: Record<string, string> = { device: tr("Appareils"), verse_device: tr("Appareils Verse"), prop: tr("Accessoires"), mesh: tr("Maillages") }
 
+/** Acteurs du moteur et ceux qu'UEFN crée lui-même (le point de départ d'un Spawn Pad) : on n'y touche pas. */
+const MOTEUR = /^(WorldDataLayers|WorldSettings|LevelBounds|WorldPartitionMiniMap|WorldPartitionHLOD|FortPlayerStartCreative|PlayerStart|Brush|DefaultPhysicsVolume|AbstractNavData|RecastNavMesh|NavMeshBoundsVolume|GameplayDebuggerPlayerManager)(_C)?$/
+export const estMoteur = (a: RangeActor) => MOTEUR.test(a.class || '')
+
+/** Groupe de rangement. Un appareil connu du catalogue (libellé d'appareil) reste un appareil, même si sa classe
+ * finit par « _Prop » (le Spawn Pad, BP_Creative_Player_Spawner_Prop_C). */
+const groupe = (a: RangeActor) => (a.type === 'prop' && a.kind_label ? 'device' : a.type)
+
+/** Python d'UEFN renvoie « None » pour un acteur sans dossier. */
+const dossier = (a: RangeActor) => (a.folder === 'None' ? '' : a.folder || '')
+
 /** Nom de type lisible et sans espaces, pour les dossiers et les noms (« Bouton » → « Bouton », « BP_Arbre_C » → « Arbre »). */
 export const baseType = (a: RangeActor) => {
   const brut = a.kind_label || a.class || a.type || 'Acteur'
@@ -18,17 +29,18 @@ export const baseType = (a: RangeActor) => {
 }
 
 /** Propose le rangement : dossier « Groupe/Type » et nom « Type_n » (n dans l'ordre des noms actuels). */
-export function proposer(actors: RangeActor[], me: string, dossiers: boolean, noms: boolean): { patches: Patch[]; verrouilles: RangeActor[] } {
-  const verrouilles = actors.filter(a => a.locked_by && a.locked_by.toLowerCase() !== me.toLowerCase())
-  const libres = actors.filter(a => !verrouilles.includes(a)).sort((a, b) => a.name.localeCompare(b.name, 'fr', { numeric: true }))
+export function proposer(actors: RangeActor[], me: string, dossiers: boolean, noms: boolean): { patches: Patch[]; verrouilles: RangeActor[]; moteur: RangeActor[] } {
+  const moteur = actors.filter(estMoteur)
+  const verrouilles = actors.filter(a => !estMoteur(a) && a.locked_by && a.locked_by.toLowerCase() !== me.toLowerCase())
+  const libres = actors.filter(a => !estMoteur(a) && !verrouilles.includes(a)).sort((a, b) => a.name.localeCompare(b.name, 'fr', { numeric: true }))
   const compte = new Map<string, number>()
   const patches: Patch[] = []
   for (const a of libres) {
     const t = baseType(a)
     const changes: Patch['changes'] = {}
     if (dossiers) {
-      const f = `${GROUPE[a.type] ?? tr("Autres")}/${t}`
-      if (f !== a.folder) changes.folder = f
+      const f = `${GROUPE[groupe(a)] ?? tr("Autres")}/${t}`
+      if (f !== dossier(a)) changes.folder = f
     }
     if (noms) {
       const n = (compte.get(t) ?? 0) + 1
@@ -38,7 +50,7 @@ export function proposer(actors: RangeActor[], me: string, dossiers: boolean, no
     }
     if (changes.folder !== undefined || changes.name !== undefined) patches.push({ id: a.id, changes })
   }
-  return { patches, verrouilles }
+  return { patches, verrouilles, moteur }
 }
 
 export function RangementModal({ actors, me, onClose, onApply }: {
@@ -47,7 +59,7 @@ export function RangementModal({ actors, me, onClose, onApply }: {
   const [dossiers, setDossiers] = useState(true)
   const [noms, setNoms] = useState(true)
   const [occupe, setOccupe] = useState(false)
-  const { patches, verrouilles } = useMemo(() => proposer(actors, me, dossiers, noms), [actors, me, dossiers, noms])
+  const { patches, verrouilles, moteur } = useMemo(() => proposer(actors, me, dossiers, noms), [actors, me, dossiers, noms])
   const parId = useMemo(() => new Map(actors.map(a => [a.id, a])), [actors])
 
   return <Modal onClose={onClose} label={tr("Ranger le niveau")}>
@@ -62,8 +74,8 @@ export function RangementModal({ actors, me, onClose, onApply }: {
         <thead><tr><th style={{ textAlign: 'left' }}>{tr("Avant")}</th><th style={{ textAlign: 'left' }}>{tr("Après")}</th></tr></thead>
         <tbody>
           {patches.slice(0, 500).map(p => { const a = parId.get(p.id)!; return <tr key={p.id}>
-            <td>{a.name}<div className="muted">{a.folder || '—'}</div></td>
-            <td>{p.changes.name ?? a.name}<div className="muted">{p.changes.folder ?? (a.folder || '—')}</div></td>
+            <td>{a.name}<div className="muted">{dossier(a) || '—'}</div></td>
+            <td>{p.changes.name ?? a.name}<div className="muted">{p.changes.folder ?? (dossier(a) || '—')}</div></td>
           </tr> })}
           {patches.length === 0 && <tr><td colSpan={2} className="muted">{tr("Le niveau est déjà rangé.")}</td></tr>}
         </tbody>
@@ -72,6 +84,7 @@ export function RangementModal({ actors, me, onClose, onApply }: {
     {patches.length > 500 && <p className="small muted">{tr("… et {0} autres.", [patches.length - 500])}</p>}
     {verrouilles.length > 0 && <div className="warn" style={{ marginTop: 12 }}><Lock size={16} /><span>
       {tr("Laissés tels quels (verrouillés dans Lore par un autre) : {0}", [verrouilles.map(a => a.name).join(', ')])}</span></div>}
+    {moteur.length > 0 && <p className="small muted" style={{ marginTop: 10 }}>{tr("Acteurs du moteur laissés tels quels : {0}", [moteur.map(a => a.name).join(', ')])}</p>}
     <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
       <button className="btn" onClick={onClose}>{tr("Annuler")}</button>
       <button className="btn pri" disabled={occupe || patches.length === 0}
