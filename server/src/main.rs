@@ -6,6 +6,7 @@ mod agents;
 mod aiplan;
 mod aipop;
 mod analytics;
+mod announce;
 mod auth;
 mod billing;
 mod boards;
@@ -386,6 +387,13 @@ fn api() -> Router<AppState> {
         .route("/api/admin/lock", post(security::lock_admin))
         .route("/api/admin/audit", get(security::admin_audit))
         .route("/api/admin/overview", get(admin::overview))
+        .route(
+            "/api/admin/announcement",
+            get(announce::current)
+                .post(announce::publish)
+                .delete(announce::remove),
+        )
+        .route("/api/announcement/{id}/dismiss", post(announce::dismiss))
         .route("/api/admin/waitlist", get(admin::waitlist))
         .route("/api/admin/waitlist/{id}/approve", post(admin::approve))
         .route("/api/admin/waitlist/{id}/refuse", post(admin::refuse))
