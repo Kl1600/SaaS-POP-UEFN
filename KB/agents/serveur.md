@@ -7,6 +7,10 @@ EN COURS | #96 Forge F22 · Serveur : vérifications automatiques du niveau | 21
 Owner : Kl1600 | Sur la tâche : Claude Code, pour Kl1600
 Fait : checks.rs (lien cassé, réglage vide, option sans effet, tags Verse), GET /api/maps/{mid}/checks, MCP check_level, tests
 Reste : test avec le vrai UEFN ; liens d'événements non lisibles par UEFN MCP
+EN COURS | #85 Forge F11 · Serveur : bibliothèque de modules Verse du studio | 21/11 00:40
+Owner : Kl1600 | Sur la tâche : Claude Code, pour Kl1600
+Fait : migration 0027 verse_modules, library.rs (API, rôles), MCP search_library / get_library_module, tests
+Reste : validation par Kl1600
 Bloque : rien
 ```
 

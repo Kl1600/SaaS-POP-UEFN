@@ -18,6 +18,7 @@ mod ideas;
 mod integrations;
 mod launch;
 mod legal;
+mod library;
 mod link;
 mod mail;
 mod manage;
@@ -544,6 +545,16 @@ fn api() -> Router<AppState> {
         .route("/api/verse-versions/{id}/revert", post(verse::revert))
         .route("/api/maps/{mid}/verse/symbols", get(verse::symbols))
         .route("/api/maps/{mid}/verse/send", post(verse::send))
+        .route(
+            "/api/studios/{sid}/library",
+            get(library::list).post(library::create),
+        )
+        .route(
+            "/api/library/{id}",
+            get(library::get)
+                .post(library::update)
+                .delete(library::delete),
+        )
         .route(
             "/api/maps/{mid}/tokens",
             get(mcp::tokens).post(mcp::create_token),
