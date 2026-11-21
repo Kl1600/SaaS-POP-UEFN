@@ -2545,5 +2545,8 @@ const EN: Record<string, string> = {
   "Accessoires": "Props",
   "Maillages": "Meshes",
   "Autres": "Others",
+  "Thème": "Theme",
+  "Clair": "Light",
+  "Sombre": "Dark",
 }
 export default EN
