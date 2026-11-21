@@ -62,6 +62,24 @@ concernée ; corrigez une ligne fausse en le disant.
 - Python renvoie `None` comme dossier d'un acteur sans dossier : l'Organiseur affiche un dossier « None »
   (à corriger dans `link/src/mcpdriver.rs`).
 
+## Réglage `@editable` vers des props (`creative_prop`, `[]creative_prop`) (testé le 21/11/2026, projet GrassCutter)
+
+- Le `refPath` d'un `creative_prop` n'est **pas** le chemin de l'acteur : c'est un sous-objet de l'appareil,
+  `<appareil>.<classe Verse>_0.Devices_creative_prop_N`, de classe `/VerseDevices/_Verse/VNI/VerseDevices.Devices_creative_prop`,
+  dont le champ `SavedActor` pointe vers l'acteur. La pipette du panneau Détails crée ce sous-objet.
+- `SetDeviceProperty` avec le chemin de l'acteur est refusé : « … is not valid Devices_creative_prop for property … ».
+  Avec un objet inconnu (`{"actor": …}`, `{"__ref": …}`), UEFN **accepte et enregistre `null`** sans erreur :
+  relire avec `GetDeviceProperties` après chaque écriture.
+- Ce qui marche par Python, dans un `ScopedEditorTransaction` : `w = unreal.new_object(<classe du sous-objet>,
+  outer=<objet Verse de l'appareil>, name="Devices_creative_prop_N")`, `w.set_editor_property("SavedActor", acteur)`,
+  puis `SetDeviceProperty` avec la liste des `{"refPath": w.get_path_name()}`. Vérifié en session : l'appareil voit
+  bien les props.
+- Le nom du réglage suit la règle des minuscules : `CasesHerbe` → `casesHerbe`.
+- Les props des galeries Fortnite (`FortPlaysetPropItemDefinition`, environ 100 000) se cherchent dans
+  l'Asset Registry ; leur classe à poser est le `BlueprintGeneratedClass` du même nom (ex.
+  `/CRG_Props/SetupAssets/Blueprints/CP_Grass_Tall_01.CP_Grass_Tall_01_C`), que `place_device` accepte. Un prop
+  de galerie est un `BuildingProp`. `CP_Grass_Tall_01` fait environ 5 m × 5 m × 2 m à l'échelle 1.
+
 ## Session de test (testé le 18/11/2026, projet TestPopHub, #5)
 
 - `SessionToolset` : `GetSessionStatus` (`Connected` / `Disconnected`), `GetGameState` (`Running`…),
