@@ -92,7 +92,9 @@ pub async fn seed_map_defaults(st: &AppState, map_id: i64) -> Result<(), AppErro
 #[derive(Deserialize)]
 pub struct NewStudio {
     name: String,
-    map_name: String,
+    /// Facultatif : un studio peut naître sans map.
+    #[serde(default)]
+    map_name: Option<String>,
     genre: Option<String>,
     release_date: Option<String>,
 }
@@ -103,7 +105,10 @@ pub async fn create_studio(
     Json(b): Json<NewStudio>,
 ) -> ApiResult<Value> {
     check_len("Nom du studio", &b.name, 1, 60)?;
-    check_len("Nom de la map", &b.map_name, 1, 60)?;
+    let map_name = b.map_name.as_deref().map(str::trim).unwrap_or("");
+    if !map_name.is_empty() {
+        check_len("Nom de la map", map_name, 1, 60)?;
+    }
     let sid: i64 = sqlx::query_scalar("INSERT INTO studios (name) VALUES (?) RETURNING id")
         .bind(b.name.trim())
         .fetch_one(&st.db)
@@ -113,10 +118,13 @@ pub async fn create_studio(
         .bind(u.id)
         .execute(&st.db)
         .await?;
+    if map_name.is_empty() {
+        return Ok(Json(json!({ "studio_id": sid, "map_id": null })));
+    }
     let mid = insert_map(
         &st,
         sid,
-        b.map_name.trim(),
+        map_name,
         b.genre.as_deref().unwrap_or(""),
         b.release_date.as_deref(),
     )
@@ -127,7 +135,7 @@ pub async fn create_studio(
         Some(u.id),
         "map",
         "Map créée",
-        &format!("{} a créé {}", u.name, b.map_name.trim()),
+        &format!("{} a créé {}", u.name, map_name),
     )
     .await?;
     Ok(Json(json!({ "studio_id": sid, "map_id": mid })))
@@ -891,4 +899,63 @@ pub async fn lore_hook(
     }
     crate::access::notify(&st, b.map_id, json!({ "t": "refresh", "what": "tasks" }));
     Ok(Json(json!({ "ok": true })))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    async fn compte(st: &AppState) -> AuthUser {
+        let id: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash) VALUES ('s@exemple.com', 'Sam', 'x') RETURNING id")
+            .fetch_one(&st.db).await.unwrap();
+        AuthUser {
+            id,
+            email: "s@exemple.com".into(),
+            name: "Sam".into(),
+            sid: String::new(),
+        }
+    }
+    fn studio(map: Option<&str>) -> Json<NewStudio> {
+        Json(NewStudio {
+            name: "POP Studio".into(),
+            map_name: map.map(Into::into),
+            genre: Some("Tycoon".into()),
+            release_date: None,
+        })
+    }
+    async fn maps(st: &AppState, sid: i64) -> i64 {
+        sqlx::query_scalar("SELECT COUNT(*) FROM maps WHERE studio_id = ?")
+            .bind(sid)
+            .fetch_one(&st.db)
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn studio_avec_ou_sans_premiere_map() {
+        let st = crate::test_state().await;
+        let u = compte(&st).await;
+        // Sans map (absente ou vide) : le studio existe, sans aucune map.
+        for m in [None, Some("   ")] {
+            let r = create_studio(State(st.clone()), u.clone(), studio(m))
+                .await
+                .unwrap()
+                .0;
+            assert!(r["map_id"].is_null());
+            assert_eq!(maps(&st, r["studio_id"].as_i64().unwrap()).await, 0);
+        }
+        // Avec map : comme avant.
+        let r = create_studio(State(st.clone()), u.clone(), studio(Some("VaultRush")))
+            .await
+            .unwrap()
+            .0;
+        assert!(r["map_id"].as_i64().is_some());
+        assert_eq!(maps(&st, r["studio_id"].as_i64().unwrap()).await, 1);
+        // Nom de map trop long : refusé.
+        assert!(
+            create_studio(State(st.clone()), u.clone(), studio(Some(&"x".repeat(61))))
+                .await
+                .is_err()
+        );
+    }
 }
