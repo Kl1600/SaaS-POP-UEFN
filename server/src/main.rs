@@ -540,7 +540,8 @@ fn api() -> Router<AppState> {
         .route("/api/maps/{mid}/uefn/topview", get(uefn::topview))
         .route("/api/maps/{mid}/uefn/action", post(uefn::action))
         .route("/api/maps/{mid}/uefn/journal", get(uefn::journal))
-        .route("/api/maps/{mid}/checks", get(checks::get))
+        // Vérifications automatiques du niveau (#96) ; « /checks » est la checklist de la page Lancer (#130).
+        .route("/api/maps/{mid}/level-checks", get(checks::get))
         .route("/api/maps/{mid}/agents", get(agents::list))
         .route("/api/uefn-actions/{id}/undo", post(uefn::undo))
         .route("/api/approvals/{id}/{verdict}", post(uefn::decide))
@@ -777,4 +778,13 @@ async fn renumber_old_migrations(db: &sqlx::SqlitePool) -> Result<(), sqlx::Erro
     tx.commit().await?;
     tracing::info!("Migrations locales renumérotées (12-20 → 15-23).");
     Ok(())
+}
+
+#[cfg(test)]
+mod routeur {
+    /// Le routeur complet se construit : axum refuse (panique) une route déclarée deux fois (#130).
+    #[test]
+    fn routes_sans_doublon() {
+        let _ = super::api();
+    }
 }
