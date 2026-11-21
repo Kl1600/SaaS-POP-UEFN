@@ -9,7 +9,7 @@ import { tr } from '../i18n/t'
 
 type Task = {
   id: number; number: number; title: string; tag: string; status: string; assignee_id: number | null; assignee_name: string | null
-  planned_day: string | null; deps: number[]; comments: number; subtasks: { total: number; done: number }; lot: string; ai: number
+  planned_day: string | null; deps: number[]; comments: number; subtasks: { total: number; done: number }; lot: string; ai: number; uefn: number
 }
 const COLS = ['todo', 'doing', 'blocked', 'done']
 
@@ -28,6 +28,7 @@ export default function Tasks() {
   const [over, setOver] = useState<string | null>(null)
   const [open, setOpen] = useState<number | null>(null)
   const [msg, setMsg] = useState('')
+  const [checkin, setCheckin] = useState<Task | null>(null)
   const { data: tasks, reload, setData } = useLoad<Task[]>(map ? `/api/maps/${map.id}/tasks` : null, [map?.id])
   const { data: mem } = useMembers()
   useLive(['tasks'], reload)
@@ -42,6 +43,8 @@ export default function Tasks() {
     setOver(null)
     const t = tasks?.find(x => x.id === id)
     if (!t || t.status === status) return
+    // Une tâche UEFN ne passe à « Faite » qu'avec le message de son check-in Lore (#127).
+    if (status === 'done' && t.uefn) { setCheckin(t); return }
     setData(tasks!.map(x => (x.id === id ? { ...x, status } : x)))
     try { await api.post(`/api/tasks/${id}/status`, { status }); setMsg('') } catch (e: any) { setMsg(e.message); reload() }
   }
@@ -74,7 +77,7 @@ export default function Tasks() {
                   return (
                     <button key={t.id} className={'kcard' + (c === 'blocked' ? ' kblk' : c === 'done' ? ' kfin' : '')} draggable={canEdit}
                       onDragStart={e => e.dataTransfer.setData('text/plain', String(t.id))} onClick={() => setOpen(t.id)}>
-                      <div className="row" style={{ justifyContent: 'space-between' }}><span className="small muted mono">#{t.number}</span><span className="small muted">1 h{t.ai ? ' · IA' : ''}</span></div>
+                      <div className="row" style={{ justifyContent: 'space-between' }}><span className="small muted mono">#{t.number}</span><span className="small muted">1 h{t.uefn ? ' · UEFN' : ''}{t.ai ? ' · IA' : ''}</span></div>
                       <div style={{ fontWeight: 500, margin: '8px 0 10px' }}>{t.title}</div>
                       {blockedBy.length > 0 && c !== 'done' && <div className="small" style={{ marginBottom: 10 }}>{c === 'blocked' ? tr("Bloquée par") : tr("Dépend de")} <span className="mono">#{blockedBy.join(', #')}</span></div>}
                       <div className="row" style={{ justifyContent: 'space-between' }}>
@@ -92,6 +95,7 @@ export default function Tasks() {
 
       {tab === 'people' && <People />}
       {tab === 'files' && <Locks />}
+      {checkin && <CheckinModal task={checkin} onClose={() => setCheckin(null)} onDone={() => { setCheckin(null); setMsg(''); reload() }} />}
       {open && <TaskDrawer id={open} onClose={() => setOpen(null)} members={mem?.members ?? []} tasks={tasks ?? []} />}
     </main>
   )
@@ -157,14 +161,15 @@ function TaskDrawer({ id, onClose, members, tasks }: { id: number; onClose: () =
   const [comment, setComment] = useState('')
   const [sub, setSub] = useState('')
   const [deps, setDeps] = useState('')
+  const [checkin, setCheckin] = useState(false)
   useLive(['tasks'], reload)
   useEffect(() => { if (data) setDeps(data.deps.map((d: any) => d.number).join(', ')) }, [data?.task.id])
   if (!data) return <Drawer onClose={onClose} label={tr("Tâche")}><p className="muted">{tr("Chargement…")}</p></Drawer>
   const t = data.task
   const patch = async (b: any) => { try { await api.patch(`/api/tasks/${id}`, b); reload() } catch (e: any) { toast(e.message, true) } }
-  const status = async (s: string) => { try { await api.post(`/api/tasks/${id}/status`, { status: s }); reload() } catch (e: any) { toast(e.message, true) } }
+  const status = async (s: string) => { if (s === 'done' && t.uefn) { setCheckin(true); return } try { await api.post(`/api/tasks/${id}/status`, { status: s }); reload() } catch (e: any) { toast(e.message, true) } }
   const origin = t.origin?.startsWith('board:') ? `/tableau/${t.origin.split(':')[1]}` : null
-  return (
+  return (<>
     <Drawer onClose={onClose} label={tr("Tâche #{0}", [t.number])}>
       <div className="row" style={{ justifyContent: 'space-between' }}><span className="small muted mono">#{t.number} · {t.lot || tr("sans lot")}</span><button className="iconbtn" aria-label={tr("Fermer")} onClick={onClose}><X size={18} /></button></div>
       <input className="ptitle" style={{ fontSize: 22, margin: '8px 0 16px' }} defaultValue={t.title} disabled={!canEdit} onBlur={e => e.target.value !== t.title && patch({ title: e.target.value })} aria-label={tr("Titre")} />
@@ -182,6 +187,8 @@ function TaskDrawer({ id, onClose, members, tasks }: { id: number; onClose: () =
         <span className="muted">{tr("Dépend de")}</span>
         <input className="field mono" value={deps} disabled={!canEdit} placeholder="ex. 12, 18" onChange={e => setDeps(e.target.value)}
           onBlur={() => patch({ deps: deps.split(/[^0-9]+/).filter(Boolean).map(Number) })} />
+        <span className="muted">{tr("UEFN")}</span>
+        <label className="row" style={{ gap: 8 }}><input type="checkbox" checked={!!t.uefn} disabled={!canEdit} onChange={e => patch({ uefn: e.target.checked })} /><span className="small">{tr("Check-in Lore requis pour la fermer")}</span></label>
         <span className="muted">{tr("Origine")}</span>
         <span>{origin ? <a href={origin}>{tr("Post-it du tableau blanc")}</a> : t.origin === 'plan' ? tr("Générateur de projet") : tr("Créée à la main")}</span>
       </div>
@@ -219,13 +226,39 @@ function TaskDrawer({ id, onClose, members, tasks }: { id: number; onClose: () =
         <button className="btn" style={{ color: 'var(--tr)' }} onClick={async () => { if (!confirm(tr("Supprimer définitivement la tâche #{0} « {1} » ?", [t.number, t.title]))) return; try { await api.del(`/api/tasks/${t.id}`); toast(tr("Tâche #{0} supprimée", [t.number])); onClose() } catch (e: any) { toast(e.message, true) } }}>{tr("Supprimer la tâche")}</button>
       </div>}
     </Drawer>
+    {/* Hors du panneau : sinon la fenêtre se place dans le panneau et reste cachée. */}
+    {checkin && <CheckinModal task={t} onClose={() => setCheckin(false)} onDone={() => { setCheckin(false); reload() }} />}
+  </>)
+}
+
+/** Fermer une tâche UEFN : demande le message du check-in Lore, qui commence par #N (#127). */
+function CheckinModal({ task, onClose, onDone }: { task: { id: number; number: number; title: string }; onClose: () => void; onDone: () => void }) {
+  const [m, setM] = useState(`#${task.number} `)
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (busy) return
+    setBusy(true)
+    try { await api.post(`/api/tasks/${task.id}/status`, { status: 'done', checkin: m }); onDone() } catch (er: any) { setErr(er.message); setBusy(false) }
+  }
+  return (
+    <Modal onClose={onClose} label={tr("Check-in Lore")}>
+      <form className="stack" onSubmit={submit}>
+        <h2 style={{ margin: 0, fontWeight: 400 }}>{tr("Fermer #{0}", [task.number])}</h2>
+        <p className="muted" style={{ margin: 0 }}>{tr("C’est une tâche UEFN : elle ne passe à « Faite » qu’avec son check-in Lore. Archivez dans Lore, puis collez ici le message du check-in. Il commence par #{0}.", [task.number])}</p>
+        <label className="label">{tr("Message du check-in Lore")}<input className="field mono" autoFocus value={m} onChange={e => setM(e.target.value)} required maxLength={300} /></label>
+        {err && <div className="err" role="alert">{err}</div>}
+        <div className="row" style={{ justifyContent: 'flex-end' }}><button type="button" className="btn" onClick={onClose}>{tr("Annuler")}</button><button className="btn pri" disabled={busy}>{busy ? tr("Envoi…") : tr("Marquer comme faite")}</button></div>
+      </form>
+    </Modal>
   )
 }
 
 export function NewTaskModal({ onClose }: { onClose: () => void }) {
   const { map, toast } = useApp()
   const { data: mem } = useMembers()
-  const [f, setF] = useState({ title: '', tag: 'code', assignee_id: '', planned_day: '', deps: '' })
+  const [f, setF] = useState({ title: '', tag: 'code', assignee_id: '', planned_day: '', deps: '', uefn: false })
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   const submit = async (e: React.FormEvent) => {
@@ -235,7 +268,7 @@ export function NewTaskModal({ onClose }: { onClose: () => void }) {
     try {
       const r = await api.post(`/api/maps/${map!.id}/tasks`, {
         title: f.title, tag: f.tag, assignee_id: f.assignee_id ? Number(f.assignee_id) : null, planned_day: f.planned_day || null,
-        deps: f.deps.split(/[^0-9]+/).filter(Boolean).map(Number),
+        deps: f.deps.split(/[^0-9]+/).filter(Boolean).map(Number), uefn: f.uefn,
       })
       toast(tr("Tâche #{0} créée", [r.number])); onClose()
     } catch (e: any) { setErr(e.message); setBusy(false) }
@@ -252,6 +285,7 @@ export function NewTaskModal({ onClose }: { onClose: () => void }) {
           <label className="label">{tr("Jour prévu")}<input className="field" type="date" value={f.planned_day} onChange={e => setF({ ...f, planned_day: e.target.value })} /></label>
           <label className="label">{tr("Dépend de (n°)")}<input className="field mono" value={f.deps} onChange={e => setF({ ...f, deps: e.target.value })} placeholder="12, 18" /></label>
         </div>
+        <label className="row" style={{ gap: 8 }}><input type="checkbox" checked={f.uefn} onChange={e => setF({ ...f, uefn: e.target.checked })} />{tr("Tâche UEFN : check-in Lore requis pour la fermer")}</label>
         {err && <div className="err">{err}</div>}
         <div className="row" style={{ justifyContent: 'flex-end' }}><button type="button" className="btn" onClick={onClose}>{tr("Annuler")}</button><button className="btn pri" disabled={busy}>{busy ? tr("Création…") : tr("Créer la tâche")}</button></div>
       </form>

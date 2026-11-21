@@ -1,6 +1,17 @@
 // Traduction anglaise de l'application. Clé = texte français de l'interface (ou du serveur), valeur = anglais.
 // Généré à partir des textes enveloppés dans tr(...) ; à compléter quand on ajoute des textes.
 const EN: Record<string, string> = {
+ "UEFN": "UEFN",
+ "Check-in Lore requis pour la fermer": "Lore check-in required to close it",
+ "Tâche UEFN : check-in Lore requis pour la fermer": "UEFN task: Lore check-in required to close it",
+ "Check-in Lore": "Lore check-in",
+ "Fermer #{0}": "Close #{0}",
+ "C’est une tâche UEFN : elle ne passe à « Faite » qu’avec son check-in Lore. Archivez dans Lore, puis collez ici le message du check-in. Il commence par #{0}.": "This is a UEFN task: it can only move to “Done” with its Lore check-in. Check in to Lore, then paste the check-in message here. It starts with #{0}.",
+ "Message du check-in Lore": "Lore check-in message",
+ "Envoi…": "Sending…",
+ "Marquer comme faite": "Mark as done",
+ "#{0} est une tâche UEFN : elle ne passe à « Faite » qu’avec son check-in Lore. Archivez dans Lore avec un message qui commence par #{1}, puis donnez ce message pour fermer la tâche.": "#{0} is a UEFN task: it can only move to “Done” with its Lore check-in. Check in to Lore with a message starting with #{1}, then give that message to close the task.",
+ "Le message du check-in doit commencer par #{0} (par exemple « #{1} ce qui a été fait »).": "The check-in message must start with #{0} (for example “#{1} what was done”).",
  "Fermer l’annonce": "Close the announcement",
  "Annonce": "Announcement",
  "Un bandeau en haut de POP pour tous les comptes connectés, au prochain chargement de page. Chacun peut le fermer.": "A banner at the top of POP for every signed-in account, on their next page load. Anyone can close it.",

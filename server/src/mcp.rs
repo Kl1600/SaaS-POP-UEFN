@@ -135,8 +135,8 @@ fn tools() -> Value {
         tool("list_tasks", "Liste les tâches de la map (numéro, titre, statut, étiquette, personne, jour prévu, dépendances en attente). Filtres facultatifs : status (todo, doing, blocked, done), mine (vos tâches seulement), query (texte).", json!({ "status": { "type": "string" }, "mine": { "type": "boolean" }, "query": { "type": "string" } }), &[]),
         tool("get_task", "Détail d'une tâche par son numéro : description, dépendances, sous-tâches, commentaires.", json!({ "number": { "type": "integer" } }), &["number"]),
         tool("next_task", "Ce que Boussole conseille de faire maintenant : retards, tâches du jour et tâches qui en débloquent d'autres.", json!({}), &[]),
-        tool("create_task", "Crée une tâche d'environ une heure. tag : code, carte, conception ou test. depends_on : numéros de tâches. assign_to_me : vous l'assigner.", json!({ "title": { "type": "string" }, "description": { "type": "string" }, "tag": { "type": "string" }, "planned_day": { "type": "string", "description": "AAAA-MM-JJ" }, "depends_on": { "type": "array", "items": { "type": "integer" } }, "assign_to_me": { "type": "boolean" } }), &["title"]),
-        tool("set_task_status", "Change le statut d'une tâche : todo (à faire), doing (en cours), blocked (bloquée), done (faite). Passer en cours exige que ses dépendances soient faites. note : commentaire facultatif (ce qui a été fait, ce qui bloque).", json!({ "number": { "type": "integer" }, "status": { "type": "string", "enum": ["todo", "doing", "blocked", "done"] }, "note": { "type": "string" } }), &["number", "status"]),
+        tool("create_task", "Crée une tâche d'environ une heure. tag : code, carte, conception ou test. depends_on : numéros de tâches. assign_to_me : vous l'assigner. uefn : tâche qui touche le projet UEFN (elle ne se ferme qu'avec un check-in Lore « #n … »).", json!({ "title": { "type": "string" }, "description": { "type": "string" }, "tag": { "type": "string" }, "planned_day": { "type": "string", "description": "AAAA-MM-JJ" }, "depends_on": { "type": "array", "items": { "type": "integer" } }, "assign_to_me": { "type": "boolean" }, "uefn": { "type": "boolean" } }), &["title"]),
+        tool("set_task_status", "Change le statut d'une tâche : todo (à faire), doing (en cours), blocked (bloquée), done (faite). Passer en cours exige que ses dépendances soient faites. note : commentaire facultatif (ce qui a été fait, ce qui bloque). Une tâche UEFN ne passe à done qu'avec son check-in Lore : checkin = message qui commence par #n, inutile si vous avez archivé par lore_checkin « #n … » depuis que vous l'avez réservée.", json!({ "number": { "type": "integer" }, "status": { "type": "string", "enum": ["todo", "doing", "blocked", "done"] }, "note": { "type": "string" }, "checkin": { "type": "string" } }), &["number", "status"]),
         tool("claim_task", "Réserve une tâche POP pour vous (agent IA) : une seule tâche à la fois, et une tâche n'a qu'un agent. À faire avant de travailler dessus ; refusé si un autre agent l'a déjà. Vos fichiers Verse de cette tâche ne peuvent pas être modifiés par un autre agent.", json!({ "number": { "type": "integer" } }), &["number"]),
         tool("release_task", "Libère la tâche que vous avez réservée (claim_task), quand vous arrêtez sans la finir.", json!({}), &[]),
         tool("comment_task", "Ajoute un commentaire à une tâche.", json!({ "number": { "type": "integer" }, "text": { "type": "string" } }), &["number", "text"]),
@@ -382,6 +382,7 @@ async fn call_as(
                 status: None,
                 ai: Some(true),
                 origin: Some("ia".into()),
+                uefn: a["uefn"].as_bool(),
             };
             if b.title.trim().is_empty() {
                 return Err(crate::error::bad("Titre manquant."));
@@ -394,7 +395,17 @@ async fn call_as(
             ctx.can_edit()?;
             let tid = task_by_number(a["number"].as_i64()).await?;
             let status = a["status"].as_str().unwrap_or("");
-            crate::tasks::set_status_internal(st, mid, tid, user.id, status, "IA").await?;
+            crate::tasks::set_status_checked(
+                st,
+                mid,
+                tid,
+                user.id,
+                status,
+                "IA",
+                a["checkin"].as_str(),
+                agent,
+            )
+            .await?;
             if let Some(note) = a["note"].as_str().filter(|n| !n.trim().is_empty()) {
                 sqlx::query(
                     "INSERT INTO comments (map_id, target, user_id, body) VALUES (?, ?, ?, ?)",
@@ -992,5 +1003,112 @@ mod tests_import {
             .await
             .unwrap();
         assert_eq!(action, "asset_delete");
+    }
+}
+
+#[cfg(test)]
+mod tests_checkin {
+    use super::*;
+
+    /// Critère 4 (#127) : après `lore_checkin "#N …"` par l'agent qui a réservé la tâche, `set_task_status done`
+    /// passe sans redemander le message. Un autre agent, ou un check-in d'une autre tâche, ne suffit pas.
+    #[tokio::test]
+    async fn checkin_de_l_agent_repris() {
+        let st = crate::test_state().await;
+        let sid: i64 = sqlx::query_scalar("INSERT INTO studios (name) VALUES ('S') RETURNING id")
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        let mid: i64 =
+            sqlx::query_scalar("INSERT INTO maps (studio_id, name) VALUES (?, 'M') RETURNING id")
+                .bind(sid)
+                .fetch_one(&st.db)
+                .await
+                .unwrap();
+        let uid: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash) VALUES ('ia@a.fr', 'IA', 'x') RETURNING id")
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO memberships (studio_id, user_id, role) VALUES (?, ?, 'member')")
+            .bind(sid)
+            .bind(uid)
+            .execute(&st.db)
+            .await
+            .unwrap();
+        let u = AuthUser {
+            id: uid,
+            email: "ia@a.fr".into(),
+            name: "IA".into(),
+            sid: String::new(),
+        };
+        let jeton = |nom: &'static str| {
+            let st = st.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>("INSERT INTO api_tokens (user_id, map_id, name, token_hash, kind) VALUES (?, ?, ?, ?, 'claude_code') RETURNING id")
+                    .bind(uid).bind(mid).bind(nom).bind(format!("h-{nom}")).fetch_one(&st.db).await.unwrap()
+            }
+        };
+        let (a, b) = (jeton("Claude").await, jeton("Codex").await);
+        // create_task avec uefn : la tâche est marquée.
+        let r = call_as(
+            &st,
+            &u,
+            mid,
+            Some(a),
+            "create_task",
+            json!({ "title": "Poser les spawns", "uefn": true }),
+        )
+        .await
+        .unwrap();
+        let n = r["number"].as_i64().unwrap();
+        call_as(&st, &u, mid, Some(a), "claim_task", json!({ "number": n }))
+            .await
+            .unwrap();
+        let fini = |agent: i64| {
+            let (st, u) = (st.clone(), u.clone());
+            async move {
+                call_as(
+                    &st,
+                    &u,
+                    mid,
+                    Some(agent),
+                    "set_task_status",
+                    json!({ "number": n, "status": "done" }),
+                )
+                .await
+            }
+        };
+        // Sans check-in : refus clair.
+        match fini(a).await {
+            Err(AppError::Conflict(m)) => assert!(m.contains("check-in Lore"), "{m}"),
+            _ => panic!("la tâche UEFN devait être refusée sans check-in"),
+        }
+        // Check-ins archivés (comme le fait `exec` après lore_checkin) : un d'une autre tâche, un d'un autre agent.
+        let archive = |agent: i64, msg: String| {
+            let st = st.clone();
+            async move {
+                sqlx::query("INSERT INTO uefn_actions (map_id, user_id, source, action, args, summary, status, agent_id) VALUES (?, ?, 'mcp', 'lore_checkin', ?, 'Archivage Lore', 'done', ?)")
+                    .bind(mid).bind(uid).bind(json!({ "message": msg }).to_string()).bind(agent)
+                    .execute(&st.db).await.unwrap();
+            }
+        };
+        archive(a, format!("#{}0 autre tâche", n)).await;
+        archive(b, format!("#{n} fait par un autre agent")).await;
+        assert!(
+            fini(a).await.is_err(),
+            "ni #N0 ni le check-in d'un autre agent ne comptent"
+        );
+        archive(a, format!("#{n} spawns posés")).await;
+        fini(a).await.unwrap();
+        let what: Vec<String> = sqlx::query_scalar("SELECT e.what FROM task_events e JOIN tasks t ON t.id = e.task_id WHERE t.map_id = ? AND t.number = ?")
+            .bind(mid)
+            .bind(n)
+            .fetch_all(&st.db)
+            .await
+            .unwrap();
+        assert!(
+            what.contains(&format!("Check-in Lore : #{n} spawns posés")),
+            "{what:?}"
+        );
     }
 }

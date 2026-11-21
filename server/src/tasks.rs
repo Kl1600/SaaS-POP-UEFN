@@ -41,9 +41,10 @@ pub struct TaskRow {
     pub ai: i64,
     pub origin: String,
     pub done_at: Option<String>,
+    pub uefn: i64,
 }
 
-const TASK_SELECT: &str = "SELECT t.id, t.map_id, t.number, t.title, t.description, t.tag, t.status, t.assignee_id, u.name AS assignee_name, t.minutes, t.planned_day, t.lot, t.ai, t.origin, t.done_at FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id";
+const TASK_SELECT: &str = "SELECT t.id, t.map_id, t.number, t.title, t.description, t.tag, t.status, t.assignee_id, u.name AS assignee_name, t.minutes, t.planned_day, t.lot, t.ai, t.origin, t.done_at, t.uefn FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id";
 
 async fn deps_of(st: &AppState, task_id: i64) -> Result<Vec<(i64, String)>, AppError> {
     Ok(sqlx::query_as("SELECT d.number, d.status FROM task_deps x JOIN tasks d ON d.id = x.depends_on WHERE x.task_id = ? ORDER BY d.number")
@@ -123,6 +124,9 @@ pub struct NewTask {
     pub status: Option<String>,
     pub ai: Option<bool>,
     pub origin: Option<String>,
+    /// Tâche UEFN : check-in Lore obligatoire pour la fermer (#127).
+    #[serde(default)]
+    pub uefn: Option<bool>,
 }
 
 async fn check_assignee(st: &AppState, ctx: &MapCtx, a: Option<i64>) -> Result<(), AppError> {
@@ -198,7 +202,7 @@ pub async fn insert_task(st: &AppState, ctx: &MapCtx, b: &NewTask) -> Result<(i6
             .fetch_one(&st.db)
             .await?;
     let id: i64 = sqlx::query_scalar(
-        "INSERT INTO tasks (map_id, number, title, description, tag, status, assignee_id, planned_day, lot, ai, origin, done_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CASE WHEN ? = 'done' THEN datetime('now') END) RETURNING id",
+        "INSERT INTO tasks (map_id, number, title, description, tag, status, assignee_id, planned_day, lot, ai, origin, uefn, done_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CASE WHEN ? = 'done' THEN datetime('now') END) RETURNING id",
     )
     .bind(ctx.map_id)
     .bind(number)
@@ -211,6 +215,7 @@ pub async fn insert_task(st: &AppState, ctx: &MapCtx, b: &NewTask) -> Result<(i6
     .bind(b.lot.clone().unwrap_or_default())
     .bind(b.ai.unwrap_or(false) as i64)
     .bind(b.origin.clone().unwrap_or_default())
+    .bind(b.uefn.unwrap_or(false) as i64)
     .bind(&status)
     .fetch_one(&st.db)
     .await?;
@@ -310,6 +315,7 @@ pub struct TaskPatch {
     assignee_id: Option<Option<i64>>,
     planned_day: Option<Option<String>>,
     deps: Option<Vec<i64>>,
+    uefn: Option<bool>,
 }
 
 pub async fn update(
@@ -377,11 +383,18 @@ pub async fn update(
     if let Some(d) = &b.deps {
         set_deps(&st, t.map_id, tid, d).await?;
     }
+    if let Some(x) = b.uefn {
+        sqlx::query("UPDATE tasks SET uefn = ? WHERE id = ?")
+            .bind(x as i64)
+            .bind(tid)
+            .execute(&st.db)
+            .await?;
+    }
     notify(&st, t.map_id, json!({ "t": "refresh", "what": "tasks" }));
     Ok(Json(json!({ "ok": true })))
 }
 
-/// Change le statut d'une tâche en appliquant la règle : « En cours » seulement si les dépendances sont faites.
+/// Change le statut d'une tâche sans message de check-in (une tâche UEFN ne peut alors pas passer à « Faite »).
 pub async fn set_status_internal(
     st: &AppState,
     map_id: i64,
@@ -390,17 +403,86 @@ pub async fn set_status_internal(
     status: &str,
     via: &str,
 ) -> Result<(), AppError> {
+    set_status_checked(st, map_id, tid, uid, status, via, None, None).await
+}
+
+/// Vrai si le message de check-in commence par `#N` (et pas par `#N0`, `#N1`… d'une autre tâche).
+pub fn checkin_matches(msg: &str, number: i64) -> bool {
+    msg.trim_start()
+        .strip_prefix(&format!("#{number}"))
+        .is_some_and(|rest| !rest.starts_with(|c: char| c.is_ascii_digit()))
+}
+
+/// Message du check-in Lore qui permet de fermer la tâche UEFN #`number` (#127) : celui donné, sinon celui que
+/// l'agent `agent` a archivé par `lore_checkin` depuis qu'il a réservé la tâche.
+async fn checkin_for_done(
+    st: &AppState,
+    map_id: i64,
+    tid: i64,
+    number: i64,
+    checkin: Option<&str>,
+    agent: Option<i64>,
+) -> Result<String, AppError> {
+    if let Some(m) = checkin.map(str::trim).filter(|m| !m.is_empty()) {
+        check_len("Message du check-in", m, 1, 300)?;
+        if !checkin_matches(m, number) {
+            return Err(bad(format!(
+                "Le message du check-in doit commencer par #{number} (par exemple « #{number} ce qui a été fait »)."
+            )));
+        }
+        return Ok(m.to_string());
+    }
+    if let Some(agent) = agent {
+        let msgs: Vec<(String,)> = sqlx::query_as(
+            "SELECT COALESCE(json_extract(x.args, '$.message'), '') FROM uefn_actions x JOIN api_tokens a ON a.id = x.agent_id
+             WHERE x.agent_id = ? AND a.task_id = ? AND x.map_id = ? AND x.action = 'lore_checkin'
+               AND x.status IN ('queued', 'sent', 'done') AND x.at >= a.task_since
+             ORDER BY x.id DESC",
+        )
+        .bind(agent)
+        .bind(tid)
+        .bind(map_id)
+        .fetch_all(&st.db)
+        .await?;
+        if let Some((m,)) = msgs.into_iter().find(|(m,)| checkin_matches(m, number)) {
+            return Ok(m.trim().to_string());
+        }
+    }
+    Err(AppError::Conflict(format!(
+        "#{number} est une tâche UEFN : elle ne passe à « Faite » qu’avec son check-in Lore. Archivez dans Lore avec un message qui commence par #{number}, puis donnez ce message pour fermer la tâche."
+    )))
+}
+
+/// Change le statut d'une tâche en appliquant les règles : « En cours » seulement si les dépendances sont faites ;
+/// « Faite » pour une tâche UEFN seulement avec le message de son check-in Lore (`checkin`, ou celui archivé par
+/// l'agent `agent` qui a réservé la tâche).
+#[allow(clippy::too_many_arguments)]
+pub async fn set_status_checked(
+    st: &AppState,
+    map_id: i64,
+    tid: i64,
+    uid: i64,
+    status: &str,
+    via: &str,
+    checkin: Option<&str>,
+    agent: Option<i64>,
+) -> Result<(), AppError> {
     if !STATUSES.contains(&status) {
         return Err(bad("Statut inconnu."));
     }
-    let (number, title, old): (i64, String, String) =
-        sqlx::query_as("SELECT number, title, status FROM tasks WHERE id = ?")
+    let (number, title, old, uefn): (i64, String, String, i64) =
+        sqlx::query_as("SELECT number, title, status, uefn FROM tasks WHERE id = ?")
             .bind(tid)
             .fetch_one(&st.db)
             .await?;
     if old == status {
         return Ok(());
     }
+    let checkin = if status == "done" && uefn == 1 {
+        Some(checkin_for_done(st, map_id, tid, number, checkin, agent).await?)
+    } else {
+        None
+    };
     if status == "doing" {
         let pending: Vec<(i64, String)> = deps_of(st, tid)
             .await?
@@ -431,6 +513,15 @@ pub async fn set_status_internal(
         .bind(via)
         .execute(&st.db)
         .await?;
+    if let Some(m) = &checkin {
+        sqlx::query("INSERT INTO task_events (task_id, user_id, what, via) VALUES (?, ?, ?, ?)")
+            .bind(tid)
+            .bind(uid)
+            .bind(format!("Check-in Lore : {m}"))
+            .bind(via)
+            .execute(&st.db)
+            .await?;
+    }
     let kind = match status {
         "done" => "done",
         "blocked" => "blocked",
@@ -497,6 +588,8 @@ pub async fn set_status_internal(
 #[derive(Deserialize)]
 pub struct StatusIn {
     status: String,
+    /// Message du check-in Lore, exigé pour fermer une tâche UEFN (#127).
+    checkin: Option<String>,
 }
 
 pub async fn set_status(
@@ -510,7 +603,17 @@ pub async fn set_status(
     if ctx.role == Role::Freelance && t.assignee_id != Some(u.id) {
         return Err(AppError::Forbidden);
     }
-    set_status_internal(&st, t.map_id, tid, u.id, &b.status, "Bouton").await?;
+    set_status_checked(
+        &st,
+        t.map_id,
+        tid,
+        u.id,
+        &b.status,
+        "Bouton",
+        b.checkin.as_deref(),
+        None,
+    )
+    .await?;
     Ok(Json(json!({ "ok": true })))
 }
 
@@ -697,4 +800,178 @@ pub async fn people(
         "people": people,
         "chains": chains.into_iter().map(|c| json!({"from": c.0, "from_title": c.1, "from_who": c.2, "from_status": c.3, "to": c.4, "to_title": c.5, "to_who": c.6, "to_status": c.7})).collect::<Vec<_>>()
     })))
+}
+
+#[cfg(test)]
+mod tests_uefn {
+    use super::*;
+
+    /// Un studio, une map, un propriétaire et deux tâches : #1 marquée « UEFN », #2 normale.
+    async fn monde() -> (AppState, AuthUser, i64, i64, i64) {
+        let st = crate::test_state().await;
+        let sid: i64 = sqlx::query_scalar("INSERT INTO studios (name) VALUES ('S') RETURNING id")
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        let mid: i64 =
+            sqlx::query_scalar("INSERT INTO maps (studio_id, name) VALUES (?, 'M') RETURNING id")
+                .bind(sid)
+                .fetch_one(&st.db)
+                .await
+                .unwrap();
+        let uid: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash) VALUES ('h@a.fr', 'Yanis', 'x') RETURNING id")
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO memberships (studio_id, user_id, role) VALUES (?, ?, 'owner')")
+            .bind(sid)
+            .bind(uid)
+            .execute(&st.db)
+            .await
+            .unwrap();
+        let u = AuthUser {
+            id: uid,
+            email: "h@a.fr".into(),
+            name: "Yanis".into(),
+            sid: String::new(),
+        };
+        let ctx = map_ctx(&st, &u, mid).await.unwrap();
+        let nt = |title: &str, uefn: Option<bool>| NewTask {
+            title: title.into(),
+            tag: None,
+            description: None,
+            assignee_id: None,
+            deps: None,
+            planned_day: None,
+            lot: None,
+            status: None,
+            ai: None,
+            origin: None,
+            uefn,
+        };
+        let (t1, _) = insert_task(&st, &ctx, &nt("Poser les spawns", Some(true)))
+            .await
+            .unwrap();
+        let (t2, _) = insert_task(&st, &ctx, &nt("Écrire la doc", None))
+            .await
+            .unwrap();
+        (st, u, mid, t1, t2)
+    }
+
+    async fn statut(st: &AppState, u: &AuthUser, tid: i64, b: Value) -> Result<(), AppError> {
+        set_status(
+            State(st.clone()),
+            u.clone(),
+            Path(tid),
+            Json(serde_json::from_value(b).unwrap()),
+        )
+        .await
+        .map(|_| ())
+    }
+
+    async fn etat(st: &AppState, tid: i64) -> String {
+        sqlx::query_scalar("SELECT status FROM tasks WHERE id = ?")
+            .bind(tid)
+            .fetch_one(&st.db)
+            .await
+            .unwrap()
+    }
+
+    #[test]
+    fn prefixe_du_checkin() {
+        assert!(checkin_matches("#12 spawns posés", 12));
+        assert!(checkin_matches("  #12", 12));
+        assert!(checkin_matches("#12: fini", 12));
+        assert!(!checkin_matches("#120 autre tâche", 12));
+        assert!(!checkin_matches("#1 autre tâche", 12));
+        assert!(!checkin_matches("spawns posés #12", 12));
+    }
+
+    /// Critères 1, 2, 3 et 5 (#127), par la route de l'interface.
+    #[tokio::test]
+    async fn tache_uefn_exige_le_checkin() {
+        let (st, u, _mid, t1, t2) = monde().await;
+        // 1. Sans message : refus qui explique quoi faire.
+        match statut(&st, &u, t1, json!({ "status": "done" })).await {
+            Err(AppError::Conflict(m)) => assert!(
+                m.contains("tâche UEFN") && m.contains("check-in Lore") && m.contains("#1"),
+                "{m}"
+            ),
+            _ => panic!("#1 devait être refusée sans check-in"),
+        }
+        assert_eq!(etat(&st, t1).await, "todo");
+        // 3. Mauvais numéro : refus.
+        match statut(
+            &st,
+            &u,
+            t1,
+            json!({ "status": "done", "checkin": "#12 spawns" }),
+        )
+        .await
+        {
+            Err(AppError::BadRequest(m)) => assert!(m.contains("commencer par #1"), "{m}"),
+            _ => panic!("un check-in #12 ne doit pas fermer #1"),
+        }
+        assert_eq!(etat(&st, t1).await, "todo");
+        // 2. Bon message : faite, et le message est dans l'historique.
+        statut(
+            &st,
+            &u,
+            t1,
+            json!({ "status": "done", "checkin": "#1 spawns posés" }),
+        )
+        .await
+        .unwrap();
+        assert_eq!(etat(&st, t1).await, "done");
+        let Json(d) = detail(State(st.clone()), u.clone(), Path(t1))
+            .await
+            .unwrap();
+        assert_eq!(d["task"]["uefn"], 1);
+        assert!(d["events"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|e| e["what"] == "Check-in Lore : #1 spawns posés"));
+        // 5. Tâche normale : se ferme comme avant.
+        statut(&st, &u, t2, json!({ "status": "done" }))
+            .await
+            .unwrap();
+        assert_eq!(etat(&st, t2).await, "done");
+        // La case se coche et se décoche en modification.
+        let patch = |v: bool| TaskPatch {
+            title: None,
+            description: None,
+            tag: None,
+            assignee_id: None,
+            planned_day: None,
+            deps: None,
+            uefn: Some(v),
+        };
+        let Json(_) = update(State(st.clone()), u.clone(), Path(t2), Json(patch(true)))
+            .await
+            .unwrap();
+        statut(&st, &u, t2, json!({ "status": "todo" }))
+            .await
+            .unwrap();
+        assert!(statut(&st, &u, t2, json!({ "status": "done" }))
+            .await
+            .is_err());
+        let Json(_) = update(State(st.clone()), u.clone(), Path(t2), Json(patch(false)))
+            .await
+            .unwrap();
+        statut(&st, &u, t2, json!({ "status": "done" }))
+            .await
+            .unwrap();
+    }
+
+    /// Une fermeture automatique (GitHub, Discord) passe par `set_status_internal` : refusée pour une tâche UEFN.
+    #[tokio::test]
+    async fn fermeture_automatique_refusee() {
+        let (st, u, mid, t1, _) = monde().await;
+        assert!(matches!(
+            set_status_internal(&st, mid, t1, u.id, "done", "GitHub").await,
+            Err(AppError::Conflict(_))
+        ));
+        assert_eq!(etat(&st, t1).await, "todo");
+    }
 }

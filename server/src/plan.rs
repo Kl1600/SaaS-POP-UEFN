@@ -470,6 +470,7 @@ pub async fn apply(
                 status: None,
                 ai: Some(t.ai),
                 origin: Some("plan".into()),
+                uefn: None,
             },
         )
         .await?;

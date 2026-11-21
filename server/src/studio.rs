@@ -858,15 +858,23 @@ pub async fn lore_hook(
                     sqlx::query("INSERT INTO task_events (task_id, user_id, what, via) VALUES (?, ?, ?, 'Lore / UEFN')")
                         .bind(tid).bind(uid).bind(format!("Check-in : {}", files.join(", "))).execute(&st.db).await?;
                     if msg.to_lowercase().contains("fini") {
-                        crate::tasks::set_status_internal(
+                        // Le message de ce check-in Lore vaut check-in pour une tâche UEFN (#127).
+                        match crate::tasks::set_status_checked(
                             &st,
                             b.map_id,
                             tid,
                             uid,
                             "done",
                             "Lore / UEFN",
+                            Some(&msg),
+                            None,
                         )
-                        .await?;
+                        .await
+                        {
+                            // Message qui ne commence pas par #N : la tâche UEFN reste ouverte, le check-in est noté.
+                            Err(AppError::Conflict(_) | AppError::BadRequest(_)) => {}
+                            r => r?,
+                        }
                     }
                 }
             }
