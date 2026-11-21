@@ -26,7 +26,8 @@ le CPX02 (1 Go + 2 Go de swap) suffit pour la bêta. Passer au CPX12 (2 Go) depu
 
 | Quoi | Valeur |
 |---|---|
-| Adresse du site | **https://2-29-177-96.sslip.io** (pas encore de vrai domaine) |
+| Adresse du site | **https://pop-uefn.com** depuis le 21/11/2026 (`www.pop-uefn.com` y renvoie). Avant : `https://2-29-177-96.sslip.io`, qui ne répond plus |
+| DNS | `A @` et `A www` → `2.29.177.96` |
 | Serveur | Hetzner CPX02 `pop-prod`, IP `2.29.177.96`, en ligne depuis le 19/11/2026 |
 | Fichiers | `/opt/pop` (`.env`, `docker-compose.yml`) |
 | Connexion SSH | `ssh pop-admin@2.29.177.96` (connexion `root` refusée) |
@@ -38,7 +39,8 @@ Le jeton GitHub `pop-serveur` (lecture de l'image) expire le 16/02/2027 : après
 ## 1. Avant de commencer
 
 1. **Le serveur** : Hetzner Cloud, CPX02, Ubuntu 24.04, **avec votre clé SSH**, option Backups conseillée.
-2. **Le domaine** : chez votre registrar, un enregistrement `A` (et `AAAA` pour l'IPv6) vers l'adresse du serveur.
+2. **Le domaine** : chez votre registrar, un enregistrement `A` (et `AAAA` pour l'IPv6) vers l'adresse du serveur,
+   pour le domaine et pour `www` (Caddy renvoie `www.<domaine>` vers `<domaine>`).
    Il doit répondre **avant** le premier démarrage, sinon Caddy n'obtient pas de certificat.
 3. **L'image** : la première fois, lancer l'action « publier l'image » (onglet Actions du dépôt → *Run workflow*),
    ou l'action « déployer » une fois le §4.1 en place (elle construit l'image si besoin).
