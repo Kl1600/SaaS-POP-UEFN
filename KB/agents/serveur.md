@@ -15,6 +15,10 @@ EN COURS | #93 Forge F19 · Serveur : registre des agents IA et attribution des 
 Owner : Kl1600 | Sur la tâche : Claude Code, pour Kl1600
 Fait : migration 0028, agents.rs (liste, claim_task, release_task, fichiers Verse par agent), journal par agent, tests
 Reste : validation par Kl1600 ; fusionner #85 (migration 0027) avant
+EN COURS | #113 Forge F27 · Compétences : packs de consignes UEFN et Verse lus par les IA | 21/11 01:40
+Owner : Kl1600 | Sur la tâche : Claude Code, pour Kl1600
+Fait : 5 compétences POP (server/skills/), compétences du studio (migration 0029), MCP list_skills / get_skill, tests
+Reste : validation par Kl1600
 Bloque : rien
 ```
 
