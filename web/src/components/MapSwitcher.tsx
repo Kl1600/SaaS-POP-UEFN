@@ -7,6 +7,7 @@ import { useApp, studioName } from '../state'
 import { Modal } from './ui'
 import { tr } from '../i18n/t'
 import { ConfirmMove, isAdmin, previewMove, type Drag, type Pending } from './MoveMap'
+import { cssRect } from '../zoom'
 
 type Create = { kind: 'map' | 'studio'; studioId?: number }
 
@@ -29,7 +30,7 @@ export function MapSwitcher() {
   const [pos, setPos] = useState({ top: 0, left: 0, width: 280 })
   useLayoutEffect(() => {
     if (!open || !btn.current) return
-    const r = btn.current.getBoundingClientRect()
+    const r = cssRect(btn.current)
     setPos({ top: r.bottom + 6, left: r.left, width: Math.max(280, r.width) })
   }, [open])
   useEffect(() => {

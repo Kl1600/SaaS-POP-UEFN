@@ -1,7 +1,7 @@
 import { SecuritySettings } from '../components/Security'
 import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { Copy, KeyRound, Plus, Trash2 } from 'lucide-react'
+import { Copy, KeyRound, Moon, Plus, Sun, Trash2 } from 'lucide-react'
 import { api, euros } from '../api'
 import { useApp, useLoad, studioName } from '../state'
 import { Avatar, CardHead, PageHead, ROLE, Tabs } from '../components/ui'
@@ -173,14 +173,14 @@ function Maps() {
 }
 
 export function Account() {
-  const { me, toast, reload } = useApp()
+  const { me, toast, reload, dark, toggleDark } = useApp()
   const [name, setName] = useState(me?.user.name ?? '')
   const [pw, setPw] = useState({ current: '', new: '' })
   return (<>
     <div className="grid2">
       <section className="card">
         <CardHead title={tr("Mon compte")} />
-        <div className="props"><span className="muted">E-mail</span><span>{me?.user.email}</span><span className="muted">{tr("Langue")}</span><span><LangPicker app /></span><span className="muted">{tr("Crédits de playtest")}</span><span>{me?.credits}</span><span className="muted">{tr("Studios")}</span><span>{me?.studios.map(s => s.personal ? studioName(s) : `${s.name} (${ROLE[s.role]})`).join(', ')}</span></div>
+        <div className="props"><span className="muted">E-mail</span><span>{me?.user.email}</span><span className="muted">{tr("Langue")}</span><span><LangPicker app /></span><span className="muted">{tr("Thème")}</span><span className="row" style={{ gap: 6 }}><button type="button" className={dark ? 'btn' : 'btn pri'} aria-pressed={!dark} onClick={() => { if (dark) toggleDark() }}><Sun size={16} />{tr("Clair")}</button><button type="button" className={dark ? 'btn pri' : 'btn'} aria-pressed={dark} onClick={() => { if (!dark) toggleDark() }}><Moon size={16} />{tr("Sombre")}</button></span><span className="muted">{tr("Crédits de playtest")}</span><span>{me?.credits}</span><span className="muted">{tr("Studios")}</span><span>{me?.studios.map(s => s.personal ? studioName(s) : `${s.name} (${ROLE[s.role]})`).join(', ')}</span></div>
         <form className="row" style={{ marginTop: 16 }} onSubmit={async e => { e.preventDefault(); try { await api.post('/api/me/profile', { name }); await reload(); toast(tr("Nom enregistré")) } catch (er: any) { toast(er.message, true) } }}>
           <label className="label" style={{ flex: 1 }}>{tr("Nom affiché")}<input className="field" value={name} onChange={e => setName(e.target.value)} maxLength={80} required /></label>
           <button className="btn" style={{ alignSelf: 'flex-end' }}>{tr("Enregistrer")}</button>
