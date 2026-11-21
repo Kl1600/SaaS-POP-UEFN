@@ -9,3 +9,9 @@
 		-Server
 	}
 }
+
+# www.<domaine> renvoie vers le domaine principal (même certificat automatique).
+# Son DNS doit aussi pointer vers le serveur ; sinon Caddy le signale dans ses journaux, sans gêner le domaine principal.
+www.{$POP_DOMAIN} {
+	redir https://{$POP_DOMAIN}{uri} permanent
+}
