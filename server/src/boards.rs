@@ -485,6 +485,7 @@ pub async fn convert(
                 status: None,
                 ai: None,
                 origin: Some(format!("board:{bid}:{id}")),
+                uefn: None,
             },
         )
         .await?;

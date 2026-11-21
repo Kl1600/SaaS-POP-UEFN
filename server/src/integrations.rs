@@ -299,8 +299,14 @@ pub async fn discord_hook(
             let Some((tid, title)) = t else {
                 return Ok(reply(&format!("Tâche #{n} introuvable.")));
             };
-            crate::tasks::set_status_internal(&st, mid, tid, uid, "done", "Discord").await?;
-            Ok(reply(&format!("✅ #{n} {title} : faite.")))
+            // Une tâche UEFN sans check-in Lore est refusée (#127) : Discord reçoit l'explication.
+            match crate::tasks::set_status_internal(&st, mid, tid, uid, "done", "Discord").await {
+                Err(AppError::Conflict(m)) => Ok(reply(&m)),
+                r => {
+                    r?;
+                    Ok(reply(&format!("✅ #{n} {title} : faite.")))
+                }
+            }
         }
         _ => Ok(reply("Commande inconnue.")),
     }
@@ -442,9 +448,18 @@ pub async fn github_sync(
                     .map_err(ext)?;
                     closed += 1;
                 } else if status != "done" && !open {
-                    crate::tasks::set_status_internal(&st, q.map, *tid, u.id, "done", "GitHub")
-                        .await?;
-                    done += 1;
+                    // Une tâche UEFN reste ouverte tant que son check-in Lore manque (#127).
+                    match crate::tasks::set_status_internal(
+                        &st, q.map, *tid, u.id, "done", "GitHub",
+                    )
+                    .await
+                    {
+                        Err(AppError::Conflict(_)) => {}
+                        r => {
+                            r?;
+                            done += 1;
+                        }
+                    }
                 }
             }
         }
@@ -527,8 +542,14 @@ pub async fn github_hook(
     .fetch_one(&st.db)
     .await?;
     match action {
+        // Une tâche UEFN reste ouverte tant que son check-in Lore manque (#127).
         "closed" => {
-            crate::tasks::set_status_internal(&st, mid, tid, owner, "done", "GitHub").await?
+            match crate::tasks::set_status_internal(&st, mid, tid, owner, "done", "GitHub").await {
+                Err(AppError::Conflict(m)) => {
+                    return Ok(Json(json!({ "ignored": true, "reason": m })))
+                }
+                r => r?,
+            }
         }
         "reopened" => {
             crate::tasks::set_status_internal(&st, mid, tid, owner, "todo", "GitHub").await?

@@ -142,6 +142,7 @@ pub async fn apply(
             status: None,
             ai: Some(true),
             origin: Some("ia-pop".into()),
+            uefn: None,
         };
         ids.push(insert_task(&st, &ctx, &nt).await.ok().map(|x| x.0));
     }
