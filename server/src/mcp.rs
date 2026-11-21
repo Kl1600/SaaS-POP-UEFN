@@ -131,6 +131,8 @@ fn tools() -> Value {
         tool("next_task", "Ce que Boussole conseille de faire maintenant : retards, tâches du jour et tâches qui en débloquent d'autres.", json!({}), &[]),
         tool("create_task", "Crée une tâche d'environ une heure. tag : code, carte, conception ou test. depends_on : numéros de tâches. assign_to_me : vous l'assigner.", json!({ "title": { "type": "string" }, "description": { "type": "string" }, "tag": { "type": "string" }, "planned_day": { "type": "string", "description": "AAAA-MM-JJ" }, "depends_on": { "type": "array", "items": { "type": "integer" } }, "assign_to_me": { "type": "boolean" } }), &["title"]),
         tool("set_task_status", "Change le statut d'une tâche : todo (à faire), doing (en cours), blocked (bloquée), done (faite). Passer en cours exige que ses dépendances soient faites. note : commentaire facultatif (ce qui a été fait, ce qui bloque).", json!({ "number": { "type": "integer" }, "status": { "type": "string", "enum": ["todo", "doing", "blocked", "done"] }, "note": { "type": "string" } }), &["number", "status"]),
+        tool("claim_task", "Réserve une tâche POP pour vous (agent IA) : une seule tâche à la fois, et une tâche n'a qu'un agent. À faire avant de travailler dessus ; refusé si un autre agent l'a déjà. Vos fichiers Verse de cette tâche ne peuvent pas être modifiés par un autre agent.", json!({ "number": { "type": "integer" } }), &["number"]),
+        tool("release_task", "Libère la tâche que vous avez réservée (claim_task), quand vous arrêtez sans la finir.", json!({}), &[]),
         tool("comment_task", "Ajoute un commentaire à une tâche.", json!({ "number": { "type": "integer" }, "text": { "type": "string" } }), &["number", "text"]),
         tool("search_library", "Cherche dans la bibliothèque Verse du studio (modules prêts : économie, équipes, minuteur, HUD, sauvegarde…). À faire AVANT d'écrire du Verse neuf : réutilisez un module existant quand il convient. Filtres facultatifs : query (texte du nom ou de la description), category (economie, equipes, minuteur, hud, sauvegarde, interface, jeu, outils, autre).", json!({ "query": { "type": "string" }, "category": { "type": "string" } }), &[]),
         tool("get_library_module", "Lit un module de la bibliothèque Verse du studio : code complet, appareils requis, version.", json!({ "id": { "type": "integer" } }), &["id"]),
@@ -184,13 +186,13 @@ pub async fn mcp(
         .or(q.token)
         .unwrap_or_default();
     let token = token.as_str();
-    let row: Option<(i64, i64, String, String, String)> = match sqlx::query_as(
-        "SELECT t.user_id, t.map_id, u.email, u.name, t.scope FROM api_tokens t JOIN users u ON u.id = t.user_id WHERE t.token_hash = ? AND u.disabled = 0",
+    let row: Option<(i64, i64, String, String, String, i64)> = match sqlx::query_as(
+        "SELECT t.user_id, t.map_id, u.email, u.name, t.scope, t.id FROM api_tokens t JOIN users u ON u.id = t.user_id WHERE t.token_hash = ? AND u.disabled = 0",
     ).bind(sha256_hex(token)).fetch_optional(&st.db).await {
         Ok(r) => r,
         Err(_) => return rpc_err(id, -32603, "Erreur interne"),
     };
-    let Some((uid, mid, email, name, scope)) = row else {
+    let Some((uid, mid, email, name, scope, agent)) = row else {
         return (
             StatusCode::UNAUTHORIZED,
             Json(json!({ "error": "Jeton POP invalide." })),
@@ -233,7 +235,7 @@ pub async fn mcp(
                 return rpc_ok(id, text("Cette IA est en lecture seule dans POP (IA connectées → autoriser les modifications).", true));
             }
             let args = req["params"]["arguments"].clone();
-            match call(&st, &user, mid, name, args).await {
+            match call_as(&st, &user, mid, Some(agent), name, args).await {
                 Ok(v) => rpc_ok(
                     id,
                     text(serde_json::to_string_pretty(&v).unwrap_or_default(), false),
@@ -256,10 +258,23 @@ pub async fn mcp(
     }
 }
 
+#[cfg(test)]
 async fn call(
     st: &AppState,
     user: &AuthUser,
     mid: i64,
+    name: &str,
+    a: Value,
+) -> Result<Value, AppError> {
+    call_as(st, user, mid, None, name, a).await
+}
+
+/// Appel d'un outil par l'agent `agent` (jeton MCP), au nom de l'humain qui a créé le jeton.
+async fn call_as(
+    st: &AppState,
+    user: &AuthUser,
+    mid: i64,
+    agent: Option<i64>,
     name: &str,
     a: Value,
 ) -> Result<Value, AppError> {
@@ -268,8 +283,11 @@ async fn call(
     let o = || Origin {
         ctx: &ctx,
         source: "mcp",
+        agent,
         task,
     };
+    let agent_requis =
+        || agent.ok_or_else(|| crate::error::bad("Réservé aux agents IA (jeton MCP)."));
     let task_by_number = |n: Option<i64>| async move {
         let n = n.ok_or_else(|| crate::error::bad("Numéro de tâche manquant."))?;
         let r: Option<(i64,)> =
@@ -296,6 +314,13 @@ async fn call(
                 .ok_or_else(|| crate::error::bad("Identifiant du module manquant."))?;
             crate::library::module(st, ctx.studio_id, id).await
         }
+        "claim_task" => {
+            let n = a["number"]
+                .as_i64()
+                .ok_or_else(|| crate::error::bad("Numéro de tâche manquant."))?;
+            crate::agents::claim(st, agent_requis()?, mid, n).await
+        }
+        "release_task" => crate::agents::release(st, agent_requis()?).await,
         "list_tasks" => {
             let rows: Vec<(i64, String, String, String, Option<String>, Option<i64>, Option<String>, i64)> = sqlx::query_as(
                 "SELECT t.number, t.title, t.status, t.tag, u.name, t.assignee_id, t.planned_day, t.id FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id WHERE t.map_id = ? ORDER BY t.status = 'done', t.planned_day IS NULL, t.planned_day, t.number",
@@ -490,6 +515,9 @@ async fn call(
             Ok(json!({ "path": a["path"], "content": c }))
         }
         "write_verse_file" => {
+            if let Some(ag) = agent {
+                crate::agents::check_file(st, ag, mid, a["path"].as_str().unwrap_or("")).await?;
+            }
             exec(
                 st,
                 o(),

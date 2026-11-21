@@ -702,6 +702,8 @@ pub async fn topview(
 pub struct Origin<'a> {
     pub ctx: &'a MapCtx,
     pub source: &'a str,
+    /// Agent IA (jeton MCP) qui demande l'action, pour le journal par agent (#93).
+    pub agent: Option<i64>,
     pub task: Option<i64>,
 }
 
@@ -1013,9 +1015,9 @@ pub async fn exec(
     let mid = o.ctx.map_id;
     let journal = !matches!(action, "refresh_actors" | "render_topview");
     let aid: Option<i64> = if journal {
-        Some(sqlx::query_scalar("INSERT INTO uefn_actions (map_id, user_id, source, action, args, summary, before, undo, task_number, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued') RETURNING id")
+        Some(sqlx::query_scalar("INSERT INTO uefn_actions (map_id, user_id, source, action, args, summary, before, undo, task_number, status, agent_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?) RETURNING id")
             .bind(mid).bind(o.ctx.user.id).bind(o.source).bind(action).bind(args.to_string()).bind(&summary).bind(before.to_string())
-            .bind(undo.map(|u| u.to_string())).bind(o.task).fetch_one(&st.db).await?)
+            .bind(undo.map(|u| u.to_string())).bind(o.task).bind(o.agent).fetch_one(&st.db).await?)
     } else {
         None
     };
@@ -1323,6 +1325,7 @@ pub async fn action(
             Origin {
                 ctx: &ctx,
                 source: "web",
+                agent: None,
                 task: b.task,
             },
             &b.action,
@@ -1332,17 +1335,24 @@ pub async fn action(
     ))
 }
 
+#[derive(Deserialize, Default)]
+pub struct JournalQ {
+    /// Seulement les actions de cet agent IA (#93).
+    agent: Option<i64>,
+}
+
 pub async fn journal(
     State(st): State<AppState>,
     u: AuthUser,
     Path(mid): Path<i64>,
+    Query(q): Query<JournalQ>,
 ) -> ApiResult<Value> {
     map_ctx(&st, &u, mid).await?;
-    let rows: Vec<(i64, Option<String>, String, String, String, Option<i64>, String, Option<String>, String, i64)> = sqlx::query_as(
-        "SELECT a.id, u.name, a.source, a.action, a.summary, a.task_number, a.status, a.error, a.at, a.undo IS NOT NULL FROM uefn_actions a LEFT JOIN users u ON u.id = a.user_id WHERE a.map_id = ? ORDER BY a.id DESC LIMIT 200",
-    ).bind(mid).fetch_all(&st.db).await?;
+    let rows: Vec<(i64, Option<String>, String, String, String, Option<i64>, String, Option<String>, String, i64, Option<i64>, Option<String>)> = sqlx::query_as(
+        "SELECT a.id, u.name, a.source, a.action, a.summary, a.task_number, a.status, a.error, a.at, a.undo IS NOT NULL, a.agent_id, t.name FROM uefn_actions a LEFT JOIN users u ON u.id = a.user_id LEFT JOIN api_tokens t ON t.id = a.agent_id WHERE a.map_id = ? AND (? IS NULL OR a.agent_id = ?) ORDER BY a.id DESC LIMIT 200",
+    ).bind(mid).bind(q.agent).bind(q.agent).fetch_all(&st.db).await?;
     Ok(Json(json!(rows.into_iter().map(|r| json!({
-        "id": r.0, "who": r.1, "source": r.2, "action": r.3, "summary": r.4, "task": r.5, "status": r.6, "error": r.7, "at": r.8, "undoable": r.9 == 1 && (r.6 == "done" || r.6 == "queued")
+        "id": r.0, "who": r.1, "source": r.2, "action": r.3, "summary": r.4, "task": r.5, "status": r.6, "error": r.7, "at": r.8, "undoable": r.9 == 1 && (r.6 == "done" || r.6 == "queued"), "agent": r.10, "agent_name": r.11
     })).collect::<Vec<_>>())))
 }
 
@@ -1392,6 +1402,7 @@ pub async fn undo(
         Origin {
             ctx: &ctx,
             source: "undo",
+            agent: None,
             task: None,
         },
         u2["action"].as_str().unwrap_or(""),
@@ -1442,6 +1453,7 @@ pub async fn decide(
             Origin {
                 ctx: &ctx,
                 source: "mcp",
+                agent: None,
                 task: None,
             },
             &action,
