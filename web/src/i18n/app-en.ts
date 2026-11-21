@@ -304,6 +304,8 @@ const EN: Record<string, string> = {
  "Un studio regroupe votre équipe et vos maps.": "A studio groups your team and your maps.",
  "Nom du studio": "Studio name",
  "Première map": "First map",
+ "Première map (facultatif)": "First map (optional)",
+ "Laissez vide si vous n’avez pas encore de map": "Leave empty if you have no map yet",
  "Date de sortie visée": "Target release date",
  "Créer": "Create",
  "Invitation acceptée…": "Invitation accepted…",

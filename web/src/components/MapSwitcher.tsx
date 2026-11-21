@@ -92,8 +92,9 @@ function CreateModal({ c, onClose }: { c: Create; onClose: () => void }) {
     try {
       const r = kind === 'map'
         ? await api.post(`/api/studios/${sid}/maps`, { name: f.name, genre: f.genre, release_date: f.release_date || null })
-        : await api.post('/api/studios', { name: f.studio, map_name: f.name, genre: f.genre, release_date: f.release_date || null })
-      await reload(); setMapId(r.map_id); nav(`/map/${r.map_id}`)
+        : await api.post('/api/studios', f.name.trim() ? { name: f.studio, map_name: f.name, genre: f.genre, release_date: f.release_date || null } : { name: f.studio })
+      await reload()
+      if (r.map_id) { setMapId(r.map_id); nav(`/map/${r.map_id}`) } else nav(`/studio/${r.studio_id}/equipe`)
       toast(kind === 'map' ? tr('Map « {0} » créée', [f.name]) : tr('Studio « {0} » créé', [f.studio]))
       onClose()
     } catch (er: any) { setErr(er.message); setBusy(false) }
@@ -119,11 +120,11 @@ function CreateModal({ c, onClose }: { c: Create; onClose: () => void }) {
         {!solo && teams.length > 1 && <label className="label">{tr('Studio')}<select className="field" value={sid} onChange={e => setSid(Number(e.target.value))}>{teams.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>}
       </> : <p className="muted" style={{ margin: 0 }}>{tr('Un studio = une équipe : vous invitez des membres, et toutes les maps du studio sont partagées avec eux.')}</p>}
       {kind === 'studio' && <label className="label">{tr('Nom du studio')}<input className="field" autoFocus value={f.studio} onChange={e => setF({ ...f, studio: e.target.value })} required maxLength={60} /></label>}
-      <label className="label">{kind === 'map' ? tr('Nom de la map') : tr('Première map')}<input className="field" autoFocus={kind === 'map'} value={f.name} onChange={e => setF({ ...f, name: e.target.value })} required maxLength={60} placeholder={tr('Nom de la map (ex. VaultRush)')} /></label>
-      <div className="grid2" style={{ gridTemplateColumns: '1fr 1fr' }}>
+      <label className="label">{kind === 'map' ? tr('Nom de la map') : tr('Première map (facultatif)')}<input className="field" autoFocus={kind === 'map'} value={f.name} onChange={e => setF({ ...f, name: e.target.value })} required={kind === 'map'} maxLength={60} placeholder={kind === 'map' ? tr('Nom de la map (ex. VaultRush)') : tr('Laissez vide si vous n’avez pas encore de map')} /></label>
+      {(kind === 'map' || f.name.trim() !== '') && <div className="grid2" style={{ gridTemplateColumns: '1fr 1fr' }}>
         <label className="label">{tr('Genre')}<input className="field" value={f.genre} onChange={e => setF({ ...f, genre: e.target.value })} placeholder={tr('Tycoon, box fight…')} /></label>
         <label className="label">{tr('Sortie visée')}<input className="field" type="date" value={f.release_date} onChange={e => setF({ ...f, release_date: e.target.value })} /></label>
-      </div>
+      </div>}
       {err && <div className="err">{err}</div>}
       <div className="row" style={{ justifyContent: 'flex-end' }}>
         <button type="button" className="btn" onClick={onClose}>{tr('Annuler')}</button>
