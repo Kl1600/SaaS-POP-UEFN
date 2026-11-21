@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-21 · #169 · menu du compte sans création
+- Fait : « Nouvelle map » et « Nouveau studio » retirés du menu du compte ; on crée depuis le sélecteur de map.
+- Vérifié : navigateur (menu, création map et studio depuis le sélecteur), aucune erreur JS.
+
 ### 2026-11-21 · #167 · sélecteur : plus d'« Accueil », glisser-déposer des maps
 - Fait : lien « Accueil » retiré de la barre latérale (la page `/` reste via « Toutes mes maps ») ; dans le sélecteur, une map se glisse vers un autre groupe → même confirmation que l'Accueil ; la confirmation et l'aperçu sont dans `components/MoveMap.tsx`, partagés par `Home.tsx` et `MapSwitcher.tsx`.
 - Vérifié : navigateur (perso → studio, studio → perso, annuler, clic simple, Accueil), aucune erreur JS.
