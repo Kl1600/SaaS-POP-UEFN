@@ -4,7 +4,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import { Lightbulb, Heart, X, Rocket, Bell, BellOff, TrendingUp, Users, Clock, DoorOpen, Sparkles } from 'lucide-react'
 import { ago, api } from '../api'
 import { useApp, useLoad, studioName } from '../state'
-import { CardHead, Empty, PageHead, Tabs, useDialog } from '../components/ui'
+import { CardHead, Empty, PageHead, Tabs, useDialog, Layer } from '../components/ui'
 import { IslandDrawer } from './Analysis'
 import { tr, LANG, LOCALE } from '../i18n/t'
 
@@ -105,7 +105,7 @@ function Detail({ d, onClose, onState, onStart }: { d: any; onClose: () => void;
   const [isl, setIsl] = useState<string | null>(null)
   if (isl) return <IslandDrawer code={isl} onClose={() => setIsl(null)} />
   const Map = ({ m }: { m: any }) => <button className="ilink" onClick={() => setIsl(m.code)}><b>{m.title}</b><span className="small muted">{tr("{0} joueurs · {1} min · J+1 {2}", [num(m.players), num(m.minutes), pc(m.d1)])}</span></button>
-  return <>
+  return <Layer>
     <div className="scrim" onClick={onClose} />
     <aside ref={dlg as any} tabIndex={-1} aria-modal="true" role="dialog" className="drawer idrawer" aria-label={tr("Fiche idée")}>
       <div className="idrawer-head" style={{ ['--h' as any]: GENRE_HUE[d.genre] ?? 200 }}>
@@ -164,7 +164,7 @@ function Detail({ d, onClose, onState, onStart }: { d: any; onClose: () => void;
 
       <p className="small muted" style={{ marginTop: 16 }}>{tr("Calculé sur les chiffres publics d’Epic du {0}. Les idées sont recalculées après chaque collecte.", [d.generated_day ?? ''])}</p>
     </aside>
-  </>
+  </Layer>
 }
 
 function StartModal({ d, onClose }: { d: any; onClose: () => void }) {

@@ -2,6 +2,11 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-22 · #172 · fiches en fenêtre centrée arrondie
+- Fait : `.drawer` devient une fenêtre centrée aux coins arrondis (hauteur selon le contenu, défilement interne, plein écran ou presque sur mobile) ; `Layer` dans `ui.tsx` rend les fiches dans `.app` par un portail ; Boussole : `.guide-sugs` en `minmax(0,1fr)` (les boutons ne débordent plus).
+- Vérifié : navigateur, 1440 px et 390 px, clair et sombre : Boussole et détail de tâche centrés, sans défilement horizontal ; Échap et clic à côté ferment. Fiches île, genre, idée : compilé et code lu seulement (pas de données de marché en local).
+- Piège : un `position: fixed` dans une page se cale sur le parent animé ou transformé, pas sur l'écran ; passer par `Layer` (portail dans `.app`, pas dans `body`, sinon on perd les variables du thème).
+
 ### 2026-11-21 · #169 · menu du compte sans création
 - Fait : « Nouvelle map » et « Nouveau studio » retirés du menu du compte ; on crée depuis le sélecteur de map.
 - Vérifié : navigateur (menu, création map et studio depuis le sélecteur), aucune erreur JS.
