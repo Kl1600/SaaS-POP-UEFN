@@ -31,6 +31,7 @@ mod plan;
 mod privstats;
 mod s3;
 mod security;
+mod skills;
 mod stripe;
 mod studio;
 mod tasks;
@@ -557,6 +558,12 @@ fn api() -> Router<AppState> {
                 .post(library::update)
                 .delete(library::delete),
         )
+        .route(
+            "/api/studios/{sid}/skills",
+            get(skills::list).post(skills::save),
+        )
+        .route("/api/studios/{sid}/skills/{name}", get(skills::get))
+        .route("/api/skills/{id}", delete(skills::delete))
         .route(
             "/api/maps/{mid}/tokens",
             get(mcp::tokens).post(mcp::create_token),

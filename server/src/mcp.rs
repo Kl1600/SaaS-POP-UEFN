@@ -136,6 +136,8 @@ fn tools() -> Value {
         tool("comment_task", "Ajoute un commentaire à une tâche.", json!({ "number": { "type": "integer" }, "text": { "type": "string" } }), &["number", "text"]),
         tool("search_library", "Cherche dans la bibliothèque Verse du studio (modules prêts : économie, équipes, minuteur, HUD, sauvegarde…). À faire AVANT d'écrire du Verse neuf : réutilisez un module existant quand il convient. Filtres facultatifs : query (texte du nom ou de la description), category (economie, equipes, minuteur, hud, sauvegarde, interface, jeu, outils, autre).", json!({ "query": { "type": "string" }, "category": { "type": "string" } }), &[]),
         tool("get_library_module", "Lit un module de la bibliothèque Verse du studio : code complet, appareils requis, version.", json!({ "id": { "type": "integer" } }), &["id"]),
+        tool("list_skills", "Liste les compétences : méthodes de POP (Verse, appareils, session de test, Lore, rangement) et règles écrites par le studio. Lisez celles qui concernent votre tâche avant de commencer.", json!({}), &[]),
+        tool("get_skill", "Lit une compétence par son nom (voir list_skills).", json!({ "name": { "type": "string" } }), &["name"]),
         tool("undo_action", "Annule une action du journal par son identifiant.", json!({ "id": { "type": "integer" } }), &["id"]),
     ])
 }
@@ -152,6 +154,8 @@ const READ_TOOLS: &[&str] = &[
     "next_task",
     "search_library",
     "get_library_module",
+    "list_skills",
+    "get_skill",
 ];
 
 fn rpc_ok(id: Value, result: Value) -> Response {
@@ -220,7 +224,7 @@ pub async fn mcp(
                 "protocolVersion": req["params"]["protocolVersion"].as_str().unwrap_or("2025-06-18"),
                 "capabilities": { "tools": {} },
                 "serverInfo": { "name": "pop", "version": "0.1.0" },
-                "instructions": "Outils POP : gérer les tâches de la map (list_tasks, next_task, create_task, set_task_status, comment_task) et piloter UEFN via le relais du créateur. Avant de travailler, prenez une tâche avec next_task et passez-la en cours ; quand elle est finie, passez-la en done avec une note. Toute action UEFN est journalisée et annulable ; les suppressions attendent une validation humaine."
+                "instructions": "Outils POP : gérer les tâches de la map (list_tasks, next_task, create_task, set_task_status, comment_task) et piloter UEFN via le relais du créateur. Avant de travailler, lisez les compétences utiles (list_skills, get_skill : la méthode de POP et les règles du studio), prenez une tâche avec next_task et passez-la en cours ; quand elle est finie, passez-la en done avec une note. Toute action UEFN est journalisée et annulable ; les suppressions attendent une validation humaine."
             }),
         ),
         m if m.starts_with("notifications/") => StatusCode::ACCEPTED.into_response(),
@@ -321,6 +325,10 @@ async fn call_as(
             crate::agents::claim(st, agent_requis()?, mid, n).await
         }
         "release_task" => crate::agents::release(st, agent_requis()?).await,
+        "list_skills" => Ok(json!(crate::skills::liste(st, ctx.studio_id).await?)),
+        "get_skill" => {
+            crate::skills::lire(st, ctx.studio_id, a["name"].as_str().unwrap_or("")).await
+        }
         "list_tasks" => {
             let rows: Vec<(i64, String, String, String, Option<String>, Option<i64>, Option<String>, i64)> = sqlx::query_as(
                 "SELECT t.number, t.title, t.status, t.tag, u.name, t.assignee_id, t.planned_day, t.id FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id WHERE t.map_id = ? ORDER BY t.status = 'done', t.planned_day IS NULL, t.planned_day, t.number",
