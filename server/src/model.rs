@@ -5,6 +5,9 @@
 //!    suivants ont vraiment percé. Les axes qui prédisaient bien la réussite prennent plus de poids.
 //! 2. **Chance de percer** : un modèle logistique, entraîné sur les nouvelles maps suivies par POP, estime dès
 //!    les premiers jours la probabilité qu'une map dépasse 1 000 joueurs par jour avant la fin des 14 jours de test d'Epic.
+//! 3. **Mémoire de l'IA** (#70) : chaque version entraînée est gardée avec sa précision, mesurée sur les maps les plus
+//!    récentes (jamais vues à l'entraînement, comme l'avenir) ; chaque prédiction du jour est gardée, puis notée une
+//!    fois le test d'Epic fini. On voit ainsi, jour après jour, si l'IA progresse.
 use crate::{ideas, AppState};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -25,6 +28,12 @@ pub async fn daily(st: &AppState) {
     if due.1 {
         if let Err(e) = train(st).await {
             tracing::warn!("modèle de lancement : {e:?}")
+        }
+        if let Err(e) = grade(st).await {
+            tracing::warn!("notation des prédictions : {e:?}")
+        }
+        if let Err(e) = record_predictions(st).await {
+            tracing::warn!("prédictions du jour : {e:?}")
         }
     }
 }
@@ -233,19 +242,33 @@ async fn train(st: &AppState) -> Result<(), sqlx::Error> {
     sqlx::query("UPDATE idea_model SET trained_at = datetime('now') WHERE id = 1")
         .execute(&st.db)
         .await?;
-    let rows: Vec<(String, i64, Option<i64>, Option<f64>, Option<f64>)> = sqlx::query_as(
-        "SELECT m.code, CAST(julianday(m.day) - julianday(date(i.first_seen)) AS INTEGER), m.unique_players, m.avg_minutes, m.d1
+    let rows: Vec<(String, String, i64, Option<i64>, Option<f64>, Option<f64>)> = sqlx::query_as(
+        "SELECT m.code, i.first_seen, CAST(julianday(m.day) - julianday(date(i.first_seen)) AS INTEGER), m.unique_players, m.avg_minutes, m.d1
          FROM fn_metrics m JOIN fn_islands i ON i.code = m.code
          WHERE i.seen_new = 1 AND i.first_seen > datetime('now', '-200 days') AND i.first_seen < datetime('now', '-15 days')
            AND m.day BETWEEN date(i.first_seen) AND date(i.first_seen, '+14 days')").fetch_all(&st.db).await?;
-    let mut by: HashMap<String, HashMap<i64, (Option<i64>, Option<f64>, Option<f64>)>> =
-        HashMap::new();
-    for (c, a, p, m, d) in rows {
-        by.entry(c).or_default().insert(a, (p, m, d));
+    let mut by: HashMap<
+        String,
+        (
+            String,
+            HashMap<i64, (Option<i64>, Option<f64>, Option<f64>)>,
+        ),
+    > = HashMap::new();
+    for (c, first, a, p, m, d) in rows {
+        by.entry(c)
+            .or_insert_with(|| (first, HashMap::new()))
+            .1
+            .insert(a, (p, m, d));
     }
+    // Rangées de la plus ancienne à la plus récente : la vérification se fait sur les plus récentes.
+    let mut maps: Vec<&(
+        String,
+        HashMap<i64, (Option<i64>, Option<f64>, Option<f64>)>,
+    )> = by.values().collect();
+    maps.sort_by(|a, b| a.0.cmp(&b.0));
     let mut x: Vec<[f64; 5]> = vec![];
     let mut y: Vec<f64> = vec![];
-    for ages in by.values() {
+    for (_, ages) in maps {
         let Some(f) = features(ages) else { continue };
         let best = ages.values().filter_map(|v| v.0).max().unwrap_or(0);
         x.push(f);
@@ -296,37 +319,216 @@ async fn train(st: &AppState) -> Result<(), sqlx::Error> {
         }
         (w, b)
     };
-    // Fiabilité mesurée honnêtement : on apprend sur 3 maps sur 4 et on vérifie sur la 4e, jamais vue.
-    // AUC = probabilité qu'une map qui a percé soit mieux notée qu'une map qui n'a pas percé.
-    let (train_i, test_i): (Vec<usize>, Vec<usize>) = (0..n).partition(|i| i % 4 != 0);
+    // Fiabilité mesurée comme pour l'avenir (#70) : on apprend sur les 3/4 les plus anciens et on vérifie sur le
+    // quart le plus récent, jamais vu.
+    let (train_i, test_i) = temporal_split(n);
     let (wt, bt) = fit(&train_i);
-    let score = |i: usize| bt + z[i].iter().zip(&wt).map(|(a, c)| a * c).sum::<f64>();
-    let (mut good, mut tot) = (0.0, 0.0);
-    for &i in &test_i {
-        if y[i] > 0.5 {
-            for &j in &test_i {
-                if y[j] < 0.5 {
-                    tot += 1.0;
-                    let (a, c) = (score(i), score(j));
-                    if a > c {
-                        good += 1.0
-                    } else if a == c {
-                        good += 0.5
-                    }
-                }
-            }
-        }
-    }
-    let auc = if tot > 0.0 { good / tot } else { 0.5 };
+    let probs: Vec<f64> = test_i
+        .iter()
+        .map(|&i| sigmoid(bt + z[i].iter().zip(&wt).map(|(a, c)| a * c).sum::<f64>()))
+        .collect();
+    let ys: Vec<f64> = test_i.iter().map(|&i| y[i]).collect();
+    let (auc, brier, hit) = (auc(&probs, &ys), brier(&probs, &ys), hit_rate(&probs, &ys));
     let all: Vec<usize> = (0..n).collect();
     let (w, b) = fit(&all);
+    let params = json!({ "mean": mean, "std": std, "w": w, "b": b, "features": FEATURES });
+    let model_id: i64 = sqlx::query_scalar("INSERT INTO ia_models (n, positives, test_n, auc, brier, hit_rate, params) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id")
+        .bind(n as i64).bind(pos as i64).bind(test_i.len() as i64).bind(auc).bind(brier).bind(hit).bind(params.to_string())
+        .fetch_one(&st.db).await?;
     sqlx::query("UPDATE idea_model SET launch = ? WHERE id = 1")
-        .bind(json!({ "ready": true, "n": n, "positives": pos, "mean": mean, "std": std, "w": w, "b": b, "auc": auc, "threshold": BREAKOUT }).to_string()).execute(&st.db).await?;
+        .bind(json!({ "ready": true, "n": n, "positives": pos, "mean": mean, "std": std, "w": w, "b": b, "auc": auc, "brier": brier, "threshold": BREAKOUT, "model_id": model_id }).to_string()).execute(&st.db).await?;
     tracing::info!(
         "modèle de lancement : {n} maps, {pos} ont percé, AUC {:.2}",
         auc
     );
     Ok(())
+}
+
+fn sigmoid(v: f64) -> f64 {
+    1.0 / (1.0 + (-v).exp())
+}
+
+/// Indices d'entraînement (les 3/4 les plus anciens) et de vérification (le quart le plus récent), pour `n` maps
+/// rangées de la plus ancienne à la plus récente.
+pub fn temporal_split(n: usize) -> (Vec<usize>, Vec<usize>) {
+    let cut = n - n / 4;
+    ((0..cut).collect(), (cut..n).collect())
+}
+
+/// AUC : probabilité qu'une map qui a percé soit mieux notée qu'une map qui n'a pas percé (0,5 = au hasard).
+pub fn auc(probs: &[f64], ys: &[f64]) -> f64 {
+    let (mut good, mut tot) = (0.0, 0.0);
+    for (i, &pi) in probs.iter().enumerate() {
+        if ys[i] < 0.5 {
+            continue;
+        }
+        for (j, &pj) in probs.iter().enumerate() {
+            if ys[j] > 0.5 {
+                continue;
+            }
+            tot += 1.0;
+            if pi > pj {
+                good += 1.0
+            } else if pi == pj {
+                good += 0.5
+            }
+        }
+    }
+    if tot > 0.0 {
+        good / tot
+    } else {
+        0.5
+    }
+}
+
+/// Score de Brier : écart moyen au carré entre la probabilité annoncée et ce qui s'est passé (0 = parfait).
+pub fn brier(probs: &[f64], ys: &[f64]) -> f64 {
+    if probs.is_empty() {
+        return 0.0;
+    }
+    probs
+        .iter()
+        .zip(ys)
+        .map(|(p, y)| (p - y).powi(2))
+        .sum::<f64>()
+        / probs.len() as f64
+}
+
+/// Part des maps annoncées « fortes » (50 % ou plus) qui ont vraiment percé ; rien si aucune n'a été annoncée.
+pub fn hit_rate(probs: &[f64], ys: &[f64]) -> Option<f64> {
+    let strong: Vec<f64> = probs
+        .iter()
+        .zip(ys)
+        .filter(|(p, _)| **p >= 0.5)
+        .map(|(_, y)| *y)
+        .collect();
+    (!strong.is_empty()).then(|| strong.iter().sum::<f64>() / strong.len() as f64)
+}
+
+/// Probabilité donnée par les paramètres d'un modèle (`launch`), et la part de chaque signal.
+fn score(m: &Value, f: &[f64; 5]) -> Option<(f64, Vec<f64>)> {
+    let g = |k: &str| {
+        m[k].as_array()
+            .map(|a| a.iter().filter_map(|v| v.as_f64()).collect::<Vec<f64>>())
+            .unwrap_or_default()
+    };
+    let (mean, std, w) = (g("mean"), g("std"), g("w"));
+    if mean.len() != 5 || std.len() != 5 || w.len() != 5 {
+        return None;
+    }
+    let contrib: Vec<f64> = (0..5).map(|k| w[k] * (f[k] - mean[k]) / std[k]).collect();
+    Some((
+        sigmoid(m["b"].as_f64().unwrap_or(0.0) + contrib.iter().sum::<f64>()),
+        contrib,
+    ))
+}
+
+async fn launch_model(st: &AppState) -> Value {
+    let m: Option<String> = sqlx::query_scalar("SELECT launch FROM idea_model WHERE id = 1")
+        .fetch_optional(&st.db)
+        .await
+        .ok()
+        .flatten()
+        .flatten();
+    m.and_then(|m| serde_json::from_str(&m).ok())
+        .unwrap_or(json!({}))
+}
+
+/// Garde la prédiction du jour de chaque nouvelle map encore dans son test d'Epic (0 à 13 jours).
+async fn record_predictions(st: &AppState) -> Result<usize, sqlx::Error> {
+    let m = launch_model(st).await;
+    if m["ready"].as_bool() != Some(true) {
+        return Ok(0);
+    }
+    let rows: Vec<(String, i64, i64, Option<i64>, Option<f64>, Option<f64>)> = sqlx::query_as(
+        "SELECT m.code, CAST(julianday('now') - julianday(date(i.first_seen)) AS INTEGER),
+                CAST(julianday(m.day) - julianday(date(i.first_seen)) AS INTEGER), m.unique_players, m.avg_minutes, m.d1
+         FROM fn_metrics m JOIN fn_islands i ON i.code = m.code
+         WHERE i.seen_new = 1 AND i.code NOT LIKE 'playlist_%' AND i.first_seen > datetime('now', '-14 days')
+           AND m.day BETWEEN date(i.first_seen) AND date('now')",
+    )
+    .fetch_all(&st.db)
+    .await?;
+    let mut by: HashMap<String, (i64, HashMap<i64, (Option<i64>, Option<f64>, Option<f64>)>)> =
+        HashMap::new();
+    for (c, age, a, p, mi, d) in rows {
+        by.entry(c)
+            .or_insert_with(|| (age, HashMap::new()))
+            .1
+            .insert(a, (p, mi, d));
+    }
+    let mut n = 0;
+    for (code, (age, ages)) in by {
+        let Some(f) = features(&ages) else { continue };
+        let Some((p, _)) = score(&m, &f) else {
+            continue;
+        };
+        n += sqlx::query("INSERT OR IGNORE INTO ia_predictions (code, day, age, model_id, prob, features) VALUES (?, date('now'), ?, ?, ?, ?)")
+            .bind(&code).bind(age).bind(m["model_id"].as_i64()).bind(p).bind(json!(f).to_string())
+            .execute(&st.db).await?.rows_affected() as usize;
+    }
+    Ok(n)
+}
+
+/// Note les prédictions des maps dont le test d'Epic (14 jours) est fini : ont-elles percé ?
+async fn grade(st: &AppState) -> Result<u64, sqlx::Error> {
+    let n = sqlx::query(
+        "UPDATE ia_predictions SET graded_at = datetime('now'),
+           best = (SELECT MAX(m.unique_players) FROM fn_metrics m JOIN fn_islands i ON i.code = m.code
+                   WHERE m.code = ia_predictions.code AND m.day BETWEEN date(i.first_seen) AND date(i.first_seen, '+14 days'))
+         WHERE graded_at IS NULL AND code IN (SELECT code FROM fn_islands WHERE first_seen < datetime('now', '-15 days'))",
+    )
+    .execute(&st.db)
+    .await?
+    .rows_affected();
+    sqlx::query("UPDATE ia_predictions SET outcome = (best >= ?) WHERE graded_at IS NOT NULL AND outcome IS NULL AND best IS NOT NULL")
+        .bind(BREAKOUT)
+        .execute(&st.db)
+        .await?;
+    Ok(n)
+}
+
+/// Administration → Apprentissage de l'IA : versions du modèle, précision réelle des prédictions vérifiées.
+pub async fn admin_learning(
+    axum::extract::State(st): axum::extract::State<AppState>,
+    u: crate::auth::AuthUser,
+) -> crate::error::ApiResult<Value> {
+    crate::security::require_admin(&st, &u).await?;
+    let models: Vec<(i64, String, i64, i64, Option<i64>, Option<f64>, Option<f64>, Option<f64>)> = sqlx::query_as(
+        "SELECT id, trained_at, n, positives, test_n, auc, brier, hit_rate FROM ia_models ORDER BY id DESC LIMIT 90",
+    ).fetch_all(&st.db).await?;
+    // Précision réelle : prédictions faites au 3e jour (âge 2, premiers jours complets), notées, par semaine.
+    let graded: Vec<(String, f64, i64)> = sqlx::query_as(
+        "SELECT strftime('%Y-%W', day), prob, outcome FROM ia_predictions WHERE age = 2 AND outcome IS NOT NULL ORDER BY day",
+    ).fetch_all(&st.db).await?;
+    let mut weeks: Vec<(String, Vec<f64>, Vec<f64>)> = vec![];
+    for (w, p, o) in graded {
+        if weeks.last().map(|x| x.0 != w).unwrap_or(true) {
+            weeks.push((w.clone(), vec![], vec![]));
+        }
+        let last = weeks.last_mut().unwrap();
+        last.1.push(p);
+        last.2.push(o as f64);
+    }
+    let recent: Vec<(String, String, i64, f64, Option<i64>, Option<i64>)> = sqlx::query_as(
+        "SELECT p.code, i.title, p.age, p.prob, p.best, p.outcome FROM ia_predictions p JOIN fn_islands i ON i.code = p.code
+         WHERE p.age = 2 AND p.graded_at IS NOT NULL ORDER BY p.graded_at DESC, p.prob DESC LIMIT 20",
+    ).fetch_all(&st.db).await?;
+    let counts: (i64, i64) = sqlx::query_as(
+        "SELECT COUNT(*), COALESCE(SUM(graded_at IS NOT NULL), 0) FROM ia_predictions",
+    )
+    .fetch_one(&st.db)
+    .await?;
+    Ok(axum::Json(json!({
+        "threshold": BREAKOUT,
+        "predictions": counts.0, "graded": counts.1,
+        "models": models.into_iter().map(|r| json!({ "id": r.0, "at": r.1, "n": r.2, "positives": r.3, "test_n": r.4, "auc": r.5, "brier": r.6, "hit_rate": r.7 })).collect::<Vec<_>>(),
+        "weeks": weeks.iter().map(|(w, p, y)| json!({ "week": w, "n": p.len(),
+            // L'AUC n'a de sens que si la semaine a des maps qui ont percé et d'autres non.
+            "auc": (y.iter().any(|v| *v > 0.5) && y.iter().any(|v| *v < 0.5)).then(|| auc(p, y)), "brier": brier(p, y),
+            "accuracy": p.iter().zip(y).filter(|(a, b)| (**a >= 0.5) == (**b > 0.5)).count() as f64 / p.len() as f64 })).collect::<Vec<_>>(),
+        "recent": recent.into_iter().map(|r| json!({ "code": r.0, "title": r.1, "prob": r.3, "best": r.4, "outcome": r.5 })).collect::<Vec<_>>(),
+    })))
 }
 
 /// Chance de percer d'une map d'après ses premiers jours, avec ce qui la fait monter ou baisser.
@@ -337,30 +539,13 @@ pub async fn predict(
     let Some(f) = features(by_age) else {
         return Value::Null;
     };
-    let m: Option<String> = sqlx::query_scalar("SELECT launch FROM idea_model WHERE id = 1")
-        .fetch_optional(&st.db)
-        .await
-        .ok()
-        .flatten()
-        .flatten();
-    let m: Value = m
-        .and_then(|m| serde_json::from_str(&m).ok())
-        .unwrap_or(json!({}));
+    let m = launch_model(st).await;
     if m["ready"].as_bool() != Some(true) {
         return json!({ "ready": false, "n": m["n"], "positives": m["positives"], "threshold": BREAKOUT });
     }
-    let g = |k: &str| {
-        m[k].as_array()
-            .map(|a| a.iter().filter_map(|v| v.as_f64()).collect::<Vec<f64>>())
-            .unwrap_or_default()
-    };
-    let (mean, std, w) = (g("mean"), g("std"), g("w"));
-    if mean.len() != 5 || std.len() != 5 || w.len() != 5 {
+    let Some((p, contrib)) = score(&m, &f) else {
         return Value::Null;
-    }
-    let b = m["b"].as_f64().unwrap_or(0.0);
-    let contrib: Vec<f64> = (0..5).map(|k| w[k] * (f[k] - mean[k]) / std[k]).collect();
-    let p = 1.0 / (1.0 + (-(b + contrib.iter().sum::<f64>())).exp());
+    };
     let mut factors: Vec<(usize, f64)> = contrib
         .iter()
         .copied()
@@ -413,4 +598,107 @@ pub async fn admin_refresh(
         .await?;
     daily(&st).await;
     Ok(axum::Json(status(&st).await))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn decoupage_dans_le_temps_et_mesures() {
+        let (tr, te) = temporal_split(8);
+        assert_eq!(tr, (0..6).collect::<Vec<_>>());
+        assert_eq!(
+            te,
+            vec![6, 7],
+            "la vérification porte sur les maps les plus récentes"
+        );
+        assert_eq!(auc(&[0.9, 0.8, 0.1], &[1.0, 1.0, 0.0]), 1.0);
+        assert_eq!(auc(&[0.1, 0.9], &[1.0, 0.0]), 0.0);
+        assert!((brier(&[1.0, 0.0], &[1.0, 0.0])).abs() < 1e-9);
+        assert!((brier(&[0.5, 0.5], &[1.0, 0.0]) - 0.25).abs() < 1e-9);
+        assert_eq!(hit_rate(&[0.2, 0.3], &[1.0, 0.0]), None);
+        assert_eq!(hit_rate(&[0.9, 0.6, 0.1], &[1.0, 0.0, 1.0]), Some(0.5));
+    }
+
+    /// Une map de test : `strong` décide si ses premiers jours sont bons et si elle perce ensuite.
+    async fn island(st: &AppState, code: &str, days_ago: i64, strong: bool, noise: i64) {
+        sqlx::query("INSERT INTO fn_islands (code, title, first_seen, seen_new) VALUES (?, ?, datetime('now', ?), 1)")
+            .bind(code).bind(format!("Map {code}")).bind(format!("-{days_ago} days")).execute(&st.db).await.unwrap();
+        for age in 0..=14i64 {
+            if days_ago - age < 1 {
+                break;
+            }
+            let base = if strong { 300 + 120 * age } else { 40 + noise };
+            let players = if strong && age >= 6 { 1500 } else { base };
+            sqlx::query("INSERT INTO fn_metrics (code, day, unique_players, avg_minutes, d1) VALUES (?, date('now', ?), ?, ?, ?)")
+                .bind(code).bind(format!("-{} days", days_ago - age)).bind(players)
+                .bind(if strong { 25.0 } else { 8.0 }).bind(if strong { 0.3 } else { 0.08 })
+                .execute(&st.db).await.unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn entraine_garde_les_predictions_et_les_note() {
+        let st = crate::test_state().await;
+        // 80 maps sorties il y a 20 à 180 jours ; une sur quatre perce.
+        for k in 0..80i64 {
+            island(
+                &st,
+                &format!("1000-0000-{k:04}"),
+                20 + 2 * k,
+                k % 4 == 0,
+                k % 7,
+            )
+            .await;
+        }
+        train(&st).await.unwrap();
+        let (n, test_n, a): (i64, i64, f64) =
+            sqlx::query_as("SELECT n, test_n, auc FROM ia_models ORDER BY id DESC LIMIT 1")
+                .fetch_one(&st.db)
+                .await
+                .unwrap();
+        assert_eq!(n, 80);
+        assert_eq!(test_n, 20, "un quart, les plus récentes");
+        assert!(
+            a > 0.9,
+            "sur des données nettes, l'IA sépare bien les maps : AUC {a}"
+        );
+
+        // Deux nouvelles maps encore en test : leur prédiction du jour est gardée.
+        island(&st, "2000-0000-0001", 3, true, 0).await;
+        island(&st, "2000-0000-0002", 3, false, 3).await;
+        assert_eq!(record_predictions(&st).await.unwrap(), 2);
+        assert_eq!(
+            record_predictions(&st).await.unwrap(),
+            0,
+            "une seule prédiction par map et par jour"
+        );
+        let (strong, weak): (f64, f64) = sqlx::query_as(
+            "SELECT (SELECT prob FROM ia_predictions WHERE code = '2000-0000-0001'), (SELECT prob FROM ia_predictions WHERE code = '2000-0000-0002')",
+        ).fetch_one(&st.db).await.unwrap();
+        assert!(
+            strong > weak,
+            "la bonne map est mieux notée ({strong} > {weak})"
+        );
+
+        // Une prédiction faite il y a longtemps pour une map dont le test est fini est notée.
+        sqlx::query("INSERT INTO ia_predictions (code, day, age, prob, features) VALUES ('1000-0000-0000', date('now', '-30 days'), 2, 0.8, '[]'), ('1000-0000-0001', date('now', '-30 days'), 2, 0.7, '[]'), ('2000-0000-0001', date('now', '-1 days'), 2, 0.6, '[]')")
+            .execute(&st.db).await.unwrap();
+        grade(&st).await.unwrap();
+        let o: Vec<(String, Option<i64>)> =
+            sqlx::query_as("SELECT code, outcome FROM ia_predictions WHERE age = 2 ORDER BY code")
+                .fetch_all(&st.db)
+                .await
+                .unwrap();
+        assert_eq!(
+            o,
+            vec![
+                ("1000-0000-0000".into(), Some(1)),
+                ("1000-0000-0001".into(), Some(0)),
+                ("2000-0000-0001".into(), None)
+            ],
+            "percée, ratée, et pas encore notée tant que son test n'est pas fini"
+        );
+    }
 }

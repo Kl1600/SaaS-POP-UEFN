@@ -19,6 +19,10 @@ EN COURS | #113 Forge F27 · Compétences : packs de consignes UEFN et Verse lus
 Owner : Kl1600 | Sur la tâche : Claude Code, pour Kl1600
 Fait : 5 compétences POP (server/skills/), compétences du studio (migration 0029), MCP list_skills / get_skill, tests
 Reste : validation par Kl1600
+FAIT | #70 IA d'analyse : garder chaque prédiction, la vérifier après coup et suivre la précision jour par jour | 20/11 21:10
+Owner : Kl1600 | Sur la tâche : Claude Code, pour Kl1600
+Fait : migration 0027 (ia_models, ia_predictions), model.rs (temporal_split, auc, brier, record_predictions, grade, admin_learning), onglet Admin
+Reste : rien ; prochaines étapes #71 (signaux) et #72 (modèle)
 Bloque : rien
 ```
 
