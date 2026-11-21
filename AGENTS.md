@@ -6,8 +6,8 @@ humain** avant d'agir.
 
 ## 0. Règle absolue
 
-Une tâche n'est pas finie tant que son issue GitHub n'est pas à jour, que son code n'est pas fusionné dans `main`
-et qu'un humain ne l'a pas validée.
+Une tâche n'est pas finie tant que son issue GitHub n'est pas à jour, que chaque critère d'acceptation n'a pas été
+vérifié par l'agent (preuve notée avec `done --verifie`) et que son code n'est pas fusionné dans `main` avec un CI vert.
 
 - On change un statut avec `python tools/task.py`, et rien d'autre. L'outil refuse ce qui casse une règle ;
   l'action GitHub `règles des tâches` rattrape ce qui passerait par le site ou l'API.
@@ -57,10 +57,10 @@ python tools/task.py next                         ce qu'on peut commencer, le pl
 python tools/task.py show 12                      la tâche, ses dépendances, sa branche, sa PR
 python tools/task.py start 12 --who "Claude Code, pour <humain>"
    … travail sur la branche issue/12-… , commits « #12 : … » …
-python tools/task.py review 12 --note "ce qui a été fait et vérifié" --plan "1. … 2. …"
-   … l'humain suit le plan de test …
-python tools/task.py rework 12 --note "ce qui a échoué"       l'humain a trouvé un problème
-python tools/task.py done 12 --valide-par "<humain> : ce qu'il a vérifié"   seulement après son accord
+python tools/task.py review 12 --note "ce qui a été fait" --plan "1. … 2. …"
+   … l'agent vérifie chaque critère, le CI passe au vert …
+python tools/task.py done 12 --verifie "critère 1 : testé en local, … ; critère 2 : …"   fusionne la PR
+python tools/task.py rework 12 --note "ce qui a échoué"       un problème trouvé en revue (ou par un humain)
 python tools/task.py block 12 --raison "…"        coincé : dire pourquoi
 python tools/task.py release 12 --note "fait / reste"         vous arrêtez sans finir
 python tools/task.py check                        audit du tableau
@@ -93,7 +93,7 @@ python tools/task.py check                        audit du tableau
 Une branche longue qui mélange plusieurs sujets ne se relit pas, ne se teste pas et casse le travail des autres
 à la fusion. Donc :
 - **Rien n'arrive sur `main` sans PR.** On ne pousse jamais sur `main`, on n'y fusionne jamais sa branche soi-même
-  (`git merge` puis `git push origin main`) : c'est `task.py done` qui fusionne, après la validation de l'humain.
+  (`git merge` puis `git push origin main`) : c'est `task.py done` qui fusionne, une fois les critères vérifiés et le CI vert.
   Un push direct sur `main` ouvre automatiquement une issue d'alerte (action `garde de main`).
 - **Une branche = une issue = un sujet.** Nom `issue/N-…` (créée par `start`) ou `outillage/…` (outillage ou
   documentation demandés par l'humain). Pas de branche `claude`, `fix`, `wip`, au nom d'un agent ou d'un humain.
@@ -124,10 +124,13 @@ Une branche longue qui mélange plusieurs sujets ne se relit pas, ne se teste pa
   *testé en local*, *testé avec le vrai UEFN*, *lecture du code seulement*. Du code qui compile n'est **pas** validé.
 - `review` pousse la branche, ouvre la PR (`Closes #N`) et passe la tâche `en revue`. Le **plan de test manuel**
   a une étape numérotée par critère : point de départ, actions, résultat attendu, faisable sans lire le code.
-  Donnez le même plan à votre humain dans la conversation.
-- L'humain teste. OK → `done N --valide-par "…"` : l'outil refuse sans `en revue`, sans PR, si le CI n'est pas vert
-  ou si une dépendance est ouverte ; il fusionne la PR en *squash* et ferme l'issue. Problème → `rework`, on corrige,
-  on revient au début de §4.4.
+  Il reste dans la PR pour qu'un humain puisse retester après coup ; donnez-le aussi à votre humain.
+- Pas de validation humaine avant la fusion : quand chaque critère est vérifié, `done N --verifie "…"` avec, pour
+  chaque critère, la preuve et son genre. L'outil refuse sans `en revue`, sans PR, si le CI n'est pas vert ou si une
+  dépendance est ouverte ; il fusionne la PR en *squash* et ferme l'issue. Un critère pas vérifiable par l'agent
+  (vrai UEFN absent, par exemple) : dites-le dans `--verifie` ou demandez à votre humain, n'inventez pas de preuve.
+  Problème → `rework`, on corrige, on revient au début de §4.4. Un humain qui trouve un problème après la fusion
+  ouvre une issue `type:bug`.
 - Vous arrêtez avant la fin → `release` avec ce qui est fait, ce qui reste **et le nom de la branche**. Ne laissez
   jamais une tâche `en cours` sans personne dessus.
 - Puis une entrée dans votre fichier de domaine `KB/agents/<domaine>.md` (modèle dans `KB/README.md`).
@@ -184,7 +187,7 @@ l'accord de votre humain.
 
 - Commencer une tâche prise, bloquée, en revue ou faite ; réassigner ou désassigner quelqu'un d'autre.
 - Proposer des tâches sans avoir rafraîchi le tableau (§4.1).
-- Fermer une issue dont un critère n'est pas vérifié, ou qu'aucun humain n'a validée.
+- Fermer une issue dont un critère n'est pas vérifié, ou dire qu'un critère est vérifié sans l'avoir fait.
 - Supprimer ou réécrire des issues, jalons ou étiquettes ; changer le périmètre d'une autre issue.
 - Changer une décision de `KB/DECISIONS.md`, ou éditer l'entrée d'un autre dans la KB.
 - Réécrire l'historique publié (`main`), pousser sur `main` (en force ou non), fusionner sa branche dans `main`

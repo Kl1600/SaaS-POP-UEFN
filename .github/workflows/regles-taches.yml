@@ -1,7 +1,7 @@
 # Fait respecter les règles des tâches (AGENTS.md §0 et §4) sur chaque issue, quel que soit le chemin
 # (tools/task.py, le site GitHub, un agent qui passe par l'API) :
 #   - une issue fermée alors qu'une dépendance est ouverte est rouverte ;
-#   - une issue fermée « terminée » sans commentaire « Validé par : » est rouverte
+#   - une issue fermée « terminée » sans commentaire « Vérifié par : » (ou l'ancien « Validé par : ») est rouverte
 #     (pour abandonner une tâche, fermez-la en « Not planned ») ;
 #   - « en cours » ou « en revue » posé sur une issue bloquée est retiré ;
 #   - une issue fermée perd ses étiquettes de statut.
@@ -45,8 +45,8 @@ jobs:
               } else if (issue.state_reason !== 'not_planned') {
                 const comments = await github.paginate(github.rest.issues.listComments,
                   { owner, repo, issue_number: number, per_page: 100 });
-                if (!comments.some(c => /^Validé par :/m.test(c.body))) {
-                  reason = `Rouverte : aucune validation humaine. Une tâche se ferme avec « python tools/task.py done ${number} --valide-par "…" » après le test d'un humain. Pour l'abandonner, fermez-la en « Not planned ».`;
+                if (!comments.some(c => /^(Vérifié|Validé) par :/m.test(c.body))) {
+                  reason = `Rouverte : aucune vérification notée. Une tâche se ferme avec « python tools/task.py done ${number} --verifie "…" » une fois chaque critère vérifié et le CI vert. Pour l'abandonner, fermez-la en « Not planned ».`;
                 }
               }
               if (reason) {
