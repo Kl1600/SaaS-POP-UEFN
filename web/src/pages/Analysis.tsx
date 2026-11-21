@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Flame, RefreshCw, Star, X, ExternalLink, TrendingUp, TrendingDown, Search } from 'lucide-react'
 import { ago, api } from '../api'
 import { useApp, useLoad } from '../state'
-import { CardHead, Empty, PageHead, useDialog } from '../components/ui'
+import { CardHead, Empty, PageHead, useDialog, Layer } from '../components/ui'
 import { tr, LOCALE } from '../i18n/t'
 import { useNav } from '../routes'
 
@@ -34,7 +34,7 @@ export function IslandDrawer({ code, onClose }: { code: string; onClose: () => v
   const { data, reload, error } = useLoad<any>(`/api/analytics/islands/${code}`, [code])
   const series = (data?.series ?? []).filter((s: any) => s.players !== null)
   const max = Math.max(1, ...series.map((s: any) => s.players ?? 0))
-  return <>
+  return <Layer>
     <div className="scrim" onClick={onClose} />
     <aside ref={dlg as any} tabIndex={-1} aria-modal="true" role="dialog" className="drawer" aria-label={tr("Fiche de l’île")}>
       <div className="row" style={{ justifyContent: 'space-between' }}><h2 style={{ margin: 0, fontWeight: 500, fontSize: 20 }}>{data?.title || code}</h2><button className="iconbtn" aria-label={tr("Fermer")} onClick={onClose}><X size={18} /></button></div>
@@ -56,7 +56,7 @@ export function IslandDrawer({ code, onClose }: { code: string; onClose: () => v
           <tbody>{series.slice().reverse().map((s: any) => <tr key={s.day}><td>{day(s.day)}</td><td>{n(s.players)}</td><td>{n(s.peak_ccu)}</td><td>{n(s.plays)}</td><td>{s.avg_minutes ? Math.round(s.avg_minutes) : '—'}</td><td>{pct(s.d1)}</td></tr>)}</tbody></table>
       </>}
     </aside>
-  </>
+  </Layer>
 }
 
 function useIsland() {
@@ -156,7 +156,7 @@ function GenreDrawer({ g, onClose, openIsland }: { g: any; onClose: () => void; 
   const dlg = useDialog(onClose)
   const v = VERDICT[g.verdict]
   const max = Math.max(1, ...g.series.map((s: any) => s.players ?? 0))
-  return <>
+  return <Layer>
     <div className="scrim" onClick={onClose} />
     <aside ref={dlg as any} tabIndex={-1} aria-modal="true" role="dialog" className="drawer" aria-label={tr("Genre {0}", [g.tag])}>
       <div className="row" style={{ justifyContent: 'space-between' }}><h2 style={{ margin: 0, fontWeight: 500, fontSize: 22 }}>{cap(g.tag)}</h2><button className="iconbtn" aria-label={tr("Fermer")} onClick={onClose}><X size={18} /></button></div>
@@ -178,7 +178,7 @@ function GenreDrawer({ g, onClose, openIsland }: { g: any; onClose: () => void; 
       <div className="list">{g.top.map((m: any, i: number) => <button key={m.code} className="li rowlink" style={{ border: 0, background: 'none', font: 'inherit', color: 'inherit', textAlign: 'left', width: '100%' }} onClick={() => openIsland(m.code)}>
         <span className="muted" style={{ width: 18 }}>{i + 1}</span><span style={{ flex: 1 }}>{m.title || m.code}</span><span className="small muted">{n(m.players)} joueurs</span></button>)}</div>
     </aside>
-  </>
+  </Layer>
 }
 
 export function Market({ title, bar }: { title?: string; bar?: ReactNode } = {}) {

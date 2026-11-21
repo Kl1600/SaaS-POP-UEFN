@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import { useEffect, useRef, type ReactNode } from 'react'
 import { initials } from '../api'
 import { tr } from '../i18n/t'
@@ -52,12 +53,16 @@ export function useDialog(onClose: () => void) {
   return ref
 }
 
+/** Rend une fiche au niveau de l'appli (dans `.app`, pour garder le thème) : centrée sur l'écran,
+ *  quel que soit le conteneur de la page (un parent animé ou transformé décalerait `position: fixed`). */
+export const Layer = ({ children }: { children: ReactNode }) => createPortal(children, document.querySelector('.app') ?? document.body)
+
 export const Drawer = ({ onClose, label, children }: { onClose: () => void; label: string; children: ReactNode }) => {
   const ref = useDialog(onClose)
-  return <>
+  return <Layer>
     <div className="scrim" onClick={onClose} />
     <aside ref={ref as any} className="drawer" role="dialog" aria-modal="true" aria-label={label} tabIndex={-1}>{children}</aside>
-  </>
+  </Layer>
 }
 
 export const Modal = ({ onClose, label, children }: { onClose: () => void; label: string; children: ReactNode }) => {

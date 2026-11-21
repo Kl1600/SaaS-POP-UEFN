@@ -144,7 +144,10 @@ button{font:inherit}
 .auth img{height:56px;margin:0 auto 24px;display:block}
 /* Overlays */
 .scrim{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:40;animation:fade .12s ease}
-.drawer{position:fixed;top:0;right:0;bottom:0;width:min(520px,100%);background:var(--surface);border-left:1px solid var(--border);padding:24px;overflow:auto;z-index:41;animation:slide .15s ease;color:var(--text)}
+.drawer{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(580px,calc(100vw - 32px));max-height:calc(100dvh - 48px);background:var(--surface);border:1px solid var(--border);border-radius:20px;box-shadow:0 24px 60px rgba(0,0,0,.28);padding:24px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;z-index:41;animation:dpop .16s ease;color:var(--text)}
+.drawer > *{max-width:100%}
+@keyframes dpop{from{opacity:0;transform:translate(-50%,-48%) scale(.98)}}
+@media (max-width:640px){.drawer{width:calc(100vw - 16px);max-height:calc(100dvh - 16px);padding:18px;border-radius:16px}}
 .modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(560px,calc(100% - 32px));max-height:calc(100vh - 64px);overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:24px;z-index:41;color:var(--text)}
 @keyframes fade{from{opacity:0}}
 @keyframes slide{from{transform:translateX(16px);opacity:0}}
@@ -527,7 +530,7 @@ body.wb-fs .side,body.wb-fs .top{visibility:hidden}
 .guide-pts{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:8px}
 .guide-pts li{display:flex;gap:10px;line-height:1.45;font-size:14.5px}
 .guide-pace{margin-top:12px;padding:10px 12px;border:1px solid var(--border);border-radius:12px}
-.guide-sugs{display:grid;gap:8px}
+.guide-sugs{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
 .guide-sug{display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:12px;padding:8px 8px 8px 12px}
 .guide-sug.first{border-color:rgba(237,117,62,.55);background:rgba(237,117,62,.05)}
 .guide-sug-main{all:unset;flex:1;min-width:0;cursor:pointer;display:flex;flex-direction:column;gap:2px}
@@ -671,7 +674,7 @@ body.wb-fs .side,body.wb-fs .top{visibility:hidden}
   .icard-foot { display: flex; justify-content: space-between; padding: 10px 16px 14px; }
   .icard-save.on { color: #e5484d; }
   .icard-save.on svg { fill: currentColor; }
-  .idrawer { width: min(640px, 100%); padding: 0; }
+  .idrawer { width: min(640px, calc(100vw - 32px)); padding: 0; }
   .idrawer > :not(.idrawer-head) { margin-left: 24px; margin-right: 24px; }
   .idrawer-head { padding: 18px 24px 20px; }
   .idrawer-head h2 { margin: 0; font-size: 22px; font-weight: 600; }
