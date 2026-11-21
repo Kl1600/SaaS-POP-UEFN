@@ -39,6 +39,7 @@ mod tasks;
 mod uefn;
 mod verify;
 mod verse;
+mod widgets;
 mod ws;
 
 use axum::{

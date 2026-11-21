@@ -1485,6 +1485,17 @@ pub async fn undo(
     if status != "done" {
         return Err(bad("Seule une action réussie s’annule."));
     }
+    // Une interface POP déjà posée dans le niveau ne se retire pas : le niveau ne compilerait plus (#115).
+    if u2["action"] == "delete_file" {
+        if let Some(acteur) = crate::widgets::utilise(
+            u2["args"]["path"].as_str().unwrap_or(""),
+            &snapshot(&st, mid).await?.actors,
+        ) {
+            return Err(AppError::Conflict(format!(
+                "Interface encore utilisée par l’acteur « {acteur} » : retirez-le du niveau avant d’annuler."
+            )));
+        }
+    }
     // Réserve l'annulation avant de l'envoyer : deux Ctrl+Z rapprochés n'annulent pas deux fois la même action (#6).
     let claimed =
         sqlx::query("UPDATE uefn_actions SET status = 'undone' WHERE id = ? AND status = 'done'")
