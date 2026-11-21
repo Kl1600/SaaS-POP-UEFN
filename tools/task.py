@@ -8,9 +8,9 @@
                                                      prend la tâche et crée la branche issue/12-…
     python tools/task.py review 12 --note "..." --plan "1. ... 2. ..." [--gros "raison"]
                                                      pousse la branche, ouvre la PR, passe « en revue »
-    python tools/task.py rework 12 --note "..."      la validation humaine a échoué : retour « en cours »
-    python tools/task.py done 12 --valide-par "Yassine : ce qu'il a vérifié"
-                                                     après la validation humaine et un CI vert : fusionne la PR
+    python tools/task.py done 12 --verifie "critère 1 : testé en local, … ; critère 2 : …"
+                                                     l'agent a vérifié chaque critère et le CI est vert : fusionne la PR
+    python tools/task.py rework 12 --note "..."      un problème trouvé pendant la revue : retour « en cours »
     python tools/task.py block 12 --raison "..."     dit pourquoi une tâche commencée est coincée
     python tools/task.py release 12 --note "..."     rend la tâche (fait, reste, branche)
     python tools/task.py check                       audit du tableau et des branches (code 1 s'il y a un problème)
@@ -41,7 +41,7 @@ DOING, REVIEW, BLOCKED = "en cours", "en revue", "bloqué"
 STATUS_LABELS = (DOING, REVIEW, BLOCKED)
 PRIORITIES = ("P0", "P1", "P2")
 PRIORITY_PREFIX = "priorité:"
-VALIDATED_PREFIX = "Validé par :"
+VALIDATED_PREFIX = "Vérifié par :"
 CLAIM_RE = re.compile(r"<!-- tache-prise id=(\w+) -->")
 RELEASE_MARK = "<!-- tache-rendue -->"
 STALE_HOURS = 48
@@ -250,7 +250,7 @@ def claimable_reason(item):
         return f"#{n} est fermée ({status(item)})"
     labels = labels_of(item)
     if REVIEW in labels:
-        return f"#{n} est en revue : elle attend la validation d'un humain"
+        return f"#{n} est en revue : son agent doit finir sa vérification et lancer « done »"
     if DOING in labels:
         who = ", ".join(a["login"] for a in item["assignees"]) or "personne"
         return f"#{n} est déjà en cours ({who})"
@@ -475,7 +475,7 @@ def cmd_review(a):
     add_label(n, REVIEW)
     comment(n, f"EN REVUE : {pr['url']}\nFait : {a.note}\n\nPlan de test manuel :\n{a.plan}")
     print(f"#{n} en revue · {pr['url']}")
-    print("Donnez le plan de test à votre humain et attendez sa validation avant « done ».")
+    print("Vérifiez vous-même chaque critère, puis « done » avec --verifie quand le CI est vert.")
     return 0
 
 
@@ -539,9 +539,10 @@ def cmd_done(a):
     n = a.number
     i = issue(n)
     if REVIEW not in labels_of(i):
-        raise Refused(f"#{n} n'est pas en revue ({status(i)}) : « done » vient après « review » et la validation d'un humain")
-    if not a.valide_par.strip():
-        raise Refused("--valide-par est obligatoire : qui a validé, et ce qu'il a vérifié")
+        raise Refused(f"#{n} n'est pas en revue ({status(i)}) : « done » vient après « review »")
+    if not a.verifie.strip():
+        raise Refused("--verifie est obligatoire : pour chaque critère, ce qui a été vérifié et comment "
+                      "(compilé, testé en local, testé avec le vrai UEFN, lecture du code)")
     waiting = open_blockers(n)
     if waiting:
         raise Refused(f"#{n} est bloquée par " + ", ".join(f"#{b['number']}" for b in waiting))
@@ -558,7 +559,7 @@ def cmd_done(a):
         raise Refused("le CI tourne encore (" + ", ".join(pending) + ") : attendez qu'il soit vert")
     if not good:
         raise Refused("aucun contrôle CI sur la PR : attendez que le CI démarre")
-    comment(n, f"{VALIDATED_PREFIX} {a.valide_par}" + (f"\nNote : {a.note}" if a.note else ""))
+    comment(n, f"{VALIDATED_PREFIX} {me()} : {a.verifie}" + (f"\nNote : {a.note}" if a.note else ""))
     merge_pr(pr)
     for label in STATUS_LABELS:
         remove_label(n, label)
@@ -685,7 +686,8 @@ def main():
     x.add_argument("--gros", help="raison, acceptée par l'humain, de dépasser la taille limite d'une branche")
     x.set_defaults(fn=cmd_review)
     x = s.add_parser("rework"); x.add_argument("number", type=int); x.add_argument("--note", required=True); x.set_defaults(fn=cmd_rework)
-    x = s.add_parser("done"); x.add_argument("number", type=int); x.add_argument("--valide-par", required=True)
+    x = s.add_parser("done"); x.add_argument("number", type=int); x.add_argument("--verifie", "--valide-par", dest="verifie", required=True,
+                   help="ce qui a été vérifié pour chaque critère, et comment")
     x.add_argument("--note"); x.set_defaults(fn=cmd_done)
     x = s.add_parser("block"); x.add_argument("number", type=int); x.add_argument("--raison", required=True); x.set_defaults(fn=cmd_block)
     x = s.add_parser("release"); x.add_argument("number", type=int); x.add_argument("--note", required=True); x.set_defaults(fn=cmd_release)
