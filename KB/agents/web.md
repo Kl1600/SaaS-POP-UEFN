@@ -41,3 +41,7 @@ Bloque : rien
 - Fait : le titre de page et les cellules des tableaux sont des zones de texte qui grandissent (`AutoText` dans `Pages.tsx`) au lieu d'`<input>` qui ne passent jamais à la ligne ; Entrée n'y ajoute pas de ligne. Le bloc de code défile seul à l'horizontale, une longue URL se coupe (`overflow-wrap:anywhere`, `min-width:0` sur `.btext`).
 - Vérifié : navigateur en local à 900 px, thèmes clair et sombre (largeur de page = largeur de fenêtre), saisie dans le titre et une cellule enregistrée.
 - Leçon : un `<input>` dans une cellule ou un titre coupe toujours le texte long ; dans un conteneur flex, un enfant qui doit rétrécir a besoin de `min-width:0`.
+### 2026-11-22 · #171 · noms des jalons lisibles dans la chronologie
+- Fait : `MilestoneRow` dans `Plan.tsx` mesure chaque nom après le rendu, le garde dans la piste (bords gauche et droit) et le pose sur la première rangée libre, dans l'ordre des dates ; la ligne « Jalons » grandit avec les rangées. Nom complet et date au survol du losange et du nom ; nom raccourci au-delà de 220 px.
+- Vérifié : navigateur en local, 8 jalons dont 6 sur 5 jours consécutifs et 2 le même jour : aucun chevauchement, aucun nom hors de la piste, en clair (écran large) et en sombre (900 px).
+- Vu en passant (hors périmètre) : les dates du haut de la chronologie se chevauchent aussi au début de la période (« 15 nov. »).

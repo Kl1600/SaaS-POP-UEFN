@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Trash2 } from 'lucide-react'
 import { addDays, api, frDate, ymd } from '../api'
 import { useApp, useLive, useLoad } from '../state'
@@ -194,9 +194,7 @@ function Timeline() {
               </div>
             )
           })}
-          <div className="grow" style={{ minHeight: 50 }}><span className="gname" style={{ fontWeight: 500 }}>{tr("Jalons")}</span><div className="gtrack">
-            {data.milestones.map((m: any) => pos(m.date) >= 0 && <span key={m.id}><span className="diamond" style={{ left: `${(pos(m.date) + 0.5) * W}%` }} /><span className="dlab" style={{ left: `${(pos(m.date) + 0.5) * W}%` }}>{m.title}</span></span>)}
-          </div></div>
+          <MilestoneRow items={data.milestones.filter((m: any) => pos(m.date) >= 0).map((m: any) => ({ id: m.id, title: m.title, date: m.date, x: (pos(m.date) + 0.5) * W / 100 }))} />
         </div>
       </div>
       <p className="small muted">{tr("Barres pleines : chemin critique. Ligne rouge : aujourd'hui. Double-clic sur une barre : ouvrir la tâche.")}</p>
@@ -224,6 +222,53 @@ function Timeline() {
       </section>
     </div>
   </>
+}
+
+/** Ligne « Jalons » de la chronologie (#171) : chaque nom est mesuré, gardé dans la piste et posé sur
+ * la première rangée où il ne touche aucun autre nom ; la ligne grandit avec le nombre de rangées. */
+function MilestoneRow({ items }: { items: { id: number; title: string; date: string; x: number }[] }) {
+  const track = useRef<HTMLDivElement>(null)
+  const [lay, setLay] = useState<{ left: number; row: number }[] | null>(null)
+  const [width, setWidth] = useState(0)
+  useEffect(() => {
+    const el = track.current; if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => setWidth(el.clientWidth)); ro.observe(el); return () => ro.disconnect()
+  }, [])
+  const key = items.map(m => `${m.id}:${m.title}:${m.x}`).join('|')
+  useLayoutEffect(() => {
+    const el = track.current; if (!el) return
+    const tw = el.clientWidth
+    const labs = Array.from(el.querySelectorAll<HTMLElement>('.dlab'))
+    const gap = 8
+    const placed = items.map((m, i) => {
+      const w = labs[i]?.offsetWidth ?? 0
+      return { i, w, x: m.x, left: Math.max(0, Math.min(tw - w, m.x * tw - w / 2)) }
+    }).sort((a, b) => a.x - b.x || a.left - b.left) // ordre des dates : les rangées se lisent de gauche à droite
+    const ends: number[] = []
+    const out: { left: number; row: number }[] = new Array(items.length)
+    for (const p of placed) {
+      let r = ends.findIndex(e => p.left >= e + gap)
+      if (r < 0) { r = ends.length; ends.push(0) }
+      ends[r] = p.left + p.w
+      out[p.i] = { left: p.left, row: r }
+    }
+    if (JSON.stringify(out) !== JSON.stringify(lay)) setLay(out)
+  }, [key, width])
+  const rows = lay ? Math.max(1, ...lay.map(l => l.row + 1)) : 1
+  return (
+    <div className="grow" style={{ minHeight: 34 + rows * 18 }}><span className="gname" style={{ fontWeight: 500 }}>{tr("Jalons")}</span>
+      <div className="gtrack" ref={track} style={{ height: 30 + rows * 18 }}>
+        {items.map((m, i) => {
+          const tip = `${m.title} · ${frDate(m.date)}`
+          const l = lay?.[i]
+          return <span key={m.id}>
+            <span className="diamond" style={{ left: `${m.x * 100}%` }} title={tip} aria-label={tip} />
+            <span className="dlab" title={tip} style={l ? { left: l.left, top: 26 + l.row * 18, transform: 'none' } : { left: `${m.x * 100}%`, visibility: 'hidden' }}>{m.title}</span>
+          </span>
+        })}
+      </div>
+    </div>
+  )
 }
 
 function Seasons() {

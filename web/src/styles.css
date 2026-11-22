@@ -255,8 +255,8 @@ button{font:inherit}
 .gbar{position:absolute;top:3px;height:24px;border-radius:7px;border:1px solid var(--text3);background:var(--hover);color:var(--text);font-size:11.5px;font-weight:500;display:flex;align-items:center;gap:6px;padding:0 6px;cursor:grab;white-space:nowrap;overflow:hidden}
 .gbar.crit{background:var(--text);color:var(--bg);border-color:var(--text)}
 .gbar.done{opacity:.45}
-.diamond{position:absolute;top:8px;width:14px;height:14px;background:var(--text);transform:translateX(-7px) rotate(45deg);border-radius:2px}
-.dlab{position:absolute;top:26px;font-size:11.5px;font-weight:500;transform:translateX(-50%);white-space:nowrap}
+.diamond{position:absolute;top:8px;width:14px;height:14px;background:var(--text);transform:translateX(-7px) rotate(45deg);border-radius:2px;cursor:help}
+.dlab{position:absolute;top:26px;font-size:11.5px;font-weight:500;transform:translateX(-50%);white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis;line-height:16px}
 /* Wizard */
 .steps{display:flex;flex-wrap:wrap;gap:6px;list-style:none;margin:0;padding:0}
 .stp{display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 14px 0 6px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--text2);font-weight:500;cursor:pointer}
