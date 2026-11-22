@@ -1,5 +1,5 @@
 //! Boussole : guide virtuel du jour. Pas d'IA : des règles simples appliquées aux tâches,
-//! aux dépendances et aux jalons pour résumer la journée, signaler les retards et proposer quoi faire.
+//! aux dépendances et aux objectifs pour résumer la journée, signaler les retards et proposer quoi faire.
 use crate::{access::map_ctx, auth::AuthUser, error::ApiResult, AppState};
 use axum::{
     extract::{Path, Query, State},
@@ -279,7 +279,7 @@ pub async fn guide(
             ),
         )
     }
-    // Jalon : au rythme des 14 derniers jours, est-ce qu'on y arrive ?
+    // Objectif : au rythme des 14 derniers jours, est-ce qu'on y arrive ?
     let mut pace = Value::Null;
     if let Some((title, date)) = &milestone {
         if let Some(md) = day(&Some(date.clone())) {
@@ -301,24 +301,24 @@ pub async fn guide(
                     "good",
                     tf!(
                         en,
-                        "Jalon « {title} » dans {} : aucune tâche restante prévue avant.",
+                        "Objectif « {title} » dans {} : aucune tâche restante prévue avant.",
                         "Milestone “{title}” in {}: no tasks left planned before it.",
                         jours(en, left)
                     ),
                 )
             } else if need == i64::MAX {
-                ("warn", tf!(en, "Jalon « {title} » dans {} avec {} à finir avant, et aucune tâche finie ces 14 derniers jours.", "Milestone “{title}” in {} with {} to finish before it, and no tasks finished in the last 14 days.", jours(en, left), taches(en, remaining)))
+                ("warn", tf!(en, "Objectif « {title} » dans {} avec {} à finir avant, et aucune tâche finie ces 14 derniers jours.", "Milestone “{title}” in {} with {} to finish before it, and no tasks finished in the last 14 days.", jours(en, left), taches(en, remaining)))
             } else if need <= left {
                 (
                     "good",
                     if en {
                         format!("Milestone “{title}” in {}: {} to finish. At the current pace ({:.1} per day), you’re on track.", jours(en, left), taches(en, remaining), per_day)
                     } else {
-                        format!("Jalon « {title} » dans {} : {} à finir. Au rythme actuel ({:.1} par jour), c’est dans les temps.", jours(en, left), taches(en, remaining), per_day).replace('.', ",")
+                        format!("Objectif « {title} » dans {} : {} à finir. Au rythme actuel ({:.1} par jour), c’est dans les temps.", jours(en, left), taches(en, remaining), per_day).replace('.', ",")
                     },
                 )
             } else {
-                ("bad", tf!(en, "Jalon « {title} » dans {} : {} à finir, il faudrait environ {} au rythme actuel. Retard prévu : {}.", "Milestone “{title}” in {}: {} to finish, about {} needed at the current pace. Expected delay: {}.", jours(en, left), taches(en, remaining), jours(en, need), jours(en, need - left)))
+                ("bad", tf!(en, "Objectif « {title} » dans {} : {} à finir, il faudrait environ {} au rythme actuel. Retard prévu : {}.", "Milestone “{title}” in {}: {} to finish, about {} needed at the current pace. Expected delay: {}.", jours(en, left), taches(en, remaining), jours(en, need), jours(en, need - left)))
             };
             say(tone, text);
             pace = json!({ "title": title, "date": date, "days_left": left, "remaining": remaining, "per_day": (per_day * 10.0).round() / 10.0, "on_track": remaining == 0 || (need != i64::MAX && need <= left) });
@@ -389,7 +389,7 @@ pub async fn guide(
                     score += 15;
                     why.push(ls(
                         en,
-                        "compte pour le prochain jalon",
+                        "compte pour le prochain objectif",
                         "counts for the next milestone",
                     ))
                 }
@@ -492,7 +492,7 @@ fn status_fr(en: bool, s: &str) -> &'static str {
     }
 }
 
-/// Répond avec les vraies données de la map (retards, personnes, tâche n°, jalon, chiffres de la semaine…).
+/// Répond avec les vraies données de la map (retards, personnes, tâche n°, objectif, chiffres de la semaine…).
 /// Renvoie `{ "answer": null }` quand la question ne porte pas sur les données : l'interface utilise alors le guide de POP.
 pub async fn ask(
     State(st): State<AppState>,
@@ -846,7 +846,7 @@ pub async fn ask(
             return reply(
                 ls(
                     en,
-                    "Aucun jalon à venir. Ajoutez-en un dans Planifier → Jalons.",
+                    "Aucun objectif à venir. Ajoutez-en un dans Planifier → Objectifs.",
                     "No upcoming milestone. Add one in Plan → Milestones.",
                 ),
                 vec![
@@ -865,7 +865,7 @@ pub async fn ask(
         let left = (md - today).num_days();
         let mut text = tf!(
             en,
-            "Prochain jalon : « {title} » le {} (dans {}). {} à finir avant.",
+            "Prochain objectif : « {title} » le {} (dans {}). {} à finir avant.",
             "Next milestone: “{title}” on {} (in {}). {} to finish before it.",
             fr_day(en, md),
             jours(en, left),

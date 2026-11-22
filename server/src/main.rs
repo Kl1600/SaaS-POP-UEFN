@@ -245,7 +245,7 @@ pub async fn report_text(st: &AppState, mid: i64) -> Result<String, error::AppEr
             .join(" · ")
     ));
     if let Some((title, date)) = ms {
-        t.push_str(&format!("Prochain jalon : {title}, {date}\n"));
+        t.push_str(&format!("Prochain objectif : {title}, {date}\n"));
     }
     Ok(t)
 }

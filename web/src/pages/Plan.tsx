@@ -75,7 +75,7 @@ function Wizard({ done }: { done: () => void }) {
       <div className="card"><div className="lab">{tr("Tâches d'1 heure")}</div><div className="num">{plan.stats.tasks}</div></div>
       <div className="card"><div className="lab">{tr("Confiées à des agents IA")}</div><div className="num">{plan.stats.ai}</div></div>
       <div className="card"><div className="lab">{tr("Dernière tâche prévue")}</div><div className="num">{frDate(plan.stats.end)}</div><div className="muted">{plan.stats.late ? tr("après la date de soumission") : tr("avant la soumission")}</div></div>
-      <div className="card"><div className="lab">{tr("Jalons")}</div><div className="num">{plan.milestones.length}</div><div className="muted">{plan.milestones.map((m: any) => m.title).join(' · ')}</div></div>
+      <div className="card"><div className="lab">{tr("Objectifs")}</div><div className="num">{plan.milestones.length}</div><div className="muted">{plan.milestones.map((m: any) => m.title).join(' · ')}</div></div>
     </div>
     <div className="row"><button className="btn" onClick={() => setPlan(null)}>{tr("Retour")}</button><span className="muted small">{tr("Tout est modifiable avant de valider.")}</span><span className="spacer" /><button className="btn pri" disabled={busy} onClick={apply}>{tr("Valider le plan")}</button></div>
     <p className="small muted" style={{ margin: 0 }}><b>{tr("Dépend de")}</b> · {tr(DEP_HELP)}</p>
@@ -180,9 +180,9 @@ function Timeline() {
 
   return <>
     {alerts.length > 0 && <div className="warn" role="alert"><AlertTriangle size={18} /><div>{alerts.map((a, i) => <div key={i}>{a}</div>)}</div></div>}
-    {shifted.length > 0 && alerts.length === 0 && <div className="warn"><span>{tr("Recalcul : #{0} décalées pour respecter les dépendances. Aucun jalon dépassé.", [shifted.join(', #')])}</span></div>}
+    {shifted.length > 0 && alerts.length === 0 && <div className="warn"><span>{tr("Recalcul : #{0} décalées pour respecter les dépendances. Aucun objectif dépassé.", [shifted.join(', #')])}</span></div>}
     <section className="card">
-      <CardHead title={tr("Chronologie")} sub={tr("Glissez une barre pour la déplacer : les tâches qui en dépendent et les jalons se recalculent.")}>
+      <CardHead title={tr("Chronologie")} sub={tr("Glissez une barre pour la déplacer : les tâches qui en dépendent et les objectifs se recalculent.")}>
         <label className="row small"><input type="checkbox" checked={hideDone} onChange={e => setHideDone(e.target.checked)} />{tr("Masquer les tâches faites")}</label>
         {canEdit && <button className="btn" onClick={async () => { const r = await api.post(`/api/maps/${map!.id}/plan/recalc`); setAlerts(r.alerts); setShifted(r.shifted); reload() }}>{tr("Recalculer")}</button>}
       </CardHead>
@@ -212,17 +212,17 @@ function Timeline() {
     </section>
     <div className="two">
       <section className="card">
-        <CardHead title={tr("Jalons")} sub={tr("Fin d'étape, tests à plusieurs, soumission, sortie")} />
+        <CardHead title={tr("Objectifs")} sub={tr("Fin d'étape, tests à plusieurs, soumission, sortie")} />
         <div className="list">{data.milestones.map((m: any) => <div key={m.id} className="li"><span className="mono small" style={{ width: 90 }}>{frDate(m.date)}</span><span style={{ flex: 1 }}>{m.title}</span>{canEdit && <button className="iconbtn" aria-label={tr("Supprimer")} onClick={async () => { await api.del(`/api/milestones/${m.id}`); reload() }}><Trash2 size={16} /></button>}</div>)}</div>
         {canEdit && <form className="row" style={{ marginTop: 12, flexWrap: 'wrap' }} onSubmit={async e => { e.preventDefault(); try { await api.post(`/api/maps/${map!.id}/milestones`, ms); setMs({ title: '', date: '' }); reload() } catch (er: any) { toast(er.message, true) } }}>
-          <input className="field" placeholder={tr("Nouveau jalon")} value={ms.title} onChange={e => setMs({ ...ms, title: e.target.value })} required /><input className="field" type="date" value={ms.date} onChange={e => setMs({ ...ms, date: e.target.value })} required /><button className="btn">{tr("Ajouter")}</button>
+          <input className="field" placeholder={tr("Nouvel objectif")} value={ms.title} onChange={e => setMs({ ...ms, title: e.target.value })} required /><input className="field" type="date" value={ms.date} onChange={e => setMs({ ...ms, date: e.target.value })} required /><button className="btn">{tr("Ajouter")}</button>
         </form>}
       </section>
     </div>
   </>
 }
 
-/** Ligne « Jalons » de la chronologie (#171) : chaque nom est mesuré, gardé dans la piste et posé sur
+/** Ligne « Objectifs » de la chronologie (#171) : chaque nom est mesuré, gardé dans la piste et posé sur
  * la première rangée où il ne touche aucun autre nom ; la ligne grandit avec le nombre de rangées. */
 function MilestoneRow({ items }: { items: { id: number; title: string; date: string; x: number }[] }) {
   const track = useRef<HTMLDivElement>(null)
@@ -254,7 +254,7 @@ function MilestoneRow({ items }: { items: { id: number; title: string; date: str
   }, [key, width])
   const rows = lay ? Math.max(1, ...lay.map(l => l.row + 1)) : 1
   return (
-    <div className="grow" style={{ minHeight: 34 + rows * 18 }}><span className="gname" style={{ fontWeight: 500 }}>{tr("Jalons")}</span>
+    <div className="grow" style={{ minHeight: 34 + rows * 18 }}><span className="gname" style={{ fontWeight: 500 }}>{tr("Objectifs")}</span>
       <div className="gtrack" ref={track} style={{ height: 30 + rows * 18 }}>
         {items.map((m, i) => {
           const tip = `${m.title} · ${frDate(m.date)}`
@@ -280,7 +280,7 @@ function Seasons() {
   const label: Record<string, [string, string]> = { map: [tr("Votre map"), ''], aim: [tr("À viser"), 'b-g'], avoid: [tr("À éviter"), 'b-r'], money: [tr("Impact revenus"), 'b-o'] }
   return (
     <section className="card">
-      <CardHead title={tr("Calendrier des mises à jour et des saisons")} sub={tr("Vos jalons face aux dates Fortnite à viser ou à éviter. Les dates Epic sont indicatives : vérifiez les annonces officielles.")} />
+      <CardHead title={tr("Calendrier des mises à jour et des saisons")} sub={tr("Vos objectifs face aux dates Fortnite à viser ou à éviter. Les dates Epic sont indicatives : vérifiez les annonces officielles.")} />
       <div className="grid2" style={{ gridTemplateColumns: tr("repeat(auto-fit, minmax(220px, 1fr))") }}>
         {months.map(([k, evs]) => (
           <div key={k} style={{ border: tr("1px solid var(--border)"), borderRadius: 14, padding: 14 }}>

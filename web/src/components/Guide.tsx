@@ -41,7 +41,7 @@ export function GuidePanel({ compact, onNavigate }: { compact?: boolean; onNavig
     </div>
     {data.points.length > 0 && <ul className="guide-pts">{data.points.slice(0, compact ? 4 : 8).map((p: any, i: number) => { const [I, c] = TONE[p.tone] ?? TONE.info; return <li key={i}><I size={16} style={{ color: c, flex: 'none', marginTop: 2 }} /><span>{p.text}</span></li> })}</ul>}
     {data.pace && <div className="guide-pace" title={tr("{0} tâche(s) restante(s), {1} finie(s) par jour en moyenne", [data.pace.remaining, data.pace.per_day])}>
-      <div className="row small" style={{ justifyContent: 'space-between' }}><span>{tr("Prochain jalon :")}{' '}<b style={{ fontWeight: 500 }}>{data.pace.title}</b></span><span className={'badge ' + (data.pace.on_track ? 'b-g' : 'b-r')}>{data.pace.on_track ? tr("Dans les temps") : tr("En retard")}</span></div>
+      <div className="row small" style={{ justifyContent: 'space-between' }}><span>{tr("Prochain objectif :")}{' '}<b style={{ fontWeight: 500 }}>{data.pace.title}</b></span><span className={'badge ' + (data.pace.on_track ? 'b-g' : 'b-r')}>{data.pace.on_track ? tr("Dans les temps") : tr("En retard")}</span></div>
     </div>}
     <div className="dsec" style={{ marginTop: 14 }}>{tr("À faire maintenant")}</div>
     {data.suggestions.length === 0 ? <p className="small muted" style={{ margin: 0 }}>{tr("Aucune tâche disponible pour vous. Créez-en une ou demandez à l’équipe.")}</p> :
@@ -55,7 +55,7 @@ export function GuidePanel({ compact, onNavigate }: { compact?: boolean; onNavig
           : <button className={'btn' + (i === 0 ? ' pri' : '')} onClick={() => take(s)}><Play size={14} />{s.mine ? tr("Commencer") : tr("Prendre")}</button>}
       </div>)}</div>}
     {compact && <AskBar />}
-    <p className="small muted" style={{ margin: '12px 0 0' }}>{tr("Boussole lit vos tâches, vos jalons et votre équipe, et répond aussi aux questions sur POP. Tout reste dans POP.")}</p>
+    <p className="small muted" style={{ margin: '12px 0 0' }}>{tr("Boussole lit vos tâches, vos objectifs et votre équipe, et répond aussi aux questions sur POP. Tout reste dans POP.")}</p>
   </div>
 }
 
@@ -74,7 +74,7 @@ function GuideChat({ initial, onNavigate, onToday }: { initial?: string; onNavig
     setQ(''); setMsgs(m => [...m, { who: 'me', text: t }, { who: 'bot', typing: true }])
     const res = ask(t, shortPath(loc.pathname))
     let bot: Msg
-    // 1. Question sur les données de la map (retards, une personne, une tâche, le jalon, les chiffres…).
+    // 1. Question sur les données de la map (retards, une personne, une tâche, l’objectif, les chiffres…).
     const data = map ? await api.get(`/api/maps/${map.id}/guide/ask?lang=${LANG}&q=${encodeURIComponent(t)}`).catch(() => null) : null
     if (data?.answer) bot = { who: 'bot', text: data.answer, items: data.items, others: res.slice(0, 2).map(x => x.f) }
     // 2. Question sur l'utilisation de POP.

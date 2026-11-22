@@ -213,7 +213,7 @@ function GlobalSearch() {
     </form>
     {open && q.trim().length >= 2 && <div className="menu gresults">
       {res.length === 0 ? <div className="small muted" style={{ padding: 10 }}>{tr("Aucun résultat pour « {0} »", [q])}</div> : res.map((r, i) => (<div key={i}>
-        {(i === 0 || res[i - 1].kind !== r.kind) && <div className="gr-head">{({ Tâche: tr("Tâches"), Page: tr("Pages"), Tableau: tr("Tableaux"), Verse: tr("Fichiers Verse"), Acteur: tr("Acteurs UEFN"), Jalon: tr("Jalons"), Membre: tr("Membres"), Action: tr("Actions récentes") } as any)[r.kind] ?? r.kind}</div>}
+        {(i === 0 || res[i - 1].kind !== r.kind) && <div className="gr-head">{({ Tâche: tr("Tâches"), Page: tr("Pages"), Tableau: tr("Tableaux"), Verse: tr("Fichiers Verse"), Acteur: tr("Acteurs UEFN"), Objectif: tr("Objectifs"), Membre: tr("Membres"), Action: tr("Actions récentes") } as any)[r.kind] ?? r.kind}</div>}
         <button className={i === sel ? 'on' : ''} onMouseDown={e => { e.preventDefault(); go(r) }} onMouseEnter={() => setSel(i)}>
           <span style={{ minWidth: 0, flex: 1, textAlign: 'left' }}><span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>{r.detail && <span className="small muted" style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tx(r.detail)}</span>}</span>
         </button></div>))}

@@ -59,7 +59,7 @@ export default function Overview() {
         <div className="card"><div className="lab"><Clock size={18} strokeWidth={1.5} />{tr("Tâches en cours")}</div><div className="num">{t.doing}</div><div className="muted">{tr("{0} / {1} finies au total", [t.done, t.total])}</div></div>
         <div className="card"><div className="lab"><Ban size={18} strokeWidth={1.5} />{tr("Bloquées")}</div><div className="num">{t.blocked}</div><div className="muted">{t.blocked ? tr("voir « qui bloque qui »") : tr("rien ne bloque")}</div></div>
         <div className="card"><div className="lab"><CheckSquare size={18} strokeWidth={1.5} />{tr("Finies cette semaine")}</div><div className="num">{t.done_week}</div><div className="muted">{tr("{0}{1} vs semaine dernière", [diffWeek >= 0 ? '+' : '', diffWeek])}</div></div>
-        <div className="card"><div className="lab"><Flag size={18} strokeWidth={1.5} />{tr("Prochain jalon")}</div><div className="num">{next ? tr('J-{0}', [days]) : '—'}</div><div className="muted">{next ? `${next.title} · ${frDate(next.date, { weekday: 'short', day: 'numeric', month: 'short' })}` : tr("aucun jalon à venir")}</div></div>
+        <div className="card"><div className="lab"><Flag size={18} strokeWidth={1.5} />{tr("Prochain objectif")}</div><div className="num">{next ? tr('J-{0}', [days]) : '—'}</div><div className="muted">{next ? `${next.title} · ${frDate(next.date, { weekday: 'short', day: 'numeric', month: 'short' })}` : tr("aucun objectif à venir")}</div></div>
         <div className="card"><div className="lab"><Coins size={18} strokeWidth={1.5} />{tr("Gains du dernier mois")}</div><div className="num">{t.revenue ? euros(t.revenue.cents, 0) : '—'}</div><div className="muted">{t.revenue ? `${frDate(t.revenue.month + '-01', { month: 'long', year: 'numeric' })}${t.revenue_prev_cents ? ` · ${t.revenue.cents >= t.revenue_prev_cents ? '+' : ''}${Math.round((t.revenue.cents / t.revenue_prev_cents - 1) * 100)} %` : ''}` : tr("aucun import")}</div></div>
         <div className="card"><div className="lab"><Users size={18} strokeWidth={1.5} />{tr("Joueurs · dernier playtest")}</div><div className="num">{t.playtest ? t.playtest.players : '—'}</div><div className="muted">{t.playtest ? tr("décrochage moyen à {0} min", [Math.round(t.playtest.avg_minutes)]) : tr("aucun playtest")}</div></div>
       </section>
@@ -86,8 +86,8 @@ export default function Overview() {
           )}
         </section>
         <section className="card">
-          <CardHead title={tr("Prochains jalons")} sub={tr("Recalculés quand une tâche prend du retard")} />
-          {upcoming.length === 0 ? <Empty text={tr("Aucun jalon à venir.")} /> : <div className="list">
+          <CardHead title={tr("Prochains objectifs")} sub={tr("Recalculés quand une tâche prend du retard")} />
+          {upcoming.length === 0 ? <Empty text={tr("Aucun objectif à venir.")} /> : <div className="list">
             {upcoming.slice(0, 3).map((m: any) => (
               <div key={m.id} className="li">
                 <div style={{ width: 52, textAlign: 'center' }}><div style={{ fontSize: 22, fontWeight: 500 }}>{new Date(m.date + 'T12:00:00').getDate()}</div><div className="small muted">{frDate(m.date, { month: 'short' })}</div></div>

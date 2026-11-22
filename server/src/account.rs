@@ -391,7 +391,7 @@ fn block_text(blocks: &str) -> String {
     out
 }
 
-/// Recherche globale dans la map : tâches, pages, tableaux, acteurs, jalons, membres et actions.
+/// Recherche globale dans la map : tâches, pages, tableaux, acteurs, objectifs, membres et actions.
 /// Insensible aux majuscules et aux accents ; plusieurs mots = tous doivent être présents.
 pub async fn search(
     State(st): State<AppState>,
@@ -486,7 +486,7 @@ pub async fn search(
             }
         }
     }
-    // Jalons.
+    // Objectifs.
     let ms: Vec<(String, String)> =
         sqlx::query_as("SELECT title, date FROM milestones WHERE map_id = ?")
             .bind(mid)
@@ -496,7 +496,7 @@ pub async fn search(
         if let Some(sc) = query.score(&t, "") {
             out.push((
                 sc,
-                json!({ "kind": "Jalon", "title": t, "detail": d, "link": "/planifier" }),
+                json!({ "kind": "Objectif", "title": t, "detail": d, "link": "/planifier" }),
             ))
         }
     }
