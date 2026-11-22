@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-22 · #190 · Popy
+- Fait : « Boussole » renommée « Popy » (interface, aide, messages du serveur, outil MCP next_task) ; icône retirée de la barre du haut ; bouton rond flottant `.popy-fab` en bas à droite sur les pages d'une map, il ouvre l'assistant (évènement `boussole` gardé dans le code).
+- Vérifié : navigateur (bouton au même endroit sur 3 pages, ouverture), aucune erreur JS.
+
 ### 2026-11-22 · #214 · « jalon » devient « objectif »
 - Fait : remplacement dans web/src et server/src (accords : l’objectif, de l’objectif, cet objectif, Nouvel objectif), traductions anglaises milestone → goal ; mots-clés de l'aide gardent « jalon » pour la recherche ; valeur stockée `kind = 'jalon'` (plan.rs) et mots-clés de guide.rs inchangés.
 - Vérifié : cargo test, tsc + vite build, navigateur (Dashboard, Planifier : aucun « jalon »).

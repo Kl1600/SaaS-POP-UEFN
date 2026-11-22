@@ -29,7 +29,7 @@ export function t(s: string, v?: readonly unknown[] | Record<string, unknown>): 
 /** Alias utilisé dans les composants (beaucoup ont déjà une variable `t`). */
 export const tr = t
 
-// Textes venus du serveur (messages d'erreur, Boussole, analyse) : correspondance exacte, puis modèles avec {0}…
+// Textes venus du serveur (messages d'erreur, Popy, analyse) : correspondance exacte, puis modèles avec {0}…
 let patterns: [RegExp, string][] | null = null
 const esc = (s: string) => s.replace(/[.*+?^$()|[\]\\]/g, '\\$&')
 function compile() {

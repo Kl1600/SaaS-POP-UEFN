@@ -1,4 +1,4 @@
-// Boussole : assistant intégré (calculs côté serveur sur les données de la map + guide de POP, rien ne sort de POP).
+// Popy : assistant intégré (calculs côté serveur sur les données de la map + guide de POP, rien ne sort de POP).
 import { useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Compass, AlertCircle, AlertTriangle, CheckCircle2, Info, Play, ArrowRight, X, Send } from 'lucide-react'
@@ -35,7 +35,7 @@ export function GuidePanel({ compact, onNavigate }: { compact?: boolean; onNavig
     <div className="guide-head">
       <span className="guide-ico"><Compass size={20} strokeWidth={1.75} /></span>
       <div style={{ minWidth: 0 }}>
-        <div className="guide-name">{tr("Boussole")}{' '}<span className="small muted">{tr("· assistant intégré")}</span></div>
+        <div className="guide-name">{tr("Popy")}{' '}<span className="small muted">{tr("· assistant intégré")}</span></div>
         <div className="guide-hl">{data.headline}</div>
       </div>
     </div>
@@ -55,13 +55,13 @@ export function GuidePanel({ compact, onNavigate }: { compact?: boolean; onNavig
           : <button className={'btn' + (i === 0 ? ' pri' : '')} onClick={() => take(s)}><Play size={14} />{s.mine ? tr("Commencer") : tr("Prendre")}</button>}
       </div>)}</div>}
     {compact && <AskBar />}
-    <p className="small muted" style={{ margin: '12px 0 0' }}>{tr("Boussole lit vos tâches, vos objectifs et votre équipe, et répond aussi aux questions sur POP. Tout reste dans POP.")}</p>
+    <p className="small muted" style={{ margin: '12px 0 0' }}>{tr("Popy lit vos tâches, vos objectifs et votre équipe, et répond aussi aux questions sur POP. Tout reste dans POP.")}</p>
   </div>
 }
 
 type Msg = { who: 'me' | 'bot'; text?: string; f?: Fiche; others?: Fiche[]; today?: boolean; items?: { label: string; link: string; kind?: string }[]; typing?: boolean }
 
-/** Questions-réponses : Boussole guide l'utilisateur dans POP (base de fiches locale, pas d'IA). */
+/** Questions-réponses : Popy guide l'utilisateur dans POP (base de fiches locale, pas d'IA). */
 function GuideChat({ initial, onNavigate, onToday }: { initial?: string; onNavigate?: () => void; onToday: () => void }) {
   const nav = useNav()
   const loc = useLocation()
@@ -118,11 +118,11 @@ function GuideChat({ initial, onNavigate, onToday }: { initial?: string; onNavig
   </div>
 }
 
-/** Petite barre « Demandez à Boussole » (ouvre le panneau sur l'onglet questions). */
+/** Petite barre « Demandez à Popy » (ouvre le panneau sur l'onglet questions). */
 export function AskBar() {
   const [q, setQ] = useState('')
   return <form className="gask" style={{ marginTop: 12 }} onSubmit={e => { e.preventDefault(); window.dispatchEvent(new CustomEvent('boussole', { detail: q.trim() || '' })); setQ('') }}>
-    <input className="field" value={q} onChange={e => setQ(e.target.value)} placeholder={tr("Une question sur POP ? « Comment relier UEFN ? »")} aria-label={tr("Demander à Boussole")} />
+    <input className="field" value={q} onChange={e => setQ(e.target.value)} placeholder={tr("Une question sur POP ? « Comment relier UEFN ? »")} aria-label={tr("Demander à Popy")} />
     <button className="btn" aria-label={tr("Demander")}><Send size={16} /></button>
   </form>
 }
@@ -132,7 +132,7 @@ export function GuideDrawer({ onClose, ask: initial }: { onClose: () => void; as
   const [tab, setTab] = useState<'day' | 'ask'>(initial !== undefined ? 'ask' : 'day')
   return <>
     <div className="scrim" onClick={onClose} />
-    <aside ref={dlg as any} tabIndex={-1} aria-modal="true" className="drawer gdrawer" role="dialog" aria-label={tr("Boussole")}>
+    <aside ref={dlg as any} tabIndex={-1} aria-modal="true" className="drawer gdrawer" role="dialog" aria-label={tr("Popy")}>
       <div className="row" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
         <div className="seg" role="tablist">
           <button role="tab" aria-selected={tab === 'day'} className={tab === 'day' ? 'on' : ''} onClick={() => setTab('day')}>{tr("Mon jour")}</button>
