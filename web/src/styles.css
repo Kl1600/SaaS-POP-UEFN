@@ -924,3 +924,6 @@ body.wb-fs .side,body.wb-fs .top{visibility:hidden}
 .tdates{border-top:1px solid var(--border);padding-top:10px}
 @media (max-width:760px){.tgrid{grid-template-columns:minmax(0,1fr)}.tside{order:-1}}
 .kwho{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px}
+
+/* #200 : logo devant le titre d'une carte. */
+.chead h2 > .brand,.chead h2 > svg:first-child{margin-right:10px;vertical-align:-3px}

@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-22 · #200 · logos des intégrations
+- Fait : composant `Brand` (components/Brand.tsx) : logos simple-icons (CC0, nouvelle dépendance), dessinés en currentColor ; Discord, GitHub, Lore (logo Epic Games) devant leur titre dans Intégrations. +12 Ko au bundle.
+- Vérifié : tsc + vite build.
+
 ### 2026-11-22 · #194 · Planifier allégé
 - Fait : carte « Charge par personne » retirée ; onglet Générateur retiré de Planifier : il s'ouvre par /planifier?vue=generateur, depuis la dernière ligne du sélecteur de map (quand une map est ouverte).
 - Vérifié : navigateur, aucune erreur JS.

@@ -1,4 +1,5 @@
 import { SecuritySettings } from '../components/Security'
+import { Brand } from '../components/Brand'
 import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { Copy, KeyRound, Moon, Plus, Sun, Trash2 } from 'lucide-react'
@@ -117,7 +118,7 @@ function Integrations() {
       <Discord data={data.discord} set={set} />
       <GitHub data={data.github} set={set} />
       <section className="card">
-        <CardHead title={tr("Lore / UEFN")} sub={tr("Check-ins reliés aux tâches, fichiers verrouillés")}><button className={'btn' + (lore.enabled ? '' : ' pri')} disabled={!isAdmin} onClick={() => set('lore', !lore.enabled, lore.config)}>{lore.enabled ? tr("Désactiver") : tr("Activer")}</button></CardHead>
+        <CardHead icon={<Brand name="lore" />} title={tr("Lore / UEFN")} sub={tr("Check-ins reliés aux tâches, fichiers verrouillés")}><button className={'btn' + (lore.enabled ? '' : ' pri')} disabled={!isAdmin} onClick={() => set('lore', !lore.enabled, lore.config)}>{lore.enabled ? tr("Désactiver") : tr("Activer")}</button></CardHead>
         <span className={'badge' + (lore.enabled ? ' b-g' : '')}>{lore.enabled ? tr("Activé") : tr("Désactivé")}</span>
         {lore.enabled && isAdmin && <>
           <p className="small muted">{tr("Appelez ce webhook depuis votre script de check-in. « #15 » relie le check-in à la tâche 15, « fini #15 » la passe à Fait.")}</p>
@@ -236,7 +237,7 @@ function Discord({ data, set }: { data: any; set: (k: string, e: boolean, c: any
   const save = (c: any) => set('discord', data.enabled, c)
   const hook = `${location.origin}/api/hooks/discord/${studio!.id}`
   return <section className="card">
-    <CardHead title={tr("Discord")} sub={tr("Rapport du soir automatique, commandes /tache-suivante, /fini, /rapport")}><button className={'btn' + (data.enabled ? '' : ' pri')} disabled={!isAdmin} onClick={() => set('discord', !data.enabled, cfg)}>{data.enabled ? tr("Désactiver") : tr("Activer")}</button></CardHead>
+    <CardHead icon={<Brand name="discord" />} title={tr("Discord")} sub={tr("Rapport du soir automatique, commandes /tache-suivante, /fini, /rapport")}><button className={'btn' + (data.enabled ? '' : ' pri')} disabled={!isAdmin} onClick={() => set('discord', !data.enabled, cfg)}>{data.enabled ? tr("Désactiver") : tr("Activer")}</button></CardHead>
     <span className={'badge' + (data.enabled ? ' b-g' : '')}>{data.enabled ? tr("Activé") : tr("Désactivé")}</span>
     {data.enabled && isAdmin && <>
       <div className="dsec">{tr("1 · Rapport du soir")}</div>
@@ -263,7 +264,7 @@ function GitHub({ data, set }: { data: any; set: (k: string, e: boolean, c: any)
   const save = (c: any) => set('github', data.enabled, c)
   const [busy, setBusy] = useState(false)
   return <section className="card">
-    <CardHead title={tr("GitHub")} sub={tr("Issues ↔ tâches dans les deux sens")}><button className={'btn' + (data.enabled ? '' : ' pri')} disabled={!isAdmin} onClick={() => set('github', !data.enabled, cfg)}>{data.enabled ? tr("Désactiver") : tr("Activer")}</button></CardHead>
+    <CardHead icon={<Brand name="github" />} title={tr("GitHub")} sub={tr("Issues ↔ tâches dans les deux sens")}><button className={'btn' + (data.enabled ? '' : ' pri')} disabled={!isAdmin} onClick={() => set('github', !data.enabled, cfg)}>{data.enabled ? tr("Désactiver") : tr("Activer")}</button></CardHead>
     <span className={'badge' + (data.enabled ? ' b-g' : '')}>{data.enabled ? tr("Activé") : tr("Désactivé")}</span>
     {data.enabled && isAdmin && <>
       <F label={tr("Dépôt (propriétaire/nom)")} k="repo" cfg={cfg} onSave={save} disabled={!isAdmin} placeholder="mon-studio/ma-map" mono />
