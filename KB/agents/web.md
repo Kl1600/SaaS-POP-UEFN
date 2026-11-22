@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-22 · #189 · Dashboard
+- Fait : « Vue d'ensemble » renommée « Dashboard » (menu, titre, aide) ; Boussole retirée de la page (bouton flottant : #190) ; tuiles `.tiles.six` (6, 3 × 2 ou 2 × 3, jamais une seule) ; journal limité à 5 + « Voir plus » (fiche avec les 60 dernières actions, `LIMIT 60` dans `plan::overview`) ; 3 prochains jalons + « Voir plus » vers Planifier ; calendrier du mois retiré.
+- Vérifié : navigateur 1800, 1440, 1000 et 390 px, aucune erreur JS.
+
 ### 2026-11-22 · #174 · thème et langue dans Paramètres, interface à 90 %
 - Fait (travail de l'agent 2, repris car sans accès GitHub) : thème et langue déplacés vers Paramètres → Mon compte ; `zoom` 90 % sur `<html>` au-delà de 1100 px (`--ui-zoom`), conversions souris dans `web/src/zoom.ts` ; fiches centrées (#172) recalculées avec `--ui-zoom`.
 - Vérifié : navigateur 1440 et 1000 px : zoom 0,9 / 1, barre sans thème ni langue, Clair/Sombre gardé après rechargement, post-it posé et glissé au bon endroit, sélecteur sous son bouton, Boussole centrée, langue sur la page d'accueil publique. Organiseur avec UEFN : non testé (pas d'UEFN ici).
