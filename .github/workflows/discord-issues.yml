@@ -1,0 +1,26 @@
+# Prévient le salon #issues du Discord de POP quand une issue est ouverte, fermée ou rouverte (#185).
+# Le webhook est le secret du dépôt DISCORD_WEBHOOK_ISSUES (Settings → Secrets and variables → Actions) ; sans lui,
+# le message est sauté avec un avertissement. Le texte est construit par tools/discord.py.
+name: "discord : issues"
+
+on:
+  issues:
+    types: [opened, closed, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  annoncer:
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: tools/discord.py
+          sparse-checkout-cone-mode: false
+      - name: Message Discord
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_ISSUES }}
+        run: python3 tools/discord.py issue

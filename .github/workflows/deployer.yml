@@ -140,3 +140,57 @@ jobs:
             echo "::error::latest ($b) ne désigne pas l'image déployée $IMAGE ($a)."; exit 1
           fi
           echo "::notice::En ligne : $IMAGE ; latest désigne maintenant cette image ($a)."
+
+  # Notes de version et Discord (#185). Après un déploiement réussi : une release `deploy-AAAA-MM-JJ-<sha>` dont les
+  # notes listent les changements de main depuis la release de déploiement précédente, postées aussi dans
+  # #deploiements (secret DISCORD_WEBHOOK_DEPLOIEMENTS). Après un échec : un court message avec le lien des journaux.
+  # Discord ne fait jamais échouer ce job (continue-on-error) ; sans le secret, le message est sauté.
+  annoncer:
+    name: notes de version et Discord
+    needs: [resoudre, construire, deployer]
+    if: always()
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    env:
+      COMMIT: ${{ needs.resoudre.outputs.commit || github.sha }}
+      REUSSI: ${{ needs.deployer.result == 'success' }}
+      JOURNAUX: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Créer la release
+        id: release
+        if: env.REUSSI == 'true'
+        run: |
+          precedente=$(gh release list --limit 100 --json tagName \
+            --jq '[.[] | select(.tagName | startswith("deploy-"))][0].tagName // ""')
+          de=""
+          [ -n "$precedente" ] && de=$(git rev-list -n 1 "refs/tags/$precedente")
+          echo "Release précédente : ${precedente:-aucune} ${de:0:7}"
+          python3 tools/discord.py notes --de "$de" --a "$COMMIT" > "$RUNNER_TEMP/notes.md"
+          tag="deploy-$(date -u +%Y-%m-%d)-${COMMIT:0:7}"
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            gh release create "$tag" --target "$COMMIT" --latest \
+              --title "Mise en ligne du $(date -u +%d/%m/%Y) · ${COMMIT:0:7}" --notes-file "$RUNNER_TEMP/notes.md"
+          else
+            echo "::notice::La release $tag existe déjà (même version redéployée le même jour)."
+          fi
+          echo "url=$(gh release view "$tag" --json url --jq .url)" >> "$GITHUB_OUTPUT"
+      - name: Message Discord
+        # Même si la release a échoué : le site est en ligne, on l'annonce (sans notes).
+        if: always()
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_DEPLOIEMENTS }}
+          RELEASE: ${{ steps.release.outputs.url }}
+        run: |
+          if [ "$REUSSI" = true ]; then
+            python3 tools/discord.py deploiement --statut ok --commit "$COMMIT" \
+              --notes "$RUNNER_TEMP/notes.md" --release "$RELEASE"
+          else
+            python3 tools/discord.py deploiement --statut echec --commit "$COMMIT" --journaux "$JOURNAUX"
+          fi
