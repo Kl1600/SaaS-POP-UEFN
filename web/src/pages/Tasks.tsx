@@ -1,7 +1,7 @@
 import { AiPlanButton } from '../components/AiPlan'
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { ArrowRight, X } from 'lucide-react'
+import { ArrowRight, X , AlertTriangle } from 'lucide-react'
 import { ago, api, frDate } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { Avatar, CardHead, Drawer, Modal, PageHead, STATUS, TAGS, Tabs, tagLabel } from '../components/ui'
@@ -37,7 +37,7 @@ export default function Tasks() {
   const { data: mem } = useMembers()
   useLive(['tasks'], reload)
   useEffect(() => setQ(params.get('q') ?? ''), [params])
-  useEffect(() => { const t = Number(params.get('t')); if (t) setOpen(t); if (params.get('vue') === 'personnes') setTab('people'); if (params.get('vue') === 'dependances') setTab('graph') }, [params])
+  useEffect(() => { const t = Number(params.get('t')); if (t) setOpen(t); if (params.get('vue') === 'dependances') setTab('graph') }, [params])
 
   const vis = useMemo(() => (tasks ?? []).filter(t =>
     (member === 'all' || t.assignee_id === member) && (tag === 'all' || t.tag === tag) &&
@@ -62,7 +62,7 @@ export default function Tasks() {
   return (
     <main className="content">
       <PageHead title={tr("Tâches")} help={tr("Des tâches d'une heure. Chaque changement de statut est tracé.")}><AiPlanButton /></PageHead>
-      <Tabs value={tab} onChange={setTab} items={[['kanban', tr("Kanban")], ['graph', tr("Dépendances")], ['people', tr("Par personne")]]} />
+      <Tabs value={tab} onChange={setTab} items={[['kanban', tr("Kanban")], ['graph', tr("Dépendances")]]} />
 
       {(tab === 'kanban' || tab === 'graph') && <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
           <input className="field" style={{ width: 220 }} placeholder={tr("Filtrer…")} value={q} onChange={e => setQ(e.target.value)} aria-label={tr("Filtrer les tâches")} />
@@ -87,11 +87,11 @@ export default function Tasks() {
                 {cards.map(t => {
                   const blockedBy = t.deps.filter(n => tasks!.find(x => x.number === n)?.status !== 'done')
                   return (
-                    <button key={t.id} className={'kcard' + (c === 'blocked' ? ' kblk' : c === 'done' ? ' kfin' : '')} draggable={canEdit}
+                    <button key={t.id} className={'kcard' + (c === 'blocked' ? ' kblk' : c === 'done' ? ' kfin' : '') + (blockedBy.length > 0 && c !== 'done' ? ' kwaits' : '')} draggable={canEdit}
                       onDragStart={e => e.dataTransfer.setData('text/plain', String(t.id))} onClick={() => setOpen(t.id)}>
-                      <div className="row" style={{ justifyContent: 'space-between' }}><span className="small muted mono">#{t.number}</span><span className="small muted">1 h{t.uefn ? ' · UEFN' : ''}{t.ai ? ' · IA' : ''}</span></div>
+                      <div className="row" style={{ justifyContent: 'space-between' }}><span className="small muted mono">#{t.number}</span><span className="row small muted" style={{ gap: 6 }}>1 h{t.uefn ? ' · UEFN' : ''}{t.ai ? ' · IA' : ''}{blockedBy.length > 0 && c !== 'done' && <span className="kdanger" data-tip={tr("Bloquée par #{0}", [blockedBy.join(', #')])} aria-label={tr("Bloquée par #{0}", [blockedBy.join(', #')])}><AlertTriangle size={16} strokeWidth={2} /></span>}</span></div>
                       <div style={{ fontWeight: 500, margin: '8px 0 10px' }}>{t.title}</div>
-                      {blockedBy.length > 0 && c !== 'done' && <div className="small" style={{ marginBottom: 10 }}>{c === 'blocked' ? tr("Bloquée par") : tr("Dépend de")} <span className="mono">#{blockedBy.join(', #')}</span></div>}
+                      {blockedBy.length > 0 && c !== 'done' && <div className="small kwait" style={{ marginBottom: 10 }}>{tr("Attend")} <span className="mono">#{blockedBy.join(', #')}</span> · {tr("ne peut pas être prise")}</div>}
                       <div className="row" style={{ justifyContent: 'space-between' }}>
                         <span className="row" style={{ gap: 6 }}><span className="badge">{tagLabel(t.tag)}</span>{t.comments > 0 && <span className="small muted">{t.comments} comm.</span>}{t.subtasks.total > 0 && <span className="small muted">{t.subtasks.done}/{t.subtasks.total}</span>}</span>
                         {t.assignee_name && <Avatar name={t.assignee_name} small />}
@@ -105,52 +105,13 @@ export default function Tasks() {
         </div>
       </>}
 
-      {tab === 'people' && <People />}
       {checkin && <CheckinModal task={checkin} onClose={() => setCheckin(null)} onDone={() => { setCheckin(null); setMsg(''); reload() }} />}
-      {open && <TaskDrawer id={open} onClose={() => setOpen(null)} members={mem?.members ?? []} tasks={tasks ?? []} />}
+      {open && <TaskDrawer key={open} id={open} onClose={() => setOpen(null)} members={mem?.members ?? []} tasks={tasks ?? []} onOpen={setOpen} />}
     </main>
   )
 }
 
-function People() {
-  const { map } = useApp()
-  const { data, reload } = useLoad<any>(map ? `/api/maps/${map.id}/people` : null, [map?.id])
-  useLive(['tasks'], reload)
-  if (!data) return null
-  return (
-    <div className="two">
-      <section className="card">
-        <CardHead title={tr("Charge de la semaine")} sub={tr("Heures prévues et faites, retards")} />
-        <div style={{ overflowX: 'auto' }}><table className="tbl"><thead><tr><th>{tr("Membre")}</th><th>{tr("En cours")}</th><th>{tr("Faites / prévues")}</th><th>{tr("Retards")}</th></tr></thead><tbody>
-          {data.people.map((p: any) => (
-            <tr key={p.id}>
-              <td><span className="row" style={{ gap: 10 }}><Avatar name={p.name} small /><span><span style={{ display: 'block', fontWeight: 500 }}>{p.name}</span><span className="small muted">{p.specialty || p.role}</span></span></span></td>
-              <td>{p.wip}</td>
-              <td style={{ minWidth: 170 }}><div className="small" style={{ marginBottom: 6 }}>{p.done_h} h / {p.planned_h} h{p.overload && tr(" · surcharge")}</div><div className="bar"><span style={{ width: `${p.planned_h ? Math.min(100, (p.done_h / p.planned_h) * 100) : 0}%` }} /></div></td>
-              <td>{p.late ? <span className="badge b-r">{tr("{0} en retard", [p.late])}</span> : <span className="badge">{tr("Aucun")}</span>}</td>
-            </tr>
-          ))}
-        </tbody></table></div>
-      </section>
-      <section className="card">
-        <CardHead title={tr("Qui bloque qui")} sub={tr("Tâches non finies dont d'autres dépendent")} />
-        {data.chains.length === 0 && <p className="muted">{tr("Personne n'est bloqué.")}</p>}
-        <div className="list">
-          {data.chains.map((c: any, i: number) => (
-            <div key={i} className="li" style={{ flexWrap: 'wrap' }}>
-              <span className="row" style={{ gap: 8 }}><Avatar name={c.from_who} small /><span><b style={{ fontWeight: 500 }}>{c.from_who ?? '—'}</b> <span className="muted mono">#{c.from}</span></span></span>
-              <ArrowRight size={16} />
-              <span className="row" style={{ gap: 8 }}><Avatar name={c.to_who} small /><span><b style={{ fontWeight: 500 }}>{c.to_who ?? '—'}</b> <span className="muted mono">#{c.to}</span></span></span>
-              <span className="small muted" style={{ flex: '1 1 100%' }}>{c.from_title} → {c.to_title}</span>
-            </div>
-          ))}
-        </div>
-      </section>
-    </div>
-  )
-}
-
-function TaskDrawer({ id, onClose, members, tasks }: { id: number; onClose: () => void; members: any[]; tasks: Task[] }) {
+function TaskDrawer({ id, onClose, members, tasks, onOpen }: { id: number; onClose: () => void; members: any[]; tasks: Task[]; onOpen?: (id: number) => void }) {
   const { canEdit, isAdmin, me, toast } = useApp()
   const { data, reload } = useLoad<any>(`/api/tasks/${id}`, [id])
   const [comment, setComment] = useState('')
@@ -203,7 +164,8 @@ function TaskDrawer({ id, onClose, members, tasks }: { id: number; onClose: () =
         <span className="muted">{tr("Origine")}</span>
         <span>{origin ? <a href={origin}>{tr("Post-it du tableau blanc")}</a> : t.origin === 'plan' ? tr("Générateur de projet") : tr("Créée à la main")}</span>
       </div>
-      {data.deps.length > 0 && <p className="small muted">{data.deps.map((d: any) => `#${d.number} : ${STATUS[d.status]}`).join(' · ')}</p>}
+      {data.deps.some((d: any) => d.status !== 'done') && <div className="warn" role="status"><AlertTriangle size={18} /><span>{tr("Bloquée par")} {data.deps.filter((d: any) => d.status !== 'done').map((d: any, i: number) => { const x = tasks.find(t => t.number === d.number); return <span key={d.number}>{i > 0 && ', '}<button className="linkbtn" onClick={() => x && onOpen?.(x.id)}>#{d.number}{x ? ` ${x.title}` : ''}</button> ({STATUS[d.status]})</span> })}</span></div>}
+      {data.deps.length > 0 && data.deps.every((d: any) => d.status === 'done') && <p className="small muted">{data.deps.map((d: any) => `#${d.number} : ${STATUS[d.status]}`).join(' · ')}</p>}
 
       <div className="dsec">{tr("Description")}</div>
       <textarea className="field" style={{ width: '100%', minHeight: 90, padding: 10 }} defaultValue={t.description} disabled={!canEdit} onBlur={e => e.target.value !== t.description && patch({ description: e.target.value })} aria-label={tr("Description")} />
