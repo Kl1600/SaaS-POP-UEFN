@@ -4,7 +4,9 @@
 name: image Docker
 
 on:
-  pull_request:
+  # Sur main seulement, comme le CI (décision du 22/11).
+  push:
+    branches: [main]
     paths: [Dockerfile, .dockerignore, .github/workflows/docker.yml]
   workflow_dispatch:
 

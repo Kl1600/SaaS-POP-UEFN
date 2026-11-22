@@ -9,7 +9,7 @@
     python tools/task.py review 12 --note "..." --plan "1. ... 2. ..." [--gros "raison"]
                                                      pousse la branche, ouvre la PR, passe « en revue »
     python tools/task.py done 12 --verifie "critère 1 : testé en local, … ; critère 2 : …"
-                                                     l'agent a vérifié chaque critère et le CI est vert : fusionne la PR
+                                                     l'agent a vérifié chaque critère : fusionne la PR (le CI tourne ensuite sur main)
     python tools/task.py rework 12 --note "..."      un problème trouvé pendant la revue : retour « en cours »
     python tools/task.py block 12 --raison "..."     dit pourquoi une tâche commencée est coincée
     python tools/task.py release 12 --note "..."     rend la tâche (fait, reste, branche)
@@ -475,7 +475,7 @@ def cmd_review(a):
     add_label(n, REVIEW)
     comment(n, f"EN REVUE : {pr['url']}\nFait : {a.note}\n\nPlan de test manuel :\n{a.plan}")
     print(f"#{n} en revue · {pr['url']}")
-    print("Vérifiez vous-même chaque critère, puis « done » avec --verifie quand le CI est vert.")
+    print("Vérifiez vous-même chaque critère (compilation et tests en local), puis « done » avec --verifie.")
     return 0
 
 
@@ -491,30 +491,19 @@ def cmd_rework(a):
     return 0
 
 
-def pr_checks(pr_number):
-    """(bons, en attente, en échec) des contrôles CI du dernier commit de la PR (check-runs et statuts, en REST)."""
-    sha = api(f"repos/{repo()}/pulls/{pr_number}")["head"]["sha"]
-    runs = api(f"repos/{repo()}/commits/{sha}/check-runs?per_page=100").get("check_runs", [])
-    latest = {}
-    for r in runs:   # un contrôle relancé apparaît plusieurs fois : on garde le plus récent
-        if r["name"] not in latest or r["id"] > latest[r["name"]]["id"]:
-            latest[r["name"]] = r
-    good, waiting, bad = [], [], []
-    for name, r in latest.items():
-        if r["status"] != "completed":
-            waiting.append(name)
-        elif r["conclusion"] in ("success", "skipped", "neutral"):
-            good.append(name)
-        else:   # failure, cancelled, timed_out, action_required, stale
-            bad.append(name)
-    for s in api(f"repos/{repo()}/commits/{sha}/status").get("statuses", []):
-        {"success": good, "pending": waiting}.get(s["state"], bad).append(s["context"])
-    return good, waiting, bad
+def main_ci():
+    """(conclusion, adresse) du dernier CI terminé sur main, ou (None, None). Le CI ne tourne plus que sur main
+    (décision du 22/11 dans KB/DECISIONS.md)."""
+    runs = api(f"repos/{repo()}/actions/workflows/ci.yml/runs?branch=main&event=push&status=completed&per_page=50")
+    for r in runs.get("workflow_runs", []):
+        if r["conclusion"] != "cancelled":   # annulé par une fusion plus récente : ne dit rien
+            return r["conclusion"], r["html_url"]
+    return None, None
 
 
 def merge_pr(pr):
     """Fusion en squash de la PR (titre « … (#N) » comme sur le site), puis suppression de sa branche distante.
-    `sha` : GitHub refuse si la branche a bougé depuis la vérification du CI."""
+    `sha` : GitHub refuse si la branche a bougé depuis la lecture de la PR."""
     api(f"repos/{repo()}/pulls/{pr['number']}/merge", "PUT",
         {"merge_method": "squash", "commit_title": f"{pr['title']} (#{pr['number']})", "sha": pr["headSha"]})
     gh("api", "-X", "DELETE", f"repos/{repo()}/git/refs/heads/{urllib.parse.quote(pr['headRefName'])}", check=False)
@@ -552,13 +541,10 @@ def cmd_done(a):
     branch = pr["headRefName"]
     if git("rev-parse", "--verify", "-q", branch, check=False) and unpushed(branch):
         raise Refused(f"la branche {branch} a des commits non poussés : git push d'abord")
-    good, pending, bad = pr_checks(pr["number"])
-    if bad:
-        raise Refused("le CI est en échec (" + ", ".join(bad) + ") : corrigez avant de fusionner")
-    if pending:
-        raise Refused("le CI tourne encore (" + ", ".join(pending) + ") : attendez qu'il soit vert")
-    if not good:
-        raise Refused("aucun contrôle CI sur la PR : attendez que le CI démarre")
+    ci, url = main_ci()
+    if ci not in (None, "success"):
+        print(f"Attention : le dernier CI de main est en échec ({url}). Votre fusion s'ajoute par-dessus : "
+              "si l'échec vient de votre domaine, corrigez-le d'abord.")
     comment(n, f"{VALIDATED_PREFIX} {me()} : {a.verifie}" + (f"\nNote : {a.note}" if a.note else ""))
     merge_pr(pr)
     for label in STATUS_LABELS:

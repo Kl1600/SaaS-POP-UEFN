@@ -1,13 +1,13 @@
-# Contrôles de chaque PR et de main. `python tools/task.py done` refuse de fusionner tant qu'ils ne sont pas verts.
+# Contrôles de main, après chaque fusion (décision du 22/11 dans KB/DECISIONS.md : plus de CI sur les PR, il
+# ralentissait tout le monde sans pouvoir être imposé). Chaque run compare main au dernier commit de main dont le
+# CI était vert : un run annulé par une fusion plus récente ne laisse donc rien passer sans contrôle.
 # Pour rester sous le quota gratuit de GitHub Actions (#46), chaque contrôle ne tourne que si ce qu'il vérifie a
-# changé ; un contrôle sauté ne coûte rien et compte comme bon pour `task.py done`. Modifier ce fichier fait tout
-# tourner.
+# changé ; un contrôle sauté ne coûte rien. Modifier ce fichier fait tout tourner.
 # Runner : `vars.RUNNER` (variable du dépôt) envoie les jobs Linux sur un runner local, par exemple quand les minutes
 # gratuites de GitHub sont épuisées ; sans la variable, ils tournent chez GitHub (voir KB/RUNNER.md).
 name: CI
 
 on:
-  pull_request:
   push:
     branches: [main]
   # Failles publiées sans changement de code : audit des dépendances chaque lundi.
@@ -17,6 +17,7 @@ on:
 
 permissions:
   contents: read
+  actions: read   # retrouver le dernier commit de main dont le CI était vert
 
 concurrency:
   group: ci-${{ github.event_name }}-${{ github.ref }}
@@ -38,6 +39,7 @@ jobs:
       web: ${{ steps.f.outputs.web }}
       migrations: ${{ steps.f.outputs.migrations }}
       audit: ${{ steps.f.outputs.audit }}
+      base: ${{ steps.f.outputs.base }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -46,13 +48,17 @@ jobs:
       - id: f
         env:
           EVENT: ${{ github.event_name }}
-          BASE_REF: ${{ github.base_ref }}
           BEFORE: ${{ github.event.before }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           tout=0
+          # Dernier commit de main au CI vert : les fusions annulées entre-temps sont contrôlées avec celle-ci.
+          runs="$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?branch=main&event=push&status=success&per_page=1"
+          vert=$(curl -fsS -H "Authorization: Bearer $GH_TOKEN" "$runs" | jq -r '.workflow_runs[0].head_sha // empty' || true)
           case "$EVENT" in
-            pull_request) base=$(git merge-base "origin/$BASE_REF" HEAD) ;;
-            push) base=$BEFORE ;;
+            push)
+              if [ -n "$vert" ] && git merge-base --is-ancestor "$vert" HEAD 2>/dev/null; then base=$vert; else base=$BEFORE; fi
+              echo "Comparé à $base (dernier vert : ${vert:-aucun})" ;;
             schedule) base= ;;
             *) tout=1 ;;
           esac
@@ -78,6 +84,7 @@ jobs:
           out forge '^(forge|link)/'
           out web '^web/'
           out migrations '^server/migrations/'
+          echo "base=$base" >> "$GITHUB_OUTPUT"
           if [ "$EVENT" = schedule ]; then echo "audit=1" >> "$GITHUB_OUTPUT"
           else out audit '^(server|link)/(Cargo\.(lock|toml)|\.cargo/audit\.toml)$|^web/package(-lock)?\.json$'; fi
           cat "$GITHUB_OUTPUT"
@@ -103,12 +110,12 @@ jobs:
       - run: cargo test --locked
         working-directory: server
 
-  # Le relais proposé au téléchargement était resté sur une vieille version (#158) : une PR qui change le code
-  # du relais doit aussi apporter l'exécutable recompilé (AGENTS.md §5).
+  # Le relais proposé au téléchargement était resté sur une vieille version (#158) : un changement du code du
+  # relais doit aussi apporter l'exécutable recompilé (AGENTS.md §5).
   relais-telechargeable:
     name: relais téléchargeable à jour
     needs: changements
-    if: github.event_name == 'pull_request' && needs.changements.outputs.relais_src == '1'
+    if: needs.changements.outputs.relais_src == '1'
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     steps:
       - env:
@@ -205,7 +212,7 @@ jobs:
     needs: changements
     if: >-
       needs.changements.outputs.audit == '1' ||
-      (github.event_name == 'pull_request' && needs.changements.outputs.migrations == '1')
+      (github.event_name == 'push' && needs.changements.outputs.migrations == '1')
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
@@ -213,9 +220,11 @@ jobs:
           fetch-depth: 0
       # Une migration existante ne se modifie jamais : on en ajoute une nouvelle, numérotée à la suite.
       - name: seules des migrations nouvelles
-        if: github.event_name == 'pull_request' && needs.changements.outputs.migrations == '1'
+        if: github.event_name == 'push' && needs.changements.outputs.migrations == '1'
+        env:
+          BASE: ${{ needs.changements.outputs.base }}
         run: |
-          changed=$(git diff --name-status "origin/${{ github.base_ref }}...HEAD" -- server/migrations | grep -v '^A' || true)
+          changed=$(git diff --name-status "$BASE" HEAD -- server/migrations | grep -v '^A' || true)
           if [ -n "$changed" ]; then
             echo "$changed"
             echo "::error::Une migration existante a été modifiée, renommée ou supprimée : créez plutôt une nouvelle migration numérotée à la suite."
