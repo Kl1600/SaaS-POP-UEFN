@@ -2,6 +2,11 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-22 · #205 · IA connectées dans Paramètres
+- Fait : page Settings.tsx en onglets (Mon compte, IA connectées ?onglet=ia) ; AI.tsx s'affiche intégrée (embedded) pour la map ouverte ; /map/N/ia redirige ; entrée « IA connectées » retirée de la barre ; logos (Brand) devant chaque IA (Codex et « Autre » gardent l'icône robot : pas de logo OpenAI dans simple-icons).
+- Corrige aussi #200 : la classe .brand des logos entrait en conflit avec celle du logo POP (renommée .blogo).
+- Vérifié : navigateur, aucune erreur JS.
+
 ### 2026-11-22 · #200 · logos des intégrations
 - Fait : composant `Brand` (components/Brand.tsx) : logos simple-icons (CC0, nouvelle dépendance), dessinés en currentColor ; Discord, GitHub, Lore (logo Epic Games) devant leur titre dans Intégrations. +12 Ko au bundle.
 - Vérifié : tsc + vite build.

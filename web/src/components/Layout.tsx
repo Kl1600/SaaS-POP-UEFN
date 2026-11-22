@@ -21,7 +21,7 @@ type Item = [string, string, any]
 const mapGroups = (mid: number): [string, Item[]][] => [
   ['', [[`/map/${mid}`, tr("Dashboard"), Home]]],
   [tr("Organiser"), [[`/map/${mid}/planifier`, tr("Planifier"), CalendarDays], [`/map/${mid}/taches`, tr("Tâches"), KanbanSquare]]],
-  [tr("Créer"), [[`/map/${mid}/pages`, tr("Pages"), FileText], [`/map/${mid}/tableau`, tr("Tableau blanc"), PenTool], [`/map/${mid}/organiseur`, tr("Organiseur"), ListTree], [`/map/${mid}/ia`, tr("IA connectées"), Bot]]],
+  [tr("Créer"), [[`/map/${mid}/pages`, tr("Pages"), FileText], [`/map/${mid}/tableau`, tr("Tableau blanc"), PenTool], [`/map/${mid}/organiseur`, tr("Organiseur"), ListTree]]],
   [tr("Publier"), [[`/map/${mid}/lancer`, tr("Lancer et suivre"), Rocket], [`/map/${mid}/remunerer`, tr("Rémunérer"), Coins]]],
 ]
 /** Catégorie Analyse (plan du compte). */

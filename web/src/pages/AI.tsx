@@ -4,6 +4,9 @@ import { ago, api } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { CardHead, Modal, PageHead } from '../components/ui'
 import { tr } from '../i18n/t'
+import { Brand } from '../components/Brand'
+
+const LOGO: Record<string, string> = { claude_code: 'claude', claude_desktop: 'claude', cursor: 'cursor', windsurf: 'windsurf', vscode: 'copilot', gemini: 'gemini' }
 
 type Client = { kind: string; name: string; where: string; config: (url: string, token: string) => string; note?: string }
 
@@ -19,7 +22,8 @@ const CLIENTS: Client[] = [
   { kind: 'autre', name: tr("Autre IA (MCP)"), where: tr("Serveur MCP « Streamable HTTP » :"), config: (u, t) => tr("Adresse : {0}\nEn-tête : Authorization: Bearer {1}\n(ou adresse avec le jeton : {2}?token={3})", [u, t, u, t]) },
 ]
 
-export default function AI() {
+/** IA connectées : dans Paramètres → IA connectées (#205), pour la map ouverte. */
+export default function AI({ embedded }: { embedded?: boolean } = {}) {
   const { map, canEdit, toast } = useApp()
   const { data, reload } = useLoad<any[]>(map ? `/api/maps/${map.id}/tokens` : null, [map?.id])
   useLive(['ai'], reload)
@@ -35,15 +39,15 @@ export default function AI() {
   }
   const copy = async (t: string) => { try { await navigator.clipboard.writeText(t); setCopied(true) } catch { toast(tr("Copie impossible : sélectionnez le texte."), true) } }
   return (
-    <main className="content">
-      <PageHead title={tr("IA connectées")} help={tr("Branchez une ou plusieurs IA (Claude, Cursor, Codex…) sur cette map : elles lisent et modifient le Verse et les acteurs UEFN comme vous, avec un journal et l’annulation.")} />
+    <Wrap embedded={embedded}>
+      {!embedded && <PageHead title={tr("IA connectées")} help={tr("Branchez une ou plusieurs IA (Claude, Cursor, Codex…) sur cette map : elles lisent et modifient le Verse et les acteurs UEFN comme vous, avec un journal et l’annulation.")} />}
       <section className="card">
         <CardHead title={tr("Connecter une IA")} sub={tr("Chaque IA reçoit son propre jeton, lié à la map « {0} ». Vous pouvez en connecter autant que vous voulez.", [map?.name])} />
         <div className="aigrid">
           {CLIENTS.map(c => {
             const n = (data ?? []).filter(t => t.kind === c.kind).length
             return <button key={c.kind} className="aicard" disabled={!canEdit} onClick={() => connect(c)}>
-              <Bot size={20} /><span style={{ flex: 1, textAlign: 'left' }}><b style={{ fontWeight: 500 }}>{c.name}</b>{n > 0 && <span className="small muted">{' '}{tr("· {0} connectée{1}", [n, n > 1 ? 's' : ''])}</span>}</span><span className="small">{tr("Connecter")}</span>
+              <Brand name={LOGO[c.kind] ?? ''} size={20} /><span style={{ flex: 1, textAlign: 'left' }}><b style={{ fontWeight: 500 }}>{c.name}</b>{n > 0 && <span className="small muted">{' '}{tr("· {0} connectée{1}", [n, n > 1 ? 's' : ''])}</span>}</span><span className="small">{tr("Connecter")}</span>
             </button>
           })}
         </div>
@@ -54,7 +58,7 @@ export default function AI() {
         {data?.length === 0 && <p className="muted">{tr("Aucune IA connectée pour l’instant.")}</p>}
         <div className="list">{data?.map(t => (
           <div key={t.id} className="li" style={{ flexWrap: 'wrap' }}>
-            <Bot size={18} />
+            <Brand name={LOGO[t.kind] ?? ''} />
             <span style={{ flex: 1, minWidth: 180 }}>{t.name}<span className="small muted"> · {CLIENTS.find(c => c.kind === t.kind)?.name ?? tr("Autre")}</span></span>
             <span className={'badge ' + (t.last_used ? 'b-g' : '')}>{t.last_used ? tr("Utilisée {0} · {1} appel{2}", [ago(t.last_used), t.calls, t.calls > 1 ? 's' : '']) : tr("Jamais utilisée")}</span>
             <button className="btn" style={{ height: 34 }} onClick={async () => { await api.post(`/api/tokens/${t.id}/scope`, { scope: t.scope === 'read' ? 'write' : 'read' }); reload() }}>{t.scope === 'read' ? <><Lock size={14} />{tr("Lecture seule")}</> : <><Unlock size={14} />{tr("Peut modifier")}</>}</button>
@@ -81,6 +85,8 @@ export default function AI() {
           <p className="small muted">{tr("Redémarrez l’IA puis demandez-lui par exemple : « Liste les acteurs de ma map POP ». Cette page indiquera qu’elle est utilisée.")}</p>
         </Modal>
       </>}
-    </main>
+    </Wrap>
   )
 }
+
+const Wrap = ({ embedded, children }: { embedded?: boolean; children: React.ReactNode }) => embedded ? <>{children}</> : <main className="content">{children}</main>

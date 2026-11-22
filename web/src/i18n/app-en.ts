@@ -161,6 +161,8 @@ const EN: Record<string, string> = {
  "Général": "General",
  "Vue d'ensemble": "Overview",
  "Dashboard": "Dashboard",
+ "Votre compte et vos connexions.": "Your account and connections.",
+ "Ouvrez une map pour y connecter une IA.": "Open a map to connect an AI to it.",
  "Retour au planning": "Back to the schedule",
  "Découpe la map en tâches d'une heure, avec dépendances, jours, personnes et objectifs jusqu'à la sortie.": "Breaks the map into one-hour tasks, with dependencies, days, people and goals up to release.",
  "Prise le": "Taken on",
