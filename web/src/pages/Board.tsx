@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import {
   MousePointer2, Lasso, StickyNote, Type, Square, Circle, Spline, Pen, Highlighter, Eraser, Frame, ImagePlus, MessageSquarePlus, ThumbsUp,
   Timer, Eye, EyeOff, LayoutGrid, Presentation, Download, Plus, Minus, Maximize, UserRound, ChevronLeft, ChevronRight, X, Network,
-  Expand, Shrink, Undo2, Redo2, MoreHorizontal, Users, Copy, Trash2, BringToFront, SendToBack, AlignStartVertical, AlignStartHorizontal, AlignCenterVertical, AlignCenterHorizontal, Upload, Pencil,
+  Expand, Shrink, Undo2, Redo2, MoreHorizontal, ExternalLink, Sparkles, Users, Copy, Trash2, BringToFront, SendToBack, AlignStartVertical, AlignStartHorizontal, AlignCenterVertical, AlignCenterHorizontal, Upload, Pencil,
 } from 'lucide-react'
 import { api } from '../api'
 import { useApp, useLoad } from '../state'
@@ -21,6 +21,8 @@ const SHADES = [['#FFFFFF', '#0A0A0A'], ['#E5E5E5', '#0A0A0A'], ['#A3A3A3', '#0A
 const SHADE_NAMES = [tr("Blanc"), tr("Gris clair"), tr("Gris moyen"), tr("Gris foncé"), tr("Jaune"), tr("Vert"), tr("Bleu"), tr("Rose"), tr("Orange")]
 const KEYS: Record<string, string> = { v: 'select', l: 'lasso', n: 'sticky', t: 'text', r: 'rect', o: 'ellipse', c: 'connector', p: 'pen', h: 'hl', e: 'erase', f: 'frame', m: 'comment' }
 const GRID = 24
+// Lien d'artefact Claude (#207) : même règle que le serveur (boards.rs, artifact_url_ok).
+const ARTIFACT_RE = /^https:\/\/claude\.ai\/(artifact|public\/artifacts|share)\/[A-Za-z0-9_-]{6,80}\/?$/
 const snap = (v: number, on: boolean) => (on ? Math.round(v / GRID) * GRID : v)
 const UEFN: [string, string, string][] = [
   ['zone', tr("Zone"), 'Z'], ['spawn', tr("Apparition"), 'A'], ['button', tr("Bouton"), 'B'], ['trigger', tr("Déclencheur"), 'D'], ['dispenser', tr("Distributeur"), 'R'], ['npc', 'PNJ', 'P'],
@@ -417,6 +419,7 @@ function Canvas({ id }: { id: number }) {
       if (o.kind === 'shape') return g(shp(o) + txt(o, o.x, o.y, o.w ?? 140, o.h ?? 90, { size: 13, color: o.fill !== undefined ? SHADES[o.fill]?.[1] ?? '#1a1a1a' : '#1a1a1a', anchor: 'center', va: 'middle' }))
       if (o.kind === 'text' || o.kind === 'comment') return g(`${o.bg && o.bg !== 'none' ? tr("<rect x=\"{0}\" y=\"{1}\" width=\"{2}\" height=\"{3}\" fill=\"{4}\"/>", [o.x, o.y, o.w, o.h, o.bg]) : ''}${o.bw ? tr("<rect x=\"{0}\" y=\"{1}\" width=\"{2}\" height=\"{3}\" fill=\"none\" stroke=\"{4}\" stroke-width=\"{5}\"/>", [o.x, o.y, o.w, o.h, o.bc ?? '#1a1a1a', o.bw]) : ''}${txt(o, o.x - 10, o.y - 8, (o.w ?? 220) + 10, o.h ?? 40, { size: o.kind === 'text' ? 18 : 14, color: '#1a1a1a' })}`)
       if (o.kind === 'uefn') return tr("<circle cx=\"{0}\" cy=\"{1}\" r=\"19\" fill=\"#fff\" stroke=\"#1a1a1a\" stroke-width=\"1.5\"/><text x=\"{2}\" y=\"{3}\" font-size=\"11\" text-anchor=\"middle\" font-family=\"sans-serif\">{4}</text>", [o.x + 19, o.y + 19, o.x + 19, o.y + 60, esc(o.text ?? '')])
+      if (o.kind === 'artifact') return g(`<rect x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" rx="12" fill="#fff" stroke="#d4d4d4"/><text x="${o.x + 16}" y="${o.y + 32}" font-size="15" font-weight="600" font-family="sans-serif">${esc(o.text ?? '')}</text><text x="${o.x + 16}" y="${o.y + 54}" font-size="11" fill="#737373" font-family="sans-serif">${esc(o.url ?? '')}</text>`)
       if (o.kind === 'image' && o.url) return g(tr("<image href=\"{0}\" x=\"{1}\" y=\"{2}\" width=\"{3}\" height=\"{4}\" preserveAspectRatio=\"xMidYMid meet\"/>", [esc(o.url), o.x, o.y, o.w, o.h]))
       return ''
     })
@@ -465,6 +468,7 @@ function Canvas({ id }: { id: number }) {
               {menu === 'tools' && <div className="menu" style={{ left: 0, top: 44 }} onMouseLeave={() => setMenu(null)}>
                 {MORE.map(([k, l, I]) => <button key={k} disabled={!canEdit} onClick={() => { setTool(k); setConnFrom(null); setMenu(null) }}><I size={16} />{l}</button>)}
                 <button disabled={!canEdit} onClick={() => { setMenu(null); const u = prompt(tr("Lien https de l’image (plan de map vu du dessus, capture…)")); if (u && /^https:\/\//.test(u)) add({ kind: 'image', url: u, w: 600, h: 400, locked: confirm(tr("Utiliser comme fond « plan de map » (verrouillé derrière) ?")) }) }}><Upload size={16} />{tr("Image par lien")}</button>
+                <button disabled={!canEdit} onClick={() => { setMenu(null); const u = prompt(tr("Lien de l’artefact Claude (https://claude.ai/…)"))?.trim(); if (!u) return; if (!ARTIFACT_RE.test(u)) { app.toast(tr("Seuls les liens d’artefacts claude.ai sont acceptés."), true); return } const t = prompt(tr("Titre affiché (facultatif)"), tr("Artefact Claude")); add({ kind: 'artifact', url: u, text: (t ?? '').trim().slice(0, 120) || tr("Artefact Claude"), w: 320, h: 170 }) }}><Sparkles size={16} />{tr("Artefact Claude")}</button>
                 <button onClick={() => { setLib(l => !l); setMenu(null) }}><LayoutGrid size={16} />{tr("{0} les formes UEFN", [lib ? tr("Masquer") : tr("Afficher")])}</button>
               </div>}
             </div>
@@ -526,6 +530,12 @@ function Canvas({ id }: { id: number }) {
                 const bx = (def = 'flex-start'): React.CSSProperties => ({ ...st, opacity: o.op, justifyContent: vAlign(o, def) })
                 const border = (o.bw ?? 0) > 0 ? { border: `${o.bw}px ${o.bs ?? 'solid'} ${o.bc ?? 'var(--text)'}` } : {}
                 const lk = o.lk ? ' locked' : ''
+                if (o.kind === 'artifact') return <div key={o.id} data-oid={o.id} className={'obj artifact' + isSel + lk} style={{ ...st, opacity: o.op }}>
+                  <div className="art-head"><Sparkles size={16} /><span>{tr("Artefact Claude")}</span></div>
+                  <b className="art-title">{o.text}</b>
+                  <span className="art-url">{String(o.url).replace('https://', '')}</span>
+                  <a className="btn sm art-open" href={ARTIFACT_RE.test(o.url ?? '') ? o.url : undefined} target="_blank" rel="noopener noreferrer" onPointerDown={e => e.stopPropagation()}><ExternalLink size={14} />{tr("Ouvrir dans Claude")}</a>
+                </div>
                 if (o.kind === 'image') return <img key={o.id} data-oid={o.id} className={'obj' + isSel + lk} src={o.url} alt="" draggable={false} style={{ ...st, opacity: o.locked ? 0.5 : o.op ?? 1, pointerEvents: o.locked ? 'none' : 'auto', objectFit: 'contain' }} />
                 if (o.kind === 'frame') return <div key={o.id} data-oid={o.id} className={'obj frame' + isSel + lk} style={{ ...st, opacity: o.op, background: o.bg && o.bg !== 'none' ? o.bg : undefined, ...(o.bw !== undefined ? { border: o.bw ? `${o.bw}px ${o.bs ?? 'solid'} ${o.bc ?? 'var(--text3)'}` : '0' } : {}) }}><span className="fname" style={ts}>{ed ? <input autoFocus defaultValue={o.text} onPointerDown={e => e.stopPropagation()} onBlur={e => { push([{ ...o, text: e.target.value }]); setEditing(null) }} className="field" style={{ height: 26 }} /> : o.text}</span></div>
                 if (o.kind === 'sticky') {
