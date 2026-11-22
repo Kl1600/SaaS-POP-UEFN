@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-22 · #194 · Planifier allégé
+- Fait : carte « Charge par personne » retirée ; onglet Générateur retiré de Planifier : il s'ouvre par /planifier?vue=generateur, depuis la dernière ligne du sélecteur de map (quand une map est ouverte).
+- Vérifié : navigateur, aucune erreur JS.
+
 ### 2026-11-22 · #212 · rouvrir une tâche finie
 - Fait : `reblock_after_reopen` (tasks.rs) quand une tâche passe de « fait » à autre chose : les suivantes non commencées l'attendent de nouveau (évènement + journal « de nouveau bloquée » ; elles restent « à faire », le serveur refuse déjà de les passer en cours), celles en cours restent et leur responsable reçoit une notification.
 - Vérifié : cargo test `rouvrir_rebloque_les_taches_suivantes`.
