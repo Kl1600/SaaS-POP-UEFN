@@ -201,22 +201,6 @@ export function Account() {
   </>)
 }
 
-function McpTokens() {
-  const { map, canEdit, toast } = useApp()
-  const { data, reload } = useLoad<any[]>(map ? `/api/maps/${map.id}/tokens` : null, [map?.id])
-  const [tok, setTok] = useState<string | null>(null)
-  const cfg = tok ? JSON.stringify({ mcpServers: { pop: { type: 'http', url: `${location.origin}/mcp`, headers: { Authorization: tr("Bearer {0}", [tok]) } } } }, null, 2) : ''
-  return (
-    <section className="card">
-      <CardHead title={tr("IA connectée (serveur MCP de POP)")} sub={tr("Votre IA (Claude Code, Cursor…) peut lire et modifier les acteurs et le Verse comme vous : tout est journalisé, et une suppression attend la validation d’un humain dans Paramètres → UEFN Link.")}>
-        {canEdit && <button className="btn pri" onClick={async () => { const n = prompt(tr("Nom du jeton"), tr("Mon IA")); if (n) { try { setTok((await api.post(`/api/maps/${map!.id}/tokens`, { name: n })).token); reload() } catch (e: any) { toast(e.message, true) } } }}>{tr("Créer un jeton")}</button>}
-      </CardHead>
-      {tok && <><p className="small muted">{tr("Copiez ce fichier .mcp.json maintenant : le jeton ne sera plus affiché.")}</p><pre className="report mono">{cfg}</pre></>}
-      <div className="list">{data?.map(t => <div key={t.id} className="li"><span style={{ flex: 1 }}>{t.name}</span><span className="small muted">{t.created_at}</span><button className="iconbtn" aria-label={tr("Révoquer")} onClick={async () => { await api.del(`/api/tokens/${t.id}`); reload() }}><Trash2 size={16} /></button></div>)}</div>
-    </section>
-  )
-}
-
 function useMembersOfStudio() {
   const { map } = useApp()
   return useLoad<any>(map ? `/api/maps/${map.id}/people` : null, [map?.id]).data?.people ?? []

@@ -1,5 +1,6 @@
 //! Serveur MCP de POP : expose à l'IA connectée du créateur les mêmes actions que l'Organiseur et l'éditeur Verse.
 //! Tout est journalisé ; une suppression attend la validation d'un humain.
+//! Un jeton est lié au compte (#145) : l'IA choisit sa map de travail par `list_maps` puis `use_map`.
 use crate::{
     access::{map_ctx, notify, Role},
     auth::{random_token, sha256_hex, AuthUser},
@@ -36,13 +37,12 @@ const KINDS: &[&str] = &[
     "autre",
 ];
 
+/// Crée un jeton MCP du compte (#145) : il n'est lié à aucune map, l'IA choisit sa map de travail par `use_map`.
 pub async fn create_token(
     State(st): State<AppState>,
     u: AuthUser,
-    Path(mid): Path<i64>,
     Json(b): Json<TokenIn>,
 ) -> ApiResult<Value> {
-    map_ctx(&st, &u, mid).await?.require(Role::Freelance)?;
     check_len("Nom", &b.name, 1, 60)?;
     let token = format!("pop_{}", random_token());
     let kind = b
@@ -54,18 +54,18 @@ pub async fn create_token(
     } else {
         "write"
     };
-    let id: i64 = sqlx::query_scalar("INSERT INTO api_tokens (user_id, map_id, name, token_hash, kind, scope) VALUES (?, ?, ?, ?, ?, ?) RETURNING id").bind(u.id).bind(mid).bind(b.name.trim()).bind(sha256_hex(&token)).bind(&kind).bind(scope).fetch_one(&st.db).await?;
+    let id: i64 = sqlx::query_scalar("INSERT INTO api_tokens (user_id, name, token_hash, kind, scope) VALUES (?, ?, ?, ?, ?) RETURNING id").bind(u.id).bind(b.name.trim()).bind(sha256_hex(&token)).bind(&kind).bind(scope).fetch_one(&st.db).await?;
     Ok(Json(json!({ "token": token, "id": id })))
 }
 
-pub async fn tokens(
-    State(st): State<AppState>,
-    u: AuthUser,
-    Path(mid): Path<i64>,
-) -> ApiResult<Value> {
-    map_ctx(&st, &u, mid).await?;
-    let rows: Vec<(i64, String, String, String, String, Option<String>, i64)> = sqlx::query_as("SELECT id, name, created_at, kind, scope, last_used, calls FROM api_tokens WHERE user_id = ? AND map_id = ? ORDER BY id DESC").bind(u.id).bind(mid).fetch_all(&st.db).await?;
-    Ok(Json(json!(rows.into_iter().map(|(id, n, at, kind, scope, last, calls)| json!({"id": id, "name": n, "created_at": at, "kind": kind, "scope": scope, "last_used": last, "calls": calls})).collect::<Vec<_>>())))
+/// Jetons du compte, avec leur map de travail (seulement si le compte y a encore accès).
+pub async fn tokens(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
+    let rows: Vec<(i64, String, String, String, String, Option<String>, i64, Option<i64>, Option<String>)> = sqlx::query_as(
+        "SELECT t.id, t.name, t.created_at, t.kind, t.scope, t.last_used, t.calls, m.id, m.name FROM api_tokens t
+         LEFT JOIN maps m ON m.id = t.map_id AND EXISTS (SELECT 1 FROM memberships ms WHERE ms.studio_id = m.studio_id AND ms.user_id = t.user_id)
+         WHERE t.user_id = ? ORDER BY t.id DESC",
+    ).bind(u.id).fetch_all(&st.db).await?;
+    Ok(Json(json!(rows.into_iter().map(|(id, n, at, kind, scope, last, calls, mid, mname)| json!({"id": id, "name": n, "created_at": at, "kind": kind, "scope": scope, "last_used": last, "calls": calls, "map": mid.map(|i| json!({ "id": i, "name": mname }))})).collect::<Vec<_>>())))
 }
 
 #[derive(Deserialize)]
@@ -112,6 +112,8 @@ fn tools() -> Value {
     let ids = json!({ "type": "array", "items": { "type": "string" }, "description": "Identifiants des acteurs" });
     let task = json!({ "type": "integer", "description": "N° de la tâche POP liée (facultatif)" });
     json!([
+        tool("list_maps", "Liste les maps auxquelles votre compte a accès (espace perso et studios), avec votre rôle ; current : la map de travail actuelle de cette IA.", json!({}), &[]),
+        tool("use_map", "Choisit la map de travail de cette IA (identifiant donné par list_maps). Tous les autres outils agissent ensuite sur cette map ; le choix est gardé par POP, même après un redémarrage de l'IA.", json!({ "map": { "type": "integer", "description": "Identifiant de la map (list_maps)" } }), &["map"]),
         tool("uefn_status", "État du relais et d'UEFN (connecté, fermé, hors ligne) et nombre d'actions en attente.", json!({}), &[]),
         tool("list_actors", "Liste les acteurs du niveau. Filtre facultatif : texte cherché dans le nom, le type, le dossier, les tags et les options.", json!({ "query": { "type": "string" } }), &[]),
         tool("get_actor", "Détails d'un acteur : transformation, tags, options, propriétés Verse, liens d'événements.", json!({ "id": { "type": "string" } }), &["id"]),
@@ -150,6 +152,8 @@ fn tools() -> Value {
 }
 
 const READ_TOOLS: &[&str] = &[
+    "list_maps",
+    "use_map",
     "uefn_status",
     "check_level",
     "session_output",
@@ -198,7 +202,7 @@ pub async fn mcp(
         .or(q.token)
         .unwrap_or_default();
     let token = token.as_str();
-    let row: Option<(i64, i64, String, String, String, i64)> = match sqlx::query_as(
+    let row: Option<(i64, Option<i64>, String, String, String, i64)> = match sqlx::query_as(
         "SELECT t.user_id, t.map_id, u.email, u.name, t.scope, t.id FROM api_tokens t JOIN users u ON u.id = t.user_id WHERE t.token_hash = ? AND u.disabled = 0",
     ).bind(sha256_hex(token)).fetch_optional(&st.db).await {
         Ok(r) => r,
@@ -217,7 +221,9 @@ pub async fn mcp(
     .bind(sha256_hex(token))
     .execute(&st.db)
     .await;
-    crate::access::notify(&st, mid, json!({ "t": "refresh", "what": "ai" }));
+    if let Some(mid) = mid {
+        crate::access::notify(&st, mid, json!({ "t": "refresh", "what": "ai" }));
+    }
     let user = AuthUser {
         id: uid,
         email,
@@ -232,7 +238,7 @@ pub async fn mcp(
                 "protocolVersion": req["params"]["protocolVersion"].as_str().unwrap_or("2025-06-18"),
                 "capabilities": { "tools": {} },
                 "serverInfo": { "name": "pop", "version": "0.1.0" },
-                "instructions": "Outils POP : gérer les tâches de la map (list_tasks, next_task, create_task, set_task_status, comment_task) et piloter UEFN via le relais du créateur. Avant de travailler, lisez les compétences utiles (list_skills, get_skill : la méthode de POP et les règles du studio), prenez une tâche avec next_task et passez-la en cours ; quand elle est finie, passez-la en done avec une note. Toute action UEFN est journalisée et annulable ; les suppressions attendent une validation humaine."
+                "instructions": "Commencez par list_maps puis use_map pour choisir la map de travail (gardée par POP). Outils POP : gérer les tâches de la map (list_tasks, next_task, create_task, set_task_status, comment_task) et piloter UEFN via le relais du créateur. Avant de travailler, lisez les compétences utiles (list_skills, get_skill : la méthode de POP et les règles du studio), prenez une tâche avec next_task et passez-la en cours ; quand elle est finie, passez-la en done avec une note. Toute action UEFN est journalisée et annulable ; les suppressions attendent une validation humaine."
             }),
         ),
         m if m.starts_with("notifications/") => StatusCode::ACCEPTED.into_response(),
@@ -247,7 +253,7 @@ pub async fn mcp(
                 return rpc_ok(id, text("Cette IA est en lecture seule dans POP (IA connectées → autoriser les modifications).", true));
             }
             let args = req["params"]["arguments"].clone();
-            match call_as(&st, &user, mid, Some(agent), name, args).await {
+            match token_call(&st, &user, mid, agent, name, args).await {
                 Ok(v) => rpc_ok(
                     id,
                     text(serde_json::to_string_pretty(&v).unwrap_or_default(), false),
@@ -267,6 +273,85 @@ pub async fn mcp(
             }
         }
         _ => rpc_err(id, -32601, "Méthode inconnue"),
+    }
+}
+
+const SANS_MAP: &str = "Aucune map de travail choisie pour cette IA. Appelez list_maps pour voir vos maps, puis use_map avec l'identifiant de la map sur laquelle travailler.";
+
+/// Appel d'un outil par un jeton MCP du compte (#145) : `list_maps` et `use_map` choisissent la map de travail ;
+/// les autres outils agissent sur elle, après vérification de l'appartenance et du rôle à chaque appel.
+async fn token_call(
+    st: &AppState,
+    user: &AuthUser,
+    work_map: Option<i64>,
+    agent: i64,
+    name: &str,
+    a: Value,
+) -> Result<Value, AppError> {
+    match name {
+        "list_maps" => {
+            let rows: Vec<(i64, String, String, String, i64, String)> = sqlx::query_as(
+                "SELECT m.id, m.name, s.name, ms.role, s.personal, m.status FROM maps m JOIN studios s ON s.id = m.studio_id
+                 JOIN memberships ms ON ms.studio_id = m.studio_id AND ms.user_id = ? ORDER BY s.personal DESC, s.name, m.name",
+            )
+            .bind(user.id)
+            .fetch_all(&st.db)
+            .await?;
+            Ok(json!({
+                "maps": rows.into_iter().map(|(id, n, s, role, personal, status)| json!({
+                    "id": id, "name": n, "studio": if personal != 0 { "Espace perso".to_string() } else { s },
+                    "role": role, "status": status, "current": Some(id) == work_map,
+                })).collect::<Vec<_>>(),
+                "message": "Choisissez la map de travail avec use_map { \"map\": <id> }.",
+            }))
+        }
+        "use_map" => {
+            let mid = a["map"]
+                .as_i64()
+                .ok_or_else(|| bad("Identifiant de la map manquant (map, voir list_maps)."))?;
+            let ctx = map_ctx(st, user, mid).await.map_err(|e| match e {
+                AppError::NotFound => bad(format!(
+                    "La map n° {mid} n'existe pas ou vous n'en êtes pas membre. Appelez list_maps pour voir vos maps."
+                )),
+                e => e,
+            })?;
+            let nom: String = sqlx::query_scalar("SELECT name FROM maps WHERE id = ?")
+                .bind(mid)
+                .fetch_one(&st.db)
+                .await?;
+            // Une tâche réservée dans une autre map est libérée : un agent n'a qu'une tâche, dans sa map de travail.
+            sqlx::query(
+                "UPDATE api_tokens SET map_id = ?,
+                   task_id = CASE WHEN task_id IN (SELECT id FROM tasks WHERE map_id = ?) THEN task_id END,
+                   task_since = CASE WHEN task_id IN (SELECT id FROM tasks WHERE map_id = ?) THEN task_since END
+                 WHERE id = ?",
+            )
+            .bind(mid)
+            .bind(mid)
+            .bind(mid)
+            .bind(agent)
+            .execute(&st.db)
+            .await?;
+            if let Some(old) = work_map.filter(|&o| o != mid) {
+                notify(st, old, json!({ "t": "refresh", "what": "ai" }));
+            }
+            notify(st, mid, json!({ "t": "refresh", "what": "ai" }));
+            Ok(json!({
+                "map": { "id": mid, "name": nom, "role": ctx.role.as_str() },
+                "message": format!("Map de travail : « {nom} ». Les outils agissent maintenant sur cette map."),
+            }))
+        }
+        _ => {
+            let mid = work_map.ok_or_else(|| bad(SANS_MAP))?;
+            // Membre retiré du studio : rien n'est lu ni modifié.
+            map_ctx(st, user, mid).await.map_err(|e| match e {
+                AppError::NotFound => bad(format!(
+                    "Vous n'avez plus accès à votre map de travail (n° {mid}). Appelez list_maps puis use_map pour en choisir une autre."
+                )),
+                e => e,
+            })?;
+            call_as(st, user, mid, Some(agent), name, a).await
+        }
     }
 }
 
@@ -1178,5 +1263,374 @@ mod tests_dependances {
         let d = t["description"].as_str().unwrap();
         assert!(d.contains("ni faite ni testée"), "{d}");
         assert!(d.contains("découvre"), "{d}");
+    }
+}
+
+#[cfg(test)]
+mod tests_compte {
+    //! #145 : un jeton MCP par compte, map de travail choisie par list_maps / use_map.
+    use super::*;
+
+    struct Monde {
+        st: AppState,
+        uid: i64,
+        perso: i64,
+        equipe: i64,
+        sid_equipe: i64,
+        autre: i64,
+    }
+
+    async fn q(st: &AppState, sql: &str) -> i64 {
+        sqlx::query_scalar(sql).fetch_one(&st.db).await.unwrap()
+    }
+
+    async fn monde() -> Monde {
+        let st = crate::test_state().await;
+        let uid = q(&st, "INSERT INTO users (email, name, password_hash) VALUES ('ia@a.fr', 'Yanis', 'x') RETURNING id").await;
+        let intrus = q(&st, "INSERT INTO users (email, name, password_hash) VALUES ('b@a.fr', 'Bob', 'x') RETURNING id").await;
+        let sp = q(
+            &st,
+            "INSERT INTO studios (name, personal) VALUES ('Perso', 1) RETURNING id",
+        )
+        .await;
+        let se = q(
+            &st,
+            "INSERT INTO studios (name) VALUES ('Equipe') RETURNING id",
+        )
+        .await;
+        let sa = q(
+            &st,
+            "INSERT INTO studios (name) VALUES ('Ailleurs') RETURNING id",
+        )
+        .await;
+        for (s, u, r) in [
+            (sp, uid, "owner"),
+            (se, uid, "member"),
+            (sa, intrus, "owner"),
+        ] {
+            sqlx::query("INSERT INTO memberships (studio_id, user_id, role) VALUES (?, ?, ?)")
+                .bind(s)
+                .bind(u)
+                .bind(r)
+                .execute(&st.db)
+                .await
+                .unwrap();
+        }
+        let map = |s: i64, n: &'static str| {
+            let st = st.clone();
+            async move {
+                let m: i64 = sqlx::query_scalar(
+                    "INSERT INTO maps (studio_id, name) VALUES (?, ?) RETURNING id",
+                )
+                .bind(s)
+                .bind(n)
+                .fetch_one(&st.db)
+                .await
+                .unwrap();
+                sqlx::query("INSERT INTO tasks (map_id, number, title) VALUES (?, 1, ?)")
+                    .bind(m)
+                    .bind(format!("Tâche de {n}"))
+                    .execute(&st.db)
+                    .await
+                    .unwrap();
+                m
+            }
+        };
+        Monde {
+            perso: map(sp, "Solo").await,
+            equipe: map(se, "GrassCutter").await,
+            autre: map(sa, "Secrète").await,
+            sid_equipe: se,
+            st,
+            uid,
+        }
+    }
+
+    /// Appel MCP complet (comme une IA) : jeton dans l'en-tête, réponse JSON-RPC.
+    async fn mcp_call(st: &AppState, token: &str, name: &str, args: Value) -> (bool, String) {
+        let mut h = HeaderMap::new();
+        h.insert("authorization", format!("Bearer {token}").parse().unwrap());
+        let r = mcp(
+            State(st.clone()),
+            h,
+            axum::extract::Query(McpQ { token: None }),
+            Json(json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": { "name": name, "arguments": args } })),
+        )
+        .await;
+        let b = axum::body::to_bytes(r.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let v: Value = serde_json::from_slice(&b).unwrap();
+        (
+            v["result"]["isError"].as_bool().unwrap_or(true),
+            v["result"]["content"][0]["text"]
+                .as_str()
+                .unwrap_or("")
+                .to_string(),
+        )
+    }
+
+    async fn jeton(m: &Monde, map: Option<i64>, scope: &str) -> String {
+        let t = format!("pop_test_{}", random_token());
+        sqlx::query("INSERT INTO api_tokens (user_id, map_id, name, token_hash, scope) VALUES (?, ?, 'IA', ?, ?)")
+            .bind(m.uid)
+            .bind(map)
+            .bind(sha256_hex(&t))
+            .bind(scope)
+            .execute(&m.st.db)
+            .await
+            .unwrap();
+        t
+    }
+
+    #[tokio::test]
+    async fn creer_un_jeton_de_compte() {
+        let m = monde().await;
+        let u = AuthUser {
+            id: m.uid,
+            email: "ia@a.fr".into(),
+            name: "Yanis".into(),
+            sid: String::new(),
+        };
+        let Json(r) = create_token(
+            State(m.st.clone()),
+            u.clone(),
+            Json(TokenIn {
+                name: "Claude Code".into(),
+                kind: Some("claude_code".into()),
+                scope: None,
+            }),
+        )
+        .await
+        .unwrap();
+        let t = r["token"].as_str().unwrap().to_string();
+        let map: Option<i64> = sqlx::query_scalar("SELECT map_id FROM api_tokens WHERE id = ?")
+            .bind(r["id"].as_i64().unwrap())
+            .fetch_one(&m.st.db)
+            .await
+            .unwrap();
+        assert_eq!(map, None, "un jeton de compte n'est lié à aucune map");
+        let Json(l) = tokens(State(m.st.clone()), u).await.unwrap();
+        assert_eq!(l.as_array().unwrap().len(), 1);
+        // Sans map de travail : l'erreur explique list_maps / use_map, et rien n'est lu.
+        let (err, msg) = mcp_call(&m.st, &t, "list_tasks", json!({})).await;
+        assert!(
+            err && msg.contains("list_maps") && msg.contains("use_map"),
+            "{msg}"
+        );
+    }
+
+    #[tokio::test]
+    async fn list_maps_puis_use_map() {
+        let m = monde().await;
+        let t = jeton(&m, None, "write").await;
+        let (err, txt) = mcp_call(&m.st, &t, "list_maps", json!({})).await;
+        assert!(!err, "{txt}");
+        let v: Value = serde_json::from_str(&txt).unwrap();
+        let ids: Vec<i64> = v["maps"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x["id"].as_i64().unwrap())
+            .collect();
+        assert_eq!(ids.len(), 2, "{txt}");
+        assert!(ids.contains(&m.perso) && ids.contains(&m.equipe) && !ids.contains(&m.autre));
+        assert!(
+            txt.contains("\"role\": \"member\"") && txt.contains("\"role\": \"owner\""),
+            "{txt}"
+        );
+        // use_map sur l'équipe : list_tasks lit les tâches de GrassCutter.
+        let (err, txt) = mcp_call(&m.st, &t, "use_map", json!({ "map": m.equipe })).await;
+        assert!(!err, "{txt}");
+        let (_, txt) = mcp_call(&m.st, &t, "list_tasks", json!({})).await;
+        assert!(txt.contains("Tâche de GrassCutter"), "{txt}");
+        // Changement de map sans reconnecter : même jeton, autre map ; le choix est gardé en base.
+        mcp_call(&m.st, &t, "use_map", json!({ "map": m.perso })).await;
+        let (_, txt) = mcp_call(&m.st, &t, "list_tasks", json!({})).await;
+        assert!(
+            txt.contains("Tâche de Solo") && !txt.contains("GrassCutter"),
+            "{txt}"
+        );
+        let gardee: Option<i64> =
+            sqlx::query_scalar("SELECT map_id FROM api_tokens WHERE token_hash = ?")
+                .bind(sha256_hex(&t))
+                .fetch_one(&m.st.db)
+                .await
+                .unwrap();
+        assert_eq!(gardee, Some(m.perso));
+        let (_, txt) = mcp_call(&m.st, &t, "list_maps", json!({})).await;
+        assert!(txt.contains("\"current\": true"), "{txt}");
+    }
+
+    #[tokio::test]
+    async fn map_inaccessible_et_retrait_du_studio() {
+        let m = monde().await;
+        let t = jeton(&m, None, "write").await;
+        // Map d'un autre studio : refus clair, la map de travail ne change pas.
+        let (err, msg) = mcp_call(&m.st, &t, "use_map", json!({ "map": m.autre })).await;
+        assert!(err && msg.contains("pas membre"), "{msg}");
+        let (err, msg) = mcp_call(&m.st, &t, "use_map", json!({ "map": 999_999 })).await;
+        assert!(err && msg.contains("list_maps"), "{msg}");
+        let (err, _) = mcp_call(&m.st, &t, "list_tasks", json!({})).await;
+        assert!(err);
+        // Retiré du studio : l'appel suivant est refusé, aucune tâche créée.
+        mcp_call(&m.st, &t, "use_map", json!({ "map": m.equipe })).await;
+        sqlx::query("DELETE FROM memberships WHERE studio_id = ? AND user_id = ?")
+            .bind(m.sid_equipe)
+            .bind(m.uid)
+            .execute(&m.st.db)
+            .await
+            .unwrap();
+        let (err, msg) = mcp_call(&m.st, &t, "create_task", json!({ "title": "Intrusion" })).await;
+        assert!(err && msg.contains("plus accès"), "{msg}");
+        let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tasks WHERE map_id = ?")
+            .bind(m.equipe)
+            .fetch_one(&m.st.db)
+            .await
+            .unwrap();
+        assert_eq!(n, 1);
+    }
+
+    #[tokio::test]
+    async fn ancien_jeton_de_map() {
+        let m = monde().await;
+        // Un jeton créé avant #145 a sa map : il marche sans use_map.
+        let t = jeton(&m, Some(m.equipe), "write").await;
+        let (err, txt) = mcp_call(&m.st, &t, "list_tasks", json!({})).await;
+        assert!(!err && txt.contains("Tâche de GrassCutter"), "{txt}");
+        let (err, txt) = mcp_call(
+            &m.st,
+            &t,
+            "create_task",
+            json!({ "title": "Couper l'herbe" }),
+        )
+        .await;
+        assert!(!err, "{txt}");
+    }
+
+    #[tokio::test]
+    async fn lecture_seule_sur_toutes_les_maps() {
+        let m = monde().await;
+        let t = jeton(&m, None, "read").await;
+        // Choisir une map reste permis, modifier non, sur chaque map.
+        for map in [m.perso, m.equipe] {
+            let (err, txt) = mcp_call(&m.st, &t, "use_map", json!({ "map": map })).await;
+            assert!(!err, "{txt}");
+            let (err, msg) = mcp_call(&m.st, &t, "create_task", json!({ "title": "Non" })).await;
+            assert!(err && msg.contains("lecture seule"), "{msg}");
+            let (err, _) = mcp_call(&m.st, &t, "list_tasks", json!({})).await;
+            assert!(!err);
+        }
+    }
+
+    #[tokio::test]
+    async fn revoquer_et_changer_de_map_libere_la_tache() {
+        let m = monde().await;
+        let t = jeton(&m, Some(m.equipe), "write").await;
+        let (err, txt) = mcp_call(&m.st, &t, "claim_task", json!({ "number": 1 })).await;
+        assert!(!err, "{txt}");
+        mcp_call(&m.st, &t, "use_map", json!({ "map": m.perso })).await;
+        let tache: Option<i64> =
+            sqlx::query_scalar("SELECT task_id FROM api_tokens WHERE token_hash = ?")
+                .bind(sha256_hex(&t))
+                .fetch_one(&m.st.db)
+                .await
+                .unwrap();
+        assert_eq!(tache, None, "la tâche de l'ancienne map est libérée");
+        // Révoqué : le jeton ne marche plus du tout.
+        let u = AuthUser {
+            id: m.uid,
+            email: "ia@a.fr".into(),
+            name: "Yanis".into(),
+            sid: String::new(),
+        };
+        let id: i64 = sqlx::query_scalar("SELECT id FROM api_tokens WHERE token_hash = ?")
+            .bind(sha256_hex(&t))
+            .fetch_one(&m.st.db)
+            .await
+            .unwrap();
+        delete_token(State(m.st.clone()), u, Path(id))
+            .await
+            .unwrap();
+        let mut h = HeaderMap::new();
+        h.insert("authorization", format!("Bearer {t}").parse().unwrap());
+        let r = mcp(
+            State(m.st.clone()),
+            h,
+            axum::extract::Query(McpQ { token: None }),
+            Json(json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/list" })),
+        )
+        .await;
+        assert_eq!(r.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    /// La migration 0034 garde un ancien jeton de map (sa map devient la map de travail) et son journal.
+    #[tokio::test]
+    async fn migration_garde_les_anciens_jetons() {
+        use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
+        use std::str::FromStr;
+        let db = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(
+                SqliteConnectOptions::from_str("sqlite::memory:")
+                    .unwrap()
+                    .foreign_keys(true),
+            )
+            .await
+            .unwrap();
+        let mut avant = sqlx::migrate!("./migrations");
+        avant.migrations = std::borrow::Cow::Owned(
+            avant
+                .migrations
+                .iter()
+                .filter(|m| m.version < 34)
+                .cloned()
+                .collect(),
+        );
+        avant.run(&db).await.unwrap();
+        let ex = |sql: &'static str| {
+            let db = db.clone();
+            async move {
+                sqlx::query(sql).execute(&db).await.unwrap();
+            }
+        };
+        ex("INSERT INTO users (id, email, name, password_hash) VALUES (1, 'a@a.fr', 'A', 'x')")
+            .await;
+        ex("INSERT INTO studios (id, name) VALUES (1, 'S')").await;
+        ex("INSERT INTO maps (id, studio_id, name) VALUES (7, 1, 'M')").await;
+        ex("INSERT INTO tasks (id, map_id, number, title) VALUES (3, 7, 1, 'T')").await;
+        ex("INSERT INTO api_tokens (id, user_id, map_id, name, token_hash, kind, scope, calls, task_id) VALUES (5, 1, 7, 'Vieux', 'h', 'codex', 'read', 9, 3)").await;
+        ex("INSERT INTO uefn_actions (id, map_id, user_id, source, action, args, summary, status, agent_id) VALUES (11, 7, 1, 'mcp', 'save', '{}', 'x', 'done', 5)").await;
+        sqlx::migrate!("./migrations").run(&db).await.unwrap();
+        let r: (Option<i64>, String, String, i64, Option<i64>) = sqlx::query_as(
+            "SELECT map_id, kind, scope, calls, task_id FROM api_tokens WHERE id = 5",
+        )
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        assert_eq!(r, (Some(7), "codex".into(), "read".into(), 9, Some(3)));
+        let agent: Option<i64> =
+            sqlx::query_scalar("SELECT agent_id FROM uefn_actions WHERE id = 11")
+                .fetch_one(&db)
+                .await
+                .unwrap();
+        assert_eq!(agent, Some(5), "le journal garde l'agent");
+        // La map supprimée : le jeton reste, sans map de travail ; le journal disparaît avec la map.
+        ex("DELETE FROM maps WHERE id = 7").await;
+        let m: Option<i64> = sqlx::query_scalar("SELECT map_id FROM api_tokens WHERE id = 5")
+            .fetch_one(&db)
+            .await
+            .unwrap();
+        assert_eq!(m, None);
+        // Supprimer le jeton vide toujours l'agent du journal (clé étrangère vers la nouvelle table).
+        ex("INSERT INTO maps (id, studio_id, name) VALUES (8, 1, 'N')").await;
+        ex("INSERT INTO uefn_actions (id, map_id, user_id, source, action, args, summary, status, agent_id) VALUES (12, 8, 1, 'mcp', 'save', '{}', 'x', 'done', 5)").await;
+        ex("DELETE FROM api_tokens WHERE id = 5").await;
+        let agent: Option<i64> =
+            sqlx::query_scalar("SELECT agent_id FROM uefn_actions WHERE id = 12")
+                .fetch_one(&db)
+                .await
+                .unwrap();
+        assert_eq!(agent, None);
     }
 }

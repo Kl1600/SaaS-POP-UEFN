@@ -575,10 +575,7 @@ fn api() -> Router<AppState> {
         )
         .route("/api/studios/{sid}/skills/{name}", get(skills::get))
         .route("/api/skills/{id}", delete(skills::delete))
-        .route(
-            "/api/maps/{mid}/tokens",
-            get(mcp::tokens).post(mcp::create_token),
-        )
+        .route("/api/me/tokens", get(mcp::tokens).post(mcp::create_token))
         .route("/api/tokens/{id}/scope", post(mcp::set_scope))
         .route("/api/tokens/{id}", delete(mcp::delete_token))
         .route("/mcp", post(mcp::mcp))

@@ -108,7 +108,7 @@ Chaque action est journalisée et annulable ; droits par rôle (invité en lectu
 
 ## IA connectée (MCP de POP)
 
-Équipe et intégrations → « Créer un jeton » donne un `.mcp.json` à coller dans Claude Code, Cursor, etc. L'IA dispose des mêmes actions (lister / modifier / dupliquer les acteurs, lire / écrire le Verse, compiler, session de test, Lore, annuler), journalisées à son nom ; une suppression attend la validation d'un humain dans l'Organiseur.
+Paramètres du compte → « IA connectées » donne la commande ou le fichier à coller dans Claude Code, Cursor, etc. Le jeton vaut pour tout le compte : l'IA voit ses maps avec `list_maps` et choisit sa map de travail avec `use_map` (gardée par POP). L'IA dispose des mêmes actions (lister / modifier / dupliquer les acteurs, lire / écrire le Verse, compiler, session de test, Lore, annuler), journalisées à son nom ; une suppression attend la validation d'un humain dans l'Organiseur.
 
 ## Sécurité
 
