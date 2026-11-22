@@ -37,3 +37,7 @@ Fait : bouton « Ranger le niveau » (aperçu avant → après), action serveur 
 Reste : test avec le vrai UEFN
 Bloque : rien
 ```
+### 2026-11-22 · #150 · Pages : plus rien de coupé à droite
+- Fait : le titre de page et les cellules des tableaux sont des zones de texte qui grandissent (`AutoText` dans `Pages.tsx`) au lieu d'`<input>` qui ne passent jamais à la ligne ; Entrée n'y ajoute pas de ligne. Le bloc de code défile seul à l'horizontale, une longue URL se coupe (`overflow-wrap:anywhere`, `min-width:0` sur `.btext`).
+- Vérifié : navigateur en local à 900 px, thèmes clair et sombre (largeur de page = largeur de fenêtre), saisie dans le titre et une cellule enregistrée.
+- Leçon : un `<input>` dans une cellule ou un titre coupe toujours le texte long ; dans un conteneur flex, un enfant qui doit rétrécir a besoin de `min-width:0`.
