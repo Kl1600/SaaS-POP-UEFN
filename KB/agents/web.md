@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-22 · #212 · rouvrir une tâche finie
+- Fait : `reblock_after_reopen` (tasks.rs) quand une tâche passe de « fait » à autre chose : les suivantes non commencées l'attendent de nouveau (évènement + journal « de nouveau bloquée » ; elles restent « à faire », le serveur refuse déjà de les passer en cours), celles en cours restent et leur responsable reçoit une notification.
+- Vérifié : cargo test `rouvrir_rebloque_les_taches_suivantes`.
+
 ### 2026-11-22 · #195 · fiche de tâche large
 - Fait : nom complet du responsable sur les cartes ; détail : « Prise le » (dernier passage à « En cours » lu dans task_events, champ started_at de /api/tasks/{id} : pas de migration) et « Finie le » (done_at) ; Drawer reçoit wide, fiche en deux colonnes (.tgrid : contenu à gauche, propriétés et dates à droite, empilé sur mobile).
 - Vérifié : cargo build, navigateur 1440 et 390 px, aucune erreur JS.
