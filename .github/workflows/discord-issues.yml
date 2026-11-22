@@ -15,10 +15,9 @@ jobs:
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
+      # Checkout complet, jamais partiel : sur le runner local, le dossier de travail est partagé avec le CI, et un
+      # checkout partiel (sparse) y laissait web/, server/… absents pour les jobs suivants (22/11).
       - uses: actions/checkout@v4
-        with:
-          sparse-checkout: tools/discord.py
-          sparse-checkout-cone-mode: false
       - name: Message Discord
         continue-on-error: true
         env:
