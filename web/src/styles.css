@@ -964,3 +964,10 @@ body.wb-fs .side,body.wb-fs .top{visibility:hidden}
 .ipick-grid button{height:34px;border:0;background:none;border-radius:8px;display:grid;place-items:center;color:var(--text);cursor:pointer;padding:0}
 .ipick-grid button:hover{background:var(--hover)}
 .ipick.card,.card .ipick.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px}
+
+/* #203 : sections repliables (Marché). */
+details.fold > summary{list-style:none;cursor:pointer;position:relative;padding-right:28px}
+details.fold > summary::-webkit-details-marker{display:none}
+details.fold > summary::after{content:'';position:absolute;right:4px;top:8px;width:8px;height:8px;border-right:1.5px solid var(--text2);border-bottom:1.5px solid var(--text2);transform:rotate(45deg);transition:transform .15s}
+details.fold:not([open]) > summary::after{transform:rotate(-45deg)}
+details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *{margin-bottom:0}

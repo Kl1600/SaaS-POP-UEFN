@@ -83,7 +83,7 @@ export function Trending() {
     <PageHead title={tr("Maps qui marchent")} help={tr("Les îles Fortnite qui ont le plus de joueurs en ce moment, avec leur évolution sur la veille.")} />
     <Status />
     {rising?.items?.length > 0 && <section className="card">
-      <CardHead icon={<Flame size={18} />} title={tr("Ça monte maintenant")} sub={tr("Maps qui ont plus de joueurs ces 3 dernières heures que d’habitude à ces heures-là : le même signal que la rangée Trending d’Epic. Relevé chaque heure.")} />
+      <CardHead icon={<Flame size={18} />} title={tr("Ça monte maintenant")} sub={tr("Plus de joueurs ces 3 dernières heures que d’habitude. Relevé chaque heure.")} />
       <div className="rgrid">{rising.items.slice(0, 12).map((r: any) => <button key={r.code} className="rcard" onClick={() => isl.open(r.code)}>
         <span className="badge b-g"><TrendingUp size={12} />×{String(r.ratio).replace('.', ',')}</span>
         <b>{r.title || r.code}</b>
@@ -92,8 +92,11 @@ export function Trending() {
     </section>}
     <section className="card">
       <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'wrap', marginBottom: 12 }}>
-        <Filters q={q} setQ={setQ} tag={tag} setTag={setTag} tags={(market?.tags ?? []).map((t: any) => t.tag)} />
-        <label className="row small" style={{ gap: 6 }}><input type="checkbox" checked={epic} onChange={e => setEpic(e.target.checked)} />{tr("Inclure les modes d’Epic")}</label>
+        <div className="row" style={{ flexWrap: 'wrap', gap: 12 }}>
+          <Filters tag={tag} setTag={setTag} tags={(market?.tags ?? []).map((t: any) => t.tag)} />
+          <label className="row small" style={{ gap: 6 }}><input type="checkbox" checked={epic} onChange={e => setEpic(e.target.checked)} />{tr("Inclure les modes d’Epic")}</label>
+        </div>
+        <label className="search" style={{ flex: '0 1 280px', marginLeft: 'auto' }}><Search size={16} /><input placeholder={tr("Nom, créateur, code")} value={q} onChange={e => setQ(e.target.value)} aria-label={tr("Chercher une map")} /></label>
       </div>
       {!data ? null : data.length === 0 ? <Empty text={tr("Pas encore de données : la première collecte prend quelques minutes.")} /> :
         <div style={{ overflowX: 'auto' }}><table className="tbl"><thead><tr><th>#</th><th>{tr("Map")}</th><th>{tr("Joueurs (jour)")}</th><th>{tr("Évolution")}</th><th>{tr("Pic CCU")}</th><th>{tr("Min/joueur")}</th><th>{tr("Rétention D1")}</th><th>{tr("Genres")}</th></tr></thead>
@@ -182,11 +185,7 @@ function GenreDrawer({ g, onClose, openIsland }: { g: any; onClose: () => void; 
 }
 
 export function Market({ title, bar }: { title?: string; bar?: ReactNode } = {}) {
-  const { map, isAdmin, toast } = useApp()
   const { data } = useLoad<any>('/api/analytics/market')
-  const { data: mine, reload: reloadMine } = useLoad<any>(map ? `/api/maps/${map.id}/island` : null, [map?.id])
-  const { data: watched, reload: reloadW } = useLoad<any[]>('/api/analytics/watch')
-  const [code, setCode] = useState('')
   const [filter, setFilter] = useState('')
   const [q, setQ] = useState('')
   const [sort, setSort] = useState<'players' | 'score' | 'trend'>('score')
@@ -199,26 +198,23 @@ export function Market({ title, bar }: { title?: string; bar?: ReactNode } = {})
   const biggest = all[0]
   const rising = useMemo(() => [...all].filter(t => t.trend !== null && t.islands >= 5).sort((a, b) => b.trend - a.trend)[0], [data])
   const crowded = useMemo(() => [...all].filter(t => t.verdict === 'sature').sort((a, b) => b.islands - a.islands)[0], [data])
-  const maxP = Math.max(1, ...(data?.players_per_day ?? []).map((d: any) => d.players ?? 0))
   const Pick = ({ t }: { t: any }) => <button className="link" style={{ fontWeight: 500 }} onClick={() => setGenre(t)}>{cap(t.tag)}</button>
   return <main className="content">
-    <PageHead title={title ?? tr("Analyse du marché")} help={tr("Quels genres de maps attirent les joueurs, où il y a de la place, et où la concurrence est trop forte.")} />
+    <PageHead title={title ?? tr("Analyse du marché")} help={tr("Les genres qui attirent les joueurs et ceux où il y a de la place.")} />
     {bar}
     <Status />
     {!data ? null : all.length === 0 ? <section className="card"><Empty text={tr("Pas encore assez de données : la première collecte prend quelques minutes, revenez un peu plus tard.")} /></section> : <>
-      <section className="card">
-        <CardHead title={tr("En bref")} sub={tr("Maps de créateurs (hors modes d’Epic), chiffres du {0}", [day(data.last_day)])} />
+      <details className="card fold" open>
+        <summary><CardHead title={tr("En bref")} sub={tr("Chiffres du {0}", [day(data.last_day)])} /></summary>
         <ul className="brief">
           <li><b>{n(data.total_players)}</b>{' '}{tr("joueurs ont joué hier à")}{' '}<b>{n(data.islands)}</b>{' '}{tr("maps de créateurs")}{data.total_trend !== null && data.total_trend !== undefined ? <> (<Trend v={data.total_trend} />{' '}{tr("depuis le {0}, à maps égales)", [day(data.first_day)])}</> : null}{tr(". Une map typique attire environ")}{' '}<b>{n(data.typical_players)}</b>{' '}{tr("joueurs par jour.")}</li>
-          {biggest && <li>{tr("Le genre le plus joué :")}{' '}<Pick t={biggest} />{tr(", avec {0} % des joueurs.", [biggest.share.toFixed(0)])}</li>}
           {best && <li>{tr("Meilleure opportunité :")}{' '}<Pick t={best} />{tr(". Une map typique y attire {0} joueurs par jour, pour {1} maps en concurrence.", [n(best.typical_players), best.islands])}</li>}
           {rising && rising.trend > 0 && <li>{tr("Le genre qui monte le plus :")}{' '}<Pick t={rising} /> (<Trend v={rising.trend} />).</li>}
-          {crowded && <li>{tr("Le plus encombré :")}{' '}<Pick t={crowded} />{tr(". {0} maps se battent pour les joueurs, et une map typique n’en attire que {1}.", [crowded.islands, n(crowded.typical_players)])}</li>}
         </ul>
-      </section>
+      </details>
 
-      <section className="card">
-        <CardHead title={tr("Les genres")} sub={tr("Cliquez sur un genre pour voir le détail, ses meilleures maps et un conseil.")} />
+      <details className="card fold" open>
+        <summary><CardHead title={tr("Les genres")} sub={tr("Cliquez un genre pour le détail.")} /></summary>
         <div className="row" style={{ flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
           {FILTERS.map(([k, l]) => counts[k] > 0 || !k ? <button key={k} className={'chip' + (filter === k ? ' on' : '')} style={{ height: 32 }} onClick={() => setFilter(k)}>{l} <span className="muted" style={{ opacity: 0.7 }}>{counts[k]}</span></button> : null)}
           <span style={{ flex: 1 }} />
@@ -233,25 +229,9 @@ export function Market({ title, bar }: { title?: string; bar?: ReactNode } = {})
             <div className="small muted">{tr("{0} maps · {1} nouvelle{2} cette semaine{3}", [t.islands, t.new_7d, t.new_7d > 1 ? 's' : '', t.d1 !== null ? tr(" · {0} reviennent", [pct(t.d1)]) : ''])}</div>
             <Spark series={t.series} />
           </button> })}</div>}
-      </section>
+      </details>
     </>}
 
-    <div className="grid2">
-      <section className="card">
-        <CardHead title={tr("Votre map")} sub={map ? tr("Reliez le code de « {0} » pour comparer ses chiffres au marché", [map.name]) : ''} />
-        {mine?.code ? <div className="row" style={{ flexWrap: 'wrap' }}><span className="mono">{mine.code}</span><button className="btn" onClick={() => isl.open(mine.code)}>{tr("Voir ses statistiques")}</button>{isAdmin && <button className="btn" onClick={async () => { await api.put(`/api/maps/${map!.id}/island`, { code: null }); reloadMine() }}>{tr("Retirer")}</button>}</div>
-          : isAdmin ? <form className="row" onSubmit={async e => { e.preventDefault(); try { await api.put(`/api/maps/${map!.id}/island`, { code }); reloadMine(); toast(tr("Île reliée : ses chiffres arrivent à la prochaine collecte")) } catch (er: any) { toast(er.message, true) } }}>
-            <input className="field mono" placeholder="1234-5678-9012" value={code} onChange={e => setCode(e.target.value)} /><button className="btn pri">{tr("Relier")}</button></form> : <p className="small muted">{tr("Un admin peut relier le code de l’île publiée.")}</p>}
-        <div className="dsec">{tr("Maps concurrentes suivies")}</div>
-        <form className="row" onSubmit={async e => { e.preventDefault(); const c = (e.currentTarget.elements.namedItem('w') as HTMLInputElement).value.trim(); try { await api.post('/api/analytics/watch', { code: c, on: true }); reloadW(); isl.open(c) } catch (er: any) { toast(er.message, true) } }}>
-          <input name="w" className="field mono" placeholder={tr("Code d’une map à surveiller")} /><button className="btn">{tr("Suivre")}</button></form>
-        <div className="list" style={{ marginTop: 8 }}>{watched?.map(w => <button key={w.code} className="li rowlink" style={{ border: 0, background: 'none', font: 'inherit', color: 'inherit', textAlign: 'left' }} onClick={() => isl.open(w.code)}><Star size={14} /><span style={{ flex: 1 }}>{w.title || w.code}</span><span className="small muted">{n(w.players)} joueurs</span></button>)}</div>
-      </section>
-      <section className="card">
-        <CardHead title={tr("Joueurs par jour")} sub={tr("Toutes les maps de créateurs mesurées par POP")} />
-        <div className="minibars tall">{(data?.players_per_day ?? []).map((d: any) => <div key={d.day} title={`${day(d.day)} : ${n(d.players)}`}><span style={{ height: `${((d.players ?? 0) / maxP) * 100}%` }} /><em>{day(d.day).replace('.', '')}</em></div>)}</div>
-      </section>
-    </div>
     <details className="card howto"><summary>{tr("Comment lire ces chiffres ?")}</summary>
       <ul>
         <li><b>{tr("Joueurs / map typique")}</b>{' '}{tr(": combien de joueurs par jour attire une map « moyenne » du genre (la médiane, pour ne pas être faussé par une map géante).")}</li>
