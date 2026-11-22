@@ -212,3 +212,25 @@ faut un prop de la galerie Fortnite (`creative_prop_asset` du digest Fortnite), 
   modifiée, section créée si besoin), lance l'exécutable, puis dit de cliquer « Lancer ». Rien si UEFN est déjà
   ouvert.
 - **Pas encore testé** : le lancement quand le launcher Epic est fermé (critère 6 de #402).
+
+## Couleur et matériaux d'un prop de galerie (testé le 22/11/2026, projet GrassCutter, tâche POP #10)
+
+- **Un asset du projet ne peut pas référencer un asset de Fortnite** (`/Game/Creative/…`, `/CRG_Props/…`) : un
+  matériau créé dans le projet avec une texture Fortnite, ou une instance de matériau dont le parent est un
+  matériau Fortnite, donne « Disallowed reference » / « illegally references » dans le Message Log, et
+  `PushChanges` répond `Failed: Validation failed`. Pendant cet échec, le serveur MCP d'UEFN a cessé de répondre
+  plusieurs minutes. Les assets créés en Python (`AssetTools.create_asset`) ne sont validés qu'à l'envoi en
+  session : vérifier le Message Log (« Asset Check ») avant.
+- Conséquence : `creative_prop.SetMaterial` ne peut utiliser qu'un matériau entièrement fait dans le projet, et le
+  matériau d'origine d'un prop de galerie ne peut pas être remis par le Verse (pas de `GetMaterial`, et l'original
+  n'est pas dans `Assets.digest.verse`).
+- `editor_only_set_instance_material_vector_parameter("BlueprintColor", couleur)` sur un prop d'herbe
+  (`CP_Grass_Tall_01`) ne teinte que son premier composant (1 touffe sur 9) ; masquer les autres composants ne
+  tient pas (le Blueprint se reconstruit).
+- `CP_P_Atmospheric_Sparkles` (étincelles) n'est pas un `creative_prop` : `SetDeviceProperty` le refuse
+  (« not valid Devices_creative_prop »). `CP_ArtDeco_Gold_Bar_Pile` (pile de lingots) en est un : c'est le repère
+  retenu pour l'herbe dorée de GrassCutter, déplacé par `TeleportTo[Position, Rotation]` (garde l'échelle).
+- `place_device` pose aussi un prop de galerie par le chemin de sa classe
+  (`/Game/Creative/Sets/ArtDeco_Bank/Props/CP_ArtDeco_Gold_Bar_Pile.CP_ArtDeco_Gold_Bar_Pile_C`).
+- `duplicate_actors` de POP ne crée qu'une copie par identifiant distinct : passer N fois le même identifiant n'en
+  crée qu'une.
