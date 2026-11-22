@@ -116,6 +116,22 @@ concernée ; corrigez une ligne fausse en le disant.
 - Annulation depuis le journal (humain) : l'appareil disparaît du niveau. Annulation par une IA (`undo_action`) :
   rien n'est supprimé avant la validation d'un humain (`/api/approvals/{id}/approve`).
 
+## Hauteur des appareils posés par une IA (testé le 22/11/2026, projet GrassCutter, #13)
+
+Une IA qui pose tout à `z = 0` sans regarder les emprises casse le jeu sans aucune erreur. Avant de poser, lire
+l'emprise réelle par Python (`a.get_actor_bounds(False)`, ou `static_mesh.get_bounds()` d'un composant) et caler l'appareil
+sur le **dessus** du sol, pas sur son pivot.
+- Une dalle `CP_ColorGrass_Solid` (échelle Z 1) va de `z = -8` à `z = +4` : son dessus est à +4 cm.
+- **Bouton (`Device_Button_V2_C`)** : son maillage (`SM_MilitarySwitch_01`, 46 cm de haut, 14 cm de large) est
+  **centré sur le pivot**. À `z = 0`, il est à moitié dans le sol. Sa sphère de collision ne fait que 25 cm de rayon, et
+  l'option `InteractionRadius` vaut 0 par défaut (bornes 0 à 2,5) : le bouton est très dur à déclencher. Réglage
+  retenu : pivot à `z = 100` (hauteur de poitrine) et `InteractionRadius = 2.5`, via `update_actors`
+  (`options: { "InteractionRadius": "2.5" }`).
+- **Spawn Pad (`BP_Creative_Player_Spawner_Prop_C`)** : vérifier sa rotation. Un pad avec un roulis de 180° (à
+  l'envers) place son `FortPlayerStartCreative` à `z = -116`, sous le sol : le joueur réapparaît sous la carte et tombe.
+  À l'endroit, posé sur le dessus du sol (`z = 4`), le départ joueur est à `z = +120`. Contrôle :
+  `get_actor_rotation().roll` doit valoir 0 et le `FortPlayerStartCreative` doit être au-dessus du sol.
+
 ## Interface de jeu (HUD, menus) créée par une IA (recherche puis test du 21/11/2026, projet TestPopHub, #115)
 
 - Un Widget Blueprint (UMG) se crée par Python (`AssetTools.create_asset` + `WidgetBlueprintFactory`, à vérifier dans
