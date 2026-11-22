@@ -856,3 +856,29 @@ body.wb-fs .side,body.wb-fs .top{visibility:hidden}
 .warn.announce.important{border:1.5px solid var(--text) !important}
 .warn.announce .iconbtn{flex:none}
 }
+/* #163 : vue « Dépendances » des tâches. Noir et blanc : l'état se lit au trait et au remplissage, pas à la couleur. */
+.dg-wrap{overflow:auto;max-height:75vh;border-radius:12px}
+.dg{position:relative}
+.dg-group{position:absolute;left:0;border:1px solid var(--border);border-radius:14px;background:var(--hover)}
+.dg-gname{position:absolute;top:8px;left:14px;font-size:12.5px;font-weight:600;letter-spacing:.02em;text-transform:uppercase;color:var(--text2)}
+.dg-svg{position:absolute;left:0;top:0;pointer-events:none;color:var(--text2);overflow:visible}
+.dg-edge{fill:none;stroke:currentColor;stroke-width:1.4;transition:opacity .12s}
+.dg-edge.done{stroke-dasharray:4 4;opacity:.55}
+.dg-edge.on{color:var(--text);stroke:var(--text);stroke-width:2.4;opacity:1}
+.dg-edge.dim{opacity:.12}
+.dg-node{position:absolute;display:flex;flex-direction:column;justify-content:space-between;gap:2px;text-align:left;padding:7px 10px;border-radius:10px;background:var(--surface);color:var(--text);border:1.5px solid var(--text);font:inherit;cursor:pointer;transition:opacity .12s,box-shadow .12s;overflow:hidden}
+.dg-node:hover,.dg-node.on,.dg-node:focus-visible{box-shadow:0 0 0 3px var(--border);outline:none}
+.dg-node.dim{opacity:.3}
+.dg-ready{border-style:solid}
+.dg-doing{border-width:3px}
+.dg-blocked{border-style:dashed;border-color:var(--text2);color:var(--text2)}
+.dg-done{background:var(--text);color:var(--bg);border-color:var(--text)}
+.dg-done .dg-meta{color:var(--bg);opacity:.7}
+.dg-crit{box-shadow:inset 5px 0 0 var(--text)}
+.dg-done.dg-crit{box-shadow:inset 5px 0 0 var(--text2)}
+.dg-top{display:flex;justify-content:space-between;align-items:center;font-size:11.5px}
+.dg-state{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600}
+.dg-title{font-size:12.5px;font-weight:500;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dg-meta{font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dg-legend{display:inline-flex;align-items:center;gap:6px}
+.dg-mini{position:static;width:22px;height:14px;padding:0;border-radius:4px;cursor:default}
