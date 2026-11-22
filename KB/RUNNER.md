@@ -48,6 +48,10 @@ Seul un administrateur du dépôt (Kl1600) peut créer un runner et définir la 
 - Un seul runner exécute un job à la fois : le CI est plus lent qu'avec GitHub. Un deuxième runner (même
   procédure, autre nom) les fait tourner deux par deux.
 - Le PC doit rester allumé avec WSL et `run.sh` lancés ; sinon les jobs attendent en file.
-- `docker.yml`, `publier-image.yml` et `deployer.yml` demandent Docker dans WSL ; sans lui, ne pas les lancer
-  pendant cette période.
+- `docker.yml`, `publier-image.yml` et `deployer.yml` demandent Docker dans WSL (`sudo apt-get install -y docker.io`,
+  `sudo usermod -aG docker runner`, puis redémarrer le service du runner).
 - Retirer le runner : `./config.sh remove --token <jeton de la page Runners>`, puis supprimer l'utilisateur.
+- WSL s'éteint quand plus aucun programme ne l'utilise, et le runner avec lui. Le garder allumé :
+  `wsl -d Ubuntu-22.04 -u runner --exec sleep infinity` dans une fenêtre réduite (à relancer après un redémarrage
+  du PC). Installé en service (`sudo ./svc.sh install runner`, systemd activé dans `/etc/wsl.conf`), le runner
+  repart tout seul dès qu'Ubuntu démarre.

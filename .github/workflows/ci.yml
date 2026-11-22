@@ -223,6 +223,9 @@ jobs:
           fi
           last=$(ls server/migrations | sort | tail -1)
           echo "Dernière migration : $last"
+      # Rust n'est préinstallé que chez GitHub : un runner local (vars.RUNNER) a besoin de cette étape.
+      - uses: dtolnay/rust-toolchain@stable
+        if: needs.changements.outputs.audit == '1'
       - uses: taiki-e/install-action@v2
         if: needs.changements.outputs.audit == '1'
         with:
