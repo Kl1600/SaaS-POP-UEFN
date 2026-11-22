@@ -131,6 +131,12 @@ sur le **dessus** du sol, pas sur son pivot.
   l'envers) place son `FortPlayerStartCreative` à `z = -116`, sous le sol : le joueur réapparaît sous la carte et tombe.
   À l'endroit, posé sur le dessus du sol (`z = 4`), le départ joueur est à `z = +120`. Contrôle :
   `get_actor_rotation().roll` doit valoir 0 et le `FortPlayerStartCreative` doit être au-dessus du sol.
+- **Un acteur déplacé par Python sans `a.modify()` n'est pas enregistré.** L'éditeur l'affiche bien à sa nouvelle place,
+  mais son paquet `__ExternalActors__/…` n'est pas marqué modifié : `save_current_level()` l'ignore (aucun paquet sale), le
+  fichier garde son ancienne date et la session de test charge l'ancienne position. Vu avec `update_actors` (le
+  `patch` de pop-link fait `set_actor_location` sans `modify()`) : le Spawn Pad corrigé et les boutons remontés
+  restaient à leur ancienne place en jeu. Correctif manuel : `a.modify()` sur chaque acteur, puis
+  `EditorLoadingAndSavingUtils.save_dirty_packages(True, True)` ; vérifier la date du `.uasset` de l'acteur.
 
 ## Interface de jeu (HUD, menus) créée par une IA (recherche puis test du 21/11/2026, projet TestPopHub, #115)
 
