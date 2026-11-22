@@ -914,3 +914,13 @@ body.wb-fs .side,body.wb-fs .top{visibility:hidden}
 .kdanger[data-tip]:hover::after{content:attr(data-tip);position:absolute;right:0;bottom:calc(100% + 6px);white-space:nowrap;padding:5px 9px;border-radius:8px;background:var(--text);color:var(--surface);font-size:12px;z-index:60}
 .kwait{color:#a8321f}
 .linkbtn{background:none;border:0;padding:0;font:inherit;color:inherit;text-decoration:underline;cursor:pointer}
+
+/* #195 : fiche de tâche large, deux colonnes. */
+.drawer.wide{width:min(980px,calc(100vw / var(--ui-zoom) - 32px))}
+.tgrid{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(260px,1fr);gap:24px;align-items:start}
+.tside{background:var(--hover);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.tside .props{grid-template-columns:110px minmax(0,1fr)}
+.tside .field{max-width:100%}
+.tdates{border-top:1px solid var(--border);padding-top:10px}
+@media (max-width:760px){.tgrid{grid-template-columns:minmax(0,1fr)}.tside{order:-1}}
+.kwho{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px}

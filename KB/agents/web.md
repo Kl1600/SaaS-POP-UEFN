@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-22 · #195 · fiche de tâche large
+- Fait : nom complet du responsable sur les cartes ; détail : « Prise le » (dernier passage à « En cours » lu dans task_events, champ started_at de /api/tasks/{id} : pas de migration) et « Finie le » (done_at) ; Drawer reçoit wide, fiche en deux colonnes (.tgrid : contenu à gauche, propriétés et dates à droite, empilé sur mobile).
+- Vérifié : cargo build, navigateur 1440 et 390 px, aucune erreur JS.
+
 ### 2026-11-22 · #196 · tâches bloquées sur le Kanban
 - Fait : onglet « Par personne » (Charge de la semaine, Qui bloque qui) retiré ; carte qui attend une autre tâche : bordure rouge, icône danger (infobulle « Bloquée par #N ») et « Attend #N · ne peut pas être prise » ; détail : encadré « Bloquée par » avec liens cliquables (TaskDrawer reçoit onOpen). Le refus de passer en cours existait déjà côté serveur.
 - Vérifié : navigateur (onglets, icône, glisser refusé avec message, lien vers #1), aucune erreur JS.

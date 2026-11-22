@@ -353,6 +353,13 @@ pub async fn detail(
     .bind(tid)
     .fetch_all(&st.db)
     .await?;
+    // Prise : dernier passage à « En cours » (#195), lu dans l'historique de la tâche.
+    let started_at: Option<String> = sqlx::query_scalar(
+        "SELECT at FROM task_events WHERE task_id = ? AND what LIKE '% → En cours' ORDER BY id DESC LIMIT 1",
+    )
+    .bind(tid)
+    .fetch_optional(&st.db)
+    .await?;
     let locks: Vec<(String,)> =
         sqlx::query_as("SELECT path FROM file_locks WHERE map_id = ? AND task_number = ?")
             .bind(t.map_id)
@@ -366,6 +373,7 @@ pub async fn detail(
         "comments": comments.into_iter().map(|(id, who, body, res, at)| json!({"id": id, "who": who, "body": body, "resolved": res == 1, "at": at})).collect::<Vec<_>>(),
         "events": events.into_iter().map(|(what, via, who, at)| json!({"what": what, "via": via, "who": who, "at": at})).collect::<Vec<_>>(),
         "files": locks.into_iter().map(|(p,)| p).collect::<Vec<_>>(),
+        "started_at": started_at,
     })))
 }
 
