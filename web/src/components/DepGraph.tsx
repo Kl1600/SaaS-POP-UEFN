@@ -1,7 +1,7 @@
 // Vue « Dépendances » des tâches (#163) : qui bloque qui, groupé par fonctionnalité (le lot d'une tâche).
 // Ce qui débloque est à gauche : la colonne d'une tâche est la longueur de la plus longue chaîne de dépendances avant elle.
-import { useMemo, useState } from 'react'
-import { Check, Lock, Play } from 'lucide-react'
+import { useMemo, useRef, useState } from 'react'
+import { Check, Lock, Play, Trash2, X } from 'lucide-react'
 import { useLoad } from '../state'
 import { tr } from '../i18n/t'
 import { tagLabel } from './ui'
@@ -44,7 +44,32 @@ const NOLOT = '\u0000'
 
 const LABEL: Record<NodeState, string> = { done: 'Faite', doing: 'En cours', ready: 'Prenable', blocked: 'Bloquée' }
 
-export default function DepGraph({ mapId, tasks, match, onOpen }: { mapId: number; tasks: GraphTask[]; match: (t: GraphTask) => boolean; onOpen: (id: number) => void }) {
+/** Édition (#182) : onLink(de, vers) ajoute « vers dépend de de » ; onUnlink la retire. Absentes = lecture seule. */
+export default function DepGraph({ mapId, tasks, match, onOpen, onLink, onUnlink }: {
+  mapId: number; tasks: GraphTask[]; match: (t: GraphTask) => boolean; onOpen: (id: number) => void
+  onLink?: (from: number, to: number) => void; onUnlink?: (from: number, to: number) => void
+}) {
+  const box = useRef<HTMLDivElement>(null)
+  const [link, setLink] = useState<{ from: number; x: number; y: number } | null>(null)
+  const [sel, setSel] = useState<{ from: number; to: number } | null>(null)
+  // Coordonnées du graphe depuis la souris (la page peut être zoomée : on rapporte à la taille réelle).
+  const at = (e: React.PointerEvent) => {
+    const r = box.current!.getBoundingClientRect(), k = r.width / box.current!.offsetWidth || 1
+    return { x: (e.clientX - r.left) / k, y: (e.clientY - r.top) / k }
+  }
+  const startLink = (e: React.PointerEvent, from: number) => {
+    e.preventDefault(); e.stopPropagation(); setSel(null)
+    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+    setLink({ from, ...at(e) })
+  }
+  const moveLink = (e: React.PointerEvent) => { if (link) setLink({ ...link, ...at(e) }) }
+  const endLink = (e: React.PointerEvent) => {
+    if (!link) return
+    const el = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-num]') as HTMLElement | null
+    const to = el ? Number(el.dataset.num) : NaN
+    setLink(null)
+    if (to && to !== link.from && onLink) onLink(link.from, to)
+  }
   const { data: tl } = useLoad<any>(`/api/maps/${mapId}/plan/timeline`, [mapId, tasks.length])
   const [hover, setHover] = useState<number | null>(null)
   const critical = useMemo(() => new Set<number>((tl?.tasks ?? []).filter((t: any) => t.critical).map((t: any) => t.id)), [tl])
@@ -98,8 +123,14 @@ export default function DepGraph({ mapId, tasks, match, onOpen }: { mapId: numbe
         <span className="dg-legend"><span className="dg-node dg-done dg-mini" />{tr('Faite')}</span>
         <span className="dg-legend"><span className="dg-node dg-ready dg-crit dg-mini" />{tr('Chemin critique')}</span>
       </div>
-      <div className="dg-wrap">
-        <div className="dg" style={{ width: g.width, height: g.height }}>
+      {onLink && <p className="small muted" style={{ margin: '0 0 10px' }}>{tr('Pour ajouter une dépendance, tirez le rond à droite d’une tâche vers la tâche qui l’attend. Cliquez une flèche pour la retirer.')}</p>}
+      {sel && onUnlink && <div className="row dg-sel" role="status">
+        <span>{tr('Flèche #{0} → #{1} : #{1} attend #{0}.', [sel.from, sel.to])}</span>
+        <button className="btn" onClick={() => { onUnlink(sel.from, sel.to); setSel(null) }}><Trash2 size={15} />{tr('Retirer la dépendance')}</button>
+        <button className="iconbtn" aria-label={tr('Annuler')} onClick={() => setSel(null)}><X size={16} /></button>
+      </div>}
+      <div className="dg-wrap" tabIndex={-1} onKeyDown={e => { if (sel && onUnlink && (e.key === 'Delete' || e.key === 'Backspace')) { onUnlink(sel.from, sel.to); setSel(null) } if (e.key === 'Escape') { setSel(null); setLink(null) } }}>
+        <div className="dg" ref={box} style={{ width: g.width, height: g.height }} onPointerMove={moveLink} onPointerUp={endLink}>
           {g.groups.map(gr => <div key={gr.name} className="dg-group" style={{ top: gr.y, height: gr.h, width: g.width }}><span className="dg-gname">{gr.name}</span></div>)}
           <svg className="dg-svg" width={g.width} height={g.height} aria-hidden="true">
             <defs>
@@ -111,9 +142,14 @@ export default function DepGraph({ mapId, tasks, match, onOpen }: { mapId: numbe
               const dx = Math.max(40, (x2 - x1) / 2)
               const on = near ? near.has(e.from) && near.has(e.to) && (e.from === hover || e.to === hover) : false
               const done = g.byNum.get(e.from)?.status === 'done'
-              return <path key={`${e.from}-${e.to}`} d={`M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2},${y2}`}
-                className={'dg-edge' + (done ? ' done' : '') + (on ? ' on' : '') + (near && !on ? ' dim' : '')} markerEnd="url(#dg-arrow)" />
+              const d = `M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2},${y2}`
+              const picked = sel?.from === e.from && sel?.to === e.to
+              return <g key={`${e.from}-${e.to}`}>
+                <path d={d} className={'dg-edge' + (done ? ' done' : '') + (on || picked ? ' on' : '') + (near && !on ? ' dim' : '')} markerEnd="url(#dg-arrow)" />
+                {onUnlink && <path d={d} className="dg-hit" onClick={() => setSel({ from: e.from, to: e.to })}><title>{`#${e.from} → #${e.to}`}</title></path>}
+              </g>
             })}
+            {link && (() => { const a = g.pos.get(link.from)!; return <path d={`M${a.x + NW},${a.y + NH / 2} L${link.x},${link.y}`} className="dg-edge on dg-draft" markerEnd="url(#dg-arrow)" /> })()}
           </svg>
           {[...g.byNum.values()].map(t => {
             const p = g.pos.get(t.number); if (!p) return null
@@ -121,7 +157,8 @@ export default function DepGraph({ mapId, tasks, match, onOpen }: { mapId: numbe
             const waiting = t.deps.filter(n => g.byNum.get(n) && g.byNum.get(n)!.status !== 'done')
             const dim = (near && !near.has(t.number)) || !match(t)
             return (
-              <button key={t.id} className={`dg-node dg-${s}` + (critical.has(t.id) ? ' dg-crit' : '') + (dim ? ' dim' : '') + (hover === t.number ? ' on' : '')}
+              <span key={t.id}>
+              <button data-num={t.number} className={`dg-node dg-${s}` + (critical.has(t.id) ? ' dg-crit' : '') + (dim ? ' dim' : '') + (hover === t.number ? ' on' : '')}
                 style={{ left: p.x, top: p.y, width: NW, height: NH }}
                 onMouseEnter={() => setHover(t.number)} onMouseLeave={() => setHover(null)} onFocus={() => setHover(t.number)} onBlur={() => setHover(null)}
                 onClick={() => onOpen(t.id)}
@@ -134,6 +171,8 @@ export default function DepGraph({ mapId, tasks, match, onOpen }: { mapId: numbe
                 <span className="dg-title">{t.title}</span>
                 <span className="dg-meta">{tagLabel(t.tag)}{t.assignee_name ? ' · ' + t.assignee_name : ''}</span>
               </button>
+              {onLink && <span className="dg-port" style={{ left: p.x + NW - 7, top: p.y + NH / 2 - 7 }} title={tr('Tirer vers la tâche qui attend celle-ci')} onPointerDown={e => startLink(e, t.number)} />}
+              </span>
             )
           })}
         </div>

@@ -170,10 +170,9 @@ async fn set_deps(
     task_id: i64,
     numbers: &[i64],
 ) -> Result<(), AppError> {
-    sqlx::query("DELETE FROM task_deps WHERE task_id = ?")
-        .bind(task_id)
-        .execute(&st.db)
-        .await?;
+    // Tout est vérifié avant d'écrire, puis écrit d'un bloc : un refus (boucle, tâche inconnue)
+    // ne doit pas effacer les dépendances existantes (#182).
+    let mut ids: Vec<i64> = vec![];
     for n in numbers {
         let d: Option<(i64,)> =
             sqlx::query_as("SELECT id FROM tasks WHERE map_id = ? AND number = ?")
@@ -198,12 +197,53 @@ async fn set_deps(
                 "#{n} dépend déjà de cette tâche : boucle de dépendances."
             )));
         }
+        ids.push(did);
+    }
+    let mut tx = st.db.begin().await?;
+    sqlx::query("DELETE FROM task_deps WHERE task_id = ?")
+        .bind(task_id)
+        .execute(&mut *tx)
+        .await?;
+    for did in ids {
         sqlx::query("INSERT OR IGNORE INTO task_deps (task_id, depends_on) VALUES (?, ?)")
             .bind(task_id)
             .bind(did)
-            .execute(&st.db)
+            .execute(&mut *tx)
             .await?;
     }
+    tx.commit().await?;
+    Ok(())
+}
+
+/// Change la fonctionnalité (lot) d'une tâche et le note dans son journal (#182).
+pub async fn set_lot(
+    st: &AppState,
+    u: &AuthUser,
+    tid: i64,
+    old: &str,
+    lot: &str,
+) -> Result<(), AppError> {
+    let lot = lot.trim();
+    check_len("Fonctionnalité", lot, 0, 60)?;
+    if lot == old {
+        return Ok(());
+    }
+    sqlx::query("UPDATE tasks SET lot = ? WHERE id = ?")
+        .bind(lot)
+        .bind(tid)
+        .execute(&st.db)
+        .await?;
+    let what = if lot.is_empty() {
+        "Fonctionnalité retirée".to_string()
+    } else {
+        format!("Fonctionnalité : {lot}")
+    };
+    sqlx::query("INSERT INTO task_events (task_id, user_id, what, via) VALUES (?, ?, ?, 'Bouton')")
+        .bind(tid)
+        .bind(u.id)
+        .bind(what)
+        .execute(&st.db)
+        .await?;
     Ok(())
 }
 
@@ -340,6 +380,8 @@ pub struct TaskPatch {
     planned_day: Option<Option<String>>,
     deps: Option<Vec<i64>>,
     uefn: Option<bool>,
+    /// Fonctionnalité (lot) de la tâche ; vide = « Sans fonctionnalité » (#182).
+    lot: Option<String>,
 }
 
 pub async fn update(
@@ -447,6 +489,9 @@ pub async fn update(
     }
     if let Some(d) = &b.deps {
         set_deps(&st, t.map_id, tid, d).await?;
+    }
+    if let Some(l) = &b.lot {
+        set_lot(&st, &u, tid, &t.lot, l).await?;
     }
     if let Some(x) = b.uefn {
         sqlx::query("UPDATE tasks SET uefn = ? WHERE id = ?")
@@ -1011,6 +1056,7 @@ mod tests_uefn {
             planned_day: None,
             deps: None,
             uefn: Some(v),
+            lot: None,
         };
         let Json(_) = update(State(st.clone()), u.clone(), Path(t2), Json(patch(true)))
             .await
@@ -1220,5 +1266,130 @@ mod tests_assignation {
         assert!(insert_task(&st, &ctx, &nt(ana.id)).await.is_ok());
         let ctx = map_ctx(&st, &chef, mid).await.unwrap();
         assert!(insert_task(&st, &ctx, &nt(bob.id)).await.is_ok());
+    }
+}
+
+/// #182 : une boucle refusée garde les dépendances existantes ; le lot se change par le PATCH.
+#[cfg(test)]
+mod tests_lots_deps {
+    use super::*;
+
+    #[tokio::test]
+    async fn boucle_refusee_sans_rien_perdre_et_lot() {
+        let st = crate::test_state().await;
+        let sid: i64 = sqlx::query_scalar("INSERT INTO studios (name) VALUES ('S') RETURNING id")
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        let mid: i64 =
+            sqlx::query_scalar("INSERT INTO maps (studio_id, name) VALUES (?, 'M') RETURNING id")
+                .bind(sid)
+                .fetch_one(&st.db)
+                .await
+                .unwrap();
+        let uid: i64 = sqlx::query_scalar(
+            "INSERT INTO users (email, name, password_hash) VALUES ('a@a.fr', 'Ana', 'x') RETURNING id",
+        )
+        .fetch_one(&st.db)
+        .await
+        .unwrap();
+        sqlx::query("INSERT INTO memberships (studio_id, user_id, role) VALUES (?, ?, 'member')")
+            .bind(sid)
+            .bind(uid)
+            .execute(&st.db)
+            .await
+            .unwrap();
+        let u = AuthUser {
+            id: uid,
+            email: "a@a.fr".into(),
+            name: "Ana".into(),
+            sid: String::new(),
+        };
+        let ctx = map_ctx(&st, &u, mid).await.unwrap();
+        let mut ids = vec![];
+        for (t, d) in [("Herbe", vec![]), ("Sac", vec![1]), ("Vente", vec![2])] {
+            let (id, _) = insert_task(
+                &st,
+                &ctx,
+                &NewTask {
+                    title: t.into(),
+                    tag: None,
+                    description: None,
+                    assignee_id: None,
+                    deps: Some(d),
+                    planned_day: None,
+                    lot: None,
+                    status: None,
+                    ai: None,
+                    origin: None,
+                    uefn: None,
+                },
+            )
+            .await
+            .unwrap();
+            ids.push(id);
+        }
+        let patch = |tid: i64, b: Value| {
+            let (st, u) = (st.clone(), u.clone());
+            async move {
+                update(
+                    State(st),
+                    u,
+                    Path(tid),
+                    Json(serde_json::from_value(b).unwrap()),
+                )
+                .await
+                .map(|_| ())
+            }
+        };
+        let deps_de = |tid: i64| {
+            let st = st.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>("SELECT d.number FROM task_deps x JOIN tasks d ON d.id = x.depends_on WHERE x.task_id = ? ORDER BY d.number")
+                    .bind(tid)
+                    .fetch_all(&st.db)
+                    .await
+                    .unwrap()
+            }
+        };
+        // #1 dépendrait de #3, qui dépend de #2, qui dépend de #1 : boucle refusée en français.
+        sqlx::query("INSERT INTO task_deps (task_id, depends_on) VALUES (?, ?)")
+            .bind(ids[2])
+            .bind(ids[0])
+            .execute(&st.db)
+            .await
+            .unwrap();
+        match patch(ids[0], json!({ "deps": [3] })).await {
+            Err(AppError::BadRequest(m)) => assert!(m.contains("boucle"), "{m}"),
+            _ => panic!("la boucle doit être refusée"),
+        }
+        // #3 garde ses dépendances même si on lui en demande une impossible.
+        assert!(patch(ids[2], json!({ "deps": [1, 2, 3] })).await.is_err());
+        assert_eq!(deps_de(ids[2]).await, vec![1, 2]);
+        // Retirer une flèche : #3 ne dépend plus que de #2.
+        patch(ids[2], json!({ "deps": [2] })).await.unwrap();
+        assert_eq!(deps_de(ids[2]).await, vec![2]);
+        // Lot : rangé, puis retiré.
+        patch(ids[1], json!({ "lot": "  Sac et vente " }))
+            .await
+            .unwrap();
+        let lot: String = sqlx::query_scalar("SELECT lot FROM tasks WHERE id = ?")
+            .bind(ids[1])
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        assert_eq!(lot, "Sac et vente");
+        patch(ids[1], json!({ "lot": "" })).await.unwrap();
+        let ev: Vec<String> =
+            sqlx::query_scalar("SELECT what FROM task_events WHERE task_id = ? ORDER BY id")
+                .bind(ids[1])
+                .fetch_all(&st.db)
+                .await
+                .unwrap();
+        assert!(
+            ev.contains(&"Fonctionnalité : Sac et vente".to_string()),
+            "{ev:?}"
+        );
+        assert!(ev.contains(&"Fonctionnalité retirée".to_string()), "{ev:?}");
     }
 }
