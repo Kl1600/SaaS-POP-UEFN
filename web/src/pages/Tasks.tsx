@@ -7,6 +7,9 @@ import { useApp, useLive, useLoad } from '../state'
 import { Avatar, CardHead, Drawer, Modal, PageHead, STATUS, TAGS, Tabs, tagLabel } from '../components/ui'
 import { tr } from '../i18n/t'
 
+/** Ce qu'est une dépendance (#160) : même définition que pour les IA (outil MCP create_task, plan IA). */
+export const DEP_HELP = "Une dépendance = une tâche sans laquelle celle-ci ne peut être ni faite ni testée. Pas l’ordre dans lequel le joueur découvre le jeu : si seule une partie en a besoin, découpez la tâche."
+
 type Task = {
   id: number; number: number; title: string; tag: string; status: string; assignee_id: number | null; assignee_name: string | null
   planned_day: string | null; deps: number[]; comments: number; subtasks: { total: number; done: number }; lot: string; ai: number; uefn: number
@@ -192,8 +195,11 @@ function TaskDrawer({ id, onClose, members, tasks }: { id: number; onClose: () =
         <span className="muted">{tr("Jour prévu")}</span>
         <input className="field" type="date" value={t.planned_day ?? ''} disabled={!canEdit} onChange={e => patch({ planned_day: e.target.value || null })} />
         <span className="muted">{tr("Dépend de")}</span>
-        <input className="field mono" value={deps} disabled={!canEdit} placeholder="ex. 12, 18" onChange={e => setDeps(e.target.value)}
-          onBlur={() => patch({ deps: deps.split(/[^0-9]+/).filter(Boolean).map(Number) })} />
+        <div>
+          <input className="field mono" value={deps} disabled={!canEdit} placeholder="ex. 12, 18" onChange={e => setDeps(e.target.value)}
+            onBlur={() => patch({ deps: deps.split(/[^0-9]+/).filter(Boolean).map(Number) })} />
+          <p className="small muted" style={{ margin: '4px 0 0' }}>{tr(DEP_HELP)}</p>
+        </div>
         <span className="muted">{tr("UEFN")}</span>
         <label className="row" style={{ gap: 8 }}><input type="checkbox" checked={!!t.uefn} disabled={!canEdit} onChange={e => patch({ uefn: e.target.checked })} /><span className="small">{tr("Check-in Lore requis pour la fermer")}</span></label>
         <span className="muted">{tr("Origine")}</span>
@@ -290,7 +296,7 @@ export function NewTaskModal({ onClose }: { onClose: () => void }) {
           <label className="label">{tr("Étiquette")}<select className="field" value={f.tag} onChange={e => setF({ ...f, tag: e.target.value })}>{TAGS.map(t => <option key={t} value={t}>{tagLabel(t)}</option>)}</select></label>
           <label className="label">{tr("Assigné")}<select className="field" value={f.assignee_id} onChange={e => setF({ ...f, assignee_id: e.target.value })}><option value="">{tr("Personne")}</option>{mem?.members.filter((m: any) => isAdmin || m.id === me?.user.id).map((m: any) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></label>
           <label className="label">{tr("Jour prévu")}<input className="field" type="date" value={f.planned_day} onChange={e => setF({ ...f, planned_day: e.target.value })} /></label>
-          <label className="label">{tr("Dépend de (n°)")}<input className="field mono" value={f.deps} onChange={e => setF({ ...f, deps: e.target.value })} placeholder="12, 18" /></label>
+          <label className="label">{tr("Dépend de (n°)")}<input className="field mono" value={f.deps} onChange={e => setF({ ...f, deps: e.target.value })} placeholder="12, 18" /><span className="small muted" style={{ fontWeight: 400 }}>{tr(DEP_HELP)}</span></label>
         </div>
         <label className="row" style={{ gap: 8 }}><input type="checkbox" checked={f.uefn} onChange={e => setF({ ...f, uefn: e.target.checked })} />{tr("Tâche UEFN : check-in Lore requis pour la fermer")}</label>
         {err && <div className="err">{err}</div>}

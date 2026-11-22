@@ -2551,5 +2551,6 @@ const EN: Record<string, string> = {
  "Je la prends": "I'll take it",
  "Je la rends": "Give it back",
  "Chaque membre prendra ses tâches lui-même": "Each member will take their own tasks",
+ "Une dépendance = une tâche sans laquelle celle-ci ne peut être ni faite ni testée. Pas l’ordre dans lequel le joueur découvre le jeu : si seule une partie en a besoin, découpez la tâche.": "A dependency = a task without which this one can be neither done nor tested. Not the order in which the player discovers the game: if only part of it needs it, split the task.",
 }
 export default EN

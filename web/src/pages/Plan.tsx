@@ -3,7 +3,7 @@ import { AlertTriangle, Trash2 } from 'lucide-react'
 import { addDays, api, frDate, ymd } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { Avatar, CardHead, PageHead, Tabs, TAGS, tagLabel } from '../components/ui'
-import { useMembers } from './Tasks'
+import { DEP_HELP, useMembers } from './Tasks'
 import { tr } from '../i18n/t'
 import { useNav } from '../routes'
 
@@ -67,10 +67,11 @@ function Wizard({ done }: { done: () => void }) {
       <div className="card"><div className="lab">{tr("Jalons")}</div><div className="num">{plan.milestones.length}</div><div className="muted">{plan.milestones.map((m: any) => m.title).join(' · ')}</div></div>
     </div>
     <div className="row"><button className="btn" onClick={() => setPlan(null)}>{tr("Retour")}</button><span className="muted small">{tr("Tout est modifiable avant de valider.")}</span><span className="spacer" /><button className="btn pri" disabled={busy} onClick={apply}>{tr("Valider le plan")}</button></div>
+    <p className="small muted" style={{ margin: 0 }}><b>{tr("Dépend de")}</b> · {tr(DEP_HELP)}</p>
     {lots.map(l => (
       <section key={l} className="card">
         <CardHead title={l} sub={tr("{0} tâches", [plan.tasks.filter((t: any) => t.lot === l).length])} />
-        <div style={{ overflowX: 'auto' }}><table className="tbl"><thead><tr><th>{tr("Tâche (1 h)")}</th><th>{tr("Étiquette")}</th><th>{tr("Jour prévu")}</th><th>{tr("Dépend de")}</th><th>{tr("Assigné")}</th><th /></tr></thead><tbody>
+        <div style={{ overflowX: 'auto' }}><table className="tbl"><thead><tr><th>{tr("Tâche (1 h)")}</th><th>{tr("Étiquette")}</th><th>{tr("Jour prévu")}</th><th title={tr(DEP_HELP)}>{tr("Dépend de")}</th><th>{tr("Assigné")}</th><th /></tr></thead><tbody>
           {plan.tasks.filter((t: any) => t.lot === l).map((t: any) => (
             <tr key={t.key}>
               <td><input className="field" style={{ width: '100%', minWidth: 220 }} value={t.title} onChange={e => setT(t.key, { title: e.target.value })} />{t.ai && <span className="badge" style={{ marginTop: 4 }}>IA</span>}</td>

@@ -199,15 +199,23 @@ pub struct PlanMilestone {
 
 type T = (&'static str, &'static str, &'static [usize], bool); // titre, étiquette, dépendances (index local au gabarit), délégable à une IA
 
+// Une dépendance = une tâche sans laquelle celle-ci ne peut être ni faite ni testée, pas l'ordre du jeu (#160).
+// Exemple : construire les niveaux 6 à 10 n'attend pas les niveaux 1 à 5 ; tester tous les niveaux, si.
+
 fn genre_loop(genre: &str) -> Vec<T> {
     match genre {
         "cr" => vec![
             ("Équipes gendarmes / voleurs", "code", &[], false),
-            ("Coffre-fort et minuteur de braquage", "code", &[0], false),
+            ("Coffre-fort et minuteur de braquage", "code", &[], false),
             ("Prison et système d’arrestation", "code", &[0], false),
             ("Véhicules de police", "carte", &[], false),
-            ("Route d’évasion", "carte", &[3], false),
-            ("Tester une manche complète", "test", &[1, 2, 4], false),
+            ("Route d’évasion", "carte", &[], false),
+            (
+                "Tester une manche complète",
+                "test",
+                &[0, 1, 2, 3, 4],
+                false,
+            ),
         ],
         "tycoon" => vec![
             ("Générateur de ressource", "code", &[], false),
@@ -225,14 +233,14 @@ fn genre_loop(genre: &str) -> Vec<T> {
         "deathrun" => vec![
             ("Checkpoints et réapparition", "code", &[], false),
             ("Niveaux 1 à 5", "carte", &[], false),
-            ("Niveaux 6 à 10", "carte", &[1], false),
-            ("Chronomètre et classement", "code", &[0], false),
-            ("Tester tous les niveaux", "test", &[2, 3], false),
+            ("Niveaux 6 à 10", "carte", &[], false),
+            ("Chronomètre et classement", "code", &[], false),
+            ("Tester tous les niveaux", "test", &[0, 1, 2, 3], false),
         ],
         "horreur" => vec![
             ("Scénario et énigmes", "conception", &[], false),
             ("Ambiance sonore et lumières", "carte", &[], false),
-            ("Créature et poursuite", "code", &[0], false),
+            ("Créature et poursuite", "code", &[], false),
             ("Tester la peur (5 joueurs)", "test", &[1, 2], false),
         ],
         "course" => vec![
@@ -259,7 +267,7 @@ fn skeleton(genre: &str) -> Vec<(&'static str, Vec<T>)> {
                 ("Créer le projet UEFN et le dépôt", "code", &[], false),
                 ("Blocking de l’île", "carte", &[], false),
                 ("Écrire la boucle de jeu (1 page)", "conception", &[], false),
-                ("Règles et conventions de nommage", "conception", &[2], true),
+                ("Règles et conventions de nommage", "conception", &[], true),
             ],
         ),
         ("Lot 2 · Boucle de jeu", genre_loop(genre)),
@@ -267,7 +275,7 @@ fn skeleton(genre: &str) -> Vec<(&'static str, Vec<T>)> {
             "Lot 3 · Économie et récompenses",
             vec![
                 ("Tableau des prix et des dépenses", "conception", &[], false),
-                ("Boutique en jeu", "code", &[0], false),
+                ("Boutique en jeu", "code", &[], false),
                 ("Première offre en jeu", "code", &[1], false),
                 ("Interface de la boutique", "conception", &[1], true),
             ],
@@ -279,7 +287,7 @@ fn skeleton(genre: &str) -> Vec<(&'static str, Vec<T>)> {
                 ("Optimisation mémoire", "carte", &[], false),
                 ("Vignette, titre et description", "conception", &[], true),
                 ("Traductions FR / EN", "conception", &[0], true),
-                ("Playtest à plusieurs", "test", &[1], false),
+                ("Playtest à plusieurs", "test", &[], false),
                 ("Checklist de soumission Epic", "test", &[2], false),
             ],
         ),
@@ -844,5 +852,38 @@ mod tests_assignation {
         assert!(!tasks.is_empty());
         assert!(tasks.iter().all(|t| t["assignee_id"].is_null()));
         assert!(tasks.iter().all(|t| t["planned_day"].is_string()));
+    }
+}
+
+#[cfg(test)]
+mod tests_dependances {
+    use super::*;
+
+    /// #160 : dans chaque gabarit, une dépendance pointe vers une tâche plus haut, et celles qui
+    /// n'étaient que l'ordre du jeu ont été retirées.
+    #[test]
+    fn squelettes_sans_ordre_du_jeu() {
+        let ordre_du_jeu = [
+            "Coffre-fort et minuteur de braquage",
+            "Route d’évasion",
+            "Niveaux 6 à 10",
+            "Chronomètre et classement",
+            "Créature et poursuite",
+            "Règles et conventions de nommage",
+            "Boutique en jeu",
+            "Playtest à plusieurs",
+        ];
+        for g in [
+            "cr", "tycoon", "boxfight", "deathrun", "horreur", "course", "autre",
+        ] {
+            for (lot, list) in skeleton(g) {
+                for (i, (title, _, deps, _)) in list.iter().enumerate() {
+                    assert!(deps.iter().all(|d| *d < i), "{lot} · {title}");
+                    if ordre_du_jeu.contains(title) {
+                        assert!(deps.is_empty(), "{title} dépend encore de {deps:?}");
+                    }
+                }
+            }
+        }
     }
 }

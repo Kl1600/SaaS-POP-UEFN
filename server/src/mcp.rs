@@ -135,7 +135,7 @@ fn tools() -> Value {
         tool("list_tasks", "Liste les tâches de la map (numéro, titre, statut, étiquette, personne, jour prévu, dépendances en attente). Filtres facultatifs : status (todo, doing, blocked, done), mine (vos tâches seulement), query (texte).", json!({ "status": { "type": "string" }, "mine": { "type": "boolean" }, "query": { "type": "string" } }), &[]),
         tool("get_task", "Détail d'une tâche par son numéro : description, dépendances, sous-tâches, commentaires.", json!({ "number": { "type": "integer" } }), &["number"]),
         tool("next_task", "Ce que Boussole conseille de faire maintenant : retards, tâches du jour et tâches qui en débloquent d'autres.", json!({}), &[]),
-        tool("create_task", "Crée une tâche d'environ une heure. tag : code, carte, conception ou test. depends_on : numéros de tâches. assign_to_me : vous l'assigner. uefn : tâche qui touche le projet UEFN (elle ne se ferme qu'avec un check-in Lore « #n … »).", json!({ "title": { "type": "string" }, "description": { "type": "string" }, "tag": { "type": "string" }, "planned_day": { "type": "string", "description": "AAAA-MM-JJ" }, "depends_on": { "type": "array", "items": { "type": "integer" } }, "assign_to_me": { "type": "boolean" }, "uefn": { "type": "boolean" } }), &["title"]),
+        tool("create_task", "Crée une tâche d'environ une heure. tag : code, carte, conception ou test. depends_on : numéros des tâches sans lesquelles celle-ci ne peut être ni faite ni testée ; pas l'ordre dans lequel le joueur découvre les choses ; si seule une partie a besoin d'une autre tâche, découpez. assign_to_me : vous l'assigner. uefn : tâche qui touche le projet UEFN (elle ne se ferme qu'avec un check-in Lore « #n … »).", json!({ "title": { "type": "string" }, "description": { "type": "string" }, "tag": { "type": "string" }, "planned_day": { "type": "string", "description": "AAAA-MM-JJ" }, "depends_on": { "type": "array", "items": { "type": "integer" }, "description": "Tâches sans lesquelles celle-ci ne peut être ni faite ni testée (pas l'ordre du jeu)" }, "assign_to_me": { "type": "boolean" }, "uefn": { "type": "boolean" } }), &["title"]),
         tool("set_task_status", "Change le statut d'une tâche : todo (à faire), doing (en cours), blocked (bloquée), done (faite). Passer en cours exige que ses dépendances soient faites. note : commentaire facultatif (ce qui a été fait, ce qui bloque). Une tâche UEFN ne passe à done qu'avec son check-in Lore : checkin = message qui commence par #n, inutile si vous avez archivé par lore_checkin « #n … » depuis que vous l'avez réservée.", json!({ "number": { "type": "integer" }, "status": { "type": "string", "enum": ["todo", "doing", "blocked", "done"] }, "note": { "type": "string" }, "checkin": { "type": "string" } }), &["number", "status"]),
         tool("claim_task", "Réserve une tâche POP pour vous (agent IA) : une seule tâche à la fois, et une tâche n'a qu'un agent. À faire avant de travailler dessus ; refusé si un autre agent l'a déjà. Vos fichiers Verse de cette tâche ne peuvent pas être modifiés par un autre agent.", json!({ "number": { "type": "integer" } }), &["number"]),
         tool("release_task", "Libère la tâche que vous avez réservée (claim_task), quand vous arrêtez sans la finir.", json!({}), &[]),
@@ -1110,5 +1110,23 @@ mod tests_checkin {
             what.contains(&format!("Check-in Lore : #{n} spawns posés")),
             "{what:?}"
         );
+    }
+}
+
+#[cfg(test)]
+mod tests_dependances {
+    /// #160 : l'IA lit ce qu'est une dépendance dans la description de create_task.
+    #[test]
+    fn create_task_definit_une_dependance() {
+        let tools = super::tools();
+        let t = tools
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|t| t["name"] == "create_task")
+            .unwrap();
+        let d = t["description"].as_str().unwrap();
+        assert!(d.contains("ni faite ni testée"), "{d}");
+        assert!(d.contains("découvre"), "{d}");
     }
 }
