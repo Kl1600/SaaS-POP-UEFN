@@ -65,7 +65,7 @@ function Gate() {
           <Route path="tableau/:bid" element={<Board />} />
           <Route path="planifier" element={<Plan />} />
           <Route path="taches" element={<Tasks />} />
-          <Route path="organiseur" element={L(Organizer)} />
+          <Route path="organiseur" element={<Navigate to="/parametres?onglet=uefn" replace />} />
           <Route path="ia" element={<Navigate to="/parametres?onglet=ia" replace />} />
           <Route path="lancer" element={<Launch />} />
           <Route path="remunerer" element={<Money />} />

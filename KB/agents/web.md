@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-22 · #210 · Organiseur retiré
+- Fait : page Organiseur retirée du menu ; /organiseur et la pastille d'état mènent à Paramètres → UEFN Link (`UefnLinkSettings` dans Organizer.tsx, chargé à la demande) : relais (Pairing), suppressions à valider, journal des actions UEFN avec annulation. Mentions de l'Organiseur retirées de l'appli, de l'aide et du README ; décision notée dans KB/DECISIONS.md. Page d'accueil publique (Landing) pas encore mise à jour.
+- Vérifié : navigateur, aucune erreur JS.
+
 ### 2026-11-22 · #205 · IA connectées dans Paramètres
 - Fait : page Settings.tsx en onglets (Mon compte, IA connectées ?onglet=ia) ; AI.tsx s'affiche intégrée (embedded) pour la map ouverte ; /map/N/ia redirige ; entrée « IA connectées » retirée de la barre ; logos (Brand) devant chaque IA (Codex et « Autre » gardent l'icône robot : pas de logo OpenAI dans simple-icons).
 - Corrige aussi #200 : la classe .brand des logos entrait en conflit avec celle du logo POP (renommée .blogo).

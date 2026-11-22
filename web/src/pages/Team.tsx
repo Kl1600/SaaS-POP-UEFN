@@ -212,7 +212,7 @@ function McpTokens() {
   const cfg = tok ? JSON.stringify({ mcpServers: { pop: { type: 'http', url: `${location.origin}/mcp`, headers: { Authorization: tr("Bearer {0}", [tok]) } } } }, null, 2) : ''
   return (
     <section className="card">
-      <CardHead title={tr("IA connectée (serveur MCP de POP)")} sub={tr("Votre IA (Claude Code, Cursor…) peut lire et modifier les acteurs et le Verse comme vous : tout est journalisé, et une suppression attend la validation d’un humain dans l’Organiseur.")}>
+      <CardHead title={tr("IA connectée (serveur MCP de POP)")} sub={tr("Votre IA (Claude Code, Cursor…) peut lire et modifier les acteurs et le Verse comme vous : tout est journalisé, et une suppression attend la validation d’un humain dans Paramètres → UEFN Link.")}>
         {canEdit && <button className="btn pri" onClick={async () => { const n = prompt(tr("Nom du jeton"), tr("Mon IA")); if (n) { try { setTok((await api.post(`/api/maps/${map!.id}/tokens`, { name: n })).token); reload() } catch (e: any) { toast(e.message, true) } } }}>{tr("Créer un jeton")}</button>}
       </CardHead>
       {tok && <><p className="small muted">{tr("Copiez ce fichier .mcp.json maintenant : le jeton ne sera plus affiché.")}</p><pre className="report mono">{cfg}</pre></>}

@@ -402,3 +402,38 @@ function Pairing({ status, tools }: { status: string; tools: any }) {
     {devices && devices.length > 0 && <div className="list" style={{ marginTop: 12 }}>{devices.map(d => <div key={d.id} className="li"><span style={{ flex: 1 }}>{d.name} <span className="small muted">({d.owner}{d.last_seen ? ', vu ' + ago(d.last_seen) : ''})</span></span>{canEdit && <button className="iconbtn" aria-label={tr("Retirer ce relais")} onClick={async () => { if (confirm(tr("Retirer ce relais ? Il faudra l’appairer à nouveau."))) { await api.del(`/api/relay-devices/${d.id}`); reload() } }}><Trash2 size={15} /></button>}</div>)}</div>}
   </section>
 }
+
+/** Paramètres → UEFN Link (#210) : l'Organiseur est retiré ; restent le relais, les validations de suppression
+ *  demandées par une IA, et le journal des actions UEFN avec l'annulation. */
+export function UefnLinkSettings() {
+  const { map, canEdit, role, toast } = useApp()
+  const { data: st, reload } = useLoad<any>(map ? `/api/maps/${map.id}/uefn` : null, [map?.id])
+  const { data: tasks } = useLoad<any[]>(map ? `/api/maps/${map.id}/tasks` : null, [map?.id])
+  const [task, setTask] = useState<number | ''>('')
+  useLive(['uefn'], reload)
+  if (!st) return null
+  const canDelete = ['owner', 'admin', 'member'].includes(role)
+  const act = async (action: string, args: any, ok?: string) => {
+    try {
+      const r = await api.post(`/api/maps/${map!.id}/uefn/action`, { action, args, task: task || null })
+      toast(r.queued ? tr("UEFN indisponible : changement mis en attente") : ok ?? tr("Envoyé à UEFN"))
+      reload()
+      return r
+    } catch (e: any) { toast(e.message, true) }
+  }
+  return <div className="stack">
+    {st.stale && <div className="warn" role="alert"><AlertTriangle size={18} /><span>{tr("Relais périmé : téléchargez la dernière version d’UEFN Link ci-dessous.")}</span></div>}
+    {st.approvals.length > 0 && <section className="card">
+      <CardHead title={tr("Suppressions à valider")} sub={tr("Demandées par une IA : rien n’est supprimé sans votre accord.")} />
+      {st.approvals.map((p: any) => <div key={p.id} className="li" style={{ flexWrap: 'wrap' }}><span style={{ flex: 1 }}>{p.summary}</span>
+        {canDelete && <><button className="btn" onClick={async () => { try { await api.post(`/api/approvals/${p.id}/approve`); reload() } catch (e: any) { toast(e.message, true) } }}><Check size={15} />{tr("Valider")}</button>
+        <button className="btn" onClick={async () => { try { await api.post(`/api/approvals/${p.id}/refuse`); reload() } catch (e: any) { toast(e.message, true) } }}><X size={15} />{tr("Refuser")}</button></>}
+      </div>)}
+    </section>}
+    <Pairing status={st.status} tools={st.tools} />
+    <section className="card">
+      <CardHead title={tr("Journal des actions UEFN")} sub={tr("Ce que vous et vos IA avez fait dans le niveau ; chaque action s’annule.")} />
+      <Journal st={st} task={task} setTask={setTask} tasks={tasks ?? []} act={act} reload={reload} />
+    </section>
+  </div>
+}
