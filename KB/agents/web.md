@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-22 · #203 · Marché allégé
+- Fait : bloc « Votre map » (code d'île + maps suivies) et « Joueurs par jour » retirés du Marché (studio et Analyse). Le code d'île se relie toujours dans Lancer et suivre, une map se suit toujours depuis sa fiche (bouton Suivre). En-tête et « En bref » raccourcis (3 lignes), « En bref » et « Les genres » repliables (details.fold). Maps qui marchent : recherche à droite de la ligne des filtres.
+- Vérifié : navigateur avec une base de test locale (60 îles factices dans /tmp, jamais dans le dépôt).
+
 ### 2026-11-22 · #197 · icône de page
 - Fait : icône à gauche du titre (bouton .picon) ; panneau IconPicker chargé à l'ouverture : 1 539 icônes Lucide (étiquettes tirées de lucide-static 0.460, ISC) en catégories Jeu / Économie / Carte et décor / Projet / Équipe, recherche avec mots-clés français (épée, argent, trophée…) et classement, emojis (unicode-emoji-json, MIT, jusqu'à la v14) et récentes ; « Retirer ». Stockage : emoji ou `lucide:<nom>` (limite serveur portée à 64 caractères). Rendu dans l'arborescence par PageIcon, qui charge lucideAll à part.
 - Piège : `.card .card` rend une carte imbriquée transparente, d'où la règle `.card .ipick.card`.
