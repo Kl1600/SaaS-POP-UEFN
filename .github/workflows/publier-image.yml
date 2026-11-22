@@ -31,7 +31,7 @@ permissions:
 jobs:
   publier:
     name: construire et publier (linux/amd64)
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     outputs:
       image: ${{ steps.nom.outputs.image }}
     steps:

@@ -7,6 +7,7 @@ La mémoire commune de l'équipe et de ses agents. On lit tout ; on n'édite jam
 | `ETAT.md` | le coordinateur seulement | l'état du projet, 10 lignes au plus, **réécrit**, jamais allongé |
 | `DECISIONS.md` | tout le monde | une ligne par décision, **ajoutée en bas**, signée ; une décision qui change en remplace une autre par une nouvelle ligne qui le dit |
 | `UEFN.md` | tout le monde | faits vérifiés sur le vrai UEFN (outils MCP, formats, pièges), avec la date du test |
+| `RUNNER.md` | tout le monde | runner local de GitHub Actions : quand s'en servir, installation, retour chez GitHub |
 | `agents/<domaine>.md` | l'agent de ce domaine seulement | une entrée par tâche, sur le modèle ci-dessous |
 | `ARCHIVE.md` | chacun pour ses propres entrées | entrées FAIT anciennes déplacées, non lue par défaut |
 
