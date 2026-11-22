@@ -9,15 +9,14 @@ import LaunchDiscover from './LaunchDiscover'
 const ST: Record<string, [string, string, any]> = { ok: [tr("Conforme"), 'b-g', CheckCircle2], warn: [tr("À corriger"), 'b-o', AlertTriangle], block: [tr("Bloquant"), 'b-r', Ban], todo: [tr("À vérifier"), '', Circle] }
 
 export default function Launch() {
-  const [tab, setTab] = useState<'discover' | 'checks' | 'swap' | 'churn' | 'dday'>('discover')
+  const [tab, setTab] = useState<'discover' | 'checks' | 'swap' | 'dday'>('discover')
   return (
     <main className="content">
       <PageHead title={tr("Lancer et suivre")} help={tr("Préparez la sortie selon l’algorithme de Discover, suivez les 14 jours de test d’Epic, faites tester la map et préparez le jour J.")} />
-      <Tabs value={tab} onChange={setTab} items={[['discover', 'Discover'], ['checks', tr("Vérification")], ['swap', tr("Échange de playtests")], ['churn', tr("Pourquoi ils partent")], ['dday', tr("Jour J")]]} />
+      <Tabs value={tab} onChange={setTab} items={[['discover', 'Discover'], ['checks', tr("Vérification")], ['swap', tr("Test")], ['dday', tr("Jour J")]]} />
       {tab === 'discover' && <LaunchDiscover />}
       {tab === 'checks' && <Checks />}
       {tab === 'swap' && <Swap />}
-      {tab === 'churn' && <Churn />}
       {tab === 'dday' && <DDay />}
     </main>
   )
@@ -67,33 +66,44 @@ function Swap() {
       <div className="card"><div className="lab">{tr("Mes demandes")}</div><div className="num">{data.mine.length}</div><div className="muted">{tr("{0} places encore ouvertes", [data.mine.reduce((s: number, m: any) => s + m.slots, 0)])}</div></div>
       <div className="card"><div className="lab">{tr("Retours reçus")}</div><div className="num">{data.feedback.length}</div><div className="muted">{data.feedback.length ? tr("note moyenne {0} / 5", [(data.feedback.reduce((s: number, f: any) => s + f.score, 0) / data.feedback.length).toFixed(1).replace('.', ',')]) : '—'}</div></div>
     </div>
-    <div className="two">
-      <section className="card">
-        <CardHead title={tr("Maps à tester")} sub={tr("Testez, répondez au questionnaire guidé, gagnez des crédits.")} />
-        {data.open.length === 0 && <p className="muted">{tr("Aucune map à tester pour le moment.")}</p>}
-        <div className="list">{data.open.map((m: any) => (
-          <div key={m.id} className="li" style={{ flexWrap: 'wrap' }}>
-            <div style={{ flex: '1 1 180px' }}><div style={{ fontWeight: 500 }}>{m.map}</div><div className="small muted">{tr("{0} · {1} min · {2}{3}", [m.genre, m.minutes, m.studio, m.island_code ? tr(" · code {0}", [m.island_code]) : ''])}</div></div>
-            <span className="badge">{tr("+{0} crédits", [m.reward])}</span>
-            <button className="btn" disabled={m.done} onClick={() => setTesting(m)}>{m.done ? tr("Déjà testée") : tr("Tester")}</button>
-          </div>
-        ))}</div>
-      </section>
-      <section className="card">
-        <CardHead title={tr("Faire tester {0}", [map?.name])} sub={tr("Le coût est bloqué à la publication de la demande.")} />
-        <form className="stack" onSubmit={order}>
-          <div className="grid2" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-            <label className="label">{tr("Testeurs")}<input className="field" type="number" min={1} max={20} value={req.slots} onChange={e => setReq({ ...req, slots: Number(e.target.value) })} /></label>
-            <label className="label">{tr("Crédits / test")}<input className="field" type="number" min={5} max={100} value={req.reward} onChange={e => setReq({ ...req, reward: Number(e.target.value) })} /></label>
-            <label className="label">{tr("Minutes")}<input className="field" type="number" min={5} max={60} value={req.minutes} onChange={e => setReq({ ...req, minutes: Number(e.target.value) })} /></label>
-          </div>
-          <label className="label">{tr("Code de l'île")}<input className="field mono" value={req.island_code} onChange={e => setReq({ ...req, island_code: e.target.value })} placeholder="1234-5678-9012" /></label>
-          <button className="btn pri" disabled={!canEdit || req.slots * req.reward > data.credits}>{tr("Publier · {0} crédits", [req.slots * req.reward])}</button>
-        </form>
-      </section>
-    </div>
     <section className="card">
-      <CardHead title={tr("Retours reçus")} />
+      <CardHead title={tr("Demandes de test")} sub={tr("Testez les maps des autres pour gagner des crédits, et dépensez-les pour faire tester la vôtre.")} />
+      <div className="two" style={{ alignItems: 'start' }}>
+        <div>
+          <div className="dsec" style={{ marginTop: 0 }}>{tr("À tester · demandes des autres")}</div>
+        {data.open.length === 0 && <p className="muted">{tr("Aucune map à tester pour le moment.")}</p>}
+          <div className="list">{data.open.map((m: any) => (
+            <div key={m.id} className="li" style={{ flexWrap: 'wrap' }}>
+              <div style={{ flex: '1 1 180px' }}><div style={{ fontWeight: 500 }}>{m.map}</div><div className="small muted">{tr("{0} · {1} min · {2}{3}", [m.genre, m.minutes, m.studio, m.island_code ? tr(" · code {0}", [m.island_code]) : ''])}</div></div>
+              <span className="badge">{tr("+{0} crédits", [m.reward])}</span>
+              <button className="btn" disabled={m.done} onClick={() => setTesting(m)}>{m.done ? tr("Déjà testée") : tr("Tester")}</button>
+            </div>
+          ))}</div>
+        </div>
+        <div>
+          <div className="dsec" style={{ marginTop: 0 }}>{tr("Nos demandes · {0}", [map?.name])}</div>
+          {data.mine.length === 0 && <p className="small muted">{tr("Aucune demande publiée.")}</p>}
+          <div className="list">{data.mine.map((m: any) => <div key={m.id} className="li">
+            <div style={{ flex: 1 }}><div style={{ fontWeight: 500 }}>{tr("Demande du {0}", [frDate(m.created_at)])}</div><div className="small muted">{tr("{0} min · {1} crédits par test", [m.minutes, m.reward])}</div></div>
+            <span className="small muted">{tr("{0} retour(s)", [m.received])}</span>
+            <span className={'badge ' + (m.slots > 0 ? 'b-o' : 'b-g')}>{m.slots > 0 ? tr("En cours · {0} place(s)", [m.slots]) : tr("Terminée")}</span>
+          </div>)}</div>
+          <div className="dsec">{tr("Nouvelle demande")}</div>
+        <form className="stack" onSubmit={order}>
+            <div className="grid2" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+              <label className="label">{tr("Testeurs")}<input className="field" type="number" min={1} max={20} value={req.slots} onChange={e => setReq({ ...req, slots: Number(e.target.value) })} /></label>
+              <label className="label">{tr("Crédits / test")}<input className="field" type="number" min={5} max={100} value={req.reward} onChange={e => setReq({ ...req, reward: Number(e.target.value) })} /></label>
+              <label className="label">{tr("Minutes")}<input className="field" type="number" min={5} max={60} value={req.minutes} onChange={e => setReq({ ...req, minutes: Number(e.target.value) })} /></label>
+            </div>
+            <label className="label">{tr("Code de l'île")}<input className="field mono" value={req.island_code} onChange={e => setReq({ ...req, island_code: e.target.value })} placeholder="1234-5678-9012" /></label>
+            <button className="btn pri" disabled={!canEdit || req.slots * req.reward > data.credits}>{tr("Publier · {0} crédits", [req.slots * req.reward])}</button>
+          </form>
+        </div>
+      </div>
+    </section>
+    <section className="card">
+      <CardHead title={tr("Retours")} sub={data.feedback.length ? tr("{0} retour(s) des testeurs, avec leurs réponses au questionnaire", [data.feedback.length]) : tr("Les retours des testeurs arrivent ici.")} />
+      <Reasons />
       <div className="list">{data.feedback.map((f: any, i: number) => (
         <div key={i} className="li" style={{ alignItems: 'flex-start' }}><div style={{ flex: 1 }}><div><span style={{ fontWeight: 500 }}>{f.who}</span> <span className="small muted">{tr("· {0} · parti à {1} min · objectif compris : {2}", [ago(f.at), f.left_minute, tx(f.understood) || '—'])}</span></div><div className="muted">{tx(f.reason)}{f.comeback ? tr(" — reviendrait pour : {0}", [f.comeback]) : ''}</div></div><span className="badge">{f.score} / 5</span></div>
       ))}</div>
@@ -127,32 +137,15 @@ function Questionnaire({ m, onClose, onDone }: { m: any; onClose: () => void; on
   )
 }
 
-function Churn() {
+/** Réponses au questionnaire : pourquoi les testeurs ont arrêté (part de chaque raison). */
+function Reasons() {
   const { map } = useApp()
   const { data } = useLoad<any>(map ? `/api/maps/${map.id}/churn` : null, [map?.id])
-  if (!data) return null
-  const max = Math.max(1, ...data.per_minute)
-  const peak = data.per_minute.indexOf(Math.max(...data.per_minute))
-  return (
-    <div className="two">
-      <section className="card">
-        <CardHead title={tr("Départs par minute de jeu")} sub={tr("{0} testeurs · pic à la {1}e minute", [data.testers, peak])} />
-        {data.testers === 0 ? <p className="muted">{tr("Pas encore de retour de playtest.")}</p> : (
-          <div className="chart" role="img" aria-label={tr("Départs par minute, pic à la minute {0}", [peak])}>
-            {data.per_minute.map((v: number, i: number) => (
-              <div key={i} className="bcol"><span className="small mono">{v || ''}</span><div className="btrack"><div className={'bfill' + (i === peak && v ? ' peak' : '')} style={{ height: `${(v / max) * 100}%` }} /></div><span className="small mono muted">{i === 15 ? '15+' : i}</span></div>
-            ))}
-          </div>
-        )}
-      </section>
-      <section className="card">
-        <CardHead title={tr("Raisons citées")} sub={tr("Réponses du questionnaire guidé")} />
-        <div className="stack">{data.reasons.map((r: any) => (
-          <div key={r.reason}><div className="row" style={{ justifyContent: 'space-between', marginBottom: 6 }}><span>{tx(r.reason)}</span><span className="mono">{Math.round((r.count / data.testers) * 100)} %</span></div><div className="bar"><span style={{ width: `${(r.count / data.testers) * 100}%` }} /></div></div>
-        ))}</div>
-      </section>
-    </div>
-  )
+  if (!data || data.testers === 0) return null
+  return <div className="stack" style={{ gap: 10, marginBottom: 16 }}>
+    <div className="small muted">{tr("Pourquoi ils ont arrêté · {0} testeurs", [data.testers])}</div>
+    {data.reasons.map((r: any) => <div key={r.reason}><div className="row" style={{ justifyContent: 'space-between', marginBottom: 4 }}><span className="small">{tx(r.reason)}</span><span className="small mono">{Math.round((r.count / data.testers) * 100)} %</span></div><div className="bar"><span style={{ width: `${(r.count / data.testers) * 100}%` }} /></div></div>)}
+  </div>
 }
 
 function DDay() {
