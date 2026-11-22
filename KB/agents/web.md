@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-22 · #201 · pages du studio
+- Fait : « Maps du studio » = bouton « Créer une map » en haut à gauche + tableau (map, état, genre, sortie visée modifiable par un admin, avancement, dernière activité, gains, suppression) ; grand bloc « Créer » retiré (« Nouveau studio » reste dans l'espace perso et le +). Nouvel onglet « Paramètres » (/studio/N/parametres) avec nom, export, transfert, zone sensible (StudioSettings, sorti de Maps). Serveur : maps_summary renvoie `last_activity` (MAX(activity.at)), sans migration.
+- Vérifié : navigateur (création d'une map dans le studio, renommage) + cargo test.
+
 ### 2026-11-22 · #203 · Marché allégé
 - Fait : bloc « Votre map » (code d'île + maps suivies) et « Joueurs par jour » retirés du Marché (studio et Analyse). Le code d'île se relie toujours dans Lancer et suivre, une map se suit toujours depuis sa fiche (bouton Suivre). En-tête et « En bref » raccourcis (3 lignes), « En bref » et « Les genres » repliables (details.fold). Maps qui marchent : recherche à droite de la ligne des filtres.
 - Vérifié : navigateur avec une base de test locale (60 îles factices dans /tmp, jamais dans le dépôt).

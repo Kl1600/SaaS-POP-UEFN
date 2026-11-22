@@ -1,9 +1,9 @@
 import { SecuritySettings } from '../components/Security'
 import { Brand } from '../components/Brand'
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { Copy, KeyRound, Moon, Plus, Sun, Trash2 } from 'lucide-react'
-import { api, euros } from '../api'
+import { ago, api, euros, frDate } from '../api'
 import { useApp, useLoad, studioName } from '../state'
 import { Avatar, CardHead, PageHead, ROLE, Tabs } from '../components/ui'
 import { tr } from '../i18n/t'
@@ -11,15 +11,15 @@ import LangPicker from '../components/LangPicker'
 import { openCreate } from '../components/MapSwitcher'
 
 /** Pages du studio (ou de l'espace perso) : /studio/:sid/equipe | integrations | maps. */
-export default function Team({ tab }: { tab: 'members' | 'integ' | 'maps' }) {
+export default function Team({ tab }: { tab: 'members' | 'integ' | 'maps' | 'settings' }) {
   const { studio } = useApp()
   const nav = useNavigate()
   if (!studio) return null
-  if (studio.personal && tab === 'members') return <Navigate to={`/studio/${studio.id}/maps`} replace />
+  if (studio.personal && (tab === 'members' || tab === 'settings')) return <Navigate to={`/studio/${studio.id}/maps`} replace />
   const items: [string, string][] = studio.personal
     ? [['maps', tr("Mes maps")], ['integ', tr("Intégrations")]]
-    : [['members', tr("Membres et rôles")], ['maps', tr("Maps du studio")], ['integ', tr("Intégrations")]]
-  const sub = { members: 'equipe', integ: 'integrations', maps: 'maps' } as const
+    : [['members', tr("Membres et rôles")], ['maps', tr("Maps du studio")], ['integ', tr("Intégrations")], ['settings', tr("Paramètres")]]
+  const sub = { members: 'equipe', integ: 'integrations', maps: 'maps', settings: 'parametres' } as const
   return (
     <main className="content">
       <PageHead title={studio.personal ? tr("Mes outils") : studio.name} help={studio.personal ? tr("Vos maps perso et les outils reliés à votre compte (Discord, GitHub, Lore).") : tr("Qui fait partie du studio, ce que chacun peut faire, ses maps et les outils reliés.")} />
@@ -27,6 +27,7 @@ export default function Team({ tab }: { tab: 'members' | 'integ' | 'maps' }) {
       {tab === 'members' && <Members />}
       {tab === 'integ' && <Integrations />}
       {tab === 'maps' && <Maps />}
+      {tab === 'settings' && <StudioSettings />}
     </main>
   )
 }
@@ -139,38 +140,33 @@ function Maps() {
   const nav = useNavigate()
   const [going, setGoing] = useState<number | null>(null)
   const { data, reload } = useLoad<any[]>(studio ? `/api/studios/${studio.id}/maps` : null, [studio?.id])
-  return <>
-    <div className="two">
-      {data?.map(m => (
-        <section key={m.id} className="card">
-          <CardHead title={m.name} sub={m.genre}><span className="badge">{m.status === 'early_access' ? tr("Accès anticipé") : m.status === 'live' ? tr("Publiée") : tr("En production")}</span></CardHead>
-          <div className="tiles" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-            <div><div className="num" style={{ marginTop: 0, fontSize: 28 }}>{euros(m.last_gains_cents, 0)}</div><div className="lab">{tr("Gains du dernier mois")}</div></div>
-            <div><div className="num" style={{ marginTop: 0, fontSize: 28 }}>{m.members}</div><div className="lab">{tr("Membres")}</div></div>
-            <div><div className="num" style={{ marginTop: 0, fontSize: 28 }}>{m.progress} %</div><div className="lab">{tr("{0} / {1} tâches", [m.done, m.tasks])}</div></div>
-          </div>
-          <div className="bar" style={{ margin: '16px 0' }}><span style={{ width: `${m.progress}%` }} /></div>
-          <div className="row">
-            <button className="btn" onClick={() => nav(`/map/${m.id}`)}>{tr("Ouvrir")}</button>
-            {studio?.personal && going !== m.id && <button className="btn" onClick={() => setGoing(m.id)}>{tr("Passer en équipe")}</button>}
-            {isAdmin && (data?.length ?? 0) > 1 && <button className="btn" onClick={async () => { const c = prompt(tr("Supprimer définitivement « {0} » et tout son contenu (tâches, pages, Verse, gains) ?\nTapez le nom de la map pour confirmer :", [m.name])); if (c === null) return; try { await api.del(`/api/maps/${m.id}`, { confirm: c }); await reloadMe(); reload(); toast(tr("Map supprimée")) } catch (er: any) { toast(er.message, true) } }}>{tr("Supprimer")}</button>}
-            {isAdmin && <input className="field" type="date" defaultValue={m.release_date ?? ''} aria-label={tr("Date de sortie")} onBlur={async e => { await api.patch(`/api/maps/${m.id}`, { release_date: e.target.value }); reloadMe(); reload() }} />}
-          </div>
-          {going === m.id && <GoTeam m={m} onDone={() => setGoing(null)} />}
-        </section>
-      ))}
+  const STATUS: Record<string, string> = { early_access: tr("Accès anticipé"), live: tr("Publiée") }
+  return <section className="card">
+    <div className="row" style={{ gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+      {isAdmin && <button className="btn pri" onClick={() => openCreate({ kind: 'map', studioId: studio?.id })}><Plus size={16} />{tr("Créer une map")}</button>}
+      {studio?.personal && <button className="btn" onClick={() => openCreate({ kind: 'studio' })}><Plus size={16} />{tr("Nouveau studio")}</button>}
+      <span className="small muted" style={{ marginLeft: 'auto' }}>{tr("{0} map(s)", [data?.length ?? 0])}</span>
     </div>
-    <div className="two">
-      <section className="card">
-        <CardHead title={tr("Créer")} sub={studio?.personal ? tr("Une nouvelle map perso, ou un studio pour travailler en équipe.") : tr("Une nouvelle map pour ce studio, ou un nouveau studio pour une autre équipe.")} />
-        <div className="row" style={{ flexWrap: 'wrap' }}>
-          {isAdmin && <button className="btn pri" onClick={() => openCreate({ kind: 'map', studioId: studio?.id })}><Plus size={16} />{tr("Nouvelle map")}</button>}
-          <button className="btn" onClick={() => openCreate({ kind: 'studio' })}><Plus size={16} />{tr("Nouveau studio")}</button>
-        </div>
-      </section>
-      {!studio?.personal && <StudioSettings />}
-    </div>
-  </>
+    {data?.length === 0 && <p className="small muted">{tr("Aucune map dans ce studio pour l’instant.")}</p>}
+    {!!data?.length && <div style={{ overflowX: 'auto' }}><table className="tbl smaps">
+      <thead><tr><th>{tr("Map")}</th><th>{tr("Genre")}</th><th>{tr("Sortie visée")}</th><th>{tr("Avancement")}</th><th>{tr("Dernière activité")}</th><th>{tr("Gains du dernier mois")}</th><th /></tr></thead>
+      <tbody>{data.map(m => <Fragment key={m.id}>
+        <tr className="rowlink" tabIndex={0} onClick={() => nav(`/map/${m.id}`)} onKeyDown={e => { if (e.key === 'Enter') nav(`/map/${m.id}`) }}>
+          <td><b style={{ fontWeight: 500 }}>{m.name}</b><div className="small muted">{STATUS[m.status] ?? tr("En production")}</div></td>
+          <td className="small">{m.genre || '—'}</td>
+          <td onClick={e => e.stopPropagation()}>{isAdmin ? <input className="field" type="date" style={{ height: 32 }} defaultValue={m.release_date ?? ''} aria-label={tr("Date de sortie de {0}", [m.name])} onBlur={async e => { if (e.target.value === (m.release_date ?? '')) return; await api.patch(`/api/maps/${m.id}`, { release_date: e.target.value }); reloadMe(); reload() }} /> : <span className="small">{m.release_date ? frDate(m.release_date) : '—'}</span>}</td>
+          <td style={{ minWidth: 150 }}><div className="row" style={{ gap: 8 }}><div className="bar" style={{ flex: 1, margin: 0 }}><span style={{ width: `${m.progress}%` }} /></div><span className="small">{m.progress} %</span></div><div className="small muted">{tr("{0} / {1} tâches", [m.done, m.tasks])}</div></td>
+          <td className="small muted">{m.last_activity ? ago(m.last_activity) : '—'}</td>
+          <td className="small">{euros(m.last_gains_cents, 0)}</td>
+          <td onClick={e => e.stopPropagation()}><div className="row" style={{ gap: 4, justifyContent: 'flex-end' }}>
+            {studio?.personal && going !== m.id && <button className="btn sm" onClick={() => setGoing(m.id)}>{tr("Passer en équipe")}</button>}
+            {isAdmin && (data?.length ?? 0) > 1 && <button className="iconbtn" aria-label={tr("Supprimer {0}", [m.name])} onClick={async () => { const c = prompt(tr("Supprimer définitivement « {0} » et tout son contenu (tâches, pages, Verse, gains) ?\nTapez le nom de la map pour confirmer :", [m.name])); if (c === null) return; try { await api.del(`/api/maps/${m.id}`, { confirm: c }); toast(tr("Map supprimée")); reloadMe(); reload() } catch (e: any) { toast(e.message, true) } }}><Trash2 size={16} /></button>}
+          </div></td>
+        </tr>
+        {going === m.id && <tr><td colSpan={7}><GoTeam m={m} onDone={() => setGoing(null)} /></td></tr>}
+      </Fragment>)}</tbody>
+    </table></div>}
+  </section>
 }
 
 export function Account() {
@@ -286,7 +282,7 @@ function StudioSettings() {
   const [to, setTo] = useState('')
   if (!studio) return null
   return <section className="card">
-    <CardHead title={tr("Studio {0}", [studio.name])} sub={tr("Nom, sauvegarde, propriété")} />
+    <CardHead title={tr("Paramètres du studio")} sub={tr("Nom, sauvegarde, propriété")} />
     {isAdmin && <form className="row" onSubmit={async e => { e.preventDefault(); try { await api.patch(`/api/studios/${studio.id}`, { name }); await reloadMe(); toast(tr("Studio renommé")) } catch (er: any) { toast(er.message, true) } }}>
       <label className="label" style={{ flex: 1 }}>{tr("Nom du studio")}<input className="field" value={name} onChange={e => setName(e.target.value)} required maxLength={80} /></label>
       <button className="btn" style={{ alignSelf: 'flex-end' }}>{tr("Renommer")}</button>

@@ -661,10 +661,12 @@ pub async fn maps_summary(
         .fetch_one(&st.db)
         .await?;
         let last: Option<(String, i64, i64)> = sqlx::query_as("SELECT month, engagement_cents, sales_cents FROM revenues WHERE map_id = ? ORDER BY month DESC LIMIT 1").bind(id).fetch_optional(&st.db).await?;
+        let activity: Option<String> = sqlx::query_scalar("SELECT MAX(at) FROM activity WHERE map_id = ?").bind(id).fetch_one(&st.db).await?;
         out.push(json!({
             "id": id, "name": name, "genre": genre, "status": status, "release_date": rd, "members": members,
             "tasks": total, "done": done, "progress": if total > 0 { done * 100 / total } else { 0 },
-            "last_month": last.as_ref().map(|l| l.0.clone()), "last_gains_cents": last.map(|l| l.1 + l.2).unwrap_or(0)
+            "last_month": last.as_ref().map(|l| l.0.clone()), "last_gains_cents": last.map(|l| l.1 + l.2).unwrap_or(0),
+            "last_activity": activity
         }));
     }
     Ok(Json(json!(out)))
