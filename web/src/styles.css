@@ -939,3 +939,12 @@ body.wb-fs .side,body.wb-fs .top{visibility:hidden}
 .app.dark .tipb,.app.dark .tipb::after{background:#f2f2f2;color:#0a0a0a}
 @keyframes tipin{from{opacity:0}}
 @media (prefers-reduced-motion:reduce){.tipb{animation:none}}
+
+/* #198 : lignes de rattachement en angle droit entre une page et ses sous-pages. */
+.tnode{min-height:34px}
+.tguide,.telbow{flex:none;width:14px;align-self:stretch;position:relative;margin-left:11px}
+.tguide.on::before{content:'';position:absolute;left:0;top:0;bottom:0;border-left:1.5px solid var(--border2,#d4d4d4)}
+.telbow::before{content:'';position:absolute;left:0;top:0;bottom:0;border-left:1.5px solid var(--border2,#d4d4d4)}
+.telbow.last::before{bottom:50%}
+.telbow::after{content:'';position:absolute;left:0;top:50%;width:10px;border-top:1.5px solid var(--border2,#d4d4d4)}
+.tnode > .titem:nth-of-type(2){min-width:0;flex:1}

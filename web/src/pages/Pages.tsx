@@ -109,12 +109,22 @@ export default function Pages() {
     try { await api.patch(`/api/pages/${p.id}`, { title: t }); setMenu(null); reloadTree() } catch (e: any) { toast(e.message, true) }
   }
   const children = (p: number | null) => (tree ?? []).filter(x => (x.parent_id ?? null) === p)
-  const Node = ({ p, depth }: { p: any; depth: number }) => {
-    const [open, setOpen] = useState(true)
+  // Repli des pages mémorisé par map (#198).
+  const closedKey = `pop.tree.closed.${map?.id}`
+  const [closed, setClosed] = useState<Set<number>>(() => { try { return new Set(JSON.parse(localStorage.getItem(closedKey) ?? '[]')) } catch { return new Set() } })
+  const saveClosed = (c: Set<number>) => { setClosed(c); try { localStorage.setItem(closedKey, JSON.stringify([...c])) } catch { /* stockage indisponible */ } }
+  const toggle = (pid: number) => { const c = new Set(closed); c.has(pid) ? c.delete(pid) : c.add(pid); saveClosed(c) }
+  const collapseAll = () => saveClosed(new Set((tree ?? []).filter(x => (tree ?? []).some(y => y.parent_id === x.id)).map(x => x.id)))
+  // guides[i] : l'ancêtre du niveau i+1 a encore des frères en dessous (la ligne verticale continue).
+  const Node = ({ p, depth, last, guides }: { p: any; depth: number; last: boolean; guides: boolean[] }) => {
+    const open = !closed.has(p.id)
+    const setOpen = () => toggle(p.id)
     const kids = children(p.id)
     return <>
       <div className="row tnode" style={{ gap: 0, position: 'relative' }}>
-        <button className="titem" style={{ width: 24, padding: 0, justifyContent: 'center', marginLeft: depth * 14 }} aria-label={open ? tr("Replier") : tr("Déplier")} onClick={() => setOpen(!open)}>{kids.length ? (open ? <ChevronDown size={14} /> : <ChevronRight size={14} />) : null}</button>
+        {guides.map((g, i) => <span key={i} className={'tguide' + (g ? ' on' : '')} aria-hidden="true" />)}
+        {depth > 0 && <span className={'telbow' + (last ? ' last' : '')} aria-hidden="true" />}
+        <button className="titem" style={{ width: 24, padding: 0, justifyContent: 'center', flex: 'none' }} aria-label={open ? tr("Replier") : tr("Déplier")} onClick={setOpen}>{kids.length ? (open ? <ChevronDown size={14} /> : <ChevronRight size={14} />) : null}</button>
         <button className={'titem' + (p.id === id ? ' on' : '')} onClick={() => nav(`/pages/${p.id}`)} onContextMenu={e => { e.preventDefault(); setMenu(p.id) }}><span className="pico">{p.icon || <FileText size={12} />}</span><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title || tr("Sans titre")}</span></button>
         {canEdit && <span className="tacts">
           <button className="iconbtn" style={{ width: 26, height: 26 }} aria-label={tr("Ajouter une sous-page")} title={tr("Sous-page")} onClick={() => create(undefined, p.id)}><Plus size={14} /></button>
@@ -128,7 +138,7 @@ export default function Pages() {
           {canDelete && <button style={{ color: 'var(--tr)' }} onClick={() => removePage(p)}><Trash2 size={16} />{tr("Supprimer")}</button>}
         </div>}
       </div>
-      {open && kids.map(k => <Node key={k.id} p={k} depth={depth + 1} />)}
+      {open && kids.map((k, i) => <Node key={k.id} p={k} depth={depth + 1} last={i === kids.length - 1} guides={depth > 0 ? [...guides, !last] : []} />)}
     </>
   }
 
@@ -145,8 +155,8 @@ export default function Pages() {
         <nav className="card tree" aria-label={tr("Arborescence")}>
           <div className="tsec">{tr("Favoris")}</div>
           {tree?.filter(p => p.favorite).map(p => <button key={p.id} className={'titem' + (p.id === id ? ' on' : '')} onClick={() => nav(`/pages/${p.id}`)}><Star size={14} />{p.title}</button>)}
-          <div className="tsec">{tr("Pages de la map")}</div>
-          {children(null).map(p => <Node key={p.id} p={p} depth={0} />)}
+          <div className="tsec row" style={{ justifyContent: 'space-between' }}><span>{tr("Pages de la map")}</span>{closed.size < (tree ?? []).filter(x => (tree ?? []).some(y => y.parent_id === x.id)).length && <button className="linkbtn small muted" onClick={collapseAll}>{tr("Tout replier")}</button>}</div>
+          {children(null).map((p, i, all) => <Node key={p.id} p={p} depth={0} last={i === all.length - 1} guides={[]} />)}
           {tree?.length === 0 && <Empty text={tr("Aucune page pour l'instant.")} />}
           <Trash />
         </nav>
