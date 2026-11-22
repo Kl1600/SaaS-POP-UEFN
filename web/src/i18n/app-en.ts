@@ -2562,5 +2562,11 @@ const EN: Record<string, string> = {
  "attend": "waiting for",
  "Aucune tâche pour le moment.": "No tasks yet.",
  "Une flèche va de la tâche qui débloque vers celle qui l’attend. Survolez une tâche pour voir ses liens ; cliquez pour l’ouvrir.": "An arrow goes from the task that unblocks to the one waiting for it. Hover a task to see its links; click to open it.",
+ "Fonctionnalité": "Feature",
+ "Retirer la dépendance": "Remove the dependency",
+ "Flèche #{0} → #{1} : #{1} attend #{0}.": "Arrow #{0} → #{1}: #{1} waits for #{0}.",
+ "#{0} : dépendances mises à jour": "#{0}: dependencies updated",
+ "Tirer vers la tâche qui attend celle-ci": "Drag to the task that waits for this one",
+ "Pour ajouter une dépendance, tirez le rond à droite d’une tâche vers la tâche qui l’attend. Cliquez une flèche pour la retirer.": "To add a dependency, drag the dot on the right of a task to the task that waits for it. Click an arrow to remove it.",
 }
 export default EN

@@ -43,6 +43,12 @@ export default function Tasks() {
     (member === 'all' || t.assignee_id === member) && (tag === 'all' || t.tag === tag) &&
     (!q || (t.title + ' #' + t.number).toLowerCase().includes(q.toLowerCase()))), [tasks, member, tag, q])
 
+  // Vue Dépendances (#182) : ajoute ou retire une dépendance ; le serveur refuse les boucles en français.
+  const setDeps = async (number: number, f: (d: number[]) => number[]) => {
+    const t = tasks?.find(x => x.number === number); if (!t) return
+    const deps = [...new Set(f(t.deps))]
+    try { await api.patch(`/api/tasks/${t.id}`, { deps }); toast(tr("#{0} : dépendances mises à jour", [number])); reload() } catch (e: any) { toast(e.message, true) }
+  }
   const move = async (id: number, status: string) => {
     setOver(null)
     const t = tasks?.find(x => x.id === id)
@@ -66,7 +72,8 @@ export default function Tasks() {
           <span className="small muted" style={{ marginLeft: 8 }}>{tr("Étiquette")}</span>
           {['all', ...TAGS].map(t => <button key={t} className={'chip' + (tag === t ? ' on' : '')} onClick={() => setTag(t)}>{t === 'all' ? tr("Toutes") : tagLabel(t)}</button>)}
         </div>}
-      {tab === 'graph' && map && <DepGraph mapId={map.id} tasks={tasks ?? []} match={t => vis.some(v => v.id === t.id)} onOpen={setOpen} />}
+      {tab === 'graph' && map && <DepGraph mapId={map.id} tasks={tasks ?? []} match={t => vis.some(v => v.id === t.id)} onOpen={setOpen}
+        onLink={canEdit ? (from, to) => setDeps(to, d => [...d, from]) : undefined} onUnlink={canEdit ? (from, to) => setDeps(to, d => d.filter(x => x !== from)) : undefined} />}
       {tab === 'kanban' && <>
         {msg && <div className="warn" role="alert"><span className="crit" style={{ marginTop: 8 }} /><span>{msg}</span><button className="iconbtn" style={{ marginLeft: 'auto', width: 28, height: 28 }} aria-label={tr("Fermer")} onClick={() => setMsg('')}><X size={16} /></button></div>}
         <div className="board">
@@ -201,6 +208,12 @@ function TaskDrawer({ id, onClose, members, tasks }: { id: number; onClose: () =
           <input className="field mono" style={{ width: '100%' }} value={deps} disabled={!canEdit} placeholder="ex. 12, 18" onChange={e => setDeps(e.target.value)}
             onBlur={() => patch({ deps: deps.split(/[^0-9]+/).filter(Boolean).map(Number) })} />
           <p className="small muted" style={{ margin: '4px 0 0' }}>{tr(DEP_HELP)}</p>
+        </div>
+        <span className="muted">{tr("Fonctionnalité")}</span>
+        <div>
+          <input className="field" style={{ width: '100%' }} list="lots-de-la-map" key={t.lot} defaultValue={t.lot} disabled={!canEdit} maxLength={60} placeholder={tr("Sans fonctionnalité")}
+            onBlur={e => e.target.value.trim() !== t.lot && patch({ lot: e.target.value })} onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }} aria-label={tr("Fonctionnalité")} />
+          <datalist id="lots-de-la-map">{[...new Set(tasks.map(x => x.lot).filter(Boolean))].sort().map(l => <option key={l} value={l} />)}</datalist>
         </div>
         <span className="muted">{tr("UEFN")}</span>
         <label className="row" style={{ gap: 8 }}><input type="checkbox" checked={!!t.uefn} disabled={!canEdit} onChange={e => patch({ uefn: e.target.checked })} /><span className="small">{tr("Check-in Lore requis pour la fermer")}</span></label>

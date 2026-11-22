@@ -135,7 +135,8 @@ fn tools() -> Value {
         tool("list_tasks", "Liste les tâches de la map (numéro, titre, statut, étiquette, personne, jour prévu, dépendances en attente). Filtres facultatifs : status (todo, doing, blocked, done), mine (vos tâches seulement), query (texte).", json!({ "status": { "type": "string" }, "mine": { "type": "boolean" }, "query": { "type": "string" } }), &[]),
         tool("get_task", "Détail d'une tâche par son numéro : description, dépendances, sous-tâches, commentaires.", json!({ "number": { "type": "integer" } }), &["number"]),
         tool("next_task", "Ce que Boussole conseille de faire maintenant : retards, tâches du jour et tâches qui en débloquent d'autres.", json!({}), &[]),
-        tool("create_task", "Crée une tâche d'environ une heure. tag : code, carte, conception ou test. depends_on : numéros des tâches sans lesquelles celle-ci ne peut être ni faite ni testée ; pas l'ordre dans lequel le joueur découvre les choses ; si seule une partie a besoin d'une autre tâche, découpez. assign_to_me : vous l'assigner. uefn : tâche qui touche le projet UEFN (elle ne se ferme qu'avec un check-in Lore « #n … »).", json!({ "title": { "type": "string" }, "description": { "type": "string" }, "tag": { "type": "string" }, "planned_day": { "type": "string", "description": "AAAA-MM-JJ" }, "depends_on": { "type": "array", "items": { "type": "integer" }, "description": "Tâches sans lesquelles celle-ci ne peut être ni faite ni testée (pas l'ordre du jeu)" }, "assign_to_me": { "type": "boolean" }, "uefn": { "type": "boolean" } }), &["title"]),
+        tool("create_task", "Crée une tâche d'environ une heure. tag : code, carte, conception ou test. depends_on : numéros des tâches sans lesquelles celle-ci ne peut être ni faite ni testée ; pas l'ordre dans lequel le joueur découvre les choses ; si seule une partie a besoin d'une autre tâche, découpez. lot : fonctionnalité de la tâche (ex. « Herbe », « Boutique ») : les tâches d'une même fonctionnalité sont groupées dans la vue Dépendances. assign_to_me : vous l'assigner. uefn : tâche qui touche le projet UEFN (elle ne se ferme qu'avec un check-in Lore « #n … »).", json!({ "title": { "type": "string" }, "description": { "type": "string" }, "tag": { "type": "string" }, "planned_day": { "type": "string", "description": "AAAA-MM-JJ" }, "depends_on": { "type": "array", "items": { "type": "integer" }, "description": "Tâches sans lesquelles celle-ci ne peut être ni faite ni testée (pas l'ordre du jeu)" }, "lot": { "type": "string" }, "assign_to_me": { "type": "boolean" }, "uefn": { "type": "boolean" } }), &["title"]),
+        tool("set_task_lot", "Range une tâche dans une fonctionnalité (lot), par exemple « Herbe » ou « Boutique ». lot vide : « Sans fonctionnalité ».", json!({ "number": { "type": "integer" }, "lot": { "type": "string" } }), &["number", "lot"]),
         tool("set_task_status", "Change le statut d'une tâche : todo (à faire), doing (en cours), blocked (bloquée), done (faite). Passer en cours exige que ses dépendances soient faites. note : commentaire facultatif (ce qui a été fait, ce qui bloque). Une tâche UEFN ne passe à done qu'avec son check-in Lore : checkin = message qui commence par #n, inutile si vous avez archivé par lore_checkin « #n … » depuis que vous l'avez réservée.", json!({ "number": { "type": "integer" }, "status": { "type": "string", "enum": ["todo", "doing", "blocked", "done"] }, "note": { "type": "string" }, "checkin": { "type": "string" } }), &["number", "status"]),
         tool("claim_task", "Réserve une tâche POP pour vous (agent IA) : une seule tâche à la fois, et une tâche n'a qu'un agent. À faire avant de travailler dessus ; refusé si un autre agent l'a déjà. Vos fichiers Verse de cette tâche ne peuvent pas être modifiés par un autre agent.", json!({ "number": { "type": "integer" } }), &["number"]),
         tool("release_task", "Libère la tâche que vous avez réservée (claim_task), quand vous arrêtez sans la finir.", json!({}), &[]),
@@ -378,7 +379,7 @@ async fn call_as(
                     .as_array()
                     .map(|d| d.iter().filter_map(|x| x.as_i64()).collect()),
                 planned_day: a["planned_day"].as_str().map(String::from),
-                lot: None,
+                lot: a["lot"].as_str().map(|l| l.trim().chars().take(60).collect()),
                 status: None,
                 ai: Some(true),
                 origin: Some("ia".into()),
@@ -390,6 +391,18 @@ async fn call_as(
             let (tid, number) = crate::tasks::insert_task(st, &ctx, &b).await?;
             crate::access::notify(st, mid, json!({ "t": "refresh", "what": "tasks" }));
             Ok(json!({ "id": tid, "number": number, "message": format!("Tâche #{number} créée.") }))
+        }
+        "set_task_lot" => {
+            ctx.can_edit()?;
+            let tid = task_by_number(a["number"].as_i64()).await?;
+            let old: String = sqlx::query_scalar("SELECT lot FROM tasks WHERE id = ?")
+                .bind(tid)
+                .fetch_one(&st.db)
+                .await?;
+            let lot = a["lot"].as_str().unwrap_or("");
+            crate::tasks::set_lot(st, user, tid, &old, lot).await?;
+            crate::access::notify(st, mid, json!({ "t": "refresh", "what": "tasks" }));
+            Ok(json!({ "message": if lot.trim().is_empty() { "Tâche sans fonctionnalité.".to_string() } else { format!("Tâche rangée dans « {} ».", lot.trim()) } }))
         }
         "set_task_status" => {
             ctx.can_edit()?;
@@ -1061,6 +1074,43 @@ mod tests_checkin {
         .await
         .unwrap();
         let n = r["number"].as_i64().unwrap();
+        // #182 : create_task avec lot range la tâche ; set_task_lot la déplace.
+        let r = call_as(
+            &st,
+            &u,
+            mid,
+            Some(a),
+            "create_task",
+            json!({ "title": "Couper l'herbe", "lot": "Herbe" }),
+        )
+        .await
+        .unwrap();
+        let m = r["number"].as_i64().unwrap();
+        let lot = |num: i64| {
+            let st = st.clone();
+            async move {
+                sqlx::query_scalar::<_, String>(
+                    "SELECT lot FROM tasks WHERE map_id = ? AND number = ?",
+                )
+                .bind(mid)
+                .bind(num)
+                .fetch_one(&st.db)
+                .await
+                .unwrap()
+            }
+        };
+        assert_eq!(lot(m).await, "Herbe");
+        call_as(
+            &st,
+            &u,
+            mid,
+            Some(a),
+            "set_task_lot",
+            json!({ "number": m, "lot": "Terrains" }),
+        )
+        .await
+        .unwrap();
+        assert_eq!(lot(m).await, "Terrains");
         call_as(&st, &u, mid, Some(a), "claim_task", json!({ "number": n }))
             .await
             .unwrap();
