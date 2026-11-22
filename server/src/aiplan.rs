@@ -19,7 +19,7 @@ const SYSTEM: &str = "Tu es producteur de jeux pour Fortnite (UEFN, Verse). Tu d
 dans l'ordre où une petite équipe les ferait, du prototype jouable à la publication. Chaque tâche commence par un verbe, tient en moins de 80 caractères, \
 et se vérifie facilement (« Placer les 12 points d'apparition de l'équipe rouge », pas « Faire la carte »). \
 Étiquettes possibles : code (Verse, logique), carte (construction, décor, level design), conception (règles, équilibrage, UI, textes), test (playtests, corrections, vérifications avant publication). \
-Prévois aussi : vignette et bande-annonce conformes aux règles d'Epic, choix du genre dans le Creator Portal, playtests, et préparation du lancement. \
+« after » = les tâches sans lesquelles celle-ci ne peut être ni faite ni testée. Pas l'ordre dans lequel le joueur découvre les choses (le code de l'herbe à couper se teste sur quelques props posés n'importe où, sans attendre le décor de l'île). Si seule une partie a besoin d'une autre tâche, découpe-la. Prévois aussi : vignette et bande-annonce conformes aux règles d'Epic, choix du genre dans le Creator Portal, playtests, et préparation du lancement. \
 Réponds UNIQUEMENT avec un tableau JSON, sans texte autour, de la forme : \
 [{\"lot\": \"Prototype\", \"title\": \"…\", \"tag\": \"code\", \"description\": \"une phrase\", \"after\": [indices des tâches dont elle dépend]}]";
 
