@@ -479,16 +479,6 @@ function Canvas({ id }: { id: number }) {
           <div className="toolbar" aria-label={tr("Actions")}>
             {timerLeft ? <button className="pill on" onClick={() => setMetaOp({ timer_end: null })} disabled={!canEdit}><Timer size={16} />{`${String(Math.floor(timerLeft / 60)).padStart(2, '0')}:${String(timerLeft % 60).padStart(2, '0')}`}</button> : null}
             {voting && <button className="pill on" onClick={() => setVoting(false)}><ThumbsUp size={16} />{tr("Vote · {0} pts · Terminer", [Math.max(0, meta.points - myVotes)])}</button>}
-            <div style={{ position: 'relative' }}>
-              <button className="pill" onClick={() => setMenu(menu === 'atelier' ? null : 'atelier')} aria-expanded={menu === 'atelier'}><Users size={16} />{tr("Atelier")}</button>
-              {menu === 'atelier' && <div className="menu" style={{ right: 0, top: 44 }} onMouseLeave={() => setMenu(null)}>
-                <button disabled={!canEdit} onClick={() => { setMetaOp({ timer_end: timerLeft ? null : Date.now() + 5 * 60000 }); setMenu(null) }}><Timer size={16} />{timerLeft ? tr("Arrêter le minuteur") : tr("Minuteur 5 min")}</button>
-                <button onClick={() => { setVoting(v => !v); setMenu(null) }}><ThumbsUp size={16} />{voting ? tr("Terminer le vote") : tr("Voter pour les post-it")}</button>
-                <button disabled={!canEdit} onClick={() => { setMetaOp({ hidden: !meta.hidden }); setMenu(null) }}>{meta.hidden ? <><Eye size={16} />{tr("Révéler les idées")}</> : <><EyeOff size={16} />{tr("Cacher les idées des autres")}</>}</button>
-                <button disabled={!canEdit} onClick={() => { groupByShade(); setMenu(null) }}><LayoutGrid size={16} />{tr("Regrouper par couleur")}</button>
-                {Object.entries(cursors).map(([u, c]) => <button key={u} onClick={() => { setFollow(Number(u)); setMenu(null) }}><UserRound size={16} />{tr("Suivre {0}", [c.name])}</button>)}
-              </div>}
-            </div>
             <button className="pill" onClick={() => frames.length ? goFrame(0) : app.toast(tr("Ajoutez des cadres (menu « … ») pour présenter."))}><Presentation size={16} />{tr("Présenter")}</button>
             <div style={{ position: 'relative' }}>
               <button className="pill" onClick={() => setMenu(menu === 'export' ? null : 'export')} aria-expanded={menu === 'export'}><Download size={16} />{tr("Exporter")}</button>
