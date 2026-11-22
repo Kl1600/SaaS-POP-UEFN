@@ -13,6 +13,7 @@ import { Sparkles, MailCheck, ShieldCheck, Megaphone, AlertTriangle, X } from 'l
 import { useUefnStatus, STATUS_LABEL } from '../uefnState'
 import { tr, tx, LOCALE } from '../i18n/t'
 import { MapSwitcher, CreateHost, openCreate } from './MapSwitcher'
+import { Tooltips } from './Tooltip'
 import { useNav } from '../routes'
 import { IdeaPop } from '../pages/Ideas'
 
@@ -134,6 +135,7 @@ export default function Layout() {
       {guide && <GuideDrawer key={guide.ask ?? 'day'} ask={guide.ask} onClose={() => setGuide(false)} />}
       {newTask && <NewTaskModal onClose={() => setNewTask(false)} />}
       <CreateHost />
+      <Tooltips />
       <IdeaPop />
     </div>
   )

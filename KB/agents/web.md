@@ -2,6 +2,11 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-22 · #192 · infobulles
+- Fait : composant `Tooltips` (components/Tooltip.tsx), monté dans Layout : une bulle noire unique (claire en thème sombre) au survol (300 ms) et au focus clavier, pour `[data-tip]` et les boutons à icône (.iconbtn, .tool, .plusbtn, .popy-fab) ; au-dessus ou en dessous selon la place, recentrée pour ne pas sortir de l'écran ; un `title` est repris (pas de double bulle). Anciennes infobulles CSS ::after retirées.
+- Piège : positions en pixels CSS avec `cssRect`/`uiScale` (zoom 90 %).
+- Vérifié : navigateur (tableau blanc, barre du haut, Popy, admin).
+
 ### 2026-11-22 · #190 · Popy
 - Fait : « Boussole » renommée « Popy » (interface, aide, messages du serveur, outil MCP next_task) ; icône retirée de la barre du haut ; bouton rond flottant `.popy-fab` en bas à droite sur les pages d'une map, il ouvre l'assistant (évènement `boussole` gardé dans le code).
 - Vérifié : navigateur (bouton au même endroit sur 3 pages, ouverture), aucune erreur JS.
