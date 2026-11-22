@@ -49,3 +49,11 @@ Fait : toolsets + call_tool, options, compilation, suppression annulable (T3D), 
 Reste : tester CheckIn, PushChanges en session, réglages @editable
 Bloque : rien
 ```
+
+```
+FAIT | #158 Relais : pop-link.exe téléchargeable périmé | 22/11 17:00
+Owner : benybens | Sur la tâche : Claude Code, pour benybens
+Fait : exe recompilé (url 2.5.9), PROTO=2 = RELAY_PROTO serveur, « relais périmé » dans POP, CI refuse link/ sans exe ; testé avec le vrai UEFN
+Reste : rien
+Bloque : rien
+```
