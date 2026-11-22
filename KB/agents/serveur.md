@@ -126,3 +126,7 @@ Fait : checkin accepté seulement s'il est archivé sur la map ; « #3 #5 … »
 Reste : test avec un vrai check-in Lore (accord humain)
 Bloque : rien
 ```
+### 2026-11-22 · #145 · un jeton MCP par compte, pas par map
+- Fait : migration 0034 (`api_tokens.map_id` facultatif = map de travail, `ON DELETE SET NULL`) ; outils MCP `list_maps` et `use_map` (permis en lecture seule) ; appartenance vérifiée à chaque appel ; `use_map` libère une tâche réservée dans l'autre map. Routes `/api/me/tokens` (les routes de jetons par map sont retirées). Web : Paramètres → IA connectées (onglet de #205) gère les jetons du compte et montre les IA de la map ouverte.
+- Vérifié : `cargo test` (7 tests `tests_compte`, dont la migration sur des données d'avant), navigateur en local, `claude mcp add` réel puis révocation.
+- Leçon : sqlx 0.8 exécute chaque migration SQLite dans une transaction (`-- no-transaction` ignoré) : impossible d'y couper les clés étrangères, et `DROP TABLE` déclenche les `ON DELETE` des tables filles. Garder les colonnes filles de côté et les remettre.
