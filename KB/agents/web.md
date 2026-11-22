@@ -2,6 +2,12 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-22 · #207 · artefact Claude dans le tableau blanc
+- Fait : nouvel objet `artifact` (menu Plus d'outils > Artefact Claude) : lien + titre, affiché en carte avec « Ouvrir dans Claude ». Déplaçable, redimensionnable, annulable, synchronisé (même circuit que les autres objets), exporté en SVG.
+- Constat (22/11) : claude.ai renvoie `Content-Security-Policy: frame-ancestors 'self'` : impossible de l'afficher dans une iframe de POP, d'où la carte. Les artefacts sont aussi privés par défaut (connexion claude.ai).
+- Sécurité : seuls les liens https://claude.ai/(artifact|public/artifacts|share)/<id> passent, vérifiés dans le navigateur ET par le serveur (boards::artifact_url_ok, test tests_artefact) ; un autre objet est ignoré.
+- Vérifié : navigateur (lien refusé, ajout, synchro dans un 2e onglet, déplacement, redimensionnement, 3 annulations) + cargo test.
+
 ### 2026-11-22 · #202 · idées de maps
 - Fait : chiffres des cartes en grille icône + valeur + libellé (joueurs par jour, temps de jeu moyen, nouvelles maps qui percent, évolution sur 7 jours) ; bannières sobres (fond neutre, liseré de couleur du genre à gauche, plus de dégradé) ; fiche élargie (980 px) : accroche, badges et actions en haut, puis deux colonnes (pourquoi / chiffres à battre + graphique), puis maps à étudier / twists et pièges ; mini-courbe des cartes retirée ; graphique « Joueurs par jour » avec axes (joueurs, jours) dans la fiche.
 - Vérifié : navigateur avec des données de marché factices dans la base de test locale (/tmp), clair et sombre.

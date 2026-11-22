@@ -291,7 +291,8 @@ async fn save(st: &AppState, bid: i64, objs: &Map<String, Value>) -> Result<(), 
     Ok(())
 }
 
-const KINDS: [&str; 9] = [
+const KINDS: [&str; 10] = [
+    "artifact",
     "sticky",
     "text",
     "shape",
@@ -302,6 +303,13 @@ const KINDS: [&str; 9] = [
     "image",
     "comment",
 ];
+
+/// Lien d'artefact Claude accepté dans un tableau (#207) : seulement https://claude.ai/…
+/// (claude.ai interdit l'affichage dans une iframe d'un autre site : POP en montre une carte).
+pub fn artifact_url_ok(u: &str) -> bool {
+    let re = regex::Regex::new(r"^https://claude\.ai/(artifact|public/artifacts|share)/[A-Za-z0-9_-]{6,80}/?$").unwrap();
+    re.is_match(u)
+}
 
 /// Applique une opération reçue par WebSocket puis la diffuse aux autres membres.
 pub async fn apply_op(st: &AppState, u: &AuthUser, map_id: i64, v: &Value) -> Result<(), AppError> {
@@ -327,6 +335,9 @@ pub async fn apply_op(st: &AppState, u: &AuthUser, map_id: i64, v: &Value) -> Re
                     if t.chars().count() > 2000 {
                         continue;
                     }
+                }
+                if o["kind"] == "artifact" && !artifact_url_ok(o["url"].as_str().unwrap_or("")) {
+                    continue;
                 }
                 if o["html"]
                     .as_str()
@@ -574,4 +585,25 @@ pub async fn frame_to_page(
         .bind(mid).bind(&title).bind(&content).bind(u.id).bind(u.id).fetch_one(&st.db).await?;
     notify(&st, mid, json!({ "t": "refresh", "what": "pages" }));
     Ok(Json(json!({ "page_id": pid })))
+}
+
+#[cfg(test)]
+mod tests_artefact {
+    use super::artifact_url_ok;
+
+    #[test]
+    fn seuls_les_liens_claude_ai_passent() {
+        assert!(artifact_url_ok("https://claude.ai/artifact/WiiU6vVRT3cMJFNtQGo87B"));
+        assert!(artifact_url_ok("https://claude.ai/public/artifacts/3f2a9c1e-1234-4abc-9def-001122334455"));
+        for u in [
+            "http://claude.ai/artifact/WiiU6vVRT3cMJFNtQGo87B",
+            "https://claude.ai.evil.com/artifact/WiiU6vVRT3cMJFNtQGo87B",
+            "https://evil.com/?https://claude.ai/artifact/abcdefgh",
+            "https://claude.ai/artifact/abc def",
+            "javascript:alert(1)",
+            "",
+        ] {
+            assert!(!artifact_url_ok(u), "{u}");
+        }
+    }
 }
