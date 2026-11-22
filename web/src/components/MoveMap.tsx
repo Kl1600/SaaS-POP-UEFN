@@ -29,7 +29,7 @@ export function ConfirmMove({ p, studios, onClose }: { p: Pending; studios: Stud
       const r = await api.post(`/api/maps/${p.id}/move`, { studio_id: p.to })
       await reload()
       toast(solo
-        ? (r.reassigned > 0 ? tr("« {0} » est maintenant une map perso · {1} tâche(s) vous ont été réattribuées", [p.name, r.reassigned]) : tr("« {0} » est maintenant une map perso", [p.name]))
+        ? (r.reassigned > 0 ? tr("« {0} » est maintenant une map perso · {1} tâche(s) d’autres membres sont maintenant sans personne", [p.name, r.reassigned]) : tr("« {0} » est maintenant une map perso", [p.name]))
         : tr("« {0} » est maintenant dans {1}", [p.name, to.name]))
       onClose()
     } catch (er: any) { toast(er.message, true); setBusy(false) }
@@ -40,7 +40,7 @@ export function ConfirmMove({ p, studios, onClose }: { p: Pending; studios: Stud
       <p className="muted" style={{ margin: 0 }}>{tr("De {0} vers {1}. Tout le contenu suit : tâches, pages, tableaux, gains.", [studioName(from), studioName(to)])}</p>
       {solo
         ? <p style={{ margin: 0 }}>{p.reassigned > 0
-            ? tr("{0} tâche(s) attribuée(s) à d’autres membres vous seront réattribuées. Les membres de {1} n’auront plus accès à cette map.", [p.reassigned, from.name])
+            ? tr("{0} tâche(s) attribuée(s) à d’autres membres redeviendront sans personne : rien ne vous sera réattribué. Les membres de {1} n’auront plus accès à cette map.", [p.reassigned, from.name])
             : tr("Les membres de {0} n’auront plus accès à cette map.", [from.name])}</p>
         : <p style={{ margin: 0 }}>{tr("Les membres de {0} auront accès à cette map.", [to.name])}</p>}
       <div className="row" style={{ justifyContent: 'flex-end' }}>

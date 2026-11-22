@@ -433,8 +433,8 @@ pub struct MoveIn {
 
 /// Passer une map dans un autre studio (ou dans un nouveau studio créé pour l'occasion), par exemple
 /// pour travailler en équipe sur une map commencée seul, ou la reprendre seul. Il faut être admin des deux côtés.
-/// Vers l'espace perso : toutes les tâches attribuées à quelqu'un d'autre reviennent à la personne
-/// qui déplace la map, et les fichiers verrouillés par d'autres sont libérés (ils n'y ont plus accès).
+/// Vers l'espace perso : les tâches attribuées à quelqu'un d'autre redeviennent « sans personne »
+/// (rien n'est réattribué en silence, #157) et les fichiers verrouillés par d'autres sont libérés.
 pub async fn move_map(
     State(st): State<AppState>,
     u: AuthUser,
@@ -523,8 +523,8 @@ pub async fn move_map(
     }
     let mut reassigned = 0;
     if to_personal {
-        reassigned = sqlx::query("UPDATE tasks SET assignee_id = ? WHERE map_id = ? AND assignee_id IS NOT NULL AND assignee_id <> ?")
-            .bind(u.id).bind(mid).bind(u.id).execute(&mut *tx).await?.rows_affected();
+        reassigned = sqlx::query("UPDATE tasks SET assignee_id = NULL WHERE map_id = ? AND assignee_id IS NOT NULL AND assignee_id <> ?")
+            .bind(mid).bind(u.id).execute(&mut *tx).await?.rows_affected();
         sqlx::query(
             "DELETE FROM file_locks WHERE map_id = ? AND (user_id IS NULL OR user_id <> ?)",
         )
@@ -539,7 +539,7 @@ pub async fn move_map(
         (
             "Map reprise en solo",
             if reassigned > 0 {
-                format!("{} tâche(s) réattribuée(s) à {}", reassigned, u.name)
+                format!("{} tâche(s) d’autres membres redevenue(s) sans personne", reassigned)
             } else {
                 String::new()
             },
