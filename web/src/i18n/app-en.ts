@@ -2552,5 +2552,15 @@ const EN: Record<string, string> = {
  "Je la rends": "Give it back",
  "Chaque membre prendra ses tâches lui-même": "Each member will take their own tasks",
  "Une dépendance = une tâche sans laquelle celle-ci ne peut être ni faite ni testée. Pas l’ordre dans lequel le joueur découvre le jeu : si seule une partie en a besoin, découpez la tâche.": "A dependency = a task without which this one can be neither done nor tested. Not the order in which the player discovers the game: if only part of it needs it, split the task.",
+ "Dépendances": "Dependencies",
+ "Sans fonctionnalité": "No feature",
+ "Prenable": "Ready to take",
+ "Bloquée": "Blocked",
+ "Faite": "Done",
+ "Chemin critique": "Critical path",
+ "chemin critique": "critical path",
+ "attend": "waiting for",
+ "Aucune tâche pour le moment.": "No tasks yet.",
+ "Une flèche va de la tâche qui débloque vers celle qui l’attend. Survolez une tâche pour voir ses liens ; cliquez pour l’ouvrir.": "An arrow goes from the task that unblocks to the one waiting for it. Hover a task to see its links; click to open it.",
 }
 export default EN

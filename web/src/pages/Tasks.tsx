@@ -6,6 +6,7 @@ import { ago, api, frDate } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { Avatar, CardHead, Drawer, Modal, PageHead, STATUS, TAGS, Tabs, tagLabel } from '../components/ui'
 import { tr } from '../i18n/t'
+import DepGraph from '../components/DepGraph'
 
 /** Ce qu'est une dépendance (#160) : même définition que pour les IA (outil MCP create_task, plan IA). */
 export const DEP_HELP = "Une dépendance = une tâche sans laquelle celle-ci ne peut être ni faite ni testée. Pas l’ordre dans lequel le joueur découvre le jeu : si seule une partie en a besoin, découpez la tâche."
@@ -24,7 +25,7 @@ export function useMembers() {
 export default function Tasks() {
   const { map, canEdit, toast } = useApp()
   const [params] = useSearchParams()
-  const [tab, setTab] = useState<'kanban' | 'people' | 'files'>('kanban')
+  const [tab, setTab] = useState<'kanban' | 'graph' | 'people' | 'files'>('kanban')
   const [member, setMember] = useState<number | 'all'>('all')
   const [tag, setTag] = useState('all')
   const [q, setQ] = useState(params.get('q') ?? '')
@@ -36,7 +37,7 @@ export default function Tasks() {
   const { data: mem } = useMembers()
   useLive(['tasks'], reload)
   useEffect(() => setQ(params.get('q') ?? ''), [params])
-  useEffect(() => { const t = Number(params.get('t')); if (t) setOpen(t); if (params.get('vue') === 'personnes') setTab('people') }, [params])
+  useEffect(() => { const t = Number(params.get('t')); if (t) setOpen(t); if (params.get('vue') === 'personnes') setTab('people'); if (params.get('vue') === 'dependances') setTab('graph') }, [params])
 
   const vis = useMemo(() => (tasks ?? []).filter(t =>
     (member === 'all' || t.assignee_id === member) && (tag === 'all' || t.tag === tag) &&
@@ -55,17 +56,18 @@ export default function Tasks() {
   return (
     <main className="content">
       <PageHead title={tr("Tâches")} help={tr("Des tâches d'une heure. Chaque changement de statut est tracé.")}><AiPlanButton /></PageHead>
-      <Tabs value={tab} onChange={setTab} items={[['kanban', tr("Kanban")], ['people', tr("Par personne")], ['files', tr("Fichiers verrouillés")]]} />
+      <Tabs value={tab} onChange={setTab} items={[['kanban', tr("Kanban")], ['graph', tr("Dépendances")], ['people', tr("Par personne")], ['files', tr("Fichiers verrouillés")]]} />
 
-      {tab === 'kanban' && <>
-        <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
+      {(tab === 'kanban' || tab === 'graph') && <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
           <input className="field" style={{ width: 220 }} placeholder={tr("Filtrer…")} value={q} onChange={e => setQ(e.target.value)} aria-label={tr("Filtrer les tâches")} />
           <span className="small muted" style={{ marginLeft: 8 }}>{tr("Membre")}</span>
           <button className={'chip' + (member === 'all' ? ' on' : '')} onClick={() => setMember('all')}>{tr("Tous")}</button>
           {mem?.members.map((m: any) => <button key={m.id} className={'chip' + (member === m.id ? ' on' : '')} onClick={() => setMember(m.id)}>{m.name.split(' ')[0]}</button>)}
           <span className="small muted" style={{ marginLeft: 8 }}>{tr("Étiquette")}</span>
           {['all', ...TAGS].map(t => <button key={t} className={'chip' + (tag === t ? ' on' : '')} onClick={() => setTag(t)}>{t === 'all' ? tr("Toutes") : tagLabel(t)}</button>)}
-        </div>
+        </div>}
+      {tab === 'graph' && map && <DepGraph mapId={map.id} tasks={tasks ?? []} match={t => vis.some(v => v.id === t.id)} onOpen={setOpen} />}
+      {tab === 'kanban' && <>
         {msg && <div className="warn" role="alert"><span className="crit" style={{ marginTop: 8 }} /><span>{msg}</span><button className="iconbtn" style={{ marginLeft: 'auto', width: 28, height: 28 }} aria-label={tr("Fermer")} onClick={() => setMsg('')}><X size={16} /></button></div>}
         <div className="board">
           {COLS.map(c => {
