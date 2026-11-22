@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-22 · #151 · flèches entre objets
+- Fait : tracé en glissant d'un objet à un autre (les deux clics restent possibles), ligne d'aperçu orange qui suit la souris, cadre orange sur l'objet de départ (plein) et l'objet visé (pointillé) ; Échap, clic dans le vide ou changement d'outil annulent ; flèche sélectionnée : 2 poignées (.endhandle, data-endhandle=id:from|to) pour raccrocher un bout à un autre objet (annulable). Objet sous le pointeur trouvé par elementFromPoint (marche pendant la capture du pointeur). Les bouts partent du bord (edge) et suivent les objets.
+- Vérifié : navigateur (geste, aperçu, Échap, clic vide, deux clics, raccrochage, annuler/rétablir, déplacement, 2e onglet).
+
 ### 2026-11-22 · #193 · calendrier de Planifier
 - Fait : onglet « Calendrier » (pages/PlanCalendar.tsx) à la place de « Saisons et mises à jour » : grille mois (6 semaines, lundi d'abord, aujourd'hui en rond rouge) et semaine, pastilles colorées par tag (Sortie, Objectif de la map, Date à éviter, Date Fortnite à viser, Impact revenus, Tâche planifiée), filtres par tag mémorisés (localStorage pop.cal.filters), clic sur un événement → détail (ouvrir la tâche, supprimer l'objectif), clic sur un jour → nouvel objectif. Carte « Objectifs » et bloc des saisons retirés (ajout et suppression d'objectif passent par le calendrier). Données : /plan/timeline + /seasons, sans changement serveur. /planifier?vue=calendrier ouvre l'onglet.
 - Piège : la classe `.cal` existe déjà (mini-calendrier) : la carte s'appelle `.pcal`.

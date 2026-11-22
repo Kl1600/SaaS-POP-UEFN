@@ -79,6 +79,10 @@ function Canvas({ id }: { id: number }) {
   const [follow, setFollow] = useState<number | null>(null)
   const [present, setPresent] = useState<number | null>(null)
   const [connFrom, setConnFrom] = useState<string | null>(null)
+  // Tracé d'une flèche (#151) : point d'aperçu qui suit la souris et objet survolé où elle va s'accrocher.
+  const [connTip, setConnTip] = useState<{ x: number; y: number } | null>(null)
+  const [connOver, setConnOver] = useState<string | null>(null)
+  const [reconn, setReconn] = useState<{ id: string; end: 'from' | 'to' } | null>(null)
   const [connStyle, setConnStyle] = useState('curve')
   const [shade, setShade] = useState(0)
   const [convert, setConvert] = useState({ assignee: '', tag: 'conception' })
@@ -218,7 +222,16 @@ function Canvas({ id }: { id: number }) {
   const timerLeft = meta.timer_end ? Math.max(0, Math.round((meta.timer_end - now) / 1000)) : null
   const frames = list.filter(o => o.kind === 'frame').sort((a, b) => a.y - b.y || a.x - b.x)
 
+  // Objet (hors flèche et trait) sous le pointeur, même pendant une capture du pointeur.
+  const objAt = (e: React.PointerEvent) => {
+    const el = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-oid]') as HTMLElement | null
+    const o = el ? objs[el.dataset.oid!] : null
+    return o && o.kind !== 'connector' && o.kind !== 'stroke' ? o.id : null
+  }
+  const cancelConn = () => { setConnFrom(null); setConnTip(null); setConnOver(null); setReconn(null) }
   const onDown = (e: React.PointerEvent) => {
+    const eh = (e.target as HTMLElement).closest('[data-endhandle]') as HTMLElement | null
+    if (eh && canEdit) { const [cid, end] = eh.dataset.endhandle!.split(':'); setReconn({ id: cid, end: end as 'from' | 'to' }); drag.current = { mode: 'reconn' }; setConnTip(toWorld(e.clientX, e.clientY)); (e.target as HTMLElement).setPointerCapture?.(e.pointerId); return }
     const hd = (e.target as HTMLElement).closest('[data-handle]') as HTMLElement | null
     if (hd && canEdit) { const o = objs[hd.dataset.handle!]; drag.current = { mode: 'resize', start: toWorld(e.clientX, e.clientY), orig: { ...o } }; (e.target as HTMLElement).setPointerCapture?.(e.pointerId); return }
     if (space.current) return startPan(e)
@@ -231,7 +244,12 @@ function Canvas({ id }: { id: number }) {
     if (tool === 'lasso') { setLasso({ x0: p.x, y0: p.y, x1: p.x, y1: p.y }); drag.current = { mode: 'lasso' }; return }
     if (tool === 'pen' || tool === 'hl') { const o: Obj = { id: uid(), kind: 'stroke', x: 0, y: 0, points: [[p.x, p.y]], width: tool === 'hl' ? 16 : pen.width, color: tool === 'hl' ? 'hl' : pen.color }; setObjs(s => ({ ...s, [o.id]: o })); drag.current = { mode: 'draw', id: o.id }; return }
     if (tool === 'erase') { if (oid) del([oid]); drag.current = { mode: 'erase' }; return }
-    if (tool === 'connector') { if (oid) { if (!connFrom) setConnFrom(oid); else if (connFrom !== oid) { push([{ id: uid(), kind: 'connector', x: 0, y: 0, from: connFrom, to: oid, style: connStyle, arrow: true }]); setConnFrom(null) } } return }
+    if (tool === 'connector') {
+      const o = oid && objs[oid]?.kind !== 'connector' && objs[oid]?.kind !== 'stroke' ? oid : null
+      if (!o) { cancelConn(); return } // clic dans le vide : on annule
+      if (connFrom && connFrom !== o) { push([{ id: uid(), kind: 'connector', x: 0, y: 0, from: connFrom, to: o, style: connStyle, arrow: true }]); cancelConn(); return }
+      setConnFrom(o); setConnTip(p); drag.current = { mode: 'conn', from: o, start: p }; (e.target as HTMLElement).setPointerCapture?.(e.pointerId); return
+    }
     if (['sticky', 'text', 'rect', 'ellipse', 'frame', 'comment'].includes(tool) && !oid) {
       e.preventDefault()
       const base = { x: snap(p.x, gridOn), y: snap(p.y, gridOn) }
@@ -259,6 +277,7 @@ function Canvas({ id }: { id: number }) {
   const startPan = (e: React.PointerEvent) => { const k = uiScale(); drag.current = { mode: 'pan', sx: e.clientX / k, sy: e.clientY / k, vx: view.x, vy: view.y } }
   const onMove = (e: React.PointerEvent) => {
     const p = toWorld(e.clientX, e.clientY)
+    if (connFrom || reconn) { setConnTip(p); const t = objAt(e); setConnOver(t && t !== connFrom ? t : null) }
     if (Date.now() - lastSend.current > 60) { lastSend.current = Date.now(); app.send({ t: 'cursor', place: `board:${id}`, x: p.x, y: p.y }) }
     const d = drag.current
     if (!d) return
@@ -280,10 +299,21 @@ function Canvas({ id }: { id: number }) {
       if (Date.now() - (d.last ?? 0) > 90) { d.last = Date.now(); app.send({ t: 'board', board: id, op: 'upsert', objs: moved }) }
     }
   }
-  const onUp = () => {
+  const onUp = (e: React.PointerEvent) => {
     const d = drag.current
     drag.current = null
     if (!d) return
+    if (d.mode === 'conn') {
+      const t = objAt(e)
+      if (t && t !== d.from) { push([{ id: uid(), kind: 'connector', x: 0, y: 0, from: d.from, to: t, style: connStyle, arrow: true }]); cancelConn() }
+      // sinon : simple clic, la flèche attend le clic sur l'objet d'arrivée (l'aperçu suit la souris)
+      return
+    }
+    if (d.mode === 'reconn' && reconn) {
+      const c = objs[reconn.id], t = objAt(e), other = c && (reconn.end === 'from' ? c.to : c.from)
+      if (c && t && t !== other) push([{ ...c, [reconn.end]: t }], [{ ...c }])
+      cancelConn(); return
+    }
     if (d.mode === 'move' && d.moved) push(d.moved, d.orig)
     if (d.mode === 'resize' && d.cur) push([d.cur], [d.orig])
     if (d.mode === 'draw') { const o = objs[d.id]; if (o && (o.points?.length ?? 0) > 1) push([o], []) }
@@ -335,6 +365,7 @@ function Canvas({ id }: { id: number }) {
       if (editing || (e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'TEXTAREA' || (e.target as HTMLElement).isContentEditable) return
       if (present !== null) { if (e.key === 'ArrowRight') goFrame(Math.min(frames.length - 1, present + 1)); if (e.key === 'ArrowLeft') goFrame(Math.max(0, present - 1)); if (e.key === 'Escape') setPresent(null); return }
       const mod = e.metaKey || e.ctrlKey
+      if (e.key === 'Escape' && (connFrom || reconn)) { cancelConn(); return }
       if (e.key === 'Escape' && fs) { toggleFs(); return }
       if (mod && e.key === '0') { e.preventDefault(); fit(); return }
       if (mod && (e.key === '=' || e.key === '+')) { e.preventDefault(); zoom(1.2); return }
@@ -351,7 +382,7 @@ function Canvas({ id }: { id: number }) {
       if (mod && e.key.toLowerCase() === 'v') { e.preventDefault(); paste(clip.current); return }
       if (mod && e.key.toLowerCase() === 'd') { e.preventDefault(); paste(withLinks(sel)); return }
       if (mod && e.key.toLowerCase() === 'x' && sel.length) { clip.current = withLinks(sel).map(o => ({ ...o })); del(sel); return }
-      if (!mod && !e.altKey && KEYS[e.key.toLowerCase()] && !(e.key === 'Tab')) { setTool(KEYS[e.key.toLowerCase()]); setConnFrom(null); return }
+      if (!mod && !e.altKey && KEYS[e.key.toLowerCase()] && !(e.key === 'Tab')) { setTool(KEYS[e.key.toLowerCase()]); cancelConn(); return }
       if (e.key.startsWith(tr("Arrow")) && sel.length) {
         e.preventDefault(); const k = e.shiftKey ? GRID : 2
         const dx = e.key === 'ArrowLeft' ? -k : e.key === 'ArrowRight' ? k : 0, dy = e.key === 'ArrowUp' ? -k : e.key === 'ArrowDown' ? k : 0
@@ -435,10 +466,12 @@ function Canvas({ id }: { id: number }) {
   }
 
   const anchor = (o: Obj) => ({ x: o.x + (o.w ?? 38) / 2, y: o.y + (o.h ?? 38) / 2 })
+  // Point du bord de l'objet o dans la direction de t (la flèche part du bord, pas du centre).
+  const edge = (o: Obj, t: { x: number; y: number }) => { const c = anchor(o), hw = (o.w ?? 38) / 2 + 4, hh = (o.h ?? 38) / 2 + 4, dx = t.x - c.x, dy = t.y - c.y; if (!dx && !dy) return c; const k = Math.min(dx ? hw / Math.abs(dx) : 1e9, dy ? hh / Math.abs(dy) : 1e9); return { x: c.x + dx * k, y: c.y + dy * k } }
+  const ends = (c: Obj) => { const a = objs[c.from!], b = objs[c.to!]; if (!a || !b) return null; return { p: edge(a, anchor(b)), q: edge(b, anchor(a)) } }
   const path = (c: Obj) => {
-    const a = objs[c.from!], b = objs[c.to!]; if (!a || !b) return ''
-    const edge = (o: Obj, t: { x: number; y: number }) => { const c = anchor(o), hw = (o.w ?? 38) / 2 + 4, hh = (o.h ?? 38) / 2 + 4, dx = t.x - c.x, dy = t.y - c.y; if (!dx && !dy) return c; const k = Math.min(dx ? hw / Math.abs(dx) : 1e9, dy ? hh / Math.abs(dy) : 1e9); return { x: c.x + dx * k, y: c.y + dy * k } }
-    const p = edge(a, anchor(b)), q = edge(b, anchor(a))
+    const e2 = ends(c); if (!e2) return ''
+    const { p, q } = e2
     if (c.style === 'straight') return tr("M{0},{1} L{2},{3}", [p.x, p.y, q.x, q.y])
     if (c.style === 'elbow') return tr("M{0},{1} L{2},{3} L{4},{5} L{6},{7}", [p.x, p.y, (p.x + q.x) / 2, p.y, (p.x + q.x) / 2, q.y, q.x, q.y])
     return tr("M{0},{1} C{2},{3} {4},{5} {6},{7}", [p.x, p.y, (p.x + q.x) / 2, p.y, (p.x + q.x) / 2, q.y, q.x, q.y])
@@ -461,12 +494,12 @@ function Canvas({ id }: { id: number }) {
       <section ref={wbRef} className={'wb' + (fs ? ' fs' : '')} aria-label={tr("Canevas")}>
         <div className="wbtop">
           <div className="toolbar" role="toolbar" aria-label={tr("Outils")}>
-            {TOOLS.map(([k, l, I]) => <button key={k} className={'tool' + (tool === k ? ' on' : '')} title={l} aria-label={l} aria-pressed={tool === k} onClick={() => { setTool(k); setConnFrom(null) }} disabled={!canEdit && k !== 'select'}><I size={18} strokeWidth={1.5} /></button>)}
+            {TOOLS.map(([k, l, I]) => <button key={k} className={'tool' + (tool === k ? ' on' : '')} title={l} aria-label={l} aria-pressed={tool === k} onClick={() => { setTool(k); cancelConn() }} disabled={!canEdit && k !== 'select'}><I size={18} strokeWidth={1.5} /></button>)}
             <label className={'tool' + (canEdit ? '' : ' off')} title={tr("Image (ou glissez-la sur le tableau)")} aria-label={tr("Importer une image")}><ImagePlus size={18} strokeWidth={1.5} /><input type="file" accept="image/*" hidden disabled={!canEdit} onChange={e => { const f = e.target.files?.[0]; if (f) importImage(f); e.target.value = '' }} /></label>
             <div style={{ position: 'relative' }}>
               <button className={'tool' + (MORE.some(m => m[0] === tool) ? ' on' : '')} title={tr("Plus d’outils")} aria-label={tr("Plus d’outils")} aria-expanded={menu === 'tools'} onClick={() => setMenu(menu === 'tools' ? null : 'tools')}><MoreHorizontal size={18} strokeWidth={1.5} /></button>
               {menu === 'tools' && <div className="menu" style={{ left: 0, top: 44 }} onMouseLeave={() => setMenu(null)}>
-                {MORE.map(([k, l, I]) => <button key={k} disabled={!canEdit} onClick={() => { setTool(k); setConnFrom(null); setMenu(null) }}><I size={16} />{l}</button>)}
+                {MORE.map(([k, l, I]) => <button key={k} disabled={!canEdit} onClick={() => { setTool(k); cancelConn(); setMenu(null) }}><I size={16} />{l}</button>)}
                 <button disabled={!canEdit} onClick={() => { setMenu(null); const u = prompt(tr("Lien https de l’image (plan de map vu du dessus, capture…)")); if (u && /^https:\/\//.test(u)) add({ kind: 'image', url: u, w: 600, h: 400, locked: confirm(tr("Utiliser comme fond « plan de map » (verrouillé derrière) ?")) }) }}><Upload size={16} />{tr("Image par lien")}</button>
                 <button disabled={!canEdit} onClick={() => { setMenu(null); const u = prompt(tr("Lien de l’artefact Claude (https://claude.ai/…)"))?.trim(); if (!u) return; if (!ARTIFACT_RE.test(u)) { app.toast(tr("Seuls les liens d’artefacts claude.ai sont acceptés."), true); return } const t = prompt(tr("Titre affiché (facultatif)"), tr("Artefact Claude")); add({ kind: 'artifact', url: u, text: (t ?? '').trim().slice(0, 120) || tr("Artefact Claude"), w: 320, h: 170 }) }}><Sparkles size={16} />{tr("Artefact Claude")}</button>
                 <button onClick={() => { setLib(l => !l); setMenu(null) }}><LayoutGrid size={16} />{tr("{0} les formes UEFN", [lib ? tr("Masquer") : tr("Afficher")])}</button>
@@ -478,7 +511,7 @@ function Canvas({ id }: { id: number }) {
             {tool === 'sticky' && SHADES.map(([bg], i) => <button key={i} className="tool" title={SHADE_NAMES[i]} aria-label={SHADE_NAMES[i]} onClick={() => setShade(i)}><span style={{ width: 18, height: 18, borderRadius: 4, background: bg, border: shade === i ? tr("2px solid var(--text)") : tr("1px solid var(--border)") }} /></button>)}
             {(tool === 'pen') && <PenBar color={pen.color} width={pen.width} onColor={c => setPen(p => ({ ...p, color: c }))} onWidth={w => setPen(p => ({ ...p, width: w }))} />}
             {tool === 'connector' && <select className="field" style={{ height: 34 }} value={connStyle} onChange={e => setConnStyle(e.target.value)} aria-label={tr("Style")}><option value="straight">{tr("Droit")}</option><option value="elbow">{tr("Coudé")}</option><option value="curve">{tr("Courbe")}</option></select>}
-            {tool === 'connector' && <span className="small muted">{connFrom ? tr("Cliquez l’objet d’arrivée") : tr("Cliquez l’objet de départ")}</span>}
+            {tool === 'connector' && <span className="small muted">{connFrom ? tr("Relâchez ou cliquez sur l’objet d’arrivée · Échap pour annuler") : tr("Glissez d’un objet à un autre (ou cliquez les deux)")}</span>}
           </div>
           <div className="toolbar" aria-label={tr("Actions")}>
             {timerLeft ? <button className="pill on" onClick={() => setMetaOp({ timer_end: null })} disabled={!canEdit}><Timer size={16} />{`${String(Math.floor(timerLeft / 60)).padStart(2, '0')}:${String(timerLeft % 60).padStart(2, '0')}`}</button> : null}
@@ -516,6 +549,14 @@ function Canvas({ id }: { id: number }) {
                   <path data-oid={c.id} d={path(c)} fill="none" stroke={col} strokeWidth={w} strokeDasharray={c.dashed ? `${w * 4} ${w * 3}` : undefined} markerEnd={c.arrow ? `url(#arr-${c.id})` : undefined} markerStart={c.arrowStart ? `url(#arr-${c.id})` : undefined} style={{ pointerEvents: 'stroke' }} />
                   <path data-oid={c.id} d={path(c)} fill="none" stroke="transparent" strokeWidth={Math.max(12, w + 8)} style={{ pointerEvents: 'stroke' }} />
                 </g> })}
+                {[connFrom, connOver, reconn && connOver].filter((x, i, a) => x && objs[x] && a.indexOf(x) === i).map(x => { const o = objs[x!]; return <rect key={'hl' + x} x={o.x - 6} y={o.y - 6} width={(o.w ?? 38) + 12} height={(o.h ?? 38) + 12} rx={10} fill="none" stroke="#ED753E" strokeWidth={2} strokeDasharray={x === connFrom ? undefined : '6 4'} className="conn-hl" /> })}
+                {connTip && (() => {
+                  const src = reconn ? (() => { const c = objs[reconn.id]; return c ? objs[reconn.end === 'from' ? c.to! : c.from!] : null })() : connFrom ? objs[connFrom] : null
+                  if (!src) return null
+                  const tgt = connOver ? anchor(objs[connOver]) : connTip
+                  const a = edge(src, tgt), b = connOver ? edge(objs[connOver], anchor(src)) : connTip
+                  return <path className="conn-preview" d={`M${a.x},${a.y} L${b.x},${b.y}`} fill="none" stroke="#ED753E" strokeWidth={2} strokeDasharray="6 5" />
+                })()}
                 {list.filter(o => o.kind === 'stroke').map(s => <g key={s.id} opacity={s.op}>
                   {sel.includes(s.id) && <polyline points={s.points?.map(p => p.join(',')).join(' ')} fill="none" stroke="#ED753E" strokeOpacity={0.35} strokeWidth={(s.width ?? 2) + 8} strokeLinecap="round" strokeLinejoin="round" />}
                   <polyline data-oid={s.id} points={s.points?.map(p => p.join(',')).join(' ')} fill="none" stroke={s.color === 'hl' ? 'var(--text)' : strokeColor(s)} strokeOpacity={s.color === 'hl' ? 0.25 : 1} strokeWidth={s.width} strokeDasharray={s.color === 'path' || s.dashed ? '10 8' : undefined} strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'stroke' }} />
@@ -557,6 +598,10 @@ function Canvas({ id }: { id: number }) {
                 if (o.kind === 'comment') return <div key={o.id} data-oid={o.id} className={'obj sticky' + isSel + lk} style={{ ...bx(), background: o.bg && o.bg !== 'none' ? o.bg : 'var(--surface)', color: 'var(--text)', border: tr("1px solid var(--border)"), ...border }}><span className="small muted">{tr("Commentaire · {0}", [o.author?.split(' ')[0]])}</span><div className="tbody" style={ts}>{ed ? input : <Rich o={o} />}</div></div>
                 return <div key={o.id} data-oid={o.id} className={'obj wtext' + isSel + lk} style={{ ...bx(), background: o.bg && o.bg !== 'none' ? o.bg : undefined, ...border, padding: o.bg || o.bw ? 8 : undefined }}><div className="tbody" style={ts}>{ed ? input : <Rich o={o} />}</div></div>
               })}
+              {canEdit && sel.length === 1 && objs[sel[0]]?.kind === 'connector' && !reconn && (() => { const e2 = ends(objs[sel[0]]); if (!e2) return null; return <>
+                <div className="endhandle" data-endhandle={`${sel[0]}:from`} title={tr("Tirez pour raccrocher ce bout à un autre objet")} style={{ left: e2.p.x, top: e2.p.y }} />
+                <div className="endhandle" data-endhandle={`${sel[0]}:to`} title={tr("Tirez pour raccrocher ce bout à un autre objet")} style={{ left: e2.q.x, top: e2.q.y }} />
+              </> })()}
               {canEdit && sel.length === 1 && objs[sel[0]] && !['connector', 'stroke', 'uefn'].includes(objs[sel[0]].kind) && !objs[sel[0]].lk && editing !== sel[0] && (() => { const o = objs[sel[0]]; return <div data-handle={o.id} className="rhandle" title={tr("Redimensionner (Maj : garder les proportions)")} style={{ left: o.x + (o.w ?? 40) - 6, top: o.y + (o.h ?? 40) - 6, transform: `scale(${1 / view.z})` }} /> })()}
               {lasso && <div style={{ position: 'absolute', left: Math.min(lasso.x0, lasso.x1), top: Math.min(lasso.y0, lasso.y1), width: Math.abs(lasso.x1 - lasso.x0), height: Math.abs(lasso.y1 - lasso.y0), border: tr("1px dashed var(--text)"), background: 'rgba(127,127,127,.08)' }} />}
               {Object.entries(cursors).filter(([, c]) => Date.now() - c.t < 15000).map(([u, c]) => (
