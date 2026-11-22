@@ -9,7 +9,7 @@
     python tools/task.py review 12 --note "..." --plan "1. ... 2. ..." [--gros "raison"]
                                                      pousse la branche, ouvre la PR, passe « en revue »
     python tools/task.py done 12 --verifie "critère 1 : testé en local, … ; critère 2 : …"
-                                                     l'agent a vérifié chaque critère : fusionne la PR (le CI tourne ensuite sur main)
+                                                     l'agent a vérifié chaque critère : fusionne la PR (pas de CI : il tourne au déploiement)
     python tools/task.py rework 12 --note "..."      un problème trouvé pendant la revue : retour « en cours »
     python tools/task.py block 12 --raison "..."     dit pourquoi une tâche commencée est coincée
     python tools/task.py release 12 --note "..."     rend la tâche (fait, reste, branche)
@@ -491,16 +491,6 @@ def cmd_rework(a):
     return 0
 
 
-def main_ci():
-    """(conclusion, adresse) du dernier CI terminé sur main, ou (None, None). Le CI ne tourne plus que sur main
-    (décision du 22/11 dans KB/DECISIONS.md)."""
-    runs = api(f"repos/{repo()}/actions/workflows/ci.yml/runs?branch=main&event=push&status=completed&per_page=50")
-    for r in runs.get("workflow_runs", []):
-        if r["conclusion"] != "cancelled":   # annulé par une fusion plus récente : ne dit rien
-            return r["conclusion"], r["html_url"]
-    return None, None
-
-
 def merge_pr(pr):
     """Fusion en squash de la PR (titre « … (#N) » comme sur le site), puis suppression de sa branche distante.
     `sha` : GitHub refuse si la branche a bougé depuis la lecture de la PR."""
@@ -541,10 +531,6 @@ def cmd_done(a):
     branch = pr["headRefName"]
     if git("rev-parse", "--verify", "-q", branch, check=False) and unpushed(branch):
         raise Refused(f"la branche {branch} a des commits non poussés : git push d'abord")
-    ci, url = main_ci()
-    if ci not in (None, "success"):
-        print(f"Attention : le dernier CI de main est en échec ({url}). Votre fusion s'ajoute par-dessus : "
-              "si l'échec vient de votre domaine, corrigez-le d'abord.")
     comment(n, f"{VALIDATED_PREFIX} {me()} : {a.verifie}" + (f"\nNote : {a.note}" if a.note else ""))
     merge_pr(pr)
     for label in STATUS_LABELS:

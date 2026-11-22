@@ -1,7 +1,8 @@
 # Met POP en ligne sur le serveur, d'un clic : onglet Actions → « déployer » → Run workflow (voir deploy/README.md,
 # « Déployer depuis GitHub »). Jamais automatique : une nouvelle version peut migrer la base, on choisit le moment.
 # 1. On trouve le commit demandé (latest = la tête de main) et on regarde si son image `sha-<7 caractères>` existe
-#    sur ghcr.io. 2. Sinon, on la construit (« publier l'image ») : on ne construit plus à chaque fusion (#52).
+#    sur ghcr.io. 1 bis. Le CI complet tourne sur ce commit (décision du 22/11 : c'est le seul endroit où il tourne) ;
+#    s'il échoue, rien n'est construit ni déployé. 2. Si l'image manque, on la construit (« publier l'image ») : on ne construit plus à chaque fusion (#52).
 # 3. Le runner se connecte en SSH avec une clé qui ne peut lancer que /opt/pop/deployer.sh sur le serveur ; ce script
 #    télécharge cette image précise, redémarre POP et vérifie que le site répond. 4. `latest` désigne alors l'image
 #    déployée. Si la construction échoue, rien n'est déployé : le serveur garde sa version.
@@ -78,9 +79,18 @@ jobs:
             echo "::notice::Image absente : construction de $image (commit ${commit:0:7}) avant le déploiement."
           fi
 
+  ci:
+    name: CI complet
+    needs: resoudre
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+    with:
+      commit: ${{ needs.resoudre.outputs.commit }}
+
   construire:
     name: construire l'image
-    needs: resoudre
+    needs: [resoudre, ci]
     if: needs.resoudre.outputs.existe == 'non'
     permissions:
       contents: read
@@ -91,10 +101,10 @@ jobs:
 
   deployer:
     name: mettre à jour le serveur
-    needs: [resoudre, construire]
-    # Image déjà publiée (construction sautée) ou construite à l'instant ; jamais après une construction en échec.
+    needs: [resoudre, ci, construire]
+    # CI vert, et image déjà publiée (construction sautée) ou construite à l'instant ; jamais après un échec.
     if: >-
-      always() && needs.resoudre.result == 'success' &&
+      always() && needs.resoudre.result == 'success' && needs.ci.result == 'success' &&
       (needs.construire.result == 'success' || needs.construire.result == 'skipped')
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 15
@@ -147,7 +157,7 @@ jobs:
   # Discord ne fait jamais échouer ce job (continue-on-error) ; sans le secret, le message est sauté.
   annoncer:
     name: notes de version et Discord
-    needs: [resoudre, construire, deployer]
+    needs: [resoudre, ci, construire, deployer]
     if: always()
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 5

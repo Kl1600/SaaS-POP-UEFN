@@ -1,101 +1,42 @@
-# Contrôles de main, après chaque fusion (décision du 22/11 dans KB/DECISIONS.md : plus de CI sur les PR, il
-# ralentissait tout le monde sans pouvoir être imposé). Chaque run compare main au dernier commit de main dont le
-# CI était vert : un run annulé par une fusion plus récente ne laisse donc rien passer sans contrôle.
-# Pour rester sous le quota gratuit de GitHub Actions (#46), chaque contrôle ne tourne que si ce qu'il vérifie a
-# changé ; un contrôle sauté ne coûte rien. Modifier ce fichier fait tout tourner.
+# CI complet, lancé seulement par un déploiement (décision du 22/11 dans KB/DECISIONS.md) : « déployer » l'appelle
+# sur le commit qu'il va mettre en ligne et ne déploie rien si un contrôle échoue. Plus de CI sur les PR ni à
+# chaque fusion sur main : avec un seul runner local, il retardait tout le monde. Tout est contrôlé à chaque fois ;
+# les deux règles qui comparent à un état précédent (migrations jamais modifiées, relais téléchargeable à jour)
+# comparent au dernier déploiement (étiquette `deploy-…` de sa release).
+# On peut aussi le lancer à la main : onglet Actions → CI → Run workflow.
 # Runner : `vars.RUNNER` (variable du dépôt) envoie les jobs Linux sur un runner local, par exemple quand les minutes
 # gratuites de GitHub sont épuisées ; sans la variable, ils tournent chez GitHub (voir KB/RUNNER.md).
 name: CI
 
 on:
-  push:
-    branches: [main]
-  # Failles publiées sans changement de code : audit des dépendances chaque lundi.
-  schedule:
-    - cron: '17 6 * * 1'
+  workflow_call:
+    inputs:
+      commit:
+        description: commit complet à contrôler
+        type: string
+        required: true
   workflow_dispatch:
+    inputs:
+      commit:
+        description: "commit à contrôler (vide = la branche choisie ci-dessus)"
+        required: false
+        default: ""
 
 permissions:
   contents: read
-  actions: read   # retrouver le dernier commit de main dont le CI était vert
-
-concurrency:
-  group: ci-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
+  COMMIT: ${{ inputs.commit || github.sha }}
 
 jobs:
-  changements:
-    name: dossiers touchés
+  serveur:
+    name: serveur (build + tests)
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
-    outputs:
-      serveur: ${{ steps.f.outputs.serveur }}
-      relais: ${{ steps.f.outputs.relais }}
-      relais_src: ${{ steps.f.outputs.relais_src }}
-      relais_exe: ${{ steps.f.outputs.relais_exe }}
-      forge: ${{ steps.f.outputs.forge }}
-      web: ${{ steps.f.outputs.web }}
-      migrations: ${{ steps.f.outputs.migrations }}
-      audit: ${{ steps.f.outputs.audit }}
-      base: ${{ steps.f.outputs.base }}
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-          filter: blob:none
-      - id: f
-        env:
-          EVENT: ${{ github.event_name }}
-          BEFORE: ${{ github.event.before }}
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          tout=0
-          # Dernier commit de main au CI vert : les fusions annulées entre-temps sont contrôlées avec celle-ci.
-          runs="$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?branch=main&event=push&status=success&per_page=1"
-          vert=$(curl -fsS -H "Authorization: Bearer $GH_TOKEN" "$runs" | jq -r '.workflow_runs[0].head_sha // empty' || true)
-          case "$EVENT" in
-            push)
-              if [ -n "$vert" ] && git merge-base --is-ancestor "$vert" HEAD 2>/dev/null; then base=$vert; else base=$BEFORE; fi
-              echo "Comparé à $base (dernier vert : ${vert:-aucun})" ;;
-            schedule) base= ;;
-            *) tout=1 ;;
-          esac
-          if [ "$EVENT" = schedule ]; then
-            files=
-          elif [ "$tout" = 1 ] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
-            # Lancement à la main, première poussée ou historique réécrit : on vérifie tout.
-            tout=1
-            files=
-          else
-            files=$(git diff --name-only "$base" HEAD)
-          fi
-          echo "$files" | sed 's/^/  /'
-          if printf '%s\n' "$files" | grep -q '^\.github/workflows/ci\.yml$'; then tout=1; fi
-          touche() { [ "$tout" = 1 ] || printf '%s\n' "$files" | grep -Eq "$1"; }
-          out() { if touche "$2"; then echo "$1=1"; else echo "$1=0"; fi >> "$GITHUB_OUTPUT"; }
-          out serveur '^server/'
-          out relais '^link/'
-          # Relais téléchargeable (#158) : le code du relais et l'exécutable proposé dans POP changent ensemble.
-          out relais_src '^link/(src/|Cargo\.(toml|lock)$|build\.rs$)'
-          out relais_exe '^web/public/downloads/pop-link\.exe$'
-          # Forge embarque le relais (#77) : il se reconstruit aussi quand link/ change.
-          out forge '^(forge|link)/'
-          out web '^web/'
-          out migrations '^server/migrations/'
-          echo "base=$base" >> "$GITHUB_OUTPUT"
-          if [ "$EVENT" = schedule ]; then echo "audit=1" >> "$GITHUB_OUTPUT"
-          else out audit '^(server|link)/(Cargo\.(lock|toml)|\.cargo/audit\.toml)$|^web/package(-lock)?\.json$'; fi
-          cat "$GITHUB_OUTPUT"
-
-  serveur:
-    name: serveur (build + tests)
-    needs: changements
-    if: needs.changements.outputs.serveur == '1'
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
-    steps:
-      - uses: actions/checkout@v4
+          ref: ${{ env.COMMIT }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
@@ -110,30 +51,13 @@ jobs:
       - run: cargo test --locked
         working-directory: server
 
-  # Le relais proposé au téléchargement était resté sur une vieille version (#158) : un changement du code du
-  # relais doit aussi apporter l'exécutable recompilé (AGENTS.md §5).
-  relais-telechargeable:
-    name: relais téléchargeable à jour
-    needs: changements
-    if: needs.changements.outputs.relais_src == '1'
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
-    steps:
-      - env:
-          EXE: ${{ needs.changements.outputs.relais_exe }}
-        run: |
-          if [ "$EXE" != 1 ]; then
-            echo "::error::link/ a changé mais pas web/public/downloads/pop-link.exe. Recompilez sous Windows (cd link && cargo build --release), copiez link/target/release/pop-link.exe dans web/public/downloads/, reconstruisez le web (cd web && npm run build) et commitez."
-            exit 1
-          fi
-          echo "pop-link.exe mis à jour avec le code du relais."
-
   relais:
     name: relais pop-link (build + tests)
-    needs: changements
-    if: needs.changements.outputs.relais == '1'
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.COMMIT }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
@@ -148,16 +72,16 @@ jobs:
       - run: cargo test --locked
         working-directory: link
 
-  # POP Forge (#76) : application Windows, construite seulement quand forge/ ou link/ change (minutes Windows
-  # comptées double). L'installateur non signé (bêta) est gardé en artefact de l'exécution.
+  # POP Forge (#76) : application Windows. L'installateur non signé (bêta) est gardé en artefact de l'exécution.
   forge:
     name: forge (Windows, build + installateur)
-    needs: changements
     # Runner local (vars.RUNNER, voir KB/RUNNER.md) : il est Linux, Forge est sautée ; à lancer à la main si besoin.
-    if: needs.changements.outputs.forge == '1' && vars.RUNNER == ''
+    if: vars.RUNNER == ''
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.COMMIT }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
@@ -181,11 +105,11 @@ jobs:
 
   web:
     name: web (types + build + dist à jour)
-    needs: changements
-    if: needs.changements.outputs.web == '1'
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.COMMIT }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -206,55 +130,65 @@ jobs:
             exit 1
           fi
 
-  # Migrations et failles connues dans un seul job : GitHub arrondit chaque job à la minute.
+  # Règles qui comparent au dernier déploiement, et failles connues, dans un seul job (GitHub arrondit chaque job
+  # à la minute).
   verifications:
-    name: migrations et dépendances
-    needs: changements
-    if: >-
-      needs.changements.outputs.audit == '1' ||
-      (github.event_name == 'push' && needs.changements.outputs.migrations == '1')
+    name: migrations, relais et dépendances
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ env.COMMIT }}
           fetch-depth: 0
+      - name: dernier déploiement
+        id: dernier
+        run: |
+          tag=$(git tag -l 'deploy-*' --sort=-creatordate | head -1)
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "Comparé à ${tag:-aucun déploiement précédent}"
       # Une migration existante ne se modifie jamais : on en ajoute une nouvelle, numérotée à la suite.
       - name: seules des migrations nouvelles
-        if: github.event_name == 'push' && needs.changements.outputs.migrations == '1'
+        if: steps.dernier.outputs.tag != ''
         env:
-          BASE: ${{ needs.changements.outputs.base }}
+          BASE: ${{ steps.dernier.outputs.tag }}
         run: |
           changed=$(git diff --name-status "$BASE" HEAD -- server/migrations | grep -v '^A' || true)
           if [ -n "$changed" ]; then
             echo "$changed"
-            echo "::error::Une migration existante a été modifiée, renommée ou supprimée : créez plutôt une nouvelle migration numérotée à la suite."
+            echo "::error::Une migration existante a été modifiée, renommée ou supprimée depuis $BASE : créez plutôt une nouvelle migration numérotée à la suite."
             exit 1
           fi
-          last=$(ls server/migrations | sort | tail -1)
-          echo "Dernière migration : $last"
+          echo "Dernière migration : $(ls server/migrations | sort | tail -1)"
+      # Le relais proposé au téléchargement était resté sur une vieille version (#158) : un changement du code du
+      # relais doit aussi apporter l'exécutable recompilé (AGENTS.md §5).
+      - name: relais téléchargeable à jour
+        if: steps.dernier.outputs.tag != ''
+        env:
+          BASE: ${{ steps.dernier.outputs.tag }}
+        run: |
+          src=$(git diff --name-only "$BASE" HEAD -- link/src link/Cargo.toml link/Cargo.lock link/build.rs)
+          exe=$(git diff --name-only "$BASE" HEAD -- web/public/downloads/pop-link.exe)
+          if [ -n "$src" ] && [ -z "$exe" ]; then
+            echo "::error::link/ a changé depuis $BASE mais pas web/public/downloads/pop-link.exe. Recompilez sous Windows (cd link && cargo build --release), copiez link/target/release/pop-link.exe dans web/public/downloads/, reconstruisez le web (cd web && npm run build) et commitez."
+            exit 1
+          fi
       # Rust n'est préinstallé que chez GitHub : un runner local (vars.RUNNER) a besoin de cette étape.
       - uses: dtolnay/rust-toolchain@stable
-        if: needs.changements.outputs.audit == '1'
       - uses: taiki-e/install-action@v2
-        if: needs.changements.outputs.audit == '1'
         with:
           tool: cargo-audit
       # Échoue sur toute faille connue de la base RustSec. Les exceptions, justifiées une par une,
       # sont dans <dossier>/.cargo/audit.toml (aujourd'hui : server/ seulement).
       - name: cargo audit (serveur)
-        if: needs.changements.outputs.audit == '1'
         run: cargo audit
         working-directory: server
       - name: cargo audit (relais)
-        if: needs.changements.outputs.audit == '1'
         run: cargo audit
         working-directory: link
       - uses: actions/setup-node@v4
-        if: needs.changements.outputs.audit == '1'
         with:
           node-version: 22
       # Dépendances livrées dans l'interface seulement ; échoue à partir de la gravité élevée.
       - name: npm audit (web)
-        if: needs.changements.outputs.audit == '1'
         run: npm audit --omit=dev --audit-level=high
         working-directory: web

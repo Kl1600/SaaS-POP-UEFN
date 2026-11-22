@@ -15,10 +15,10 @@ L'espace de travail des créateurs de maps Fortnite (UEFN) : pages, tableau blan
 | Les tâches | les **Issues** du dépôt, avec jalon, priorité et liens « Blocked by » |
 | L'outil des tâches | `python tools/task.py next` · `start N` · `review N` · `done N` (Python 3.9+, `gh` connecté) |
 | La KB : état, décisions, faits UEFN | [KB/](KB/README.md) |
-| Le CI | `.github/workflows/ci.yml` : serveur, relais, web et `web/dist` à jour, migrations inchangées, failles connues ; chaque contrôle ne tourne que si son dossier change |
+| Le CI | `.github/workflows/ci.yml` : serveur, relais, web et `web/dist` à jour, migrations inchangées, failles connues ; lancé seulement par le déploiement (ou à la main), qui ne met rien en ligne s'il échoue |
 
 Une tâche suit toujours le même circuit : `start` (branche `issue/N-…`), travail, `review` (PR et plan de test),
-vérification de chaque critère par l'agent, `done --verifie` (CI vert, fusion). L'action `règles des tâches` rouvre
+vérification de chaque critère par l'agent, `done --verifie` (fusion ; le CI tourne au déploiement). L'action `règles des tâches` rouvre
 une issue fermée sans vérification notée ou avec une dépendance ouverte.
 
 ## Lancer sur le Mac

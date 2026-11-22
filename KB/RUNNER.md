@@ -41,8 +41,8 @@ Seul un administrateur du dépôt (Kl1600) peut créer un runner et définir la 
    le CI tourne. Il apparaît « Idle » dans *Settings → Actions → Runners*.
 5. **Kl1600** : *Settings → Secrets and variables → Actions → Variables → New repository variable* :
    `RUNNER` = `self-hosted`.
-6. Relancer le dernier CI de `main` (*Re-run all jobs*) : les jobs doivent passer par `pop-<pc>`. Le CI ne tourne
-   plus que sur `main` (décision du 22/11).
+6. Lancer le CI à la main (*Actions → CI → Run workflow*) : les jobs doivent passer par `pop-<pc>`. Sinon, il ne
+   tourne qu'au déploiement (décision du 22/11).
 
 ## À savoir
 

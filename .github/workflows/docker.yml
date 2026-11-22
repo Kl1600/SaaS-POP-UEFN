@@ -4,10 +4,8 @@
 name: image Docker
 
 on:
-  # Sur main seulement, comme le CI (décision du 22/11).
-  push:
-    branches: [main]
-    paths: [Dockerfile, .dockerignore, .github/workflows/docker.yml]
+  # À la main seulement (décision du 22/11 : plus de CI automatique) ; le déploiement construit l'image de toute
+  # façon (« publier l'image »). À lancer après un changement du Dockerfile.
   workflow_dispatch:
 
 permissions:

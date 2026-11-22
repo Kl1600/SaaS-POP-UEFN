@@ -7,8 +7,8 @@ humain** avant d'agir.
 ## 0. Règle absolue
 
 Une tâche n'est pas finie tant que son issue GitHub n'est pas à jour, que chaque critère d'acceptation n'a pas été
-vérifié par l'agent (preuve notée avec `done --verifie`) et que son code n'est pas fusionné dans `main`, avec le CI
-de `main` vert après la fusion (le CI ne tourne plus sur les PR : décision du 22/11).
+vérifié par l'agent (preuve notée avec `done --verifie`) et que son code n'est pas fusionné dans `main`. Le CI ne
+tourne plus qu'au déploiement (décision du 22/11) : compilation et tests se lancent en local avant `done`.
 
 - On change un statut avec `python tools/task.py`, et rien d'autre. L'outil refuse ce qui casse une règle ;
   l'action GitHub `règles des tâches` rattrape ce qui passerait par le site ou l'API.
@@ -128,9 +128,10 @@ Une branche longue qui mélange plusieurs sujets ne se relit pas, ne se teste pa
   Il reste dans la PR pour qu'un humain puisse retester après coup ; donnez-le aussi à votre humain.
 - Pas de validation humaine avant la fusion : quand chaque critère est vérifié, `done N --verifie "…"` avec, pour
   chaque critère, la preuve et son genre. L'outil refuse sans `en revue`, sans PR ou si une dépendance est ouverte ;
-  il fusionne la PR en *squash* et ferme l'issue. Le CI ne tourne pas sur la PR : il tourne sur `main` après la
-  fusion. Les commandes de « Vérifier avant `review` » (§5) sont donc à lancer vous-même avant `done`. Si le CI de
-  `main` passe au rouge après votre fusion, c'est à vous de le réparer, en priorité sur la tâche suivante.
+  il fusionne la PR en *squash* et ferme l'issue. Il n'y a plus de CI sur les PR ni sur `main` : le CI complet
+  tourne seulement au déploiement (action `déployer`), qui ne met rien en ligne s'il échoue. Les commandes de
+  « Vérifier avant `review` » (§5) sont donc à lancer vous-même avant `done`. Un déploiement bloqué par le CI à cause
+  de votre domaine est à réparer en priorité sur la tâche suivante.
   Un critère pas vérifiable par l'agent (vrai UEFN absent, par exemple) : dites-le dans `--verifie` ou demandez à votre humain, n'inventez pas de preuve.
   Problème → `rework`, on corrige, on revient au début de §4.4. Un humain qui trouve un problème après la fusion
   ouvre une issue `type:bug`.
@@ -151,9 +152,9 @@ Une branche longue qui mélange plusieurs sujets ne se relit pas, ne se teste pa
 - **UEFN** : chaque action est journalisée et annulable ; rien sur un fichier ou un acteur verrouillé dans Lore par
   un autre ; une suppression demandée par une IA attend la validation d'un humain.
 - **Base de données** : une table ou une colonne = une **nouvelle** migration numérotée à la suite dans
-  `server/migrations/`. On ne modifie jamais une migration existante (le CI le refuse).
+  `server/migrations/`. On ne modifie jamais une migration existante (le CI du déploiement le refuse).
 - **`web/dist` est versionné** : après un changement dans `web/`, reconstruisez (`npm run build`) et commitez
-  `web/dist` (le CI vérifie qu'il est à jour).
+  `web/dist` (le CI du déploiement vérifie qu'il est à jour).
 - **`pop-link.exe`** : après un changement dans `link/`, recompilez en release sous Windows et copiez l'exécutable
   dans `web/public/downloads/pop-link.exe`, puis reconstruisez le web.
 
