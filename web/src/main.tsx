@@ -76,6 +76,7 @@ function Gate() {
           <Route path="equipe" element={<Team tab="members" />} />
           <Route path="integrations" element={<Team tab="integ" />} />
           <Route path="maps" element={<Team tab="maps" />} />
+          <Route path="parametres" element={<Team tab="settings" />} />
           <Route path="marche" element={<StudioMarket />} />
           <Route path="tendances" element={<Navigate to="../marche?v=videos" replace />} />
         </Route>
