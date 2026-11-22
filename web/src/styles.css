@@ -892,3 +892,18 @@ body.wb-fs .side,body.wb-fs .top{visibility:hidden}
 .dg-port:hover{background:var(--text)}
 .dg-sel{gap:10px;margin:0 0 10px;padding:8px 12px;border:1px solid var(--border);border-radius:10px;flex-wrap:wrap}
 .dg-mini{position:static;width:22px;height:14px;padding:0;border-radius:4px;cursor:default}
+
+/* #191 : compte en bas de la barre latérale, recherche en loupe, bouton « + ». */
+.side-foot{margin-top:auto;padding-top:12px}
+.acct-wrap{position:relative}
+.side .acct{width:100%;background:transparent;border-color:rgb(46,46,46);color:#fff}
+.side .acct:hover{background:rgb(26,26,26)}
+.side .acct-av{background:linear-gradient(135deg,#f5f5f5,#d4d4d4);color:#0a0a0a}
+.side .acct-txt{display:flex !important;max-width:none;flex:1}
+.side .acct-studio,.side .acct-chev{color:rgb(150,150,150)}
+.acct-menu{left:0;right:0;bottom:54px;top:auto;min-width:0}
+.app.collapsed .side .acct-txt,.app.collapsed .side .acct-chev{display:none !important}
+.top .gsearch-wrap.open{flex:0 1 360px;animation:gsopen .22s cubic-bezier(.2,.8,.2,1)}
+@keyframes gsopen{from{flex-basis:44px;opacity:.4}to{opacity:1}}
+.top .plusbtn{width:44px;height:44px;padding:0;justify-content:center}
+.acct-menu{z-index:90}

@@ -12,7 +12,7 @@ import { GuideDrawer } from './Guide'
 import { Compass, MailCheck, ShieldCheck, Megaphone, AlertTriangle, X } from 'lucide-react'
 import { useUefnStatus, STATUS_LABEL } from '../uefnState'
 import { tr, tx, LOCALE } from '../i18n/t'
-import { MapSwitcher, CreateHost } from './MapSwitcher'
+import { MapSwitcher, CreateHost, openCreate } from './MapSwitcher'
 import { useNav } from '../routes'
 import { IdeaPop } from '../pages/Ideas'
 
@@ -64,7 +64,7 @@ export default function Layout() {
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); document.getElementById('gsearch')?.focus() }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); window.dispatchEvent(new Event('pop:search')) }
     }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
@@ -72,7 +72,6 @@ export default function Layout() {
   useEffect(() => { app.send({ t: 'place', place: title }) }, [title, app.map?.id])
 
   const uefn = useUefnStatus()
-  const others = app.presence.filter(p => p.uid !== app.me?.user.id)
   const allMaps = app.me?.studios.flatMap(s => s.maps.map(m => ({ s, m }))) ?? []
 
   return (
@@ -100,40 +99,35 @@ export default function Layout() {
             {aItems.map(([p, l, I]) => <NavLink key={p} to={p} className={({ isActive }) => (isActive ? 'on' : '') + (locked ? ' locked' : '')}><I size={20} strokeWidth={1.5} /><span className="lbl">{l}</span></NavLink>)}
           </div>
         </nav>
-        <nav className="nav" style={{ marginTop: 'auto' }} aria-label={tr("Aide")}>
-          <NavLink to="/aide" className={({ isActive }) => (isActive ? 'on' : '')}><LifeBuoy size={20} strokeWidth={1.5} /><span className="lbl">{tr("Aide et support")}</span></NavLink>
-        </nav>
+        <div className="side-foot">
+          <div className="acct-wrap" ref={acctBox}>
+          <button className="acct" onClick={() => setAcct(a => !a)} aria-expanded={acct} aria-label={tr("Compte et studio")}>
+            <span className="acct-av">{(app.me?.user.name ?? '?').split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()}</span>
+            <span className="acct-txt"><span className="acct-name">{app.me?.user.name}</span><span className="acct-studio">{studioName(app.studio)}</span></span>
+            <ChevronDown size={16} strokeWidth={1.75} className="acct-chev" />
+          </button>
+          {acct && (
+            <div className="menu acct-menu">
+              <div className="small muted" style={{ padding: '6px 10px' }}>{app.me?.user.email}</div>
+              <div className="acct-plan small">{app.me?.trial_until ? tr("Essai Pro jusqu’au {0}", [new Date(app.me.trial_until.replace(' ', 'T') + 'Z').toLocaleDateString(LOCALE, { day: 'numeric', month: 'long' })]) : app.me?.plan === 'pro' ? tr("Plan Pro") : tr("Plan Starter")}</div>
+              <button onClick={() => { setAcct(false); nav('/parametres') }}><Settings size={16} />{tr("Paramètres")}</button>
+              <button onClick={() => { setAcct(false); nav('/aide') }}><LifeBuoy size={16} />{tr("Aide et support")}</button>
+              {(app.me?.admin || app.me?.moderator) && <button onClick={() => { setAcct(false); nav('/admin') }}><ShieldCheck size={16} />{tr("Administration")}{!!app.me.admin_pending && <span className="nav-count">{app.me.admin_pending}</span>}</button>}
+              <button onClick={async () => { await api.post('/api/auth/logout'); location.href = '/' }}><LogOut size={16} />{tr("Se déconnecter")}</button>
+            </div>
+          )}
+        </div>
+        </div>
       </aside>
       <div className="main">
         <header className="top">
           <button className="iconbtn" aria-label={tr("Replier la barre latérale")} onClick={() => setCollapsed(c => !c)}><PanelLeft size={20} strokeWidth={1.5} /></button>
           <nav className="crumb" aria-label={tr("Fil d'Ariane")}><span>{group}</span><span>/</span>{title}</nav>
-          {others.length > 0 && (
-            <div className="presence" title={others.map(o => `${o.name}${o.place ? ' · ' + o.place : ''}`).join('\n')}>
-              {others.slice(0, 4).map(o => <span key={o.uid} className="pr"><Avatar name={o.name} small /></span>)}
-            </div>
-          )}
           <button className={'upill ' + uefn.status} onClick={() => nav('/organiseur')} title={uefn.project ? tr("Projet {0}", [uefn.project]) : 'UEFN Link'}><span className="udot" />{STATUS_LABEL[uefn.status]}{uefn.stale ? ` · ${tr("périmé")}` : ''}{uefn.pending ? ` · ${uefn.pending}` : ''}</button>
           <GlobalSearch />
           {app.map && <button className="iconbtn" aria-label={tr("Boussole, assistant intégré")} title={tr("Boussole : assistant intégré")} onClick={() => setGuide({})}><Compass size={20} strokeWidth={1.5} /></button>}
           <Notifications />
-          {app.canEdit && <button className="btn pri" onClick={() => setNewTask(true)}><Plus size={18} strokeWidth={1.5} />{tr("Nouvelle tâche")}</button>}
-          <div style={{ position: 'relative' }} ref={acctBox}>
-            <button className="acct" onClick={() => setAcct(a => !a)} aria-expanded={acct} aria-label={tr("Compte et studio")}>
-              <span className="acct-av">{(app.me?.user.name ?? '?').split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()}</span>
-              <span className="acct-txt"><span className="acct-name">{app.me?.user.name}</span><span className="acct-studio">{studioName(app.studio)}</span></span>
-              <ChevronDown size={16} strokeWidth={1.75} className="acct-chev" />
-            </button>
-            {acct && (
-              <div className="menu" style={{ right: 0, top: 54 }}>
-                <div className="small muted" style={{ padding: '6px 10px' }}>{app.me?.user.email}</div>
-                <div className="acct-plan small">{app.me?.trial_until ? tr("Essai Pro jusqu’au {0}", [new Date(app.me.trial_until.replace(' ', 'T') + 'Z').toLocaleDateString(LOCALE, { day: 'numeric', month: 'long' })]) : app.me?.plan === 'pro' ? tr("Plan Pro") : tr("Plan Starter")}</div>
-                <button onClick={() => { setAcct(false); nav('/parametres') }}><Settings size={16} />{tr("Paramètres")}</button>
-                {(app.me?.admin || app.me?.moderator) && <button onClick={() => { setAcct(false); nav('/admin') }}><ShieldCheck size={16} />{tr("Administration")}{!!app.me.admin_pending && <span className="nav-count">{app.me.admin_pending}</span>}</button>}
-                <button onClick={async () => { await api.post('/api/auth/logout'); location.href = '/' }}><LogOut size={16} />{tr("Se déconnecter")}</button>
-              </div>
-            )}
-          </div>
+          <CreateMenu onTask={app.map && app.canEdit ? () => setNewTask(true) : undefined} />
         </header>
         <div className="scroll" id="contenu" tabIndex={-1}>{app.me?.announcement && <Announcement a={app.me.announcement} />}{app.me?.email_verified === false && <VerifyBanner email={app.me.user.email} />}<Outlet /></div>
       </div>
@@ -197,18 +191,24 @@ function GlobalSearch() {
   const [res, setRes] = useState<any[]>([])
   const [open, setOpen] = useState(false)
   const [sel, setSel] = useState(0)
+  // Fermée : une loupe ; ouverte (clic, Ctrl K) : le champ s'élargit. Se referme vide quand on en sort.
+  const [wide, setWide] = useState(false)
+  const input = useRef<HTMLInputElement>(null)
+  const openSearch = () => { setWide(true); setTimeout(() => input.current?.focus(), 0) }
+  useEffect(() => { window.addEventListener('pop:search', openSearch); return () => window.removeEventListener('pop:search', openSearch) }, [])
   useEffect(() => {
     if (!app.map || q.trim().length < 2) { setRes([]); return }
     const t = setTimeout(() => api.get(`/api/maps/${app.map!.id}/search?q=${encodeURIComponent(q)}`).then((r: any[]) => { const order: string[] = []; r.forEach(x => { if (!order.includes(x.kind)) order.push(x.kind) }); setRes(order.flatMap(k => r.filter(x => x.kind === k))); setSel(0) }).catch(() => {}), 160)
     return () => clearTimeout(t)
   }, [q, app.map?.id])
-  const go = (r: any) => { setOpen(false); setQ(''); nav(r.link) }
-  return <div style={{ position: 'relative' }} className="gsearch-wrap">
+  const go = (r: any) => { setOpen(false); setQ(''); setWide(false); nav(r.link) }
+  if (!wide) return <button className="iconbtn" aria-label={tr("Chercher (Ctrl K)")} data-tip={tr("Chercher (Ctrl K)")} onClick={openSearch}><Search size={20} strokeWidth={1.5} /></button>
+  return <div style={{ position: 'relative' }} className="gsearch-wrap open">
     <form className="search" onSubmit={e => { e.preventDefault(); if (res[sel]) go(res[sel]) }}>
       <Search size={18} strokeWidth={1.5} />
-      <input id="gsearch" type="search" placeholder={tr("Chercher")} aria-label={tr("Recherche globale")} value={q} autoComplete="off"
-        onChange={e => { setQ(e.target.value); setOpen(true) }} onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)}
-        onKeyDown={e => { if (e.key === 'ArrowDown') { e.preventDefault(); setSel(s => Math.min(res.length - 1, s + 1)) } if (e.key === 'ArrowUp') { e.preventDefault(); setSel(s => Math.max(0, s - 1)) } if (e.key === 'Escape') (e.target as HTMLInputElement).blur() }} />
+      <input id="gsearch" ref={input} type="search" placeholder={tr("Chercher")} aria-label={tr("Recherche globale")} value={q} autoComplete="off"
+        onChange={e => { setQ(e.target.value); setOpen(true) }} onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => { setOpen(false); if (!input.current?.value) setWide(false) }, 150)}
+        onKeyDown={e => { if (e.key === 'ArrowDown') { e.preventDefault(); setSel(s => Math.min(res.length - 1, s + 1)) } if (e.key === 'ArrowUp') { e.preventDefault(); setSel(s => Math.max(0, s - 1)) } if (e.key === 'Escape') { setQ(''); setWide(false) } if (e.key === 'Escape') (e.target as HTMLInputElement).blur() }} />
       <span className="kbd">{tr("Ctrl K")}</span>
     </form>
     {open && q.trim().length >= 2 && <div className="menu gresults">
@@ -217,6 +217,21 @@ function GlobalSearch() {
         <button className={i === sel ? 'on' : ''} onMouseDown={e => { e.preventDefault(); go(r) }} onMouseEnter={() => setSel(i)}>
           <span style={{ minWidth: 0, flex: 1, textAlign: 'left' }}><span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>{r.detail && <span className="small muted" style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tx(r.detail)}</span>}</span>
         </button></div>))}
+    </div>}
+  </div>
+}
+
+/** Bouton « + » de la barre du haut : nouvelle tâche (si une map est ouverte et modifiable), map ou studio. */
+function CreateMenu({ onTask }: { onTask?: () => void }) {
+  const [open, setOpen] = useState(false)
+  const box = useOutside(open, () => setOpen(false))
+  const pick = (fn: () => void) => { setOpen(false); fn() }
+  return <div style={{ position: 'relative' }} ref={box}>
+    <button className="btn pri plusbtn" aria-label={tr("Créer")} data-tip={tr("Créer")} aria-expanded={open} aria-haspopup="menu" onClick={() => setOpen(o => !o)}><Plus size={20} strokeWidth={1.75} /></button>
+    {open && <div className="menu" role="menu" style={{ right: 0, top: 50, minWidth: 220 }}>
+      {onTask && <button role="menuitem" onClick={() => pick(onTask)}><KanbanSquare size={16} />{tr("Nouvelle tâche")}</button>}
+      <button role="menuitem" onClick={() => pick(() => openCreate({ kind: 'map' }))}><Plus size={16} />{tr("Nouvelle map")}</button>
+      <button role="menuitem" onClick={() => pick(() => openCreate({ kind: 'studio' }))}><Users size={16} />{tr("Nouveau studio")}</button>
     </div>}
   </div>
 }

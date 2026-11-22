@@ -16,4 +16,4 @@ export function useUefnStatus() {
   return s
 }
 
-export const STATUS_LABEL: Record<string, string> = { connected: tr("UEFN connecté"), closed: tr("UEFN fermé"), offline: tr("Relais hors ligne") }
+export const STATUS_LABEL: Record<string, string> = { connected: tr("UEFN connecté"), closed: tr("UEFN fermé"), offline: tr("UEFN déconnecté") }
