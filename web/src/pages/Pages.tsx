@@ -52,6 +52,21 @@ function Editable({ value, onChange, onKeyDown, className, ph, focusKey, disable
     onPaste={e => { e.preventDefault(); document.execCommand('insertText', false, e.clipboardData.getData('text/plain')) }} />
 }
 
+/** Zone de texte qui grandit avec son contenu et passe à la ligne : titre de page et cellules de tableau (#150).
+ * Entrée n'ajoute pas de ligne (le texte reste sur une seule ligne logique). */
+function AutoText({ value, onChange, className, ...rest }: { value: string; onChange: (v: string) => void; className?: string; placeholder?: string; disabled?: boolean; 'aria-label'?: string }) {
+  const ref = useRef<HTMLTextAreaElement>(null)
+  const fit = () => { const el = ref.current; if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px' } }
+  useLayoutEffect(fit, [value])
+  useEffect(() => {
+    const el = ref.current; if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(fit); ro.observe(el); return () => ro.disconnect()
+  }, [])
+  return <textarea ref={ref} rows={1} className={'autotext ' + (className ?? '')} value={value} {...rest}
+    onKeyDown={e => { if (e.key === 'Enter') e.preventDefault() }}
+    onChange={e => onChange(e.target.value.replace(/\r?\n/g, ' '))} />
+}
+
 export function BlockView({ b }: { b: Block }) {
   const t = b.text ?? ''
   switch (b.type) {
@@ -250,7 +265,7 @@ function Editor({ id, tree, onNewChild }: { id: number; tree: any[]; onNewChild:
       </div>
       <input className="field" style={{ width: 60, textAlign: 'center', fontSize: 20, height: 48, marginBottom: 8 }} defaultValue={page.icon} maxLength={2} aria-label={tr("Icône")} disabled={disabled}
         onBlur={e => api.patch(`/api/pages/${id}`, { icon: e.target.value })} />
-      <input className="ptitle" value={title} placeholder={tr("Sans titre")} disabled={disabled} aria-label={tr("Titre de la page")} onChange={e => { setTitle(e.target.value); save(blocks, e.target.value) }} />
+      <AutoText className="ptitle" value={title} placeholder={tr("Sans titre")} disabled={disabled} aria-label={tr("Titre de la page")} onChange={v => { setTitle(v); save(blocks, v) }} />
       <div className="stack" style={{ gap: 2, marginTop: 16 }}>
         {blocks.map(b => {
           if (b.type === 'number') num += 1; else num = 0
@@ -332,9 +347,9 @@ function TableBlock({ b, disabled, onChange }: { b: Block; disabled: boolean; on
   const rows = b.rows ?? [['']]
   const set = (i: number, j: number, v: string) => onChange(rows.map((r, a) => (a === i ? r.map((c, k) => (k === j ? v : c)) : r)))
   return (
-    <div style={{ flex: 1, overflowX: 'auto' }}>
-      <table className="tbl dbtable"><tbody>{rows.map((r, i) => (
-        <tr key={i}>{r.map((c, j) => <td key={j} style={i === 0 ? { fontWeight: 500 } : {}}><input value={c} disabled={disabled} onChange={e => set(i, j, e.target.value)} aria-label={tr("Cellule {0}, {1}", [i + 1, j + 1])} /></td>)}</tr>
+    <div style={{ flex: 1, minWidth: 0, overflowX: 'auto' }}>
+      <table className="tbl dbtable ptable"><tbody>{rows.map((r, i) => (
+        <tr key={i}>{r.map((c, j) => <td key={j} style={i === 0 ? { fontWeight: 500 } : {}}><AutoText value={c} disabled={disabled} onChange={v => set(i, j, v)} aria-label={tr("Cellule {0}, {1}", [i + 1, j + 1])} /></td>)}</tr>
       ))}</tbody></table>
       {!disabled && <div className="row" style={{ gap: 6, marginTop: 6 }}>
         <button className="btn ghost" onClick={() => onChange([...rows, rows[0].map(() => '')])}>{tr("+ ligne")}</button>

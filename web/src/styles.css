@@ -184,12 +184,12 @@ button{font:inherit}
 .blk.dragover{box-shadow:0 -2px 0 var(--text)}
 .handle{width:22px;height:28px;display:grid;place-items:center;color:var(--text3);cursor:grab;opacity:0;flex:none;border:0;background:none;border-radius:6px}
 .blk:hover .handle{opacity:1}.handle:hover{background:var(--hover)}
-.btext{flex:1;outline:none;padding:3px 2px;min-height:28px;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+.btext{flex:1;min-width:0;outline:none;padding:3px 2px;min-height:28px;line-height:1.6;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere}
 .btext:empty:before{content:attr(data-ph);color:var(--text3)}
 .b-h1{font-size:28px;font-weight:600;margin-top:12px}.b-h2{font-size:22px;font-weight:600;margin-top:10px}.b-h3{font-size:18px;font-weight:600;margin-top:6px}
 .b-quote{border-left:3px solid var(--text);padding-left:14px}
 .b-callout{background:var(--hover);border:1px solid var(--border);border-radius:12px;padding:12px 14px}
-.b-code{font-family:'Geist Mono',monospace;font-size:13px;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:14px;white-space:pre}
+.b-code{font-family:'Geist Mono',monospace;font-size:13px;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:14px;white-space:pre;overflow-x:auto;max-width:100%;overflow-wrap:normal;word-break:normal}
 .app.dark .b-code{background:rgb(5,5,5)}
 .bullet:before{content:'•';margin:3px 8px 0 4px;color:var(--text2)}
 .numbered{margin:3px 4px 0 2px;color:var(--text2);min-width:18px}
@@ -199,6 +199,11 @@ button{font:inherit}
 .mention{background:var(--hover);border:1px solid var(--border);border-radius:6px;padding:0 5px;font-size:13px}
 .dbtable td,.dbtable th{padding:6px 8px}
 .dbtable input{background:transparent;border:0;color:var(--text);font:inherit;width:100%;outline:none}
+/* #150 : titre et cellules de tableau des pages passent à la ligne au lieu d'être coupés. */
+.autotext{display:block;resize:none;overflow:hidden;background:transparent;border:0;color:var(--text);font:inherit;width:100%;outline:none;padding:0;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere}
+.ptitle.autotext{font-size:34px;font-weight:600;letter-spacing:-0.02em;line-height:1.2}
+.ptable td{vertical-align:top;min-width:140px}
+.ptable .autotext{line-height:1.5}
 .dbk{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
 .dbcol{background:var(--hover);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px}
 .dbcard{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
