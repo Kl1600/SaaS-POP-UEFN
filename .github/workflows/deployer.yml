@@ -149,7 +149,7 @@ jobs:
     name: notes de version et Discord
     needs: [resoudre, construire, deployer]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 5
     permissions:
       contents: write
