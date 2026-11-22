@@ -1,12 +1,11 @@
-import { GuidePanel } from '../components/Guide'
 import { useEffect, useRef, useState } from 'react'
 import {
   Clock, Ban, CheckSquare, Flag, Coins, Users, Zap, Activity, ArrowRight, Upload, FileText, PenTool, AlertTriangle, MessageSquare, CheckCircle2, Rocket,
 } from 'lucide-react'
 import { ago, api, euros, frDate } from '../api'
 import { useApp, useLive, useLoad } from '../state'
-import { CardHead, Empty, PageHead, tagLabel } from '../components/ui'
-import { tr, LOCALE, LANG, tx } from '../i18n/t'
+import { CardHead, Drawer, Empty, PageHead, tagLabel } from '../components/ui'
+import { tr, tx } from '../i18n/t'
 import { useNav } from '../routes'
 
 const ICON: Record<string, [any, string]> = {
@@ -22,17 +21,14 @@ export default function Overview() {
   const [checked, setChecked] = useState<Record<number, { item: any; prev: string }>>({})
   useEffect(() => setChecked({}), [map?.id])
   const undoRef = useRef<(id: number) => void>(() => {})
+  const [journal, setJournal] = useState(false)
   useLive(['tasks', 'activity', 'plan'], reload)
   if (!data) return null
   const t = data.tiles
   const next = t.next_milestone
   const days = next ? Math.max(0, Math.ceil((new Date(next.date + 'T18:00:00').getTime() - Date.now()) / 864e5)) : null
   const diffWeek = t.done_week - t.done_prev_week
-  const msDays = new Set(data.milestones.map((m: any) => m.date))
   const now = new Date()
-  const first = new Date(now.getFullYear(), now.getMonth(), 1)
-  const start = new Date(first); start.setDate(1 - ((first.getDay() + 6) % 7))
-  const cells = Array.from({ length: 42 }, (_, i) => { const d = new Date(start); d.setDate(start.getDate() + i); return d })
   const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
   const startTask = async (id: number, status: string) => {
@@ -50,17 +46,16 @@ export default function Overview() {
     } catch (e: any) { toast(e.message, true) }
   }
   undoRef.current = undo
+  const upcoming = data.milestones.filter((m: any) => m.date >= ymd(now))
   const todayList = [...data.today, ...Object.values(checked).map(c => c.item).filter(i => !data.today.some((x: any) => x.id === i.id))]
 
   return (
     <main className="content">
-      <PageHead title={tr("Vue d'ensemble")} help={tr("Où en est {0}, en un coup d'œil.", [map?.name])}>
+      <PageHead title={tr("Dashboard")} help={tr("Où en est {0}, en un coup d'œil.", [map?.name])}>
         <button className="btn pri" onClick={() => nav('/taches')}>{tr("Ouvrir les tâches")}</button>
       </PageHead>
 
-      <section className="card"><GuidePanel compact /></section>
-
-      <section className="tiles" aria-label={tr("Indicateurs")}>
+      <section className="tiles six" aria-label={tr("Indicateurs")}>
         <div className="card"><div className="lab"><Clock size={18} strokeWidth={1.5} />{tr("Tâches en cours")}</div><div className="num">{t.doing}</div><div className="muted">{tr("{0} / {1} finies au total", [t.done, t.total])}</div></div>
         <div className="card"><div className="lab"><Ban size={18} strokeWidth={1.5} />{tr("Bloquées")}</div><div className="num">{t.blocked}</div><div className="muted">{t.blocked ? tr("voir « qui bloque qui »") : tr("rien ne bloque")}</div></div>
         <div className="card"><div className="lab"><CheckSquare size={18} strokeWidth={1.5} />{tr("Finies cette semaine")}</div><div className="num">{t.done_week}</div><div className="muted">{tr("{0}{1} vs semaine dernière", [diffWeek >= 0 ? '+' : '', diffWeek])}</div></div>
@@ -91,48 +86,48 @@ export default function Overview() {
           )}
         </section>
         <section className="card">
-          <CardHead icon={<Activity size={22} strokeWidth={1.5} />} title={tr("Journal d'activités")} sub={tr("Dernières actions et événements de l'équipe")} />
-          <div className="list feed">
-            {data.activity.map((a: any, i: number) => {
-              const [I, cls] = ICON[a.kind] ?? [Activity, 'i-n']
-              return (
-                <div key={i} className="li">
-                  <span className={'ico ' + cls}><I size={20} strokeWidth={1.5} /></span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div><span>{tx(a.title)}</span> <span className="small muted">• {ago(a.at)}</span></div>
-                    <div className="muted">{tx(a.detail)}{a.who ? ` · ${a.who}` : ''}</div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </section>
-      </div>
-
-      <div className="two">
-        <section className="card">
-          <CardHead title={tr("Jalons · {0}", [now.toLocaleDateString(LOCALE, { month: 'long', year: 'numeric' })])} sub={tr("Aujourd'hui en noir, jalons encadrés")} />
-          <div className="cal">
-            {(LANG === 'fr' ? ['L', 'M', 'M', 'J', 'V', 'S', 'D'] : ['M', 'T', 'W', 'T', 'F', 'S', 'S']).map((d, i) => <span key={i} className="dn">{d}</span>)}
-            {cells.map((d, i) => {
-              const k = ymd(d)
-              const cls = d.getMonth() !== now.getMonth() ? 'out' : k === ymd(now) ? 'today' : msDays.has(k) ? 'ms' : ''
-              return <div key={i} className={'d ' + cls} title={data.milestones.filter((m: any) => m.date === k).map((m: any) => m.title).join(', ')}>{d.getDate()}</div>
-            })}
-          </div>
-        </section>
-        <section className="card">
-          <CardHead title={tr("Prochains jalons")} sub={tr("Recalculés quand une tâche prend du retard")}><button className="btn" onClick={() => nav('/planifier')}>{tr("Planning")}</button></CardHead>
-          <div className="list">
-            {data.milestones.filter((m: any) => m.date >= ymd(now)).map((m: any) => (
+          <CardHead title={tr("Prochains jalons")} sub={tr("Recalculés quand une tâche prend du retard")} />
+          {upcoming.length === 0 ? <Empty text={tr("Aucun jalon à venir.")} /> : <div className="list">
+            {upcoming.slice(0, 3).map((m: any) => (
               <div key={m.id} className="li">
                 <div style={{ width: 52, textAlign: 'center' }}><div style={{ fontSize: 22, fontWeight: 500 }}>{new Date(m.date + 'T12:00:00').getDate()}</div><div className="small muted">{frDate(m.date, { month: 'short' })}</div></div>
                 <div style={{ flex: 1 }}>{m.title}</div>
               </div>
             ))}
-          </div>
+          </div>}
+          <button className="btn more" onClick={() => nav('/planifier')}>{upcoming.length > 3 ? tr("Voir plus ({0})", [upcoming.length - 3]) : tr("Voir le planning")}<ArrowRight size={16} strokeWidth={1.5} /></button>
         </section>
       </div>
+
+      <section className="card">
+        <CardHead icon={<Activity size={22} strokeWidth={1.5} />} title={tr("Journal d'activités")} sub={tr("Dernières actions et événements de l'équipe")} />
+        <Feed items={data.activity.slice(0, 5)} />
+        {data.activity.length > 5 && <button className="btn more" onClick={() => setJournal(true)}>{tr("Voir plus")}<ArrowRight size={16} strokeWidth={1.5} /></button>}
+      </section>
+      {journal && <Drawer label={tr("Journal d'activités")} onClose={() => setJournal(false)}>
+        <CardHead icon={<Activity size={22} strokeWidth={1.5} />} title={tr("Journal d'activités")} sub={tr("Les {0} dernières actions de l'équipe", [data.activity.length])} />
+        <Feed items={data.activity} />
+      </Drawer>}
     </main>
+  )
+}
+
+function Feed({ items }: { items: any[] }) {
+  if (!items.length) return <Empty text={tr("Rien pour l'instant.")} />
+  return (
+    <div className="list feed">
+      {items.map((a: any, i: number) => {
+        const [I, cls] = ICON[a.kind] ?? [Activity, 'i-n']
+        return (
+          <div key={i} className="li">
+            <span className={'ico ' + cls}><I size={20} strokeWidth={1.5} /></span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div><span>{tx(a.title)}</span> <span className="small muted">• {ago(a.at)}</span></div>
+              <div className="muted">{tx(a.detail)}{a.who ? ` · ${a.who}` : ''}</div>
+            </div>
+          </div>
+        )
+      })}
+    </div>
   )
 }

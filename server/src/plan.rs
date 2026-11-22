@@ -83,7 +83,7 @@ pub async fn overview(
     .fetch_all(&st.db)
     .await?;
     let activity: Vec<(String, String, String, Option<String>, String)> = sqlx::query_as(
-        "SELECT a.kind, a.title, a.detail, u.name, a.at FROM activity a LEFT JOIN users u ON u.id = a.user_id WHERE a.map_id = ? ORDER BY a.id DESC LIMIT 12",
+        "SELECT a.kind, a.title, a.detail, u.name, a.at FROM activity a LEFT JOIN users u ON u.id = a.user_id WHERE a.map_id = ? ORDER BY a.id DESC LIMIT 60",
     )
     .bind(mid)
     .fetch_all(&st.db)

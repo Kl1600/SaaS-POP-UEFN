@@ -73,6 +73,11 @@ body{margin:0;background:rgb(0,0,0)}
 .muted{color:var(--text2) !important}
 .small{font-size:13px}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
+/* Dashboard : 6 tuiles, jamais une seule sur sa ligne (6, 3 × 2 ou 2 × 3). */
+.tiles.six{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (min-width:1600px){.tiles.six{grid-template-columns:repeat(6,minmax(0,1fr))}}
+@media (max-width:760px){.tiles.six{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.card > .btn.more{margin-top:12px}
 .lab{font-size:16px;color:var(--text);display:flex;align-items:center;gap:8px}
 .lab svg{color:var(--text)}
 .tiles .card .muted{font-size:15px}

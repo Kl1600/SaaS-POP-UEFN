@@ -19,7 +19,7 @@ import { IdeaPop } from '../pages/Ideas'
 type Item = [string, string, any]
 /** Onglets de la map (changent quand on change de map). Le premier groupe n'a pas de titre. */
 const mapGroups = (mid: number): [string, Item[]][] => [
-  ['', [[`/map/${mid}`, tr("Vue d'ensemble"), Home]]],
+  ['', [[`/map/${mid}`, tr("Dashboard"), Home]]],
   [tr("Organiser"), [[`/map/${mid}/planifier`, tr("Planifier"), CalendarDays], [`/map/${mid}/taches`, tr("Tâches"), KanbanSquare]]],
   [tr("Créer"), [[`/map/${mid}/pages`, tr("Pages"), FileText], [`/map/${mid}/tableau`, tr("Tableau blanc"), PenTool], [`/map/${mid}/organiseur`, tr("Organiseur"), ListTree], [`/map/${mid}/ia`, tr("IA connectées"), Bot]]],
   [tr("Publier"), [[`/map/${mid}/lancer`, tr("Lancer et suivre"), Rocket], [`/map/${mid}/remunerer`, tr("Rémunérer"), Coins]]],
