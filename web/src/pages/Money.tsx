@@ -14,7 +14,6 @@ export default function Money() {
   const [month, setMonth] = useState<string | null>(null)
   const { data: st, reload } = useLoad<any>(map ? `/api/maps/${map.id}/statements${month ? `?month=${month}` : ''}` : null, [map?.id, month])
   const { data: rules, reload: reloadRules } = useLoad<any[]>(map ? `/api/maps/${map.id}/share-rules` : null, [map?.id])
-  const { data: offers, reload: reloadOffers } = useLoad<any[]>(map ? `/api/maps/${map.id}/offers` : null, [map?.id])
   const { data: mem } = useMembers()
   const [sel, setSel] = useState<number | null>(null)
   if (!st) return null
@@ -62,8 +61,6 @@ export default function Money() {
         </div> : <p className="muted">{tr("Aucune règle de partage ne vous concerne pour ce mois.")}</p>}
       </section>
 
-      <Simulator cur={cur} offers={offers ?? []} month={st.month} />
-      <Offers offers={offers ?? []} reload={reloadOffers} month={st.month} />
     </main>
   )
 }
@@ -124,53 +121,3 @@ function Import({ reload }: { reload: () => void }) {
   )
 }
 
-function Simulator({ cur, offers, month }: { cur: any; offers: any[]; month: string }) {
-  const sales = offers.reduce((s, o) => s + (o.sales.find((x: any) => x.month === month)?.sales ?? 0), 0)
-  const [e, setE] = useState(cur.engagement_cents / 100)
-  const [s, setS] = useState(cur.sales_cents / 100)
-  const [n, setN] = useState(sales || 100)
-  useEffect(() => { setE(cur.engagement_cents / 100); setS(cur.sales_cents / 100); setN(sales || 100) }, [cur.month, sales])
-  const before = e + s, after = e + s / 2, loss = s / 2
-  const days = Math.ceil((new Date('2027-02-01T00:00:00').getTime() - Date.now()) / 864e5)
-  return (
-    <section className="card">
-      <CardHead title={tr("Simulateur « passage à 50 % »")} sub={tr("Le 01/02/2027, la part reversée sur les ventes en jeu passe de 100 % à 50 %.")}>{days > 0 && <span className="badge b-o">{tr("Dans {0} jours", [days])}</span>}</CardHead>
-      <div className="grid2" style={{ gridTemplateColumns: 'minmax(220px, 300px) 1fr' }}>
-        <div className="stack">
-          <label className="label">{tr("Gains d'engagement par mois (€)")}<input className="field" type="number" min={0} value={e} onChange={x => setE(Number(x.target.value))} /></label>
-          <label className="label">{tr("Ventes en jeu par mois, aujourd'hui (€)")}<input className="field" type="number" min={0} value={s} onChange={x => setS(Number(x.target.value))} /></label>
-          <label className="label">{tr("Nombre de ventes par mois")}<input className="field" type="number" min={1} value={n} onChange={x => setN(Math.max(1, Number(x.target.value)))} /></label>
-        </div>
-        <div className="tiles">
-          <div className="card"><div className="lab">{tr("Avant · 100 %")}</div><div className="num">{euros(before * 100, 0)}</div></div>
-          <div className="card"><div className="lab">{tr("Après · 50 %")}</div><div className="num">{euros(after * 100, 0)}</div></div>
-          <div className="card"><div className="lab">{tr("Perte par mois")}</div><div className="num">−{euros(loss * 100, 0)}</div><div className="muted">{tr("−{0} % du revenu total", [before ? ((loss / before) * 100).toFixed(1).replace('.', ',') : 0])}</div></div>
-          <div className="card"><div className="lab">{tr("Pour garder le même revenu")}</div><div className="num">{(n * 2).toLocaleString(LOCALE)} ventes</div><div className="muted">{tr("soit {0} de plus par mois (×2), ou +{1} d'engagement", [n.toLocaleString(LOCALE), euros(loss * 100, 0)])}</div></div>
-        </div>
-      </div>
-    </section>
-  )
-}
-
-function Offers({ offers, reload, month }: { offers: any[]; reload: () => void; month: string }) {
-  const { map, canEdit, isAdmin, toast } = useApp()
-  const [f, setF] = useState({ name: '', price: '' })
-  const total = offers.reduce((s, o) => s + (o.sales.find((x: any) => x.month === month)?.revenue_cents ?? 0), 0)
-  return (
-    <section className="card">
-      <CardHead title={tr("Offres en jeu")} sub={tr("Prix, ventes et revenu par offre · {0}", [month ? monthLabel(month) : ''])} />
-      <div style={{ overflowX: 'auto' }}><table className="tbl"><thead><tr><th>{tr("Offre")}</th><th>{tr("Prix")}</th><th>{tr("Ventes")}</th><th>{tr("Revenu")}</th><th>{tr("Après le 01/02/2027")}</th><th>{tr("Part")}</th></tr></thead><tbody>
-        {offers.map(o => { const m = o.sales.find((x: any) => x.month === month) ?? { sales: 0, revenue_cents: 0 }; return (
-          <tr key={o.id}><td style={{ fontWeight: 500 }}>{o.name}</td><td className="muted">{o.price_vbucks} V-Bucks</td>
-            <td>{isAdmin ? <input className="field" type="number" min={0} style={{ width: 90 }} defaultValue={m.sales} onBlur={async e => { await api.put(`/api/offers/${o.id}/sales`, { month, sales: Number(e.target.value), revenue_cents: m.revenue_cents }); reload() }} aria-label={tr("Ventes")} /> : m.sales}</td>
-            <td>{isAdmin ? <input className="field" type="number" min={0} step="0.01" style={{ width: 110 }} defaultValue={m.revenue_cents / 100} onBlur={async e => { await api.put(`/api/offers/${o.id}/sales`, { month, sales: m.sales, revenue_cents: Math.round(Number(e.target.value) * 100) }); reload() }} aria-label={tr("Revenu")} /> : euros(m.revenue_cents)}</td>
-            <td className="muted">{euros(m.revenue_cents / 2)}</td>
-            <td style={{ minWidth: 140 }}><div className="row" style={{ gap: 8 }}><div className="bar" style={{ flex: 1 }}><span style={{ width: `${total ? (m.revenue_cents / total) * 100 : 0}%` }} /></div><span className="small mono">{total ? Math.round((m.revenue_cents / total) * 100) : 0} %</span></div></td></tr>
-        ) })}
-      </tbody></table></div>
-      {canEdit && <form className="row" style={{ marginTop: 12, flexWrap: 'wrap' }} onSubmit={async e => { e.preventDefault(); try { await api.post(`/api/maps/${map!.id}/offers`, { name: f.name, price_vbucks: Number(f.price) }); setF({ name: '', price: '' }); reload() } catch (er: any) { toast(er.message, true) } }}>
-        <input className="field" placeholder={tr("Nouvelle offre")} value={f.name} onChange={e => setF({ ...f, name: e.target.value })} required /><input className="field" type="number" min={1} placeholder={tr("Prix en V-Bucks")} value={f.price} onChange={e => setF({ ...f, price: e.target.value })} required /><button className="btn">{tr("Ajouter")}</button>
-      </form>}
-    </section>
-  )
-}
