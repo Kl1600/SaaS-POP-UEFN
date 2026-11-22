@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-22 · #206 · tableau blanc sans Atelier
+- Fait : menu « Atelier » (minuteur, vote, masquer, regrouper, suivre) retiré de la barre du tableau ; données et code de méta conservés.
+- Vérifié : tsc + vite build.
+
 ### 2026-11-22 · #191 · barre du haut
 - Fait : avatars de présence retirés ; recherche = loupe qui s'ouvre en champ (clic ou Ctrl K via l'évènement `pop:search`, Échap ou sortie à vide la referme) ; bouton « + » (`CreateMenu` : tâche si map modifiable, map, studio) ; « Relais hors ligne » → « UEFN déconnecté » ; compte en bas de la barre latérale (`.side-foot`), menu ouvert vers le haut avec Aide et support.
 - Vérifié : navigateur 1440 px, chaque élément cliqué, aucune erreur JS.
