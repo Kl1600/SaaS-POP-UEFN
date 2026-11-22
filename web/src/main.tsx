@@ -25,7 +25,7 @@ import Money from './pages/Money'
 import Team, { Account } from './pages/Team'
 import { PageHead } from './components/ui'
 import Help from './pages/Help'
-import AI from './pages/AI'
+import Settings from './pages/Settings'
 import { Market, Trending, Launches } from './pages/Analysis'
 import Ideas from './pages/Ideas'
 import { BillingSettings, Paywall } from './components/Billing'
@@ -66,7 +66,7 @@ function Gate() {
           <Route path="planifier" element={<Plan />} />
           <Route path="taches" element={<Tasks />} />
           <Route path="organiseur" element={L(Organizer)} />
-          <Route path="ia" element={<AI />} />
+          <Route path="ia" element={<Navigate to="/parametres?onglet=ia" replace />} />
           <Route path="lancer" element={<Launch />} />
           <Route path="remunerer" element={<Money />} />
           <Route path="*" element={<Overview />} />
@@ -81,7 +81,7 @@ function Gate() {
         </Route>
         <Route path="aide" element={<Help />} />
         <Route path="admin" element={L(Admin)} />
-        <Route path="parametres" element={<main className="content"><PageHead title={tr("Paramètres")} help={tr("Votre compte : nom, mot de passe, abonnement, données personnelles.")} /><BillingSettings /><Account /></main>} />
+        <Route path="parametres" element={<Settings />} />
         <Route path="analyse/idees" element={<AnalyseGate title={tr("Idées de maps")}><Ideas /></AnalyseGate>} />
         <Route path="analyse/marche" element={<AnalyseGate title={tr("Analyse du marché")}><Market /></AnalyseGate>} />
         <Route path="analyse/tendances" element={<AnalyseGate title={tr("Maps qui marchent")}><Trending /></AnalyseGate>} />

@@ -11,5 +11,5 @@ const LOGOS: Record<string, { path: string; title: string }> = {
 export function Brand({ name, size = 18 }: { name: string; size?: number }) {
   const l = LOGOS[name]
   if (!l) return <Bot size={size} strokeWidth={1.6} aria-hidden="true" />
-  return <svg className="brand" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" role="img" aria-label={l.title}><path d={l.path} /></svg>
+  return <svg className="blogo" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" role="img" aria-label={l.title}><path d={l.path} /></svg>
 }
