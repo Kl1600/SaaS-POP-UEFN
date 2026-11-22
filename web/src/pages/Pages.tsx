@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   GripVertical, Plus, Star, FileText, Copy, Trash2, Type, Heading1, Heading2, Heading3, List, ListOrdered, CheckSquare, ChevronRight, ChevronDown, MoreHorizontal,
@@ -8,6 +8,7 @@ import { ago, api, frDate } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { Avatar, CardHead, Empty, PageHead, Tabs } from '../components/ui'
 import { tr } from '../i18n/t'
+import { IconPicker, PageIcon } from '../components/PageIcon'
 import { useNav } from '../routes'
 
 type Block = { id: string; type: string; text?: string; checked?: boolean; open?: boolean; body?: string; lang?: string; rows?: string[][]; url?: string; cols?: string[]; page?: number; board?: number; title?: string; view?: string; columns?: { key: string; label: string; type: string }[]; dbrows?: any[] } & Record<string, any>
@@ -125,7 +126,7 @@ export default function Pages() {
         {guides.map((g, i) => <span key={i} className={'tguide' + (g ? ' on' : '')} aria-hidden="true" />)}
         {depth > 0 && <span className={'telbow' + (last ? ' last' : '')} aria-hidden="true" />}
         <button className="titem" style={{ width: 24, padding: 0, justifyContent: 'center', flex: 'none' }} aria-label={open ? tr("Replier") : tr("Déplier")} onClick={setOpen}>{kids.length ? (open ? <ChevronDown size={14} /> : <ChevronRight size={14} />) : null}</button>
-        <button className={'titem' + (p.id === id ? ' on' : '')} onClick={() => nav(`/pages/${p.id}`)} onContextMenu={e => { e.preventDefault(); setMenu(p.id) }}><span className="pico">{p.icon || <FileText size={12} />}</span><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title || tr("Sans titre")}</span></button>
+        <button className={'titem' + (p.id === id ? ' on' : '')} onClick={() => nav(`/pages/${p.id}`)} onContextMenu={e => { e.preventDefault(); setMenu(p.id) }}><span className="pico"><PageIcon icon={p.icon} size={12} /></span><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title || tr("Sans titre")}</span></button>
         {canEdit && <span className="tacts">
           <button className="iconbtn" style={{ width: 26, height: 26 }} aria-label={tr("Ajouter une sous-page")} title={tr("Sous-page")} onClick={() => create(undefined, p.id)}><Plus size={14} /></button>
           <button className="iconbtn" style={{ width: 26, height: 26 }} aria-label={tr("Actions de la page")} title={tr("Actions")} onClick={() => setMenu(menu === p.id ? null : p.id)}><MoreHorizontal size={14} /></button>
@@ -160,16 +161,17 @@ export default function Pages() {
           {tree?.length === 0 && <Empty text={tr("Aucune page pour l'instant.")} />}
           <Trash />
         </nav>
-        {id ? <Editor key={id} id={id} tree={tree ?? []} onNewChild={() => create(undefined, id)} /> : <div className="card"><Empty text={tr("Créez votre première page.")} /></div>}
+        {id ? <Editor key={id} id={id} tree={tree ?? []} onNewChild={() => create(undefined, id)} onTree={reloadTree} /> : <div className="card"><Empty text={tr("Créez votre première page.")} /></div>}
       </div>
     </main>
   )
 }
 
-function Editor({ id, tree, onNewChild }: { id: number; tree: any[]; onNewChild: () => void }) {
+function Editor({ id, tree, onNewChild, onTree }: { id: number; tree: any[]; onNewChild: () => void; onTree?: () => void }) {
   const app = useApp()
   const nav = useNav()
   const [page, setPage] = useState<any>(null)
+  const [iconOpen, setIconOpen] = useState(false)
   const [blocks, setBlocks] = useState<Block[]>([])
   const [title, setTitle] = useState('')
   const [focus, setFocus] = useState<{ id: string; n: number } | null>(null)
@@ -273,9 +275,15 @@ function Editor({ id, tree, onNewChild }: { id: number; tree: any[]; onNewChild:
           }}><Trash2 size={18} /></button>}
         </div>
       </div>
-      <input className="field" style={{ width: 60, textAlign: 'center', fontSize: 20, height: 48, marginBottom: 8 }} defaultValue={page.icon} maxLength={2} aria-label={tr("Icône")} disabled={disabled}
-        onBlur={e => api.patch(`/api/pages/${id}`, { icon: e.target.value })} />
-      <AutoText className="ptitle" value={title} placeholder={tr("Sans titre")} disabled={disabled} aria-label={tr("Titre de la page")} onChange={v => { setTitle(v); save(blocks, v) }} />
+      <div className="ptitle-row">
+        <div style={{ position: 'relative', flex: 'none', zIndex: iconOpen ? 60 : undefined }}>
+          <button className={'picon' + (page.icon ? '' : ' empty')} disabled={disabled} aria-label={tr("Changer l'icône de la page")} data-tip={tr("Icône")} onClick={() => setIconOpen(o => !o)}><PageIcon icon={page.icon} size={22} /></button>
+          {iconOpen && <Suspense fallback={<div className="ipick card small muted">{tr("Chargement…")}</div>}>
+            <IconPicker onClose={() => setIconOpen(false)} onPick={async v => { setIconOpen(false); try { await api.patch(`/api/pages/${id}`, { icon: v }); setPage((pg: any) => ({ ...pg, icon: v })); onTree?.() } catch (e: any) { app.toast(e.message, true) } }} />
+          </Suspense>}
+        </div>
+        <AutoText className="ptitle" value={title} placeholder={tr("Sans titre")} disabled={disabled} aria-label={tr("Titre de la page")} onChange={v => { setTitle(v); save(blocks, v) }} />
+      </div>
       <div className="stack" style={{ gap: 2, marginTop: 16 }}>
         {blocks.map(b => {
           if (b.type === 'number') num += 1; else num = 0

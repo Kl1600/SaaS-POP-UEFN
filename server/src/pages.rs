@@ -376,7 +376,7 @@ pub async fn update(
         content_changed = true;
     }
     if let Some(i) = &bd.icon {
-        check_len("Icône", i, 0, 4)?;
+        check_len("Icône", i, 0, 64)?;
         sqlx::query("UPDATE pages SET icon = ? WHERE id = ?")
             .bind(i)
             .bind(pid)

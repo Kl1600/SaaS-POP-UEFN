@@ -948,3 +948,19 @@ body.wb-fs .side,body.wb-fs .top{visibility:hidden}
 .telbow.last::before{bottom:50%}
 .telbow::after{content:'';position:absolute;left:0;top:50%;width:10px;border-top:1.5px solid var(--border2,#d4d4d4)}
 .tnode > .titem:nth-of-type(2){min-width:0;flex:1}
+
+/* #197 : icône de page à gauche du titre et panneau de choix. */
+.ptitle-row{display:flex;align-items:center;gap:12px}
+.ptitle-row .ptitle{flex:1;min-width:0}
+.picon{width:40px;height:40px;border-radius:10px;border:1px solid var(--border);background:var(--card);display:grid;place-items:center;color:var(--text);cursor:pointer;padding:0}
+.picon:hover{background:var(--hover)}.picon.empty{color:var(--text3,var(--text2));border-style:dashed}
+.picon:disabled{cursor:default}
+.ipick{position:absolute;top:48px;left:0;z-index:60;width:360px;padding:12px;display:flex;flex-direction:column;gap:8px;box-shadow:0 12px 32px rgba(0,0,0,.16)}
+.ipick-tabs,.ipick-cats{gap:4px;flex-wrap:wrap}
+.ipick-tabs button,.ipick-cats button{border:1px solid var(--border);background:none;color:var(--text2);border-radius:999px;padding:3px 10px;font-size:12px;cursor:pointer}
+.ipick-tabs button.on,.ipick-cats button.on{background:var(--text);color:var(--bg);border-color:var(--text)}
+.ipick-body{max-height:300px;overflow:auto}
+.ipick-grid{display:grid;grid-template-columns:repeat(9,1fr);gap:2px}
+.ipick-grid button{height:34px;border:0;background:none;border-radius:8px;display:grid;place-items:center;color:var(--text);cursor:pointer;padding:0}
+.ipick-grid button:hover{background:var(--hover)}
+.ipick.card,.card .ipick.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px}

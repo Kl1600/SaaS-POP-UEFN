@@ -2,6 +2,12 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-22 · #197 · icône de page
+- Fait : icône à gauche du titre (bouton .picon) ; panneau IconPicker chargé à l'ouverture : 1 539 icônes Lucide (étiquettes tirées de lucide-static 0.460, ISC) en catégories Jeu / Économie / Carte et décor / Projet / Équipe, recherche avec mots-clés français (épée, argent, trophée…) et classement, emojis (unicode-emoji-json, MIT, jusqu'à la v14) et récentes ; « Retirer ». Stockage : emoji ou `lucide:<nom>` (limite serveur portée à 64 caractères). Rendu dans l'arborescence par PageIcon, qui charge lucideAll à part.
+- Piège : `.card .card` rend une carte imbriquée transparente, d'où la règle `.card .ipick.card`.
+- Données : components/iconData.json, régénérable depuis lucide-static/tags.json et unicode-emoji-json/data-by-group.json.
+- Vérifié : navigateur (recherche, choix, emoji, retrait, sombre, chunks à part).
+
 ### 2026-11-22 · #198 · arborescence des pages
 - Fait : lignes de rattachement en angle droit entre une page et ses sous-pages (.tguide, .telbow, en CSS), « Tout replier », repli mémorisé par map (localStorage pop.tree.closed.<map>).
 - Vérifié : navigateur (3 niveaux, repli gardé après rechargement).
