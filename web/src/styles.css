@@ -928,3 +928,10 @@ body.wb-fs .side,body.wb-fs .top{visibility:hidden}
 /* #200 : logo devant le titre d'une carte. */
 .chead h2 > svg:first-child{margin-right:10px;vertical-align:-3px}
 .blogo{flex:none}
+
+/* #190 : Popy, bouton flottant en bas à droite. */
+.popy-fab{position:fixed;right:28px;bottom:28px;z-index:35;width:56px;height:56px;border-radius:50%;border:0;display:grid;place-items:center;color:#fff;background:linear-gradient(180deg,#F0844E,#E36B33);box-shadow:0 12px 28px rgba(227,107,51,.38);cursor:pointer;transition:transform .15s ease}
+.popy-fab:hover{transform:translateY(-2px)}
+.popy-fab[data-tip]:hover::after{content:attr(data-tip);position:absolute;right:0;bottom:calc(100% + 8px);white-space:nowrap;padding:5px 9px;border-radius:8px;background:var(--text,#111);color:var(--surface,#fff);font-size:12.5px}
+@media (max-width:760px){.popy-fab{right:16px;bottom:16px;width:50px;height:50px}}
+@media print{.popy-fab{display:none}}

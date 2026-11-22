@@ -9,7 +9,7 @@ import { ago, api } from '../api'
 import { Avatar } from './ui'
 import { NewTaskModal } from '../pages/Tasks'
 import { GuideDrawer } from './Guide'
-import { Compass, MailCheck, ShieldCheck, Megaphone, AlertTriangle, X } from 'lucide-react'
+import { Sparkles, MailCheck, ShieldCheck, Megaphone, AlertTriangle, X } from 'lucide-react'
 import { useUefnStatus, STATUS_LABEL } from '../uefnState'
 import { tr, tx, LOCALE } from '../i18n/t'
 import { MapSwitcher, CreateHost, openCreate } from './MapSwitcher'
@@ -125,12 +125,12 @@ export default function Layout() {
           <nav className="crumb" aria-label={tr("Fil d'Ariane")}><span>{group}</span><span>/</span>{title}</nav>
           <button className={'upill ' + uefn.status} onClick={() => nav('/parametres?onglet=uefn')} title={uefn.project ? tr("Projet {0}", [uefn.project]) : 'UEFN Link'}><span className="udot" />{STATUS_LABEL[uefn.status]}{uefn.stale ? ` · ${tr("périmé")}` : ''}{uefn.pending ? ` · ${uefn.pending}` : ''}</button>
           <GlobalSearch />
-          {app.map && <button className="iconbtn" aria-label={tr("Boussole, assistant intégré")} title={tr("Boussole : assistant intégré")} onClick={() => setGuide({})}><Compass size={20} strokeWidth={1.5} /></button>}
           <Notifications />
           <CreateMenu onTask={app.map && app.canEdit ? () => setNewTask(true) : undefined} />
         </header>
         <div className="scroll" id="contenu" tabIndex={-1}>{app.me?.announcement && <Announcement a={app.me.announcement} />}{app.me?.email_verified === false && <VerifyBanner email={app.me.user.email} />}<Outlet /></div>
       </div>
+      {app.map && <button className="popy-fab" aria-label={tr("Popy, assistant intégré")} data-tip={tr("Popy, votre assistant")} onClick={() => setGuide({})}><Sparkles size={24} strokeWidth={1.75} /></button>}
       {guide && <GuideDrawer key={guide.ask ?? 'day'} ask={guide.ask} onClose={() => setGuide(false)} />}
       {newTask && <NewTaskModal onClose={() => setNewTask(false)} />}
       <CreateHost />

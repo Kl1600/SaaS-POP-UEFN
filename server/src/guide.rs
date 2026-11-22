@@ -1,4 +1,4 @@
-//! Boussole : guide virtuel du jour. Pas d'IA : des règles simples appliquées aux tâches,
+//! Popy : guide virtuel du jour. Pas d'IA : des règles simples appliquées aux tâches,
 //! aux dépendances et aux objectifs pour résumer la journée, signaler les retards et proposer quoi faire.
 use crate::{access::map_ctx, auth::AuthUser, error::ApiResult, AppState};
 use axum::{
@@ -460,7 +460,7 @@ pub async fn guide(
         )
     };
     Ok(Json(json!({
-        "name": "Boussole", "headline": headline, "points": points, "suggestions": suggestions, "pace": pace,
+        "name": "Popy", "headline": headline, "points": points, "suggestions": suggestions, "pace": pace,
         "counts": { "today": my_today.len(), "late": my_late.len(), "doing": my_doing.len(), "blocked": blocked.len(), "team_late": team_late.len() },
     })))
 }
