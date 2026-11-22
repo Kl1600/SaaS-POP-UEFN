@@ -789,7 +789,66 @@ pub async fn set_status_checked(
             .await?;
         }
     }
+    if old == "done" && status != "done" {
+        reblock_after_reopen(st, map_id, uid, tid, number).await?;
+    }
     notify(st, map_id, json!({ "t": "refresh", "what": "tasks" }));
+    Ok(())
+}
+
+/// Une tâche finie qui repasse « à faire » ou « en cours » (#212) : les tâches qui l'attendaient et n'ont pas
+/// commencé l'attendent de nouveau (elles ne peuvent plus passer en cours) ; celles déjà en cours restent, et leur
+/// responsable est prévenu.
+async fn reblock_after_reopen(
+    st: &AppState,
+    map_id: i64,
+    uid: i64,
+    tid: i64,
+    number: i64,
+) -> Result<(), AppError> {
+    let next: Vec<(i64, i64, String, Option<i64>, String)> = sqlx::query_as(
+        "SELECT t.id, t.number, t.status, t.assignee_id, t.title FROM tasks t JOIN task_deps x ON x.task_id = t.id WHERE x.depends_on = ? AND t.status <> 'done'",
+    )
+    .bind(tid)
+    .fetch_all(&st.db)
+    .await?;
+    for (nid, nnum, nstatus, who, ntitle) in next {
+        if nstatus == "todo" || nstatus == "blocked" {
+            // « À faire » avec une dépendance pas finie = bloquée (icône rouge, refus de passer en cours) : comme à la création.
+            sqlx::query("INSERT INTO task_events (task_id, user_id, what, via) VALUES (?, ?, ?, 'Automatique')")
+                .bind(nid)
+                .bind(uid)
+                .bind(format!("Bloquée de nouveau : #{number} a été rouverte"))
+                .execute(&st.db)
+                .await?;
+            log_activity(
+                st,
+                map_id,
+                Some(uid),
+                "blocked",
+                &format!("#{nnum} de nouveau bloquée"),
+                &format!("#{number} a été rouverte"),
+            )
+            .await?;
+        } else if nstatus == "doing" {
+            sqlx::query("INSERT INTO task_events (task_id, user_id, what, via) VALUES (?, ?, ?, 'Automatique')")
+                .bind(nid)
+                .bind(uid)
+                .bind(format!("#{number}, dont elle dépend, a été rouverte"))
+                .execute(&st.db)
+                .await?;
+            if let Some(a) = who {
+                crate::account::notify_user(
+                    st,
+                    a,
+                    map_id,
+                    &format!("#{number} a été rouverte : #{nnum} {ntitle} dépend d’elle"),
+                    &format!("/taches?t={nid}"),
+                )
+                .await;
+            }
+        }
+    }
     Ok(())
 }
 
@@ -1587,5 +1646,99 @@ mod tests_lots_deps {
             "{ev:?}"
         );
         assert!(ev.contains(&"Fonctionnalité retirée".to_string()), "{ev:?}");
+    }
+}
+
+#[cfg(test)]
+mod tests_reouverture {
+    use super::*;
+
+    #[tokio::test]
+    async fn rouvrir_rebloque_les_taches_suivantes() {
+        let st = crate::test_state().await;
+        let sid: i64 = sqlx::query_scalar("INSERT INTO studios (name) VALUES ('S') RETURNING id")
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        let mid: i64 =
+            sqlx::query_scalar("INSERT INTO maps (studio_id, name) VALUES (?, 'M') RETURNING id")
+                .bind(sid)
+                .fetch_one(&st.db)
+                .await
+                .unwrap();
+        let uid: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash) VALUES ('a@a.fr', 'Ana', 'x') RETURNING id")
+            .fetch_one(&st.db).await.unwrap();
+        sqlx::query("INSERT INTO memberships (studio_id, user_id, role) VALUES (?, ?, 'member')")
+            .bind(sid)
+            .bind(uid)
+            .execute(&st.db)
+            .await
+            .unwrap();
+        let u = AuthUser {
+            id: uid,
+            email: "a@a.fr".into(),
+            name: "Ana".into(),
+            sid: String::new(),
+        };
+        let ctx = map_ctx(&st, &u, mid).await.unwrap();
+        let mut ids = vec![];
+        for (t, d, who) in [
+            ("A", vec![], None),
+            ("B", vec![1], None),
+            ("C", vec![1], Some(uid)),
+        ] {
+            let (id, _) = insert_task(
+                &st,
+                &ctx,
+                &NewTask {
+                    title: t.into(),
+                    tag: None,
+                    description: None,
+                    assignee_id: who,
+                    deps: Some(d),
+                    planned_day: None,
+                    lot: None,
+                    status: None,
+                    ai: None,
+                    origin: None,
+                    uefn: None,
+                },
+            )
+            .await
+            .unwrap();
+            ids.push(id);
+        }
+        let etat = |id: i64| {
+            let st = st.clone();
+            async move {
+                sqlx::query_scalar::<_, String>("SELECT status FROM tasks WHERE id = ?")
+                    .bind(id)
+                    .fetch_one(&st.db)
+                    .await
+                    .unwrap()
+            }
+        };
+        set_status_internal(&st, mid, ids[0], uid, "doing", "Test")
+            .await
+            .unwrap();
+        set_status_internal(&st, mid, ids[0], uid, "done", "Test")
+            .await
+            .unwrap();
+        assert_ne!(etat(ids[1]).await, "blocked");
+        set_status_internal(&st, mid, ids[2], uid, "doing", "Test")
+            .await
+            .unwrap();
+        // A est rouverte : B (pas commencée) redevient bloquée, C (en cours) reste, et Ana est prévenue.
+        set_status_internal(&st, mid, ids[0], uid, "doing", "Test")
+            .await
+            .unwrap();
+        assert_ne!(etat(ids[1]).await, "doing");
+        assert!(set_status_internal(&st, mid, ids[1], uid, "doing", "Test")
+            .await
+            .is_err());
+        assert_eq!(etat(ids[2]).await, "doing");
+        let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND text LIKE '#1 a été rouverte%'")
+            .bind(uid).fetch_one(&st.db).await.unwrap();
+        assert_eq!(n, 1);
     }
 }
