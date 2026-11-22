@@ -196,7 +196,7 @@ function TaskDrawer({ id, onClose, members, tasks }: { id: number; onClose: () =
         <input className="field" type="date" value={t.planned_day ?? ''} disabled={!canEdit} onChange={e => patch({ planned_day: e.target.value || null })} />
         <span className="muted">{tr("Dépend de")}</span>
         <div>
-          <input className="field mono" value={deps} disabled={!canEdit} placeholder="ex. 12, 18" onChange={e => setDeps(e.target.value)}
+          <input className="field mono" style={{ width: '100%' }} value={deps} disabled={!canEdit} placeholder="ex. 12, 18" onChange={e => setDeps(e.target.value)}
             onBlur={() => patch({ deps: deps.split(/[^0-9]+/).filter(Boolean).map(Number) })} />
           <p className="small muted" style={{ margin: '4px 0 0' }}>{tr(DEP_HELP)}</p>
         </div>
