@@ -132,6 +132,27 @@ abonnement payant.
 Le serveur doit déjà être connecté à `ghcr.io` (`docker login`, §3) : `deployer.sh` tourne en `pop-admin`.
 Retirer l'accès : supprimer la ligne `deployer-github` de `/home/pop-admin/.ssh/authorized_keys`.
 
+### 4.2 Notes de version et Discord (#185)
+
+Après chaque « déployer » réussi, le job « notes de version et Discord » crée une release GitHub
+`deploy-AAAA-MM-JJ-<sha>` : ses notes listent les commits de `main` (« #N : … ») depuis la release de déploiement
+précédente (la toute première prend les 20 derniers). Les mêmes notes partent dans le salon `#deploiements` du
+Discord ; un déploiement raté y poste un message d'échec avec le lien des journaux. L'action « discord : issues »
+poste dans `#issues` chaque issue ouverte, fermée ou rouverte. Les textes viennent de `tools/discord.py`
+(`python tools/discord.py --essai …` affiche un message sans l'envoyer).
+
+Mise en place (une fois) : sur Discord, dans chaque salon, **Paramètres du salon → Intégrations → Webhooks →
+Nouveau webhook → Copier l'URL**. Puis, sur GitHub, le propriétaire du dépôt ajoute deux secrets (même page que
+ci-dessus) :
+
+| Secret | Valeur |
+|---|---|
+| `DISCORD_WEBHOOK_ISSUES` | l'URL du webhook du salon `#issues` |
+| `DISCORD_WEBHOOK_DEPLOIEMENTS` | l'URL du webhook du salon `#deploiements` |
+
+Une URL de webhook suffit pour poster dans le salon : ne la mettez nulle part ailleurs. Sans ces secrets, les
+messages sont sautés avec un avertissement ; Discord ne fait jamais échouer un déploiement.
+
 ## 5. Sauvegardes
 
 Trois niveaux :
