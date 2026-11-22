@@ -1,7 +1,7 @@
 // Sélecteur de map dans la barre latérale : changer de map, créer une map ou un studio sans quitter la page.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Check, ChevronsUpDown, Plus, Settings2, Building2, User, Users } from 'lucide-react'
+import { Check, ChevronsUpDown, Plus, Settings2, Building2, User, Users , Sparkles } from 'lucide-react'
 import { api } from '../api'
 import { useApp, studioName } from '../state'
 import { Modal } from './ui'
@@ -77,6 +77,7 @@ export function MapSwitcher() {
       <div className="mapsw-foot">
         <button role="menuitem" className="mapsw-item add" onClick={() => go(() => openCreate({ kind: 'studio' }))}><Users size={15} />{tr('Créer un studio (équipe)')}</button>
         <button role="menuitem" className="mapsw-item" onClick={() => go(() => nav('/'))}><Settings2 size={15} />{tr('Toutes mes maps')}</button>
+        {app.map && <button role="menuitem" className="mapsw-item add" onClick={() => go(() => nav(`/map/${app.map!.id}/planifier?vue=generateur`))}><Sparkles size={15} />{tr('Générateur de projet')}</button>}
       </div>
     </div>}
     {pending && app.me && <ConfirmMove p={pending} studios={app.me.studios} onClose={() => setPending(null)} />}

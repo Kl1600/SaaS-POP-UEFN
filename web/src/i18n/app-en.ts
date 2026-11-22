@@ -161,6 +161,8 @@ const EN: Record<string, string> = {
  "Général": "General",
  "Vue d'ensemble": "Overview",
  "Dashboard": "Dashboard",
+ "Retour au planning": "Back to the schedule",
+ "Découpe la map en tâches d'une heure, avec dépendances, jours, personnes et objectifs jusqu'à la sortie.": "Breaks the map into one-hour tasks, with dependencies, days, people and goals up to release.",
  "Prise le": "Taken on",
  "Finie le": "Finished on",
  "Bloquée par #{0}": "Blocked by #{0}",

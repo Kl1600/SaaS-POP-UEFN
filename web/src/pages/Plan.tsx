@@ -6,6 +6,7 @@ import { Avatar, CardHead, PageHead, Tabs, TAGS, tagLabel } from '../components/
 import { DEP_HELP, useMembers } from './Tasks'
 import { tr } from '../i18n/t'
 import { useNav } from '../routes'
+import { useSearchParams } from 'react-router-dom'
 
 const GENRES: [string, string, string][] = [
   ['cr', tr("Gendarmes et voleurs"), tr("Équipes, braquages, boutique")], ['tycoon', tr("Tycoon"), tr("Production, améliorations")], ['boxfight', tr("Box fight / Zone wars"), tr("Manches courtes")],
@@ -13,13 +14,23 @@ const GENRES: [string, string, string][] = [
 ]
 
 export default function Plan() {
-  const [tab, setTab] = useState<'timeline' | 'wizard' | 'seasons'>('timeline')
+  // Le Générateur de projet s'ouvre depuis le sélecteur de map (#194) : /planifier?vue=generateur.
+  const [sp, setSp] = useSearchParams()
+  const wizard = sp.get('vue') === 'generateur'
+  const [tab, setTab] = useState<'timeline' | 'seasons'>('timeline')
+  if (wizard) return (
+    <main className="content">
+      <PageHead title={tr("Générateur de projet")} help={tr("Découpe la map en tâches d'une heure, avec dépendances, jours, personnes et objectifs jusqu'à la sortie.")}>
+        <button className="btn" onClick={() => setSp({})}>{tr("Retour au planning")}</button>
+      </PageHead>
+      <Wizard done={() => setSp({})} />
+    </main>
+  )
   return (
     <main className="content">
       <PageHead title={tr("Planifier")} help={tr("Découpez la map en tâches d'une heure, placez-les dans le temps et soyez prévenu en cas de retard.")} />
-      <Tabs value={tab} onChange={setTab} items={[['timeline', tr("Planning")], ['wizard', tr("Générateur de projet")], ['seasons', tr("Saisons et mises à jour")]]} />
+      <Tabs value={tab} onChange={setTab} items={[['timeline', tr("Planning")], ['seasons', tr("Saisons et mises à jour")]]} />
       {tab === 'timeline' && <Timeline />}
-      {tab === 'wizard' && <Wizard done={() => setTab('timeline')} />}
       {tab === 'seasons' && <Seasons />}
     </main>
   )
@@ -200,19 +211,6 @@ function Timeline() {
       <p className="small muted">{tr("Barres pleines : chemin critique. Ligne rouge : aujourd'hui. Double-clic sur une barre : ouvrir la tâche.")}</p>
     </section>
     <div className="two">
-      <section className="card">
-        <CardHead title={tr("Charge par personne · cette semaine")} sub={tr("Heures planifiées face aux heures déclarées")} />
-        <div className="stack">
-          {data.load.map((l: any) => (
-            <div key={l.id} className="row" style={{ flexWrap: 'wrap' }}>
-              <span className="row" style={{ gap: 8, width: 170 }}><Avatar name={l.name} small />{l.name}</span>
-              <div className="bar" style={{ flex: 1, height: 8 }}><span style={{ width: `${Math.min(100, (l.planned_h / Math.max(1, l.capacity_h)) * 100)}%` }} /></div>
-              <span className="mono small" style={{ width: 70, textAlign: 'right' }}>{l.planned_h} / {l.capacity_h} h</span>
-              {l.overload ? <span className="badge b-r">{tr("Surcharge")}</span> : <span className="badge">OK</span>}
-            </div>
-          ))}
-        </div>
-      </section>
       <section className="card">
         <CardHead title={tr("Jalons")} sub={tr("Fin d'étape, tests à plusieurs, soumission, sortie")} />
         <div className="list">{data.milestones.map((m: any) => <div key={m.id} className="li"><span className="mono small" style={{ width: 90 }}>{frDate(m.date)}</span><span style={{ flex: 1 }}>{m.title}</span>{canEdit && <button className="iconbtn" aria-label={tr("Supprimer")} onClick={async () => { await api.del(`/api/milestones/${m.id}`); reload() }}><Trash2 size={16} /></button>}</div>)}</div>
