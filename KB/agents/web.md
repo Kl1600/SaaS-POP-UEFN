@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-22 · #204 · onglet Test
+- Fait : « Échange de playtests » devient « Test » ; onglet « Pourquoi ils partent » retiré. Section « Demandes de test » : à tester (demandes des autres) + nos demandes avec leur état (en cours / terminée, retours reçus : champ serveur `received`) + formulaire. Section « Retours » : raisons d'arrêt (ancien /churn) puis chaque retour avec ses réponses. Crédits inchangés. Aide, guide et README mis à jour.
+- Vérifié : navigateur (publication d'une demande, retour inséré dans la base de test locale) + cargo test.
+
 ### 2026-11-22 · #188 · sélecteur de map
 - Fait : groupes titrés « Mes maps (seul) » puis un par studio, avec rôle et nombre de maps ; map ouverte marquée (barre orange + « Ouverte ») ; créations regroupées en bas sous « Créer » (map perso, map dans un studio, studio) au lieu d'une ligne sous chaque groupe ; « Toutes mes maps » devient « Vue d’ensemble des maps » ; astuce de glisser-déposer. Le glisser-déposer (#167) est inchangé.
 - Vérifié : navigateur (3 groupes, chaque bouton Créer ouvre la bonne fenêtre, glisser vers un autre studio : zone surlignée puis contrôle du serveur).

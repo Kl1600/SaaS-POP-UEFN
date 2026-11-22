@@ -144,7 +144,7 @@ pub async fn exchange(
     .bind(u.id)
     .fetch_all(&st.db)
     .await?;
-    let mine: Vec<(i64, i64, i64, i64, String)> = sqlx::query_as("SELECT id, minutes, reward, slots, created_at FROM playtest_listings WHERE map_id = ? ORDER BY id DESC").bind(mid).fetch_all(&st.db).await?;
+    let mine: Vec<(i64, i64, i64, i64, String, i64)> = sqlx::query_as("SELECT l.id, l.minutes, l.reward, l.slots, l.created_at, (SELECT COUNT(*) FROM playtest_feedback f WHERE f.listing_id = l.id) FROM playtest_listings l WHERE l.map_id = ? ORDER BY l.id DESC").bind(mid).fetch_all(&st.db).await?;
     let fb: Vec<(String, i64, String, String, String, i64, String)> = sqlx::query_as(
         "SELECT u.name, f.left_minute, f.reason, f.understood, f.comeback, f.score, f.at FROM playtest_feedback f JOIN playtest_listings l ON l.id = f.listing_id JOIN users u ON u.id = f.tester_id WHERE l.map_id = ? ORDER BY f.id DESC LIMIT 50",
     )
@@ -155,7 +155,7 @@ pub async fn exchange(
     Ok(Json(json!({
         "credits": credits,
         "open": open.into_iter().map(|(id, map, genre, studio, min, reward, slots, code, done)| json!({"id": id, "map": map, "genre": genre, "studio": studio, "minutes": min, "reward": reward, "slots": slots, "island_code": code, "done": done == 1})).collect::<Vec<_>>(),
-        "mine": mine.into_iter().map(|(id, min, reward, slots, at)| json!({"id": id, "minutes": min, "reward": reward, "slots": slots, "created_at": at})).collect::<Vec<_>>(),
+        "mine": mine.into_iter().map(|(id, min, reward, slots, at, received)| json!({"id": id, "minutes": min, "reward": reward, "slots": slots, "created_at": at, "received": received})).collect::<Vec<_>>(),
         "feedback": fb.into_iter().map(|(who, m, reason, und, cb, score, at)| json!({"who": who, "left_minute": m, "reason": reason, "understood": und, "comeback": cb, "score": score, "at": at})).collect::<Vec<_>>(),
     })))
 }
