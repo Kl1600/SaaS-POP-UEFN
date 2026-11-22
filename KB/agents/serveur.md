@@ -118,3 +118,11 @@ Bloque : rien
 ### 2026-11-22 · #160 · une dépendance = impossible à faire ou tester sans
 - Fait : la définition est écrite dans l'outil MCP `create_task` (description et `depends_on`), dans la consigne du plan IA (`aiplan.rs`, « after ») et dans le web (`DEP_HELP` de `Tasks.tsx`, sous « Dépend de » dans la fiche, la création de tâche et l'aperçu du plan). 8 dépendances des squelettes de `plan.rs` retirées parce qu'elles suivaient l'ordre du jeu ; les tests de fin de lot dépendent maintenant directement de tout ce qu'ils testent.
 - Vérifié : `cargo test` (`tests_dependances` dans `mcp.rs` et `plan.rs`), navigateur en local en français et en anglais.
+
+```
+FAIT | #161 Tâches UEFN : check-in Lore vérifié, un check-in pour plusieurs tâches | 22/11 18:00
+Owner : benybens | Sur la tâche : Claude Code, pour benybens
+Fait : checkin accepté seulement s'il est archivé sur la map ; « #3 #5 … » ferme les tâches UEFN en cours citées ; check-in d'une autre tâche = « Rattachée » ; webhook Lore compté
+Reste : test avec un vrai check-in Lore (accord humain)
+Bloque : rien
+```

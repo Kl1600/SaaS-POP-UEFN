@@ -6,7 +6,7 @@ const EN: Record<string, string> = {
  "Tâche UEFN : check-in Lore requis pour la fermer": "UEFN task: Lore check-in required to close it",
  "Check-in Lore": "Lore check-in",
  "Fermer #{0}": "Close #{0}",
- "C’est une tâche UEFN : elle ne passe à « Faite » qu’avec son check-in Lore. Archivez dans Lore, puis collez ici le message du check-in. Il commence par #{0}.": "This is a UEFN task: it can only move to “Done” with its Lore check-in. Check in to Lore, then paste the check-in message here. It starts with #{0}.",
+ "C’est une tâche UEFN : elle ne passe à « Faite » qu’avec un check-in Lore archivé sur cette map. Collez ici son message exact, qui commence par #{0}. Si son travail est parti dans le check-in d’une autre tâche, collez le message de ce check-in : l’historique le notera.": "This is a UEFN task: it can only be marked “Done” with a Lore check-in archived on this map. Paste its exact message here, which starts with #{0}. If its work went into another task’s check-in, paste that check-in’s message: the history will note it.",
  "Message du check-in Lore": "Lore check-in message",
  "Envoi…": "Sending…",
  "Marquer comme faite": "Mark as done",

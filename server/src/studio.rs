@@ -858,6 +858,17 @@ pub async fn lore_hook(
                     .await
                     .ok();
             }
+            // Un check-in fait dans Lore ou UEFN compte comme archivé, comme ceux passés par POP (#161).
+            if !msg.trim().is_empty() {
+                sqlx::query("INSERT INTO uefn_actions (map_id, user_id, source, action, args, summary, status) VALUES (?, ?, 'lore', 'lore_checkin', ?, ?, 'done')")
+                    .bind(b.map_id)
+                    .bind(uid)
+                    .bind(json!({ "message": msg.trim() }).to_string())
+                    .bind(format!("Archivage Lore : {}", msg.trim().chars().take(280).collect::<String>()))
+                    .execute(&st.db)
+                    .await?;
+                crate::tasks::close_from_checkin(&st, b.map_id, uid, msg.trim()).await;
+            }
             if let Some(n) = num {
                 let tid: Option<(i64,)> =
                     sqlx::query_as("SELECT id FROM tasks WHERE map_id = ? AND number = ?")
