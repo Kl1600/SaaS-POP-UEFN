@@ -30,6 +30,8 @@ jobs:
     outputs:
       serveur: ${{ steps.f.outputs.serveur }}
       relais: ${{ steps.f.outputs.relais }}
+      relais_src: ${{ steps.f.outputs.relais_src }}
+      relais_exe: ${{ steps.f.outputs.relais_exe }}
       forge: ${{ steps.f.outputs.forge }}
       web: ${{ steps.f.outputs.web }}
       migrations: ${{ steps.f.outputs.migrations }}
@@ -67,6 +69,9 @@ jobs:
           out() { if touche "$2"; then echo "$1=1"; else echo "$1=0"; fi >> "$GITHUB_OUTPUT"; }
           out serveur '^server/'
           out relais '^link/'
+          # Relais téléchargeable (#158) : le code du relais et l'exécutable proposé dans POP changent ensemble.
+          out relais_src '^link/(src/|Cargo\.(toml|lock)$|build\.rs$)'
+          out relais_exe '^web/public/downloads/pop-link\.exe$'
           # Forge embarque le relais (#77) : il se reconstruit aussi quand link/ change.
           out forge '^(forge|link)/'
           out web '^web/'
@@ -95,6 +100,23 @@ jobs:
         working-directory: server
       - run: cargo test --locked
         working-directory: server
+
+  # Le relais proposé au téléchargement était resté sur une vieille version (#158) : une PR qui change le code
+  # du relais doit aussi apporter l'exécutable recompilé (AGENTS.md §5).
+  relais-telechargeable:
+    name: relais téléchargeable à jour
+    needs: changements
+    if: github.event_name == 'pull_request' && needs.changements.outputs.relais_src == '1'
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          EXE: ${{ needs.changements.outputs.relais_exe }}
+        run: |
+          if [ "$EXE" != 1 ]; then
+            echo "::error::link/ a changé mais pas web/public/downloads/pop-link.exe. Recompilez sous Windows (cd link && cargo build --release), copiez link/target/release/pop-link.exe dans web/public/downloads/, reconstruisez le web (cd web && npm run build) et commitez."
+            exit 1
+          fi
+          echo "pop-link.exe mis à jour avec le code du relais."
 
   relais:
     name: relais pop-link (build + tests)

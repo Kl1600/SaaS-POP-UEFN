@@ -35,7 +35,15 @@ struct RelayConn {
     project: String,
     conn_id: u64,
     tools: Value,
+    /// Protocole annoncé par le relais (#158) : 0 tant qu'il ne s'est pas présenté, 1 pour un relais d'avant #158.
+    proto: u32,
 }
+
+/// Protocole attendu du relais (#158), égal à `PROTO` dans `link/src/lib.rs` (vérifié par un test).
+pub const RELAY_PROTO: u32 = 2;
+
+/// Message montré quand le relais ne connaît pas une action ou annonce un protocole plus ancien.
+pub const STALE_MSG: &str = "Relais périmé : votre UEFN Link ne connaît pas cette action. Téléchargez la nouvelle version depuis l’Organiseur (UEFN Link → Télécharger UEFN Link), puis relancez-le.";
 
 #[derive(Default)]
 pub struct RelayHub {
@@ -50,6 +58,14 @@ impl RelayHub {
             Some(c) if c.uefn == "connected" => "connected",
             Some(_) => "closed",
         }
+    }
+    /// Le relais relié est plus ancien que le serveur (#158).
+    pub fn stale(&self, map_id: i64) -> bool {
+        self.conns
+            .lock()
+            .unwrap()
+            .get(&map_id)
+            .is_some_and(|c| c.proto != 0 && c.proto < RELAY_PROTO)
     }
     fn tools(&self, map_id: i64) -> Value {
         self.conns
@@ -108,17 +124,22 @@ async fn relay_call(
             if v["ok"].as_bool() == Some(true) {
                 Ok(v["data"].clone())
             } else {
-                Err(AppError::Conflict(
-                    v["error"]
-                        .as_str()
-                        .unwrap_or("Échec côté UEFN.")
-                        .to_string(),
-                ))
+                let e = v["error"].as_str().unwrap_or("Échec côté UEFN.");
+                Err(AppError::Conflict(stale_error(e)))
             }
         }
         _ => Err(AppError::Conflict(
             "UEFN ne répond pas (délai dépassé).".into(),
         )),
+    }
+}
+
+/// « action inconnue » vient d'un relais qui date d'avant cette action (#158) : on dit quoi faire.
+fn stale_error(e: &str) -> String {
+    if e.starts_with("action inconnue") {
+        STALE_MSG.to_string()
+    } else {
+        e.to_string()
     }
 }
 
@@ -246,6 +267,7 @@ async fn relay_run(st: AppState, dev: i64, mid: i64, socket: WebSocket) {
             project: String::new(),
             conn_id,
             tools: Value::Null,
+            proto: 0,
         },
     );
     let _ = sqlx::query("UPDATE relay_devices SET last_seen = datetime('now') WHERE id = ?")
@@ -283,7 +305,7 @@ fn broadcast_status(st: &AppState, mid: i64) {
     notify(
         st,
         mid,
-        json!({ "t": "uefn", "what": "status", "status": st.relays.status(mid), "project": st.relays.project(mid) }),
+        json!({ "t": "uefn", "what": "status", "status": st.relays.status(mid), "project": st.relays.project(mid), "stale": st.relays.stale(mid) }),
     );
 }
 
@@ -336,6 +358,11 @@ async fn on_relay_msg(
                 c.uefn = uefn.into();
                 if let Some(p) = v["project"].as_str() {
                     c.project = p.chars().take(120).collect();
+                }
+                if v["t"] == "hello" {
+                    c.proto = v["proto"]
+                        .as_u64()
+                        .map_or(1, |n| n.min(u32::MAX as u64) as u32);
                 }
             }
             if let Some(p) = v["project"].as_str() {
@@ -673,7 +700,7 @@ pub async fn state(
         "SELECT a.id, a.summary, u.name, a.at FROM approvals a LEFT JOIN users u ON u.id = a.user_id WHERE a.map_id = ? AND a.status = 'pending' ORDER BY a.id",
     ).bind(mid).fetch_all(&st.db).await?;
     Ok(Json(json!({
-        "status": st.relays.status(mid), "project": project, "updated_at": updated, "tools": st.relays.tools(mid),
+        "status": st.relays.status(mid), "stale": st.relays.stale(mid), "project": project, "updated_at": updated, "tools": st.relays.tools(mid),
         "actors": actors, "tags": serde_json::from_str::<Value>(&tags).unwrap_or(json!([])),
         "pending": pending, "unsaved_actors": unsaved, "has_topview": has_top == 1,
         "topview_bounds": bounds.and_then(|b| serde_json::from_str::<Value>(&b).ok()),
@@ -1727,6 +1754,20 @@ mod tests {
         assert!(check_prop_type("texte", &json!("a"), &json!(3)).is_err());
         // Valeur actuelle inconnue (référence vide) : UEFN tranche.
         assert!(check_prop_type("bouton", &Value::Null, &json!("x")).is_ok());
+    }
+
+    #[test]
+    fn relais_perime() {
+        // Le serveur et le relais parlent le même protocole (#158) : augmenter l'un sans l'autre casse ce test.
+        let lib =
+            std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../link/src/lib.rs"))
+                .expect("link/src/lib.rs");
+        assert!(
+            lib.contains(&format!("pub const PROTO: u32 = {RELAY_PROTO};")),
+            "PROTO de link/src/lib.rs différent de RELAY_PROTO"
+        );
+        assert_eq!(stale_error("action inconnue : start_session"), STALE_MSG);
+        assert_eq!(stale_error("UEFN fermé."), "UEFN fermé.");
     }
 
     #[test]

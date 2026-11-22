@@ -147,6 +147,8 @@ export default function Organizer() {
         {/* Envoi complet (acteurs et Verse) dans la session de test en cours (#5). */}
         <button className="btn" disabled={readOnly} title={tr("Envoie les modifications du niveau dans la session de test en cours")} onClick={() => act('push_session', {}, tr("Envoyé en session de test"))}><Play size={16} />{tr("Envoyer en session")}</button>
       </PageHead>
+      {/* Relais plus ancien que le serveur (#158) : des actions répondraient « action inconnue ». */}
+      {st.stale && <div className="warn" role="alert"><AlertTriangle size={18} /><span style={{ flex: 1 }}>{tr("Relais périmé : votre UEFN Link est plus ancien que POP et ne connaît pas toutes les actions (session de test, poser un appareil, importer un fichier…). Téléchargez la nouvelle version, fermez l’ancienne fenêtre et lancez la nouvelle.")}</span><a className="btn pri" href={`/api/studios/${app.studio!.id}/relay/download`} download>{tr("Télécharger UEFN Link")}</a></div>}
       {st.status !== 'connected' && <div className="warn"><AlertTriangle size={18} /><span>{tr("{0} : lecture seule sur le dernier état connu{1}. Vos modifications seront mises en attente et envoyées à l’ouverture.", [st.status === 'offline' ? tr("Relais hors ligne") : tr("UEFN fermé"), st.updated_at ? ` (${ago(st.updated_at)})` : ''])}</span></div>}
       {st.approvals.length > 0 && <div className="warn" style={{ flexWrap: 'wrap' }}><AlertTriangle size={18} /><div style={{ flex: 1 }}>{st.approvals.map((p: any) => (
         <div key={p.id} className="row" style={{ flexWrap: 'wrap', padding: '4px 0' }}><span style={{ flex: 1 }}>{p.summary}</span>
