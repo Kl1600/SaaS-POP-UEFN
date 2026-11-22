@@ -2,6 +2,8 @@
 # Pour rester sous le quota gratuit de GitHub Actions (#46), chaque contrôle ne tourne que si ce qu'il vérifie a
 # changé ; un contrôle sauté ne coûte rien et compte comme bon pour `task.py done`. Modifier ce fichier fait tout
 # tourner.
+# Runner : `vars.RUNNER` (variable du dépôt) envoie les jobs Linux sur un runner local, par exemple quand les minutes
+# gratuites de GitHub sont épuisées ; sans la variable, ils tournent chez GitHub (voir KB/RUNNER.md).
 name: CI
 
 on:
@@ -26,7 +28,7 @@ env:
 jobs:
   changements:
     name: dossiers touchés
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     outputs:
       serveur: ${{ steps.f.outputs.serveur }}
       relais: ${{ steps.f.outputs.relais }}
@@ -84,7 +86,7 @@ jobs:
     name: serveur (build + tests)
     needs: changements
     if: needs.changements.outputs.serveur == '1'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -107,7 +109,7 @@ jobs:
     name: relais téléchargeable à jour
     needs: changements
     if: github.event_name == 'pull_request' && needs.changements.outputs.relais_src == '1'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     steps:
       - env:
           EXE: ${{ needs.changements.outputs.relais_exe }}
@@ -122,7 +124,7 @@ jobs:
     name: relais pop-link (build + tests)
     needs: changements
     if: needs.changements.outputs.relais == '1'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -144,7 +146,8 @@ jobs:
   forge:
     name: forge (Windows, build + installateur)
     needs: changements
-    if: needs.changements.outputs.forge == '1'
+    # Runner local (vars.RUNNER, voir KB/RUNNER.md) : il est Linux, Forge est sautée ; à lancer à la main si besoin.
+    if: needs.changements.outputs.forge == '1' && vars.RUNNER == ''
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -173,7 +176,7 @@ jobs:
     name: web (types + build + dist à jour)
     needs: changements
     if: needs.changements.outputs.web == '1'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -203,7 +206,7 @@ jobs:
     if: >-
       needs.changements.outputs.audit == '1' ||
       (github.event_name == 'pull_request' && needs.changements.outputs.migrations == '1')
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -220,6 +223,9 @@ jobs:
           fi
           last=$(ls server/migrations | sort | tail -1)
           echo "Dernière migration : $last"
+      # Rust n'est préinstallé que chez GitHub : un runner local (vars.RUNNER) a besoin de cette étape.
+      - uses: dtolnay/rust-toolchain@stable
+        if: needs.changements.outputs.audit == '1'
       - uses: taiki-e/install-action@v2
         if: needs.changements.outputs.audit == '1'
         with:

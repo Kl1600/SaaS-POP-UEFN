@@ -14,7 +14,7 @@ permissions:
 jobs:
   image:
     name: image Docker (build, sans root, /data)
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
       - name: Construire l'image

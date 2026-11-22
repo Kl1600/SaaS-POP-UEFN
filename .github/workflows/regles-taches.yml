@@ -21,7 +21,7 @@ jobs:
     if: >-
       github.event.action == 'closed' ||
       contains(fromJSON('["en cours", "en revue"]'), github.event.label.name)
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/github-script@v7
         with:
