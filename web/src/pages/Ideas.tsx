@@ -54,12 +54,24 @@ function Ring({ v }: { v: number }) {
   </svg>
 }
 
-function Spark({ series }: { series: any[] }) {
+/** Joueurs par jour de la niche, avec axes et unités (#202). */
+function PlayersChart({ series }: { series: any[] }) {
   const v = series.map(s => s.players ?? 0)
-  const max = Math.max(1, ...v), min = Math.min(...v)
   if (v.length < 2) return null
-  const pts = v.map((x, i) => `${(i / (v.length - 1)) * 100},${28 - ((x - min) / Math.max(1, max - min)) * 24}`).join(' ')
-  return <svg className="ispark" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden><polyline points={pts} fill="none" stroke="currentColor" strokeWidth="2" vectorEffect="non-scaling-stroke" /></svg>
+  const W = 520, H = 180, L = 48, B = 26, T = 10, R = 22
+  const max = Math.max(1, ...v) * 1.1
+  const x = (i: number) => L + (i / (v.length - 1)) * (W - L - R)
+  const y = (p: number) => T + (1 - p / max) * (H - T - B)
+  const ticks = [0, max / 2, max].map(t => Math.round(t))
+  const pts = v.map((p, i) => `${x(i)},${y(p)}`).join(' ')
+  const day = (d: string) => { const [, m, j] = String(d).split('-'); return j && m ? `${Number(j)}/${Number(m)}` : d }
+  return <svg className="ichart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={tr("Joueurs par jour sur les {0} derniers jours", [v.length])}>
+    {ticks.map(t => <g key={t}><line x1={L} x2={W - R} y1={y(t)} y2={y(t)} className="ichart-grid" /><text x={L - 6} y={y(t) + 4} textAnchor="end" className="ichart-lab">{num(t)}</text></g>)}
+    <line x1={L} x2={L} y1={T} y2={H - B} className="ichart-axis" /><line x1={L} x2={W - R} y1={H - B} y2={H - B} className="ichart-axis" />
+    <polyline points={pts} fill="none" stroke="currentColor" strokeWidth="2" />
+    {v.map((p, i) => <circle key={i} cx={x(i)} cy={y(p)} r="3" fill="currentColor"><title>{tr("{0} : {1} joueurs", [day(series[i].day), num(p)])}</title></circle>)}
+    {series.map((s, i) => <text key={i} x={x(i)} y={H - 6} textAnchor="middle" className="ichart-lab">{day(s.day)}</text>)}
+  </svg>
 }
 
 function Card({ d, onOpen, onSave }: { d: any; onOpen: () => void; onSave: () => void }) {
@@ -69,7 +81,6 @@ function Card({ d, onOpen, onSave }: { d: any; onOpen: () => void; onSave: () =>
       <span className="icard-genre">{GENRE[d.genre] ?? d.genre}</span>
       {d.status === 'new' && <span className="icard-new">{tr("Nouveau")}</span>}
       <Ring v={Math.round(d.score)} />
-      <Spark series={d.series ?? []} />
     </div>
     <div className="icard-body">
       <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
@@ -79,10 +90,10 @@ function Card({ d, onOpen, onSave }: { d: any; onOpen: () => void; onSave: () =>
       <p className="icard-hook">{hook(d)}</p>
       <div className="icard-badges">{(d.badges ?? []).filter((b: string) => BADGE[b]).slice(0, 3).map((b: string) => <span key={b} className={'badge ' + BADGE[b][1]}>{BADGE[b][0]}</span>)}</div>
       <div className="icard-stats">
-        <span title={tr("Joueurs hier")}><Users size={14} />{num(d.players)}</span>
-        <span title={tr("Temps de jeu moyen")}><Clock size={14} />{num(d.minutes)} min</span>
-        <span title={tr("Nouvelles maps qui ont percé")}><DoorOpen size={14} />{d.newcomers ? `${d.success100}/${d.newcomers}` : '—'}</span>
-        <span title={tr("Évolution sur 7 jours")}><TrendingUp size={14} />{sign(d.trend)}</span>
+        <div><Users size={15} /><b>{num(d.players)}</b><span>{tr("joueurs par jour")}</span></div>
+        <div><Clock size={15} /><b>{num(d.minutes)} min</b><span>{tr("temps de jeu moyen")}</span></div>
+        <div><DoorOpen size={15} /><b>{d.newcomers ? `${d.success100}/${d.newcomers}` : '—'}</b><span>{tr("nouvelles maps qui percent")}</span></div>
+        <div><TrendingUp size={15} /><b>{sign(d.trend)}</b><span>{tr("évolution sur 7 jours")}</span></div>
       </div>
     </div>
     <div className="icard-foot small muted">
@@ -118,50 +129,64 @@ function Detail({ d, onClose, onState, onStart }: { d: any; onClose: () => void;
           <div><h2>{label(d)}</h2><p className="small" style={{ margin: 0, opacity: .85 }}>{tr("Note d’opportunité sur 100 · données {0}", [d.confidence === 'bonne' ? tr("solides") : d.confidence === 'moyenne' ? tr("moyennes") : tr("minces")])}</p></div>
         </div>
       </div>
-      <p className="ihook">{hook(d)}</p>
-      <div className="icard-badges">{(d.badges ?? []).filter((b: string) => BADGE[b]).map((b: string) => <span key={b} className={'badge ' + BADGE[b][1]}>{BADGE[b][0]}</span>)}</div>
+      <div className="itop">
+        <p className="ihook">{hook(d)}</p>
+        <div className="icard-badges">{(d.badges ?? []).filter((b: string) => BADGE[b]).map((b: string) => <span key={b} className={'badge ' + BADGE[b][1]}>{BADGE[b][0]}</span>)}</div>
+          <div className="row" style={{ gap: 8, margin: '14px 0 0', flexWrap: 'wrap' }}>
+            {d.status === 'started' ? <span className="badge b-g">{tr("Vous vous êtes lancé")}</span> : <button className="btn pri" onClick={onStart}><Rocket size={16} />{tr("Je me lance")}</button>}
+            {d.status !== 'started' && <button className="btn" onClick={() => onState(d.status === 'saved' ? 'seen' : 'saved')}><Heart size={16} />{d.status === 'saved' ? tr("Sauvegardée") : tr("Sauvegarder")}</button>}
+            {d.status !== 'started' && <button className="btn" onClick={() => onState('dismissed')}><X size={16} />{tr("Pas pour moi")}</button>}
+          </div>
 
-      <div className="row" style={{ gap: 8, margin: '16px 0', flexWrap: 'wrap' }}>
-        {d.status === 'started' ? <span className="badge b-g">{tr("Vous vous êtes lancé")}</span> : <button className="btn pri" onClick={onStart}><Rocket size={16} />{tr("Je me lance")}</button>}
-        {d.status !== 'started' && <button className="btn" onClick={() => onState(d.status === 'saved' ? 'seen' : 'saved')}><Heart size={16} />{d.status === 'saved' ? tr("Sauvegardée") : tr("Sauvegarder")}</button>}
-        {d.status !== 'started' && <button className="btn" onClick={() => onState('dismissed')}><X size={16} />{tr("Pas pour moi")}</button>}
       </div>
+      <div className="icols">
+        <div>
+          <div className="dsec">{tr("Pourquoi cette niche")}</div>
+          {AXES.map(([k, n, h]) => <Axis key={k} k={k} name={n} help={h} v={d.axes?.[k] ?? 0} />)}
+          <ul className="ifacts">
+            <li>{tr("{0} maps jouées hier, {1} joueurs ; une map typique en a {2}.", [num(d.islands), num(d.players), num(d.typical)])}</li>
+            <li>{tr("Temps de jeu moyen : {0} min (map typique de Fortnite : {1} min). Retour à J+1 : {2}, à J+7 : {3}.", [num(d.minutes), num(d.eco?.minutes), pc(d.d1), pc(d.d7)])}</li>
+            <li>{d.newcomers ? tr("{0} maps sorties depuis 30 jours : {1} ont dépassé 100 joueurs, {2} ont dépassé 1 000.", [d.newcomers, d.success100, d.success1000]) : tr("Pas assez de nouvelles maps ce mois-ci pour juger si la porte est ouverte.")}</li>
+            <li>{tr("Les 3 premières maps prennent {0} % des joueurs.", [d.top3_share])}</li>
+            <li>{tr("Évolution : {0} sur 7 jours{1}.", [sign(d.trend), d.trend14 !== null && d.trend14 !== undefined ? tr(", {0} sur 14 jours", [sign(d.trend14)]) : ''])}</li>
+            {(d.videos > 0 || d.videos_prev > 0) && <li>{tr("Vidéos TikTok et YouTube qui en parlent : {0} cette semaine, {1} la semaine d’avant.", [d.videos, d.videos_prev])}</li>}
+          </ul>
 
-      <div className="dsec">{tr("Pourquoi cette niche")}</div>
-      {AXES.map(([k, n, h]) => <Axis key={k} k={k} name={n} help={h} v={d.axes?.[k] ?? 0} />)}
-      <ul className="ifacts">
-        <li>{tr("{0} maps jouées hier, {1} joueurs ; une map typique en a {2}.", [num(d.islands), num(d.players), num(d.typical)])}</li>
-        <li>{tr("Temps de jeu moyen : {0} min (map typique de Fortnite : {1} min). Retour à J+1 : {2}, à J+7 : {3}.", [num(d.minutes), num(d.eco?.minutes), pc(d.d1), pc(d.d7)])}</li>
-        <li>{d.newcomers ? tr("{0} maps sorties depuis 30 jours : {1} ont dépassé 100 joueurs, {2} ont dépassé 1 000.", [d.newcomers, d.success100, d.success1000]) : tr("Pas assez de nouvelles maps ce mois-ci pour juger si la porte est ouverte.")}</li>
-        <li>{tr("Les 3 premières maps prennent {0} % des joueurs.", [d.top3_share])}</li>
-        <li>{tr("Évolution : {0} sur 7 jours{1}.", [sign(d.trend), d.trend14 !== null && d.trend14 !== undefined ? tr(", {0} sur 14 jours", [sign(d.trend14)]) : ''])}</li>
-        {(d.videos > 0 || d.videos_prev > 0) && <li>{tr("Vidéos TikTok et YouTube qui en parlent : {0} cette semaine, {1} la semaine d’avant.", [d.videos, d.videos_prev])}</li>}
-      </ul>
+        </div>
+        <div>
+          <div className="dsec">{tr("Chiffres à battre")}</div>
+          <p className="small muted" style={{ marginTop: 0 }}>{tr("Ce que font les meilleures maps de la niche : ce qu’Epic regarde pour Discover.")}</p>
+          <div className="itargets">
+            <div><b>{num(d.targets?.minutes)} min</b><span>{tr("de temps de jeu moyen")}</span></div>
+            <div><b>{pc(d.targets?.d1)}</b><span>{tr("de joueurs qui reviennent à J+1")}</span></div>
+          </div>
 
-      <div className="dsec">{tr("Chiffres à battre")}</div>
-      <p className="small muted" style={{ marginTop: 0 }}>{tr("Ce que font les meilleures maps de la niche (3e quart des 10 premières). Ce sont les signaux qu’Epic regarde pour vous montrer dans Discover.")}</p>
-      <div className="itargets">
-        <div><b>{num(d.targets?.minutes)} min</b><span>{tr("de temps de jeu moyen")}</span></div>
-        <div><b>{pc(d.targets?.d1)}</b><span>{tr("de joueurs qui reviennent à J+1")}</span></div>
+          {(d.series ?? []).length > 1 && <><div className="dsec">{tr("Joueurs par jour")}</div><PlayersChart series={d.series} /></>}
+        </div>
       </div>
+      <div className="icols">
+        <div>
+          <div className="dsec">{tr("Maps à étudier")}</div>
+          <div className="stack" style={{ gap: 6 }}>{(d.study ?? []).map((m: any) => <Map key={m.code} m={m} />)}</div>
+          {d.best_new && <><p className="small muted" style={{ margin: '10px 0 6px' }}>{tr("Meilleure nouvelle venue du mois :")}</p><Map m={d.best_new} /></>}
 
-      <div className="dsec">{tr("Maps à étudier")}</div>
-      <div className="stack" style={{ gap: 6 }}>{(d.study ?? []).map((m: any) => <Map key={m.code} m={m} />)}</div>
-      {d.best_new && <><p className="small muted" style={{ margin: '10px 0 6px' }}>{tr("Meilleure nouvelle venue du mois :")}</p><Map m={d.best_new} /></>}
+        </div>
+        <div>
+          {(d.twists ?? []).length > 0 && <>
+            <div className="dsec">{tr("Idées de twist")}</div>
+            {(d.twists ?? []).map((t: any) => <p key={t.key} className="itwist"><Sparkles size={16} /><span>{tr("Croiser avec « {0} » : niche notée {1}/100, et seulement {2} maps combinent les deux.", [label(t), t.score, t.maps_together])}</span></p>)}
+          </>}
 
-      {(d.twists ?? []).length > 0 && <>
-        <div className="dsec">{tr("Idées de twist")}</div>
-        {(d.twists ?? []).map((t: any) => <p key={t.key} className="itwist"><Sparkles size={16} /><span>{tr("Croiser avec « {0} » : niche notée {1}/100, et seulement {2} maps combinent les deux.", [label(t), t.score, t.maps_together])}</span></p>)}
-      </>}
+          <div className="dsec">{tr("Pièges à éviter")}</div>
+          <ul className="ifacts">
+            {(d.title_words ?? []).length > 0 && <li>{tr("Mots déjà très repris dans les titres : {0}. Un titre ou une vignette trop proche d’une map existante est moins montré par Epic.", [d.title_words.join(', ')])}</li>}
+            <li>{tr("Vignette originale qui montre le vrai jeu : pas de fond uni ou en dégradé, pas d’armes collées, pas de badges d’Epic.")}</li>
+            <li>{tr("Dans le Creator Portal, choisissez le genre « {0} » : il décide de la rangée où la map peut apparaître.", [GENRE[d.genre] ?? d.genre])}</li>
+            {(d.badges ?? []).includes('domine') && <li>{tr("Trois maps prennent l’essentiel des joueurs : il faudra un vrai angle différent.")}</li>}
+          </ul>
 
-      <div className="dsec">{tr("Pièges à éviter")}</div>
-      <ul className="ifacts">
-        {(d.title_words ?? []).length > 0 && <li>{tr("Mots déjà très repris dans les titres : {0}. Un titre ou une vignette trop proche d’une map existante est moins montré par Epic.", [d.title_words.join(', ')])}</li>}
-        <li>{tr("Vignette originale qui montre le vrai jeu : pas de fond uni ou en dégradé, pas d’armes collées, pas de badges d’Epic.")}</li>
-        <li>{tr("Dans le Creator Portal, choisissez le genre « {0} » : il décide de la rangée où la map peut apparaître.", [GENRE[d.genre] ?? d.genre])}</li>
-        {(d.badges ?? []).includes('domine') && <li>{tr("Trois maps prennent l’essentiel des joueurs : il faudra un vrai angle différent.")}</li>}
-      </ul>
-
+        </div>
+      </div>
       <p className="small muted" style={{ marginTop: 16 }}>{tr("Calculé sur les chiffres publics d’Epic du {0}. Les idées sont recalculées après chaque collecte.", [d.generated_day ?? ''])}</p>
     </aside>
   </Layer>

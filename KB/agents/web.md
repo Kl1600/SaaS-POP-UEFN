@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-22 · #202 · idées de maps
+- Fait : chiffres des cartes en grille icône + valeur + libellé (joueurs par jour, temps de jeu moyen, nouvelles maps qui percent, évolution sur 7 jours) ; bannières sobres (fond neutre, liseré de couleur du genre à gauche, plus de dégradé) ; fiche élargie (980 px) : accroche, badges et actions en haut, puis deux colonnes (pourquoi / chiffres à battre + graphique), puis maps à étudier / twists et pièges ; mini-courbe des cartes retirée ; graphique « Joueurs par jour » avec axes (joueurs, jours) dans la fiche.
+- Vérifié : navigateur avec des données de marché factices dans la base de test locale (/tmp), clair et sombre.
+
 ### 2026-11-22 · #204 · onglet Test
 - Fait : « Échange de playtests » devient « Test » ; onglet « Pourquoi ils partent » retiré. Section « Demandes de test » : à tester (demandes des autres) + nos demandes avec leur état (en cours / terminée, retours reçus : champ serveur `received`) + formulaire. Section « Retours » : raisons d'arrêt (ancien /churn) puis chaque retour avec ses réponses. Crédits inchangés. Aide, guide et README mis à jour.
 - Vérifié : navigateur (publication d'une demande, retour inséré dans la base de test locale) + cargo test.

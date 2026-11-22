@@ -982,3 +982,22 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 .mapsw-cur{display:inline-flex;align-items:center;gap:4px;font-style:normal;font-size:11.5px;color:#ED753E}
 .mapsw-hint{padding:6px 10px 4px;font-size:12px;color:rgb(120,120,120)}
 .mapsw-foot .mapsw-studio{padding-top:8px}
+
+/* #202 : idées de maps plus sobres et lisibles. */
+.icard-top,.idrawer-head{background:var(--hover);color:var(--text);border-bottom:1px solid var(--border);min-height:64px;box-shadow:inset 4px 0 0 hsl(var(--h) 55% 50%)}
+.icard-genre{background:var(--surface);border:1px solid var(--border);color:var(--text)}
+.icard-new{background:var(--text);color:var(--bg)}
+.idrawer-head .iconbtn{color:var(--text)}
+.icard-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;margin-top:4px}
+.icard-stats > div{display:grid;grid-template-columns:18px 1fr;column-gap:6px;align-items:center;font-size:12px;color:var(--text2)}
+.icard-stats svg{grid-row:span 2;color:var(--text2)}
+.icard-stats b{font-size:15px;font-weight:600;color:var(--text)}
+.idrawer{width:min(980px,calc(100vw - 32px))}
+.itop{padding-bottom:16px;border-bottom:1px solid var(--border)}
+.icols{display:grid;grid-template-columns:1fr 1fr;gap:8px 28px}
+.icols > div{min-width:0}
+@media (max-width:760px){.icols{grid-template-columns:1fr}}
+.ichart{width:100%;height:auto;color:var(--text);display:block}
+.ichart-grid{stroke:var(--border);stroke-width:1}
+.ichart-axis{stroke:var(--text3,var(--text2));stroke-width:1}
+.ichart-lab{fill:var(--text2);font-size:13px}
