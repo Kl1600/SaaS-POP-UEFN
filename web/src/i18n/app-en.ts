@@ -161,6 +161,8 @@ const EN: Record<string, string> = {
  "Général": "General",
  "Vue d'ensemble": "Overview",
  "Dashboard": "Dashboard",
+ "UEFN déconnecté": "UEFN disconnected",
+ "Chercher (Ctrl K)": "Search (Ctrl K)",
  "Voir plus": "See more",
  "Voir plus ({0})": "See more ({0})",
  "Voir le planning": "See the schedule",

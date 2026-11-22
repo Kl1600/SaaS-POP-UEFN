@@ -2,6 +2,11 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-22 · #191 · barre du haut
+- Fait : avatars de présence retirés ; recherche = loupe qui s'ouvre en champ (clic ou Ctrl K via l'évènement `pop:search`, Échap ou sortie à vide la referme) ; bouton « + » (`CreateMenu` : tâche si map modifiable, map, studio) ; « Relais hors ligne » → « UEFN déconnecté » ; compte en bas de la barre latérale (`.side-foot`), menu ouvert vers le haut avec Aide et support.
+- Vérifié : navigateur 1440 px, chaque élément cliqué, aucune erreur JS.
+- Piège : `.side` a `overflow-x: hidden` ; un menu qui en dépasse est coupé, d'où `.acct-menu` à la largeur de la barre.
+
 ### 2026-11-22 · #189 · Dashboard
 - Fait : « Vue d'ensemble » renommée « Dashboard » (menu, titre, aide) ; Boussole retirée de la page (bouton flottant : #190) ; tuiles `.tiles.six` (6, 3 × 2 ou 2 × 3, jamais une seule) ; journal limité à 5 + « Voir plus » (fiche avec les 60 dernières actions, `LIMIT 60` dans `plan::overview`) ; 3 prochains jalons + « Voir plus » vers Planifier ; calendrier du mois retiré.
 - Vérifié : navigateur 1800, 1440, 1000 et 390 px, aucune erreur JS.
