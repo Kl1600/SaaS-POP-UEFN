@@ -1309,6 +1309,21 @@ async fn run_action(
                 }
                 sqlx::query("UPDATE uefn_actions SET status = 'done', after = ?, undo = COALESCE(?, undo) WHERE id = ?").bind(short_data.to_string()).bind(extra_undo).bind(id).execute(&st.db).await?;
             }
+            // Check-in archivé : les tâches UEFN en cours qu'il cite (« #3 #5 … ») passent à « Faite » (#161).
+            if action == "lore_checkin" {
+                let who: Option<Option<i64>> = match aid {
+                    Some(id) => {
+                        sqlx::query_scalar("SELECT user_id FROM uefn_actions WHERE id = ?")
+                            .bind(id)
+                            .fetch_optional(&st.db)
+                            .await?
+                    }
+                    None => None,
+                };
+                if let (Some(Some(uid)), Some(m)) = (who, args["message"].as_str()) {
+                    crate::tasks::close_from_checkin(st, mid, uid, m.trim()).await;
+                }
+            }
         }
         // L'archivage n'a besoin que du relais quand il passe par `lore_cmd` ; sinon il passe par UEFN. Relais
         // en ligne mais UEFN fermé : il reste en attente et part à la réouverture, comme les autres actions (#4).

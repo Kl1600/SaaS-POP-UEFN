@@ -274,7 +274,7 @@ function CheckinModal({ task, onClose, onDone }: { task: { id: number; number: n
     <Modal onClose={onClose} label={tr("Check-in Lore")}>
       <form className="stack" onSubmit={submit}>
         <h2 style={{ margin: 0, fontWeight: 400 }}>{tr("Fermer #{0}", [task.number])}</h2>
-        <p className="muted" style={{ margin: 0 }}>{tr("C’est une tâche UEFN : elle ne passe à « Faite » qu’avec son check-in Lore. Archivez dans Lore, puis collez ici le message du check-in. Il commence par #{0}.", [task.number])}</p>
+        <p className="muted" style={{ margin: 0 }}>{tr("C’est une tâche UEFN : elle ne passe à « Faite » qu’avec un check-in Lore archivé sur cette map. Collez ici son message exact, qui commence par #{0}. Si son travail est parti dans le check-in d’une autre tâche, collez le message de ce check-in : l’historique le notera.", [task.number])}</p>
         <label className="label">{tr("Message du check-in Lore")}<input className="field mono" autoFocus value={m} onChange={e => setM(e.target.value)} required maxLength={300} /></label>
         {err && <div className="err" role="alert">{err}</div>}
         <div className="row" style={{ justifyContent: 'flex-end' }}><button type="button" className="btn" onClick={onClose}>{tr("Annuler")}</button><button className="btn pri" disabled={busy}>{busy ? tr("Envoi…") : tr("Marquer comme faite")}</button></div>

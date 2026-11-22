@@ -516,15 +516,61 @@ pub async fn set_status_internal(
     set_status_checked(st, map_id, tid, uid, status, via, None, None).await
 }
 
-/// Vrai si le message de check-in commence par `#N` (et pas par `#N0`, `#N1`… d'une autre tâche).
-pub fn checkin_matches(msg: &str, number: i64) -> bool {
-    msg.trim_start()
-        .strip_prefix(&format!("#{number}"))
-        .is_some_and(|rest| !rest.starts_with(|c: char| c.is_ascii_digit()))
+/// Numéros des tâches au début d'un message de check-in (#161) : « #3 #5, #8 : fini » → [3, 5, 8].
+/// Seuls les `#N` du début comptent ; « spawns posés #12 » n'en a aucun.
+pub fn checkin_numbers(msg: &str) -> Vec<i64> {
+    let mut out = vec![];
+    let mut rest = msg.trim_start();
+    while let Some(r) = rest.strip_prefix('#') {
+        let digits: String = r.chars().take_while(|c| c.is_ascii_digit()).collect();
+        let Ok(n) = digits.parse::<i64>() else { break };
+        if !out.contains(&n) {
+            out.push(n);
+        }
+        rest = r[digits.len()..].trim_start_matches(|c: char| {
+            c.is_whitespace() || matches!(c, ',' | ';' | '+' | '/' | '&')
+        });
+    }
+    out
 }
 
-/// Message du check-in Lore qui permet de fermer la tâche UEFN #`number` (#127) : celui donné, sinon celui que
-/// l'agent `agent` a archivé par `lore_checkin` depuis qu'il a réservé la tâche.
+/// Vrai si le message de check-in commence par `#N`, seul ou avec d'autres numéros (`#3 #N …`).
+pub fn checkin_matches(msg: &str, number: i64) -> bool {
+    checkin_numbers(msg).contains(&number)
+}
+
+/// Vrai si le message cite `#N` quelque part (« fini #15 » cite #15, pas « #150 »).
+fn checkin_mentions(msg: &str, number: i64) -> bool {
+    msg.split('#').skip(1).any(|r| {
+        let d: String = r.chars().take_while(|c| c.is_ascii_digit()).collect();
+        d.parse::<i64>().ok() == Some(number)
+    })
+}
+
+/// Check-in retenu pour fermer une tâche UEFN.
+struct Checkin {
+    message: String,
+    /// Le check-in ne cite pas la tâche : son travail est parti dans le check-in d'une autre (#161).
+    attached: bool,
+}
+
+/// Le check-in Lore dont le message est `msg` a-t-il vraiment été archivé sur la map (#161) ? Quel que soit
+/// l'auteur : agent, Organiseur, éditeur Verse ou webhook Lore.
+async fn archived(st: &AppState, map_id: i64, msg: &str) -> Result<bool, AppError> {
+    let n: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM uefn_actions WHERE map_id = ? AND action = 'lore_checkin' AND status = 'done'
+           AND TRIM(COALESCE(json_extract(args, '$.message'), '')) = ?",
+    )
+    .bind(map_id)
+    .bind(msg)
+    .fetch_one(&st.db)
+    .await?;
+    Ok(n > 0)
+}
+
+/// Check-in Lore qui permet de fermer la tâche UEFN #`number` (#127, #161) : celui donné s'il a été archivé sur la
+/// map (le sien, ou celui d'une autre tâche où son travail est parti), sinon celui que l'agent `agent` a archivé
+/// par `lore_checkin` depuis qu'il a réservé la tâche.
 async fn checkin_for_done(
     st: &AppState,
     map_id: i64,
@@ -532,21 +578,24 @@ async fn checkin_for_done(
     number: i64,
     checkin: Option<&str>,
     agent: Option<i64>,
-) -> Result<String, AppError> {
+) -> Result<Checkin, AppError> {
     if let Some(m) = checkin.map(str::trim).filter(|m| !m.is_empty()) {
         check_len("Message du check-in", m, 1, 300)?;
-        if !checkin_matches(m, number) {
-            return Err(bad(format!(
-                "Le message du check-in doit commencer par #{number} (par exemple « #{number} ce qui a été fait »)."
+        if !archived(st, map_id, m).await? {
+            return Err(AppError::Conflict(format!(
+                "Aucun check-in Lore « {m} » n’a été archivé sur cette map. Archivez d’abord dans Lore (lore_checkin, ou Organiseur → Archiver dans Lore) avec un message qui commence par #{number}, puis donnez ce message exact. Si le travail de #{number} est parti dans le check-in d’une autre tâche, donnez le message de ce check-in."
             )));
         }
-        return Ok(m.to_string());
+        return Ok(Checkin {
+            message: m.to_string(),
+            attached: !checkin_mentions(m, number),
+        });
     }
     if let Some(agent) = agent {
         let msgs: Vec<(String,)> = sqlx::query_as(
             "SELECT COALESCE(json_extract(x.args, '$.message'), '') FROM uefn_actions x JOIN api_tokens a ON a.id = x.agent_id
              WHERE x.agent_id = ? AND a.task_id = ? AND x.map_id = ? AND x.action = 'lore_checkin'
-               AND x.status IN ('queued', 'sent', 'done') AND x.at >= a.task_since
+               AND x.status = 'done' AND x.at >= a.task_since
              ORDER BY x.id DESC",
         )
         .bind(agent)
@@ -555,12 +604,45 @@ async fn checkin_for_done(
         .fetch_all(&st.db)
         .await?;
         if let Some((m,)) = msgs.into_iter().find(|(m,)| checkin_matches(m, number)) {
-            return Ok(m.trim().to_string());
+            return Ok(Checkin {
+                message: m.trim().to_string(),
+                attached: false,
+            });
         }
     }
     Err(AppError::Conflict(format!(
         "#{number} est une tâche UEFN : elle ne passe à « Faite » qu’avec son check-in Lore. Archivez dans Lore avec un message qui commence par #{number}, puis donnez ce message pour fermer la tâche."
     )))
+}
+
+/// Après un check-in Lore archivé (#161) : chaque tâche UEFN en cours citée au début du message (« #3 #5 … »)
+/// passe à « Faite », sans autre check-in. Une tâche qui ne peut pas être fermée reste telle quelle.
+pub async fn close_from_checkin(st: &AppState, map_id: i64, uid: i64, msg: &str) {
+    for n in checkin_numbers(msg) {
+        let tid: Option<i64> = sqlx::query_scalar(
+            "SELECT id FROM tasks WHERE map_id = ? AND number = ? AND uefn = 1 AND status = 'doing'",
+        )
+        .bind(map_id)
+        .bind(n)
+        .fetch_optional(&st.db)
+        .await
+        .unwrap_or(None);
+        let Some(tid) = tid else { continue };
+        if let Err(e) = set_status_checked(
+            st,
+            map_id,
+            tid,
+            uid,
+            "done",
+            "Check-in Lore",
+            Some(msg),
+            None,
+        )
+        .await
+        {
+            tracing::warn!("#{n} pas fermée par le check-in : {e:?}");
+        }
+    }
 }
 
 /// Change le statut d'une tâche en appliquant les règles : « En cours » seulement si les dépendances sont faites ;
@@ -623,11 +705,19 @@ pub async fn set_status_checked(
         .bind(via)
         .execute(&st.db)
         .await?;
-    if let Some(m) = &checkin {
+    if let Some(c) = &checkin {
+        let what = if c.attached {
+            format!(
+                "Rattachée au check-in Lore « {} » : son travail est archivé avec une autre tâche",
+                c.message
+            )
+        } else {
+            format!("Check-in Lore : {}", c.message)
+        };
         sqlx::query("INSERT INTO task_events (task_id, user_id, what, via) VALUES (?, ?, ?, ?)")
             .bind(tid)
             .bind(uid)
-            .bind(format!("Check-in Lore : {m}"))
+            .bind(what)
             .bind(via)
             .execute(&st.db)
             .await?;
@@ -995,12 +1085,18 @@ mod tests_uefn {
         assert!(!checkin_matches("#120 autre tâche", 12));
         assert!(!checkin_matches("#1 autre tâche", 12));
         assert!(!checkin_matches("spawns posés #12", 12));
+        // Plusieurs tâches au début (#161).
+        assert_eq!(checkin_numbers("#3 #5, #8 : fini"), vec![3, 5, 8]);
+        assert_eq!(checkin_numbers("#3 fini, voir #5"), vec![3]);
+        assert!(checkin_matches("#3 #12 spawns", 12));
+        assert!(checkin_mentions("fini #15", 15));
+        assert!(!checkin_mentions("fini #150", 15));
     }
 
     /// Critères 1, 2, 3 et 5 (#127), par la route de l'interface.
     #[tokio::test]
     async fn tache_uefn_exige_le_checkin() {
-        let (st, u, _mid, t1, t2) = monde().await;
+        let (st, u, mid, t1, t2) = monde().await;
         // 1. Sans message : refus qui explique quoi faire.
         match statut(&st, &u, t1, json!({ "status": "done" })).await {
             Err(AppError::Conflict(m)) => assert!(
@@ -1010,20 +1106,23 @@ mod tests_uefn {
             _ => panic!("#1 devait être refusée sans check-in"),
         }
         assert_eq!(etat(&st, t1).await, "todo");
-        // 3. Mauvais numéro : refus.
+        // 3. Check-in qui n'a jamais été archivé (#161) : refus, même avec le bon numéro.
         match statut(
             &st,
             &u,
             t1,
-            json!({ "status": "done", "checkin": "#12 spawns" }),
+            json!({ "status": "done", "checkin": "#1 spawns posés" }),
         )
         .await
         {
-            Err(AppError::BadRequest(m)) => assert!(m.contains("commencer par #1"), "{m}"),
-            _ => panic!("un check-in #12 ne doit pas fermer #1"),
+            Err(AppError::Conflict(m)) => {
+                assert!(m.contains("Aucun check-in Lore") && m.contains("#1"), "{m}")
+            }
+            _ => panic!("un check-in jamais archivé ne doit pas fermer #1"),
         }
         assert_eq!(etat(&st, t1).await, "todo");
-        // 2. Bon message : faite, et le message est dans l'historique.
+        archive(&st, mid, u.id, "#1 spawns posés").await;
+        // 2. Bon message archivé : faite, et le message est dans l'historique.
         statut(
             &st,
             &u,
@@ -1084,6 +1183,95 @@ mod tests_uefn {
             Err(AppError::Conflict(_))
         ));
         assert_eq!(etat(&st, t1).await, "todo");
+    }
+
+    /// Check-in archivé sur la map, comme après `lore_checkin` (#161).
+    async fn archive(st: &AppState, mid: i64, uid: i64, msg: &str) {
+        sqlx::query("INSERT INTO uefn_actions (map_id, user_id, source, action, args, summary, status) VALUES (?, ?, 'web', 'lore_checkin', ?, 'Archivage Lore', 'done')")
+            .bind(mid).bind(uid).bind(json!({ "message": msg }).to_string())
+            .execute(&st.db).await.unwrap();
+    }
+
+    async fn uefn(st: &AppState, tid: i64, status: &str) {
+        sqlx::query("UPDATE tasks SET uefn = 1, status = ? WHERE id = ?")
+            .bind(status)
+            .bind(tid)
+            .execute(&st.db)
+            .await
+            .unwrap();
+    }
+
+    async fn historique(st: &AppState, tid: i64) -> Vec<String> {
+        sqlx::query_scalar("SELECT what FROM task_events WHERE task_id = ?")
+            .bind(tid)
+            .fetch_all(&st.db)
+            .await
+            .unwrap()
+    }
+
+    /// #161, critère 2 : un check-in « #1 #2 … » ferme chaque tâche UEFN en cours qu'il cite ; une tâche à faire,
+    /// faite ou non citée n'est pas touchée.
+    #[tokio::test]
+    async fn un_checkin_pour_plusieurs_taches() {
+        let (st, u, mid, t1, t2) = monde().await;
+        uefn(&st, t1, "doing").await;
+        uefn(&st, t2, "doing").await;
+        archive(&st, mid, u.id, "#1 #2 herbe et repousse").await;
+        close_from_checkin(&st, mid, u.id, "#1 #2 herbe et repousse").await;
+        assert_eq!(etat(&st, t1).await, "done");
+        assert_eq!(etat(&st, t2).await, "done");
+        for t in [t1, t2] {
+            assert!(historique(&st, t)
+                .await
+                .contains(&"Check-in Lore : #1 #2 herbe et repousse".to_string()));
+        }
+        // Une tâche « À faire » citée reste à faire.
+        let (st, u, mid, t1, _) = monde().await;
+        uefn(&st, t1, "todo").await;
+        archive(&st, mid, u.id, "#1 rien").await;
+        close_from_checkin(&st, mid, u.id, "#1 rien").await;
+        assert_eq!(etat(&st, t1).await, "todo");
+    }
+
+    /// #161, critère 3 : le travail de #2 est parti dans le check-in de #1 ; #2 se ferme en désignant ce check-in,
+    /// et son historique le dit.
+    #[tokio::test]
+    async fn rattacher_au_checkin_d_une_autre() {
+        let (st, u, mid, t1, t2) = monde().await;
+        uefn(&st, t1, "doing").await;
+        uefn(&st, t2, "doing").await;
+        archive(&st, mid, u.id, "#1 herbe coupée").await;
+        statut(
+            &st,
+            &u,
+            t2,
+            json!({ "status": "done", "checkin": "#1 herbe coupée" }),
+        )
+        .await
+        .unwrap();
+        assert_eq!(etat(&st, t2).await, "done");
+        assert!(historique(&st, t2).await.contains(
+            &"Rattachée au check-in Lore « #1 herbe coupée » : son travail est archivé avec une autre tâche"
+                .to_string()
+        ));
+        // Un check-in archivé sur une autre map ne compte pas.
+        let autre: i64 = sqlx::query_scalar("INSERT INTO maps (studio_id, name) SELECT studio_id, 'Autre' FROM maps WHERE id = ? RETURNING id")
+            .bind(mid)
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        archive(&st, autre, u.id, "#2 ailleurs").await;
+        statut(&st, &u, t2, json!({ "status": "doing" }))
+            .await
+            .unwrap();
+        assert!(statut(
+            &st,
+            &u,
+            t2,
+            json!({ "status": "done", "checkin": "#2 ailleurs" })
+        )
+        .await
+        .is_err());
     }
 }
 
