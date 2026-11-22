@@ -57,11 +57,11 @@ export function useDialog(onClose: () => void) {
  *  quel que soit le conteneur de la page (un parent animé ou transformé décalerait `position: fixed`). */
 export const Layer = ({ children }: { children: ReactNode }) => createPortal(children, document.querySelector('.app') ?? document.body)
 
-export const Drawer = ({ onClose, label, children }: { onClose: () => void; label: string; children: ReactNode }) => {
+export const Drawer = ({ onClose, label, children, wide }: { onClose: () => void; label: string; children: ReactNode; wide?: boolean }) => {
   const ref = useDialog(onClose)
   return <Layer>
     <div className="scrim" onClick={onClose} />
-    <aside ref={ref as any} className="drawer" role="dialog" aria-modal="true" aria-label={label} tabIndex={-1}>{children}</aside>
+    <aside ref={ref as any} className={'drawer' + (wide ? ' wide' : '')} role="dialog" aria-modal="true" aria-label={label} tabIndex={-1}>{children}</aside>
   </Layer>
 }
 

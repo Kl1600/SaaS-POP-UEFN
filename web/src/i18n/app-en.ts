@@ -161,6 +161,8 @@ const EN: Record<string, string> = {
  "Général": "General",
  "Vue d'ensemble": "Overview",
  "Dashboard": "Dashboard",
+ "Prise le": "Taken on",
+ "Finie le": "Finished on",
  "Bloquée par #{0}": "Blocked by #{0}",
  "Attend": "Waiting for",
  "ne peut pas être prise": "cannot be taken",

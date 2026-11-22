@@ -94,7 +94,7 @@ export default function Tasks() {
                       {blockedBy.length > 0 && c !== 'done' && <div className="small kwait" style={{ marginBottom: 10 }}>{tr("Attend")} <span className="mono">#{blockedBy.join(', #')}</span> · {tr("ne peut pas être prise")}</div>}
                       <div className="row" style={{ justifyContent: 'space-between' }}>
                         <span className="row" style={{ gap: 6 }}><span className="badge">{tagLabel(t.tag)}</span>{t.comments > 0 && <span className="small muted">{t.comments} comm.</span>}{t.subtasks.total > 0 && <span className="small muted">{t.subtasks.done}/{t.subtasks.total}</span>}</span>
-                        {t.assignee_name && <Avatar name={t.assignee_name} small />}
+                        {t.assignee_name && <span className="row small" style={{ gap: 6, minWidth: 0 }}><Avatar name={t.assignee_name} small /><span className="kwho">{t.assignee_name}</span></span>}
                       </div>
                     </button>
                   )
@@ -126,9 +126,41 @@ function TaskDrawer({ id, onClose, members, tasks, onOpen }: { id: number; onClo
   const status = async (s: string) => { if (s === 'done' && t.uefn) { setCheckin(true); return } try { await api.post(`/api/tasks/${id}/status`, { status: s }); reload() } catch (e: any) { toast(e.message, true) } }
   const origin = t.origin?.startsWith('board:') ? `/tableau/${t.origin.split(':')[1]}` : null
   return (<>
-    <Drawer onClose={onClose} label={tr("Tâche #{0}", [t.number])}>
+    <Drawer wide onClose={onClose} label={tr("Tâche #{0}", [t.number])}>
       <div className="row" style={{ justifyContent: 'space-between' }}><span className="small muted mono">#{t.number} · {t.lot || tr("sans lot")}</span><button className="iconbtn" aria-label={tr("Fermer")} onClick={onClose}><X size={18} /></button></div>
       <input className="ptitle" style={{ fontSize: 22, margin: '8px 0 16px' }} defaultValue={t.title} disabled={!canEdit} onBlur={e => e.target.value !== t.title && patch({ title: e.target.value })} aria-label={tr("Titre")} />
+      <div className="tgrid">
+      <div className="tmain">
+      <div className="dsec">{tr("Description")}</div>
+      <textarea className="field" style={{ width: '100%', minHeight: 90, padding: 10 }} defaultValue={t.description} disabled={!canEdit} onBlur={e => e.target.value !== t.description && patch({ description: e.target.value })} aria-label={tr("Description")} />
+
+      <div className="dsec">{tr("Ce qui est fait / ce qui reste")}</div>
+      <div className="stack" style={{ gap: 8 }}>
+        {data.subtasks.map((s: any) => (
+          <label key={s.id} className="row" style={{ gap: 8 }}><input type="checkbox" checked={s.done} disabled={!canEdit} onChange={async e => { await api.patch(`/api/subtasks/${s.id}`, { done: e.target.checked }); reload() }} /><span className={s.done ? 'done' : ''}>{s.title}</span></label>
+        ))}
+        {canEdit && <form className="row" onSubmit={async e => { e.preventDefault(); if (!sub.trim()) return; await api.post(`/api/tasks/${id}/subtasks`, { title: sub }); setSub(''); reload() }}>
+          <input className="field" style={{ flex: 1 }} value={sub} onChange={e => setSub(e.target.value)} placeholder={tr("Ajouter une sous-tâche")} /><button className="btn">{tr("Ajouter")}</button></form>}
+      </div>
+
+      <div className="dsec">{tr("Commentaires")}</div>
+      {data.comments.map((c: any) => (
+        <div key={c.id} className="row" style={{ alignItems: 'flex-start', padding: '6px 0' }}><Avatar name={c.who} small /><div><b style={{ fontWeight: 500 }}>{c.who}</b> <span className="small muted">{ago(c.at)}</span><div>{c.body}</div></div></div>
+      ))}
+      <form className="row" onSubmit={async e => { e.preventDefault(); if (!comment.trim()) return; try { await api.post(`/api/tasks/${id}/comments`, { body: comment }); setComment(''); reload() } catch (er: any) { toast(er.message, true) } }}>
+        <input className="field" style={{ flex: 1 }} value={comment} onChange={e => setComment(e.target.value)} placeholder={tr("Commenter, @ pour mentionner")} aria-label={tr("Commenter")} /><button className="btn">{tr("Envoyer")}</button>
+      </form>
+
+      {data.files.length > 0 && <><div className="dsec">{tr("Fichiers")}</div><div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>{data.files.map((f: string) => <code key={f} className="path">{f}</code>)}</div></>}
+
+      <div className="dsec">{tr("Historique")}</div>
+      <div className="list">
+        {data.events.map((e: any, i: number) => (
+          <div key={i} className="li" style={{ padding: '8px 0' }}><span className="small muted mono" style={{ width: 110, flex: 'none' }}>{frDate(e.at, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span><span style={{ flex: 1 }}>{e.what}</span><span className="small muted">{e.via}{e.who ? ` · ${e.who.split(' ')[0]}` : ''}</span></div>
+        ))}
+      </div>
+      </div>
+      <aside className="tside">
       <div className="props">
         <span className="muted">{tr("Statut")}</span>
         <select className="field" value={t.status} disabled={!canEdit} onChange={e => status(e.target.value)}>{COLS.map(c => <option key={c} value={c}>{STATUS[c]}</option>)}</select>
@@ -167,33 +199,11 @@ function TaskDrawer({ id, onClose, members, tasks, onOpen }: { id: number; onClo
       {data.deps.some((d: any) => d.status !== 'done') && <div className="warn" role="status"><AlertTriangle size={18} /><span>{tr("Bloquée par")} {data.deps.filter((d: any) => d.status !== 'done').map((d: any, i: number) => { const x = tasks.find(t => t.number === d.number); return <span key={d.number}>{i > 0 && ', '}<button className="linkbtn" onClick={() => x && onOpen?.(x.id)}>#{d.number}{x ? ` ${x.title}` : ''}</button> ({STATUS[d.status]})</span> })}</span></div>}
       {data.deps.length > 0 && data.deps.every((d: any) => d.status === 'done') && <p className="small muted">{data.deps.map((d: any) => `#${d.number} : ${STATUS[d.status]}`).join(' · ')}</p>}
 
-      <div className="dsec">{tr("Description")}</div>
-      <textarea className="field" style={{ width: '100%', minHeight: 90, padding: 10 }} defaultValue={t.description} disabled={!canEdit} onBlur={e => e.target.value !== t.description && patch({ description: e.target.value })} aria-label={tr("Description")} />
-
-      <div className="dsec">{tr("Ce qui est fait / ce qui reste")}</div>
-      <div className="stack" style={{ gap: 8 }}>
-        {data.subtasks.map((s: any) => (
-          <label key={s.id} className="row" style={{ gap: 8 }}><input type="checkbox" checked={s.done} disabled={!canEdit} onChange={async e => { await api.patch(`/api/subtasks/${s.id}`, { done: e.target.checked }); reload() }} /><span className={s.done ? 'done' : ''}>{s.title}</span></label>
-        ))}
-        {canEdit && <form className="row" onSubmit={async e => { e.preventDefault(); if (!sub.trim()) return; await api.post(`/api/tasks/${id}/subtasks`, { title: sub }); setSub(''); reload() }}>
-          <input className="field" style={{ flex: 1 }} value={sub} onChange={e => setSub(e.target.value)} placeholder={tr("Ajouter une sous-tâche")} /><button className="btn">{tr("Ajouter")}</button></form>}
+      <div className="props tdates">
+        <span className="muted">{tr("Prise le")}</span><span>{data.started_at ? frDate(data.started_at, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</span>
+        <span className="muted">{tr("Finie le")}</span><span>{t.status === 'done' && t.done_at ? frDate(t.done_at, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</span>
       </div>
-
-      <div className="dsec">{tr("Commentaires")}</div>
-      {data.comments.map((c: any) => (
-        <div key={c.id} className="row" style={{ alignItems: 'flex-start', padding: '6px 0' }}><Avatar name={c.who} small /><div><b style={{ fontWeight: 500 }}>{c.who}</b> <span className="small muted">{ago(c.at)}</span><div>{c.body}</div></div></div>
-      ))}
-      <form className="row" onSubmit={async e => { e.preventDefault(); if (!comment.trim()) return; try { await api.post(`/api/tasks/${id}/comments`, { body: comment }); setComment(''); reload() } catch (er: any) { toast(er.message, true) } }}>
-        <input className="field" style={{ flex: 1 }} value={comment} onChange={e => setComment(e.target.value)} placeholder={tr("Commenter, @ pour mentionner")} aria-label={tr("Commenter")} /><button className="btn">{tr("Envoyer")}</button>
-      </form>
-
-      {data.files.length > 0 && <><div className="dsec">{tr("Fichiers")}</div><div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>{data.files.map((f: string) => <code key={f} className="path">{f}</code>)}</div></>}
-
-      <div className="dsec">{tr("Historique")}</div>
-      <div className="list">
-        {data.events.map((e: any, i: number) => (
-          <div key={i} className="li" style={{ padding: '8px 0' }}><span className="small muted mono" style={{ width: 110, flex: 'none' }}>{frDate(e.at, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span><span style={{ flex: 1 }}>{e.what}</span><span className="small muted">{e.via}{e.who ? ` · ${e.who.split(' ')[0]}` : ''}</span></div>
-        ))}
+      </aside>
       </div>
       {isAdmin && <div style={{ marginTop: 20, paddingTop: 14, borderTop: tr("1px solid var(--border)") }}>
         <button className="btn" style={{ color: 'var(--tr)' }} onClick={async () => { if (!confirm(tr("Supprimer définitivement la tâche #{0} « {1} » ?", [t.number, t.title]))) return; try { await api.del(`/api/tasks/${t.id}`); toast(tr("Tâche #{0} supprimée", [t.number])); onClose() } catch (e: any) { toast(e.message, true) } }}>{tr("Supprimer la tâche")}</button>
