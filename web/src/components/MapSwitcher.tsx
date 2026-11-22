@@ -1,10 +1,10 @@
 // Sélecteur de map dans la barre latérale : changer de map, créer une map ou un studio sans quitter la page.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Check, ChevronsUpDown, Plus, Settings2, Building2, User, Users , Sparkles } from 'lucide-react'
+import { Check, ChevronsUpDown, Building2, LayoutGrid, User, Users, Sparkles } from 'lucide-react'
 import { api } from '../api'
 import { useApp, studioName } from '../state'
-import { Modal } from './ui'
+import { Modal, ROLE } from './ui'
 import { tr } from '../i18n/t'
 import { ConfirmMove, isAdmin, previewMove, type Drag, type Pending } from './MoveMap'
 import { cssRect } from '../zoom'
@@ -41,6 +41,8 @@ export function MapSwitcher() {
     return () => { document.removeEventListener('mousedown', down); document.removeEventListener('keydown', key) }
   }, [open])
   const studios = app.me?.studios ?? []
+  const personal = studios.find(s => s.personal)
+  const teams = studios.filter(s => !s.personal && (s.role === 'owner' || s.role === 'admin'))
   const go = (fn: () => void) => { setOpen(false); fn() }
   // Glisser une map vers un autre groupe la déplace (perso ↔ studio), après confirmation.
   const [drag, setDrag] = useState<Drag | null>(null)
@@ -58,26 +60,36 @@ export function MapSwitcher() {
       <span className="mapsw-txt"><b>{app.map?.name ?? '—'}</b><small>{studioName(app.studio)}</small></span>
       <ChevronsUpDown size={16} strokeWidth={1.75} />
     </button>
-    {open && <div ref={pop} className="mapsw-pop" role="menu" style={{ top: pos.top, left: pos.left, width: pos.width }}>
+    {open && <div ref={pop} className="mapsw-pop" role="menu" style={{ top: pos.top, left: pos.left, width: Math.max(pos.width, 300) }}>
       {studios.map(s => { const canDrop = isAdmin(s) && !!drag && drag.from !== s.id; return <div key={s.id}
         className={'mapsw-group' + (canDrop ? ' drop-ok' : '') + (canDrop && over === s.id ? ' drop-over' : '')}
         onDragOver={e => { if (!canDrop) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (over !== s.id) setOver(s.id) }}
         onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null) && over === s.id) setOver(null) }}
         onDrop={e => { if (!canDrop) return; e.preventDefault(); drop(s.id) }}>
-        <div className="mapsw-studio">{s.personal ? <User size={14} /> : <Building2 size={14} />}{studioName(s)}</div>
-        {s.maps.map(m => <button key={m.id} role="menuitem" className={'mapsw-item' + (m.id === app.map?.id ? ' on' : '') + (drag?.id === m.id ? ' dragging' : '')} onClick={() => go(() => openMap(m.id))}
+        <div className="mapsw-studio">
+          <span className="mapsw-gico">{s.personal ? <User size={14} /> : <Building2 size={14} />}</span>
+          <span className="mapsw-gname">{s.personal ? tr('Mes maps (seul)') : s.name}</span>
+          {!s.personal && <span className="mapsw-role">{ROLE[s.role] ?? s.role}</span>}
+          <span className="mapsw-count">{s.maps.length}</span>
+        </div>
+        {s.maps.map(m => { const cur = m.id === app.map?.id; return <button key={m.id} role="menuitem" aria-current={cur ? 'true' : undefined} className={'mapsw-item' + (cur ? ' on' : '') + (drag?.id === m.id ? ' dragging' : '')} onClick={() => go(() => openMap(m.id))}
           draggable={isAdmin(s)} title={isAdmin(s) && studios.length > 1 ? tr('Glissez la map vers un autre groupe pour la déplacer') : undefined}
           onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(m.id)); setDrag({ id: m.id, name: m.name, from: s.id }) }}
           onDragEnd={() => { setDrag(null); setOver(null) }}>
-          <span>{m.name}</span>{m.id === app.map?.id && <Check size={15} />}
-        </button>)}
-        {s.personal && s.maps.length === 0 && <div className="mapsw-empty">{tr('Les maps que vous faites seul.')}</div>}
-        {(s.role === 'owner' || s.role === 'admin') && <button role="menuitem" className="mapsw-item add" onClick={() => go(() => openCreate({ kind: 'map', studioId: s.id }))}><Plus size={15} />{s.personal ? tr('Nouvelle map perso') : tr('Nouvelle map dans ce studio')}</button>}
+          <span>{m.name}</span>{cur && <em className="mapsw-cur"><Check size={13} />{tr('Ouverte')}</em>}
+        </button> })}
+        {s.maps.length === 0 && <div className="mapsw-empty">{s.personal ? tr('Les maps que vous faites seul.') : tr('Aucune map dans ce studio.')}</div>}
       </div> })}
       <div className="mapsw-foot">
-        <button role="menuitem" className="mapsw-item add" onClick={() => go(() => openCreate({ kind: 'studio' }))}><Users size={15} />{tr('Créer un studio (équipe)')}</button>
-        <button role="menuitem" className="mapsw-item" onClick={() => go(() => nav('/'))}><Settings2 size={15} />{tr('Toutes mes maps')}</button>
-        {app.map && <button role="menuitem" className="mapsw-item add" onClick={() => go(() => nav(`/map/${app.map!.id}/planifier?vue=generateur`))}><Sparkles size={15} />{tr('Générateur de projet')}</button>}
+        <div className="mapsw-studio"><span className="mapsw-gname">{tr('Créer')}</span></div>
+        {personal && <button role="menuitem" className="mapsw-item add" onClick={() => go(() => openCreate({ kind: 'map', studioId: personal.id }))}><User size={15} /><span>{tr('Nouvelle map perso')}</span></button>}
+        {teams.length > 0 && <button role="menuitem" className="mapsw-item add" onClick={() => go(() => openCreate({ kind: 'map', studioId: (teams.find(t => t.id === app.studio?.id) ?? teams[0]).id }))}><Building2 size={15} /><span>{tr('Nouvelle map dans un studio')}</span></button>}
+        <button role="menuitem" className="mapsw-item add" onClick={() => go(() => openCreate({ kind: 'studio' }))}><Users size={15} /><span>{tr('Créer un studio (équipe)')}</span></button>
+      </div>
+      <div className="mapsw-foot">
+        <button role="menuitem" className="mapsw-item" onClick={() => go(() => nav('/'))}><LayoutGrid size={15} /><span>{tr('Vue d’ensemble des maps')}</span></button>
+        {app.map && <button role="menuitem" className="mapsw-item" onClick={() => go(() => nav(`/map/${app.map!.id}/planifier?vue=generateur`))}><Sparkles size={15} /><span>{tr('Générateur de projet')}</span></button>}
+        {studios.some(isAdmin) && studios.length > 1 && <div className="mapsw-hint">{tr('Astuce : glissez une map vers un autre groupe pour la déplacer.')}</div>}
       </div>
     </div>}
     {pending && app.me && <ConfirmMove p={pending} studios={app.me.studios} onClose={() => setPending(null)} />}
