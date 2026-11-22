@@ -54,7 +54,7 @@ export default function AI({ embedded }: { embedded?: boolean } = {}) {
       </section>
 
       <section className="card">
-        <CardHead title={tr("Vos IA")} sub={tr("Lecture seule : l’IA voit le projet sans rien modifier. Les suppressions d’acteurs attendent toujours votre validation dans l’Organiseur.")} />
+        <CardHead title={tr("Vos IA")} sub={tr("Lecture seule : l’IA voit le projet sans rien modifier. Les suppressions d’acteurs attendent toujours votre validation dans Paramètres → UEFN Link.")} />
         {data?.length === 0 && <p className="muted">{tr("Aucune IA connectée pour l’instant.")}</p>}
         <div className="list">{data?.map(t => (
           <div key={t.id} className="li" style={{ flexWrap: 'wrap' }}>
@@ -69,7 +69,7 @@ export default function AI({ embedded }: { embedded?: boolean } = {}) {
 
       <section className="card">
         <CardHead title={tr("Ce que vos IA peuvent faire")} />
-        <p className="small muted" style={{ margin: 0, lineHeight: 1.7 }}>{tr("État d’UEFN · lister, lire, modifier, dupliquer les acteurs · demander une suppression (validée par un humain) · lire et écrire les fichiers Verse · compiler · pousser en session de test · enregistrer le niveau · archiver dans Lore · annuler une action. Tout apparaît dans le journal de l’Organiseur avec la mention « IA ».")}</p>
+        <p className="small muted" style={{ margin: 0, lineHeight: 1.7 }}>{tr("État d’UEFN · lister, lire, modifier, dupliquer les acteurs · demander une suppression (validée par un humain) · lire et écrire les fichiers Verse · compiler · pousser en session de test · enregistrer le niveau · archiver dans Lore · annuler une action. Tout apparaît dans le journal d’UEFN Link (Paramètres) avec la mention « IA ».")}</p>
       </section>
 
       {open && <>

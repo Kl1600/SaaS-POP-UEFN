@@ -21,7 +21,7 @@ type Item = [string, string, any]
 const mapGroups = (mid: number): [string, Item[]][] => [
   ['', [[`/map/${mid}`, tr("Dashboard"), Home]]],
   [tr("Organiser"), [[`/map/${mid}/planifier`, tr("Planifier"), CalendarDays], [`/map/${mid}/taches`, tr("Tâches"), KanbanSquare]]],
-  [tr("Créer"), [[`/map/${mid}/pages`, tr("Pages"), FileText], [`/map/${mid}/tableau`, tr("Tableau blanc"), PenTool], [`/map/${mid}/organiseur`, tr("Organiseur"), ListTree]]],
+  [tr("Créer"), [[`/map/${mid}/pages`, tr("Pages"), FileText], [`/map/${mid}/tableau`, tr("Tableau blanc"), PenTool]]],
   [tr("Publier"), [[`/map/${mid}/lancer`, tr("Lancer et suivre"), Rocket], [`/map/${mid}/remunerer`, tr("Rémunérer"), Coins]]],
 ]
 /** Catégorie Analyse (plan du compte). */
@@ -123,7 +123,7 @@ export default function Layout() {
         <header className="top">
           <button className="iconbtn" aria-label={tr("Replier la barre latérale")} onClick={() => setCollapsed(c => !c)}><PanelLeft size={20} strokeWidth={1.5} /></button>
           <nav className="crumb" aria-label={tr("Fil d'Ariane")}><span>{group}</span><span>/</span>{title}</nav>
-          <button className={'upill ' + uefn.status} onClick={() => nav('/organiseur')} title={uefn.project ? tr("Projet {0}", [uefn.project]) : 'UEFN Link'}><span className="udot" />{STATUS_LABEL[uefn.status]}{uefn.stale ? ` · ${tr("périmé")}` : ''}{uefn.pending ? ` · ${uefn.pending}` : ''}</button>
+          <button className={'upill ' + uefn.status} onClick={() => nav('/parametres?onglet=uefn')} title={uefn.project ? tr("Projet {0}", [uefn.project]) : 'UEFN Link'}><span className="udot" />{STATUS_LABEL[uefn.status]}{uefn.stale ? ` · ${tr("périmé")}` : ''}{uefn.pending ? ` · ${uefn.pending}` : ''}</button>
           <GlobalSearch />
           {app.map && <button className="iconbtn" aria-label={tr("Boussole, assistant intégré")} title={tr("Boussole : assistant intégré")} onClick={() => setGuide({})}><Compass size={20} strokeWidth={1.5} /></button>}
           <Notifications />
