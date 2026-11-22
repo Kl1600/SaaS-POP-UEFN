@@ -389,11 +389,6 @@ pub async fn update(
                 t.assignee_name.as_deref().unwrap_or("quelqu’un d’autre")
             )));
         }
-        sqlx::query("UPDATE tasks SET assignee_id = ? WHERE id = ?")
-            .bind(a)
-            .bind(tid)
-            .execute(&st.db)
-            .await?;
         let other: Option<String> = match a {
             Some(x) if x != u.id => {
                 sqlx::query_scalar("SELECT name FROM users WHERE id = ?")
@@ -414,12 +409,20 @@ pub async fn update(
                 t.assignee_name.as_deref().unwrap_or("?")
             ),
         };
+        // Changement et journal ensemble : une requête interrompue ne laisse pas d'assignation sans trace.
+        let mut tx = st.db.begin().await?;
+        sqlx::query("UPDATE tasks SET assignee_id = ? WHERE id = ?")
+            .bind(a)
+            .bind(tid)
+            .execute(&mut *tx)
+            .await?;
         sqlx::query("INSERT INTO task_events (task_id, user_id, what, via) VALUES (?, ?, ?, 'Bouton')")
             .bind(tid)
             .bind(u.id)
             .bind(&what)
-            .execute(&st.db)
+            .execute(&mut *tx)
             .await?;
+        tx.commit().await?;
         log_activity(&st, t.map_id, Some(u.id), "task", &what, &t.title).await?;
         if let Some(a) = a.filter(|a| *a != u.id) {
             crate::account::notify_user(

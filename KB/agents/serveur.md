@@ -111,3 +111,7 @@ Bloque : rien
 - Fait : migration 0033 (`tasks.uefn`) ; `tasks::set_status_checked` exige un message « #N … » pour fermer une tâche UEFN, repris du `lore_checkin` de l'agent qui l'a réservée ; case et fenêtre dans Tâches ; MCP `uefn`, `checkin`.
 - Vérifié : `cargo test`, navigateur en local. Pas avec le vrai UEFN.
 - Leçon : sous Windows, `web/dist/index.html` sort en CRLF ; le commiter en LF sinon le CI échoue.
+### 2026-11-22 · #157 · l'assignation à l'initiative des membres
+- Fait : `PATCH /api/tasks/:id` lit `null` comme « vider » (`double_option`) pour `assignee_id` et `planned_day` ; assigner quelqu'un d'autre ou retirer la tâche d'un autre est réservé aux propriétaires et admins (aussi à la création : `check_assignee`) ; le journal de la tâche note « X a pris #n », « X a rendu #n » ou « X a assigné #n à Y ». Le plan généré n'assigne plus personne, et une map passée en perso libère les tâches des autres au lieu de les réattribuer. Boussole : « tâches à prendre ». Web : « Je la prends » et « Je la rends » ; un membre simple ne voit plus la liste des autres.
+- Vérifié : `cargo test` (5 tests `tests_assignation`), navigateur en local avec une propriétaire et une membre (plan, fiche, déplacement vers le perso).
+- Leçon : axum abandonne le handler quand le client coupe la requête (changement de page). Un `UPDATE` suivi d'un `INSERT` dans le journal doit passer dans une transaction, sinon le changement reste sans trace.
