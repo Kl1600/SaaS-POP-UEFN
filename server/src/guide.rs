@@ -329,13 +329,13 @@ pub async fn guide(
             "info",
             if en {
                 format!(
-                    "{} with nobody assigned.",
-                    plural(unassigned, "task to do is left", "tasks to do are left")
+                    "{} up for grabs: nobody has taken them yet.",
+                    plural(unassigned, "task to do is", "tasks to do are")
                 )
             } else {
                 format!(
-                    "{} sans personne assignée.",
-                    plural(unassigned, "tâche à faire reste", "tâches à faire restent")
+                    "{} à prendre : personne ne s’en occupe encore.",
+                    plural(unassigned, "tâche à faire est", "tâches à faire sont")
                 )
             },
         )

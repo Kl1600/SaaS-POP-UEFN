@@ -361,7 +361,8 @@ pub async fn preview(
             }
         }
     }
-    // Assignation par spécialité, puis placement jour par jour selon la capacité de chacun.
+    // Placement jour par jour selon la capacité de l'équipe. Les spécialités servent à répartir la charge,
+    // mais personne n'est assigné d'office : chaque membre prend ses tâches lui-même (#157).
     let deadline = release - Duration::days(4);
     let mut cap: HashMap<i64, f64> = HashMap::new();
     for m in &b.members {
@@ -380,7 +381,6 @@ pub async fn preview(
         } else {
             u.id
         };
-        tasks[i].assignee_id = Some(who);
         let mut day = start;
         for d in tasks[i].deps.clone() {
             if let Some(dd) = tasks[d].planned_day.as_deref().and_then(parse_date) {
@@ -785,4 +785,64 @@ pub async fn seasons(
     }
     ev.sort_by(|a, b| a["date"].as_str().cmp(&b["date"].as_str()));
     Ok(Json(json!(ev)))
+}
+
+#[cfg(test)]
+mod tests_assignation {
+    use super::*;
+
+    /// #157 : un plan généré pour une équipe de 2 ne pré-assigne personne.
+    #[tokio::test]
+    async fn plan_genere_sans_assignation() {
+        let st = crate::test_state().await;
+        let sid: i64 = sqlx::query_scalar("INSERT INTO studios (name) VALUES ('S') RETURNING id")
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        let mid: i64 =
+            sqlx::query_scalar("INSERT INTO maps (studio_id, name) VALUES (?, 'M') RETURNING id")
+                .bind(sid)
+                .fetch_one(&st.db)
+                .await
+                .unwrap();
+        let mut ids = vec![];
+        for (e, r) in [("a@a.fr", "owner"), ("b@a.fr", "member")] {
+            let id: i64 = sqlx::query_scalar(
+                "INSERT INTO users (email, name, password_hash) VALUES (?, ?, 'x') RETURNING id",
+            )
+            .bind(e)
+            .bind(e)
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+            sqlx::query("INSERT INTO memberships (studio_id, user_id, role) VALUES (?, ?, ?)")
+                .bind(sid)
+                .bind(id)
+                .bind(r)
+                .execute(&st.db)
+                .await
+                .unwrap();
+            ids.push(id);
+        }
+        let u = AuthUser {
+            id: ids[0],
+            email: "a@a.fr".into(),
+            name: "A".into(),
+            sid: String::new(),
+        };
+        let release = fmt(today() + Duration::days(60));
+        let b: GenIn = serde_json::from_value(json!({
+            "genre": "autre", "ai": true, "release_date": release, "board_id": null,
+            "members": [{ "user_id": ids[0], "tag": "code", "hours": 20 }, { "user_id": ids[1], "tag": "carte", "hours": 10 }]
+        }))
+        .unwrap();
+        let r = preview(State(st.clone()), u, Path(mid), Json(b))
+            .await
+            .unwrap()
+            .0;
+        let tasks = r["tasks"].as_array().unwrap();
+        assert!(!tasks.is_empty());
+        assert!(tasks.iter().all(|t| t["assignee_id"].is_null()));
+        assert!(tasks.iter().all(|t| t["planned_day"].is_string()));
+    }
 }

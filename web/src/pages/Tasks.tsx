@@ -156,7 +156,7 @@ function Locks() {
 }
 
 function TaskDrawer({ id, onClose, members, tasks }: { id: number; onClose: () => void; members: any[]; tasks: Task[] }) {
-  const { canEdit, isAdmin, toast } = useApp()
+  const { canEdit, isAdmin, me, toast } = useApp()
   const { data, reload } = useLoad<any>(`/api/tasks/${id}`, [id])
   const [comment, setComment] = useState('')
   const [sub, setSub] = useState('')
@@ -177,9 +177,16 @@ function TaskDrawer({ id, onClose, members, tasks }: { id: number; onClose: () =
         <span className="muted">{tr("Statut")}</span>
         <select className="field" value={t.status} disabled={!canEdit} onChange={e => status(e.target.value)}>{COLS.map(c => <option key={c} value={c}>{STATUS[c]}</option>)}</select>
         <span className="muted">{tr("Assigné")}</span>
-        <select className="field" value={t.assignee_id ?? ''} disabled={!canEdit} onChange={e => patch({ assignee_id: e.target.value ? Number(e.target.value) : null })}>
-          <option value="">{tr("Personne")}</option>{members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-        </select>
+        {/* Chaque membre prend ses tâches lui-même ; seuls le propriétaire et les admins assignent les autres (#157). */}
+        <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+          {isAdmin
+            ? <select className="field" value={t.assignee_id ?? ''} onChange={e => patch({ assignee_id: e.target.value ? Number(e.target.value) : null })}>
+                <option value="">{tr("Personne")}</option>{members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+            : <span>{t.assignee_name ?? tr("Personne")}</span>}
+          {canEdit && t.status !== 'done' && t.assignee_id == null && <button className="btn" onClick={() => patch({ assignee_id: me!.user.id })}>{tr("Je la prends")}</button>}
+          {canEdit && t.assignee_id === me?.user.id && <button className="btn" onClick={() => patch({ assignee_id: null })}>{tr("Je la rends")}</button>}
+        </div>
         <span className="muted">{tr("Étiquette")}</span>
         <select className="field" value={t.tag} disabled={!canEdit} onChange={e => patch({ tag: e.target.value })}>{TAGS.map(x => <option key={x} value={x}>{tagLabel(x)}</option>)}</select>
         <span className="muted">{tr("Jour prévu")}</span>
@@ -256,7 +263,7 @@ function CheckinModal({ task, onClose, onDone }: { task: { id: number; number: n
 }
 
 export function NewTaskModal({ onClose }: { onClose: () => void }) {
-  const { map, toast } = useApp()
+  const { map, isAdmin, me, toast } = useApp()
   const { data: mem } = useMembers()
   const [f, setF] = useState({ title: '', tag: 'code', assignee_id: '', planned_day: '', deps: '', uefn: false })
   const [err, setErr] = useState('')
@@ -281,7 +288,7 @@ export function NewTaskModal({ onClose }: { onClose: () => void }) {
         <label className="label">{tr("Titre")}<input className="field" autoFocus value={f.title} onChange={e => setF({ ...f, title: e.target.value })} required maxLength={140} /></label>
         <div className="grid2" style={{ gridTemplateColumns: '1fr 1fr' }}>
           <label className="label">{tr("Étiquette")}<select className="field" value={f.tag} onChange={e => setF({ ...f, tag: e.target.value })}>{TAGS.map(t => <option key={t} value={t}>{tagLabel(t)}</option>)}</select></label>
-          <label className="label">{tr("Assigné")}<select className="field" value={f.assignee_id} onChange={e => setF({ ...f, assignee_id: e.target.value })}><option value="">{tr("Personne")}</option>{mem?.members.map((m: any) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></label>
+          <label className="label">{tr("Assigné")}<select className="field" value={f.assignee_id} onChange={e => setF({ ...f, assignee_id: e.target.value })}><option value="">{tr("Personne")}</option>{mem?.members.filter((m: any) => isAdmin || m.id === me?.user.id).map((m: any) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></label>
           <label className="label">{tr("Jour prévu")}<input className="field" type="date" value={f.planned_day} onChange={e => setF({ ...f, planned_day: e.target.value })} /></label>
           <label className="label">{tr("Dépend de (n°)")}<input className="field mono" value={f.deps} onChange={e => setF({ ...f, deps: e.target.value })} placeholder="12, 18" /></label>
         </div>

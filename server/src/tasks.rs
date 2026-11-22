@@ -129,7 +129,29 @@ pub struct NewTask {
     pub uefn: Option<bool>,
 }
 
+/// Lit `null` comme « vider le champ » (`Some(None)`) et un champ absent comme « ne rien changer » (`None`).
+/// Sans ça, serde confond les deux et on ne peut ni désassigner une tâche ni vider son jour prévu (#157).
+fn double_option<'de, D, T>(d: D) -> Result<Option<Option<T>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Option::<T>::deserialize(d).map(Some)
+}
+
+/// Les membres prennent eux-mêmes leurs tâches (#157) : assigner quelqu'un d'autre est réservé
+/// au propriétaire et aux admins du studio.
+fn check_assign_right(ctx: &MapCtx, a: Option<i64>) -> Result<(), AppError> {
+    match a {
+        Some(uid) if uid != ctx.user.id && ctx.role < Role::Admin => Err(bad(
+            "Seuls le propriétaire et les admins du studio peuvent assigner une tâche à quelqu’un d’autre. Chaque membre prend ses tâches lui-même.",
+        )),
+        _ => Ok(()),
+    }
+}
+
 async fn check_assignee(st: &AppState, ctx: &MapCtx, a: Option<i64>) -> Result<(), AppError> {
+    check_assign_right(ctx, a)?;
     if let Some(uid) = a {
         let ok: Option<(i64,)> =
             sqlx::query_as("SELECT user_id FROM memberships WHERE studio_id = ? AND user_id = ?")
@@ -312,7 +334,9 @@ pub struct TaskPatch {
     title: Option<String>,
     description: Option<String>,
     tag: Option<String>,
+    #[serde(default, deserialize_with = "double_option")]
     assignee_id: Option<Option<i64>>,
+    #[serde(default, deserialize_with = "double_option")]
     planned_day: Option<Option<String>>,
     deps: Option<Vec<i64>>,
     uefn: Option<bool>,
@@ -355,13 +379,53 @@ pub async fn update(
             .execute(&st.db)
             .await?;
     }
-    if let Some(a) = b.assignee_id {
+    if let Some(a) = b.assignee_id.filter(|a| *a != t.assignee_id) {
         check_assignee(&st, &ctx, a).await?;
+        // Prendre une tâche déjà prise par un autre, ou la lui retirer : réservé aux responsables.
+        if ctx.role < Role::Admin && t.assignee_id.is_some_and(|x| x != u.id) {
+            return Err(bad(&format!(
+                "#{} est déjà prise par {}. Demandez-lui de la rendre, ou à un admin du studio.",
+                t.number,
+                t.assignee_name.as_deref().unwrap_or("quelqu’un d’autre")
+            )));
+        }
+        let other: Option<String> = match a {
+            Some(x) if x != u.id => {
+                sqlx::query_scalar("SELECT name FROM users WHERE id = ?")
+                    .bind(x)
+                    .fetch_optional(&st.db)
+                    .await?
+            }
+            _ => None,
+        };
+        let what = match (a, &other) {
+            (Some(_), Some(n)) => format!("{} a assigné #{} à {}", u.name, t.number, n),
+            (Some(_), None) => format!("{} a pris #{}", u.name, t.number),
+            (None, _) if t.assignee_id == Some(u.id) => format!("{} a rendu #{}", u.name, t.number),
+            (None, _) => format!(
+                "{} a retiré #{} à {}",
+                u.name,
+                t.number,
+                t.assignee_name.as_deref().unwrap_or("?")
+            ),
+        };
+        // Changement et journal ensemble : une requête interrompue ne laisse pas d'assignation sans trace.
+        let mut tx = st.db.begin().await?;
         sqlx::query("UPDATE tasks SET assignee_id = ? WHERE id = ?")
             .bind(a)
             .bind(tid)
-            .execute(&st.db)
+            .execute(&mut *tx)
             .await?;
+        sqlx::query(
+            "INSERT INTO task_events (task_id, user_id, what, via) VALUES (?, ?, ?, 'Bouton')",
+        )
+        .bind(tid)
+        .bind(u.id)
+        .bind(&what)
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        log_activity(&st, t.map_id, Some(u.id), "task", &what, &t.title).await?;
         if let Some(a) = a.filter(|a| *a != u.id) {
             crate::account::notify_user(
                 &st,
@@ -374,6 +438,7 @@ pub async fn update(
         }
     }
     if let Some(d) = &b.planned_day {
+        let d = d.as_deref().map(str::trim).filter(|d| !d.is_empty());
         sqlx::query("UPDATE tasks SET planned_day = ? WHERE id = ?")
             .bind(d)
             .bind(tid)
@@ -973,5 +1038,187 @@ mod tests_uefn {
             Err(AppError::Conflict(_))
         ));
         assert_eq!(etat(&st, t1).await, "todo");
+    }
+}
+
+/// #157 : les membres prennent et rendent eux-mêmes leurs tâches ; `null` vide bien un champ.
+#[cfg(test)]
+mod tests_assignation {
+    use super::*;
+
+    async fn personne(st: &AppState, sid: i64, email: &str, name: &str, role: &str) -> AuthUser {
+        let id: i64 = sqlx::query_scalar(
+            "INSERT INTO users (email, name, password_hash) VALUES (?, ?, 'x') RETURNING id",
+        )
+        .bind(email)
+        .bind(name)
+        .fetch_one(&st.db)
+        .await
+        .unwrap();
+        sqlx::query("INSERT INTO memberships (studio_id, user_id, role) VALUES (?, ?, ?)")
+            .bind(sid)
+            .bind(id)
+            .bind(role)
+            .execute(&st.db)
+            .await
+            .unwrap();
+        AuthUser {
+            id,
+            email: email.into(),
+            name: name.into(),
+            sid: String::new(),
+        }
+    }
+
+    /// Un studio, une map, une propriétaire, deux membres simples et une tâche libre.
+    async fn monde() -> (AppState, i64, AuthUser, AuthUser, AuthUser, i64) {
+        let st = crate::test_state().await;
+        let sid: i64 = sqlx::query_scalar("INSERT INTO studios (name) VALUES ('S') RETURNING id")
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        let mid: i64 =
+            sqlx::query_scalar("INSERT INTO maps (studio_id, name) VALUES (?, 'M') RETURNING id")
+                .bind(sid)
+                .fetch_one(&st.db)
+                .await
+                .unwrap();
+        let chef = personne(&st, sid, "c@a.fr", "Chef", "owner").await;
+        let ana = personne(&st, sid, "a@a.fr", "Ana", "member").await;
+        let bob = personne(&st, sid, "b@a.fr", "Bob", "member").await;
+        let ctx = map_ctx(&st, &ana, mid).await.unwrap();
+        let (tid, _) = insert_task(
+            &st,
+            &ctx,
+            &NewTask {
+                title: "Poser les spawns".into(),
+                tag: None,
+                description: None,
+                assignee_id: None,
+                deps: None,
+                planned_day: Some("2026-12-01".into()),
+                lot: None,
+                status: None,
+                ai: None,
+                origin: None,
+                uefn: None,
+            },
+        )
+        .await
+        .unwrap();
+        (st, mid, chef, ana, bob, tid)
+    }
+
+    async fn patch(st: &AppState, u: &AuthUser, tid: i64, b: Value) -> Result<(), AppError> {
+        update(
+            State(st.clone()),
+            u.clone(),
+            Path(tid),
+            Json(serde_json::from_value(b).unwrap()),
+        )
+        .await
+        .map(|_| ())
+    }
+
+    async fn champs(st: &AppState, tid: i64) -> (Option<i64>, Option<String>) {
+        sqlx::query_as("SELECT assignee_id, planned_day FROM tasks WHERE id = ?")
+            .bind(tid)
+            .fetch_one(&st.db)
+            .await
+            .unwrap()
+    }
+
+    #[test]
+    fn null_et_absent_ne_se_confondent_pas() {
+        let a: TaskPatch = serde_json::from_value(json!({ "assignee_id": null })).unwrap();
+        assert_eq!(a.assignee_id, Some(None));
+        assert_eq!(a.planned_day, None);
+        let b: TaskPatch =
+            serde_json::from_value(json!({ "planned_day": null, "assignee_id": 4 })).unwrap();
+        assert_eq!(b.planned_day, Some(None));
+        assert_eq!(b.assignee_id, Some(Some(4)));
+    }
+
+    #[tokio::test]
+    async fn desassigner_et_vider_le_jour() {
+        let (st, _, chef, ana, _, tid) = monde().await;
+        patch(&st, &chef, tid, json!({ "assignee_id": ana.id }))
+            .await
+            .unwrap();
+        assert_eq!(champs(&st, tid).await.0, Some(ana.id));
+        patch(
+            &st,
+            &chef,
+            tid,
+            json!({ "assignee_id": null, "planned_day": null }),
+        )
+        .await
+        .unwrap();
+        assert_eq!(champs(&st, tid).await, (None, None));
+    }
+
+    #[tokio::test]
+    async fn un_membre_prend_et_rend_mais_n_assigne_pas_les_autres() {
+        let (st, _, chef, ana, bob, tid) = monde().await;
+        // Assigner quelqu'un d'autre : refusé à un membre simple, en français.
+        match patch(&st, &ana, tid, json!({ "assignee_id": bob.id })).await {
+            Err(AppError::BadRequest(m)) => assert!(m.contains("propriétaire"), "{m}"),
+            _ => panic!("un membre ne doit pas assigner un autre membre"),
+        }
+        assert_eq!(champs(&st, tid).await.0, None);
+        // Prendre une tâche libre, puis la rendre.
+        patch(&st, &ana, tid, json!({ "assignee_id": ana.id }))
+            .await
+            .unwrap();
+        assert_eq!(champs(&st, tid).await.0, Some(ana.id));
+        // Bob ne peut ni la prendre à Ana ni la lui retirer.
+        assert!(patch(&st, &bob, tid, json!({ "assignee_id": bob.id }))
+            .await
+            .is_err());
+        assert!(patch(&st, &bob, tid, json!({ "assignee_id": null }))
+            .await
+            .is_err());
+        patch(&st, &ana, tid, json!({ "assignee_id": null }))
+            .await
+            .unwrap();
+        assert_eq!(champs(&st, tid).await.0, None);
+        // Le journal de la tâche le dit.
+        let ev: Vec<(String,)> =
+            sqlx::query_as("SELECT what FROM task_events WHERE task_id = ? ORDER BY id")
+                .bind(tid)
+                .fetch_all(&st.db)
+                .await
+                .unwrap();
+        let ev: Vec<&str> = ev.iter().map(|e| e.0.as_str()).collect();
+        assert!(ev.contains(&"Ana a pris #1"), "{ev:?}");
+        assert!(ev.contains(&"Ana a rendu #1"), "{ev:?}");
+        // La propriétaire, elle, peut assigner Bob.
+        patch(&st, &chef, tid, json!({ "assignee_id": bob.id }))
+            .await
+            .unwrap();
+        assert_eq!(champs(&st, tid).await.0, Some(bob.id));
+    }
+
+    #[tokio::test]
+    async fn creer_une_tache_pour_un_autre_reserve_aux_responsables() {
+        let (st, mid, chef, ana, bob, _) = monde().await;
+        let nt = |a: i64| NewTask {
+            title: "Écrire la doc".into(),
+            tag: None,
+            description: None,
+            assignee_id: Some(a),
+            deps: None,
+            planned_day: None,
+            lot: None,
+            status: None,
+            ai: None,
+            origin: None,
+            uefn: None,
+        };
+        let ctx = map_ctx(&st, &ana, mid).await.unwrap();
+        assert!(insert_task(&st, &ctx, &nt(bob.id)).await.is_err());
+        assert!(insert_task(&st, &ctx, &nt(ana.id)).await.is_ok());
+        let ctx = map_ctx(&st, &chef, mid).await.unwrap();
+        assert!(insert_task(&st, &ctx, &nt(bob.id)).await.is_ok());
     }
 }

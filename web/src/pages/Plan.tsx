@@ -26,7 +26,7 @@ export default function Plan() {
 }
 
 function Wizard({ done }: { done: () => void }) {
-  const { map, toast } = useApp()
+  const { map, isAdmin, toast } = useApp()
   const { data: mem } = useMembers()
   const { data: boards } = useLoad<any[]>(map ? `/api/maps/${map.id}/boards` : null, [map?.id])
   const [step, setStep] = useState(1)
@@ -70,14 +70,14 @@ function Wizard({ done }: { done: () => void }) {
     {lots.map(l => (
       <section key={l} className="card">
         <CardHead title={l} sub={tr("{0} tâches", [plan.tasks.filter((t: any) => t.lot === l).length])} />
-        <div style={{ overflowX: 'auto' }}><table className="tbl"><thead><tr><th>{tr("Tâche (1 h)")}</th><th>{tr("Étiquette")}</th><th>{tr("Jour prévu")}</th><th>{tr("Dépend de")}</th><th>{tr("Assigné suggéré")}</th><th /></tr></thead><tbody>
+        <div style={{ overflowX: 'auto' }}><table className="tbl"><thead><tr><th>{tr("Tâche (1 h)")}</th><th>{tr("Étiquette")}</th><th>{tr("Jour prévu")}</th><th>{tr("Dépend de")}</th><th>{tr("Assigné")}</th><th /></tr></thead><tbody>
           {plan.tasks.filter((t: any) => t.lot === l).map((t: any) => (
             <tr key={t.key}>
               <td><input className="field" style={{ width: '100%', minWidth: 220 }} value={t.title} onChange={e => setT(t.key, { title: e.target.value })} />{t.ai && <span className="badge" style={{ marginTop: 4 }}>IA</span>}</td>
               <td><select className="field" value={t.tag} onChange={e => setT(t.key, { tag: e.target.value })}>{TAGS.map(x => <option key={x} value={x}>{tagLabel(x)}</option>)}</select></td>
               <td><input className="field" type="date" value={t.planned_day ?? ''} onChange={e => setT(t.key, { planned_day: e.target.value })} /></td>
               <td className="muted small">{t.deps.map((d: number) => plan.tasks.find((x: any) => x.key === d)?.title).filter(Boolean).join(', ') || '—'}</td>
-              <td><select className="field" value={t.assignee_id ?? ''} onChange={e => setT(t.key, { assignee_id: Number(e.target.value) })}>{mem?.members.map((m: any) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></td>
+              <td><select className="field" value={t.assignee_id ?? ''} disabled={!isAdmin} title={isAdmin ? undefined : tr("Chaque membre prendra ses tâches lui-même")} onChange={e => setT(t.key, { assignee_id: e.target.value ? Number(e.target.value) : null })}><option value="">{tr("Personne")}</option>{mem?.members.map((m: any) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></td>
               <td><button className="iconbtn" aria-label={tr("Retirer")} onClick={() => setPlan({ ...plan, tasks: plan.tasks.filter((x: any) => x.key !== t.key).map((x: any) => ({ ...x, deps: x.deps.filter((d: number) => d !== t.key) })) })}><Trash2 size={16} /></button></td>
             </tr>
           ))}
