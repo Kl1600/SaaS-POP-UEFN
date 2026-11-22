@@ -62,7 +62,7 @@ export default function Tasks() {
   return (
     <main className="content">
       <PageHead title={tr("Tâches")} help={tr("Des tâches d'une heure. Chaque changement de statut est tracé.")}><AiPlanButton /></PageHead>
-      <Tabs value={tab} onChange={setTab} items={[['kanban', tr("Kanban")], ['graph', tr("Dépendances")], ['people', tr("Par personne")], ['files', tr("Fichiers verrouillés")]]} />
+      <Tabs value={tab} onChange={setTab} items={[['kanban', tr("Kanban")], ['graph', tr("Dépendances")], ['people', tr("Par personne")]]} />
 
       {(tab === 'kanban' || tab === 'graph') && <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
           <input className="field" style={{ width: 220 }} placeholder={tr("Filtrer…")} value={q} onChange={e => setQ(e.target.value)} aria-label={tr("Filtrer les tâches")} />
@@ -106,7 +106,6 @@ export default function Tasks() {
       </>}
 
       {tab === 'people' && <People />}
-      {tab === 'files' && <Locks />}
       {checkin && <CheckinModal task={checkin} onClose={() => setCheckin(null)} onDone={() => { setCheckin(null); setMsg(''); reload() }} />}
       {open && <TaskDrawer id={open} onClose={() => setOpen(null)} members={mem?.members ?? []} tasks={tasks ?? []} />}
     </main>
@@ -148,22 +147,6 @@ function People() {
         </div>
       </section>
     </div>
-  )
-}
-
-function Locks() {
-  const { map } = useApp()
-  const { data } = useLoad<any[]>(map ? `/api/maps/${map.id}/locks` : null, [map?.id])
-  return (
-    <section className="card">
-      <CardHead title={tr("Qui travaille sur quel fichier")} sub={tr("Fichiers UEFN verrouillés dans Lore (alimenté par le webhook Lore, voir Intégrations)")} />
-      {data?.length === 0 && <p className="muted">{tr("Aucun fichier verrouillé.")}</p>}
-      <div style={{ overflowX: 'auto' }}><table className="tbl"><thead><tr><th>{tr("Fichier")}</th><th>{tr("Verrouillé par")}</th><th>{tr("Depuis")}</th><th>{tr("Tâche")}</th><th>{tr("État")}</th></tr></thead><tbody>
-        {data?.map((l, i) => (
-          <tr key={i}><td><code className="path">{l.path}</code></td><td><span className="row" style={{ gap: 8 }}><Avatar name={l.who} small />{l.who}</span></td><td className="muted">{ago(l.since)}</td><td className="mono muted">{l.task ? `#${l.task}` : '—'}</td><td>{l.stale ? <span className="badge b-r">{tr("Verrou de plus de 24 h")}</span> : <span className="badge">{tr("Actif")}</span>}</td></tr>
-        ))}
-      </tbody></table></div>
-    </section>
   )
 }
 

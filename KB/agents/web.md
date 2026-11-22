@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-22 · #209 · Tâches sans « Fichiers verrouillés »
+- Fait : onglet et composant Locks retirés de Tasks.tsx ; route /locks et webhook Lore gardés côté serveur.
+- Vérifié : tsc + vite build.
+
 ### 2026-11-22 · #199 · Rémunérer allégé
 - Fait : cartes « Simulateur passage à 50 % » et « Offres en jeu » retirées de Money.tsx (API /offers et données gardées).
 - Vérifié : tsc + vite build.
