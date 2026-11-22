@@ -111,7 +111,7 @@ pub async fn overview(
     })))
 }
 
-// ---------- Jalons ----------
+// ---------- Objectifs ----------
 
 #[derive(Deserialize)]
 pub struct MilestoneIn {
@@ -501,7 +501,7 @@ pub async fn apply(
         Some(u.id),
         "plan",
         "Plan de projet validé",
-        &format!("{} tâches, {} jalons", b.tasks.len(), b.milestones.len()),
+        &format!("{} tâches, {} objectifs", b.tasks.len(), b.milestones.len()),
     )
     .await?;
     notify(&st, mid, json!({ "t": "refresh", "what": "tasks" }));
@@ -626,7 +626,7 @@ pub struct MoveIn {
     planned_day: String,
 }
 
-/// Déplace une barre puis recalcule : les tâches qui en dépendent glissent, et on signale les jalons dépassés.
+/// Déplace une barre puis recalcule : les tâches qui en dépendent glissent, et on signale les objectifs dépassés.
 pub async fn move_and_recalc(
     State(st): State<AppState>,
     u: AuthUser,
@@ -726,7 +726,7 @@ async fn recalc_inner(st: &AppState, mid: i64) -> Result<Value, AppError> {
     .fetch_all(&st.db)
     .await?;
     let mut alerts = vec![];
-    // Alerte quand une tâche décalée passe de l'autre côté d'un jalon.
+    // Alerte quand une tâche décalée passe de l'autre côté d'un objectif.
     for t in &tasks {
         let (Some(old), Some(new)) = (
             t.planned_day.as_deref().and_then(parse_date),
@@ -757,7 +757,7 @@ async fn recalc_inner(st: &AppState, mid: i64) -> Result<Value, AppError> {
     Ok(json!({ "shifted": shifted, "alerts": alerts }))
 }
 
-/// Calendrier des mises à jour et des saisons : jalons de la map + repères Fortnite à vérifier.
+/// Calendrier des mises à jour et des saisons : objectifs de la map + repères Fortnite à vérifier.
 pub async fn seasons(
     State(st): State<AppState>,
     u: AuthUser,

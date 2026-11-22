@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-22 · #214 · « jalon » devient « objectif »
+- Fait : remplacement dans web/src et server/src (accords : l’objectif, de l’objectif, cet objectif, Nouvel objectif), traductions anglaises milestone → goal ; mots-clés de l'aide gardent « jalon » pour la recherche ; valeur stockée `kind = 'jalon'` (plan.rs) et mots-clés de guide.rs inchangés.
+- Vérifié : cargo test, tsc + vite build, navigateur (Dashboard, Planifier : aucun « jalon »).
+
 ### 2026-11-22 · #210 · Organiseur retiré
 - Fait : page Organiseur retirée du menu ; /organiseur et la pastille d'état mènent à Paramètres → UEFN Link (`UefnLinkSettings` dans Organizer.tsx, chargé à la demande) : relais (Pairing), suppressions à valider, journal des actions UEFN avec annulation. Mentions de l'Organiseur retirées de l'appli, de l'aide et du README ; décision notée dans KB/DECISIONS.md. Page d'accueil publique (Landing) pas encore mise à jour.
 - Vérifié : navigateur, aucune erreur JS.
