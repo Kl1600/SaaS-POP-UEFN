@@ -539,7 +539,10 @@ pub async fn move_map(
         (
             "Map reprise en solo",
             if reassigned > 0 {
-                format!("{} tâche(s) d’autres membres redevenue(s) sans personne", reassigned)
+                format!(
+                    "{} tâche(s) d’autres membres redevenue(s) sans personne",
+                    reassigned
+                )
             } else {
                 String::new()
             },

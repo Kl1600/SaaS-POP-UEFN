@@ -416,12 +416,14 @@ pub async fn update(
             .bind(tid)
             .execute(&mut *tx)
             .await?;
-        sqlx::query("INSERT INTO task_events (task_id, user_id, what, via) VALUES (?, ?, ?, 'Bouton')")
-            .bind(tid)
-            .bind(u.id)
-            .bind(&what)
-            .execute(&mut *tx)
-            .await?;
+        sqlx::query(
+            "INSERT INTO task_events (task_id, user_id, what, via) VALUES (?, ?, ?, 'Bouton')",
+        )
+        .bind(tid)
+        .bind(u.id)
+        .bind(&what)
+        .execute(&mut *tx)
+        .await?;
         tx.commit().await?;
         log_activity(&st, t.map_id, Some(u.id), "task", &what, &t.title).await?;
         if let Some(a) = a.filter(|a| *a != u.id) {
@@ -1131,7 +1133,8 @@ mod tests_assignation {
         let a: TaskPatch = serde_json::from_value(json!({ "assignee_id": null })).unwrap();
         assert_eq!(a.assignee_id, Some(None));
         assert_eq!(a.planned_day, None);
-        let b: TaskPatch = serde_json::from_value(json!({ "planned_day": null, "assignee_id": 4 })).unwrap();
+        let b: TaskPatch =
+            serde_json::from_value(json!({ "planned_day": null, "assignee_id": 4 })).unwrap();
         assert_eq!(b.planned_day, Some(None));
         assert_eq!(b.assignee_id, Some(Some(4)));
     }
@@ -1139,11 +1142,18 @@ mod tests_assignation {
     #[tokio::test]
     async fn desassigner_et_vider_le_jour() {
         let (st, _, chef, ana, _, tid) = monde().await;
-        patch(&st, &chef, tid, json!({ "assignee_id": ana.id })).await.unwrap();
-        assert_eq!(champs(&st, tid).await.0, Some(ana.id));
-        patch(&st, &chef, tid, json!({ "assignee_id": null, "planned_day": null }))
+        patch(&st, &chef, tid, json!({ "assignee_id": ana.id }))
             .await
             .unwrap();
+        assert_eq!(champs(&st, tid).await.0, Some(ana.id));
+        patch(
+            &st,
+            &chef,
+            tid,
+            json!({ "assignee_id": null, "planned_day": null }),
+        )
+        .await
+        .unwrap();
         assert_eq!(champs(&st, tid).await, (None, None));
     }
 
@@ -1157,24 +1167,35 @@ mod tests_assignation {
         }
         assert_eq!(champs(&st, tid).await.0, None);
         // Prendre une tâche libre, puis la rendre.
-        patch(&st, &ana, tid, json!({ "assignee_id": ana.id })).await.unwrap();
-        assert_eq!(champs(&st, tid).await.0, Some(ana.id));
-        // Bob ne peut ni la prendre à Ana ni la lui retirer.
-        assert!(patch(&st, &bob, tid, json!({ "assignee_id": bob.id })).await.is_err());
-        assert!(patch(&st, &bob, tid, json!({ "assignee_id": null })).await.is_err());
-        patch(&st, &ana, tid, json!({ "assignee_id": null })).await.unwrap();
-        assert_eq!(champs(&st, tid).await.0, None);
-        // Le journal de la tâche le dit.
-        let ev: Vec<(String,)> = sqlx::query_as("SELECT what FROM task_events WHERE task_id = ? ORDER BY id")
-            .bind(tid)
-            .fetch_all(&st.db)
+        patch(&st, &ana, tid, json!({ "assignee_id": ana.id }))
             .await
             .unwrap();
+        assert_eq!(champs(&st, tid).await.0, Some(ana.id));
+        // Bob ne peut ni la prendre à Ana ni la lui retirer.
+        assert!(patch(&st, &bob, tid, json!({ "assignee_id": bob.id }))
+            .await
+            .is_err());
+        assert!(patch(&st, &bob, tid, json!({ "assignee_id": null }))
+            .await
+            .is_err());
+        patch(&st, &ana, tid, json!({ "assignee_id": null }))
+            .await
+            .unwrap();
+        assert_eq!(champs(&st, tid).await.0, None);
+        // Le journal de la tâche le dit.
+        let ev: Vec<(String,)> =
+            sqlx::query_as("SELECT what FROM task_events WHERE task_id = ? ORDER BY id")
+                .bind(tid)
+                .fetch_all(&st.db)
+                .await
+                .unwrap();
         let ev: Vec<&str> = ev.iter().map(|e| e.0.as_str()).collect();
         assert!(ev.contains(&"Ana a pris #1"), "{ev:?}");
         assert!(ev.contains(&"Ana a rendu #1"), "{ev:?}");
         // La propriétaire, elle, peut assigner Bob.
-        patch(&st, &chef, tid, json!({ "assignee_id": bob.id })).await.unwrap();
+        patch(&st, &chef, tid, json!({ "assignee_id": bob.id }))
+            .await
+            .unwrap();
         assert_eq!(champs(&st, tid).await.0, Some(bob.id));
     }
 

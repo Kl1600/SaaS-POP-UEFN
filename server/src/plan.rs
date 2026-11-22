@@ -807,12 +807,14 @@ mod tests_assignation {
                 .unwrap();
         let mut ids = vec![];
         for (e, r) in [("a@a.fr", "owner"), ("b@a.fr", "member")] {
-            let id: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash) VALUES (?, ?, 'x') RETURNING id")
-                .bind(e)
-                .bind(e)
-                .fetch_one(&st.db)
-                .await
-                .unwrap();
+            let id: i64 = sqlx::query_scalar(
+                "INSERT INTO users (email, name, password_hash) VALUES (?, ?, 'x') RETURNING id",
+            )
+            .bind(e)
+            .bind(e)
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
             sqlx::query("INSERT INTO memberships (studio_id, user_id, role) VALUES (?, ?, ?)")
                 .bind(sid)
                 .bind(id)
@@ -834,7 +836,10 @@ mod tests_assignation {
             "members": [{ "user_id": ids[0], "tag": "code", "hours": 20 }, { "user_id": ids[1], "tag": "carte", "hours": 10 }]
         }))
         .unwrap();
-        let r = preview(State(st.clone()), u, Path(mid), Json(b)).await.unwrap().0;
+        let r = preview(State(st.clone()), u, Path(mid), Json(b))
+            .await
+            .unwrap()
+            .0;
         let tasks = r["tasks"].as_array().unwrap();
         assert!(!tasks.is_empty());
         assert!(tasks.iter().all(|t| t["assignee_id"].is_null()));
