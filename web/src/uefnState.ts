@@ -6,10 +6,10 @@ import { tr } from './i18n/t'
 /** État du relais UEFN Link pour la map courante, tenu à jour par le WebSocket. */
 export function useUefnStatus() {
   const { map, subscribe } = useApp()
-  const [s, setS] = useState<{ status: string; pending: number; project: string }>({ status: 'offline', pending: 0, project: '' })
+  const [s, setS] = useState<{ status: string; pending: number; project: string; stale: boolean }>({ status: 'offline', pending: 0, project: '', stale: false })
   useEffect(() => {
     if (!map) return
-    const load = () => api.get(`/api/maps/${map.id}/uefn`).then(d => setS({ status: d.status, pending: d.pending, project: d.project })).catch(() => {})
+    const load = () => api.get(`/api/maps/${map.id}/uefn`).then(d => setS({ status: d.status, pending: d.pending, project: d.project, stale: !!d.stale })).catch(() => {})
     load()
     return subscribe(m => { if (m.t === 'uefn' && (m.what === 'status' || m.what === 'journal')) load() })
   }, [map?.id])

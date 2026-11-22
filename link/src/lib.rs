@@ -432,6 +432,11 @@ impl Link {
     }
 }
 
+/// Version du protocole entre le relais et le serveur (#158). À augmenter, avec `RELAY_PROTO` dans
+/// `server/src/uefn.rs`, chaque fois que le relais apprend une action : un relais plus ancien est alors signalé
+/// « périmé » dans POP. 1 = relais d'avant #158, qui n'annonce rien.
+pub const PROTO: u32 = 2;
+
 /// Types de fichiers qu'on importe dans UEFN (#90).
 pub const IMPORT_EXT: &[&str] = &[
     "fbx", "obj", "png", "jpg", "jpeg", "tga", "wav", "ogg", "mp3",
@@ -675,7 +680,8 @@ async fn session(link: &mut Link) -> Result<()> {
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_default();
-    tx.send(json!({ "t": "hello", "project": project_name, "uefn": if link.uefn { "connected" } else { "closed" } }))?;
+    // `proto` (#158) : le serveur sait si ce relais connaît ses actions, sinon POP affiche « relais périmé ».
+    tx.send(json!({ "t": "hello", "project": project_name, "uefn": if link.uefn { "connected" } else { "closed" }, "proto": PROTO }))?;
     sync(link, &tx, true).await;
     let mut tick = tokio::time::interval(Duration::from_secs(2));
     let mut n: u64 = 0;

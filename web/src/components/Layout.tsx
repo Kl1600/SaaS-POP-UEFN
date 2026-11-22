@@ -113,7 +113,7 @@ export default function Layout() {
               {others.slice(0, 4).map(o => <span key={o.uid} className="pr"><Avatar name={o.name} small /></span>)}
             </div>
           )}
-          <button className={'upill ' + uefn.status} onClick={() => nav('/organiseur')} title={uefn.project ? tr("Projet {0}", [uefn.project]) : 'UEFN Link'}><span className="udot" />{STATUS_LABEL[uefn.status]}{uefn.pending ? ` · ${uefn.pending}` : ''}</button>
+          <button className={'upill ' + uefn.status} onClick={() => nav('/organiseur')} title={uefn.project ? tr("Projet {0}", [uefn.project]) : 'UEFN Link'}><span className="udot" />{STATUS_LABEL[uefn.status]}{uefn.stale ? ` · ${tr("périmé")}` : ''}{uefn.pending ? ` · ${uefn.pending}` : ''}</button>
           <GlobalSearch />
           {app.map && <button className="iconbtn" aria-label={tr("Boussole, assistant intégré")} title={tr("Boussole : assistant intégré")} onClick={() => setGuide({})}><Compass size={20} strokeWidth={1.5} /></button>}
           <Notifications />
