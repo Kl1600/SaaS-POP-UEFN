@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-22 · #188 · sélecteur de map
+- Fait : groupes titrés « Mes maps (seul) » puis un par studio, avec rôle et nombre de maps ; map ouverte marquée (barre orange + « Ouverte ») ; créations regroupées en bas sous « Créer » (map perso, map dans un studio, studio) au lieu d'une ligne sous chaque groupe ; « Toutes mes maps » devient « Vue d’ensemble des maps » ; astuce de glisser-déposer. Le glisser-déposer (#167) est inchangé.
+- Vérifié : navigateur (3 groupes, chaque bouton Créer ouvre la bonne fenêtre, glisser vers un autre studio : zone surlignée puis contrôle du serveur).
+
 ### 2026-11-22 · #201 · pages du studio
 - Fait : « Maps du studio » = bouton « Créer une map » en haut à gauche + tableau (map, état, genre, sortie visée modifiable par un admin, avancement, dernière activité, gains, suppression) ; grand bloc « Créer » retiré (« Nouveau studio » reste dans l'espace perso et le +). Nouvel onglet « Paramètres » (/studio/N/parametres) avec nom, export, transfert, zone sensible (StudioSettings, sorti de Maps). Serveur : maps_summary renvoie `last_activity` (MAX(activity.at)), sans migration.
 - Vérifié : navigateur (création d'une map dans le studio, renommage) + cargo test.
