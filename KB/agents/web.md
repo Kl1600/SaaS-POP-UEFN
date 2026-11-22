@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-22 · #198 · arborescence des pages
+- Fait : lignes de rattachement en angle droit entre une page et ses sous-pages (.tguide, .telbow, en CSS), « Tout replier », repli mémorisé par map (localStorage pop.tree.closed.<map>).
+- Vérifié : navigateur (3 niveaux, repli gardé après rechargement).
+
 ### 2026-11-22 · #192 · infobulles
 - Fait : composant `Tooltips` (components/Tooltip.tsx), monté dans Layout : une bulle noire unique (claire en thème sombre) au survol (300 ms) et au focus clavier, pour `[data-tip]` et les boutons à icône (.iconbtn, .tool, .plusbtn, .popy-fab) ; au-dessus ou en dessous selon la place, recentrée pour ne pas sortir de l'écran ; un `title` est repris (pas de double bulle). Anciennes infobulles CSS ::after retirées.
 - Piège : positions en pixels CSS avec `cssRect`/`uiScale` (zoom 90 %).

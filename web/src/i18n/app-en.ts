@@ -161,6 +161,7 @@ const EN: Record<string, string> = {
  "Général": "General",
  "Vue d'ensemble": "Overview",
  "Dashboard": "Dashboard",
+ "Tout replier": "Collapse all",
  "Popy, votre assistant": "Popy, your assistant",
  "Ouvrez une map pour la relier à UEFN.": "Open a map to link it to UEFN.",
  "Relais périmé : téléchargez la dernière version d’UEFN Link ci-dessous.": "Outdated relay: download the latest UEFN Link below.",
