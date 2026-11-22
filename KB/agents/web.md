@@ -2,6 +2,11 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-22 · #193 · calendrier de Planifier
+- Fait : onglet « Calendrier » (pages/PlanCalendar.tsx) à la place de « Saisons et mises à jour » : grille mois (6 semaines, lundi d'abord, aujourd'hui en rond rouge) et semaine, pastilles colorées par tag (Sortie, Objectif de la map, Date à éviter, Date Fortnite à viser, Impact revenus, Tâche planifiée), filtres par tag mémorisés (localStorage pop.cal.filters), clic sur un événement → détail (ouvrir la tâche, supprimer l'objectif), clic sur un jour → nouvel objectif. Carte « Objectifs » et bloc des saisons retirés (ajout et suppression d'objectif passent par le calendrier). Données : /plan/timeline + /seasons, sans changement serveur. /planifier?vue=calendrier ouvre l'onglet.
+- Piège : la classe `.cal` existe déjà (mini-calendrier) : la carte s'appelle `.pcal`.
+- Vérifié : navigateur (clair, sombre, 390 px).
+
 ### 2026-11-22 · #207 · artefact Claude dans le tableau blanc
 - Fait : nouvel objet `artifact` (menu Plus d'outils > Artefact Claude) : lien + titre, affiché en carte avec « Ouvrir dans Claude ». Déplaçable, redimensionnable, annulable, synchronisé (même circuit que les autres objets), exporté en SVG.
 - Constat (22/11) : claude.ai renvoie `Content-Security-Policy: frame-ancestors 'self'` : impossible de l'afficher dans une iframe de POP, d'où la carte. Les artefacts sont aussi privés par défaut (connexion claude.ai).

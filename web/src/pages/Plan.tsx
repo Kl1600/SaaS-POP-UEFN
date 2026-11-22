@@ -7,6 +7,7 @@ import { DEP_HELP, useMembers } from './Tasks'
 import { tr } from '../i18n/t'
 import { useNav } from '../routes'
 import { useSearchParams } from 'react-router-dom'
+import PlanCalendar from './PlanCalendar'
 
 const GENRES: [string, string, string][] = [
   ['cr', tr("Gendarmes et voleurs"), tr("Équipes, braquages, boutique")], ['tycoon', tr("Tycoon"), tr("Production, améliorations")], ['boxfight', tr("Box fight / Zone wars"), tr("Manches courtes")],
@@ -17,7 +18,7 @@ export default function Plan() {
   // Le Générateur de projet s'ouvre depuis le sélecteur de map (#194) : /planifier?vue=generateur.
   const [sp, setSp] = useSearchParams()
   const wizard = sp.get('vue') === 'generateur'
-  const [tab, setTab] = useState<'timeline' | 'seasons'>('timeline')
+  const [tab, setTab] = useState<'timeline' | 'calendar'>(() => sp.get('vue') === 'calendrier' ? 'calendar' : 'timeline')
   if (wizard) return (
     <main className="content">
       <PageHead title={tr("Générateur de projet")} help={tr("Découpe la map en tâches d'une heure, avec dépendances, jours, personnes et objectifs jusqu'à la sortie.")}>
@@ -29,9 +30,9 @@ export default function Plan() {
   return (
     <main className="content">
       <PageHead title={tr("Planifier")} help={tr("Découpez la map en tâches d'une heure, placez-les dans le temps et soyez prévenu en cas de retard.")} />
-      <Tabs value={tab} onChange={setTab} items={[['timeline', tr("Planning")], ['seasons', tr("Saisons et mises à jour")]]} />
+      <Tabs value={tab} onChange={setTab} items={[['timeline', tr("Planning")], ['calendar', tr("Calendrier")]]} />
       {tab === 'timeline' && <Timeline />}
-      {tab === 'seasons' && <Seasons />}
+      {tab === 'calendar' && <PlanCalendar />}
     </main>
   )
 }
@@ -210,15 +211,6 @@ function Timeline() {
       </div>
       <p className="small muted">{tr("Barres pleines : chemin critique. Ligne rouge : aujourd'hui. Double-clic sur une barre : ouvrir la tâche.")}</p>
     </section>
-    <div className="two">
-      <section className="card">
-        <CardHead title={tr("Objectifs")} sub={tr("Fin d'étape, tests à plusieurs, soumission, sortie")} />
-        <div className="list">{data.milestones.map((m: any) => <div key={m.id} className="li"><span className="mono small" style={{ width: 90 }}>{frDate(m.date)}</span><span style={{ flex: 1 }}>{m.title}</span>{canEdit && <button className="iconbtn" aria-label={tr("Supprimer")} onClick={async () => { await api.del(`/api/milestones/${m.id}`); reload() }}><Trash2 size={16} /></button>}</div>)}</div>
-        {canEdit && <form className="row" style={{ marginTop: 12, flexWrap: 'wrap' }} onSubmit={async e => { e.preventDefault(); try { await api.post(`/api/maps/${map!.id}/milestones`, ms); setMs({ title: '', date: '' }); reload() } catch (er: any) { toast(er.message, true) } }}>
-          <input className="field" placeholder={tr("Nouvel objectif")} value={ms.title} onChange={e => setMs({ ...ms, title: e.target.value })} required /><input className="field" type="date" value={ms.date} onChange={e => setMs({ ...ms, date: e.target.value })} required /><button className="btn">{tr("Ajouter")}</button>
-        </form>}
-      </section>
-    </div>
   </>
 }
 
@@ -266,29 +258,5 @@ function MilestoneRow({ items }: { items: { id: number; title: string; date: str
         })}
       </div>
     </div>
-  )
-}
-
-function Seasons() {
-  const { map } = useApp()
-  const { data } = useLoad<any[]>(map ? `/api/maps/${map.id}/seasons` : null, [map?.id])
-  const months = useMemo(() => {
-    const m = new Map<string, any[]>()
-    data?.forEach(e => { const k = e.date.slice(0, 7); m.set(k, [...(m.get(k) ?? []), e]) })
-    return [...m.entries()]
-  }, [data])
-  const label: Record<string, [string, string]> = { map: [tr("Votre map"), ''], aim: [tr("À viser"), 'b-g'], avoid: [tr("À éviter"), 'b-r'], money: [tr("Impact revenus"), 'b-o'] }
-  return (
-    <section className="card">
-      <CardHead title={tr("Calendrier des mises à jour et des saisons")} sub={tr("Vos objectifs face aux dates Fortnite à viser ou à éviter. Les dates Epic sont indicatives : vérifiez les annonces officielles.")} />
-      <div className="grid2" style={{ gridTemplateColumns: tr("repeat(auto-fit, minmax(220px, 1fr))") }}>
-        {months.map(([k, evs]) => (
-          <div key={k} style={{ border: tr("1px solid var(--border)"), borderRadius: 14, padding: 14 }}>
-            <div style={{ fontWeight: 500, marginBottom: 10 }}>{frDate(k + '-01', { month: 'long', year: 'numeric' })}</div>
-            <div className="stack" style={{ gap: 8 }}>{evs.map((e, i) => <div key={i}><div className="row" style={{ gap: 6 }}><span className="mono small">{frDate(e.date)}</span><span className={'badge ' + label[e.kind][1]}>{label[e.kind][0]}</span></div><div>{e.title}</div></div>)}</div>
-          </div>
-        ))}
-      </div>
-    </section>
   )
 }
