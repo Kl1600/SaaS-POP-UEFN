@@ -907,3 +907,10 @@ body.wb-fs .side,body.wb-fs .top{visibility:hidden}
 @keyframes gsopen{from{flex-basis:44px;opacity:.4}to{opacity:1}}
 .top .plusbtn{width:44px;height:44px;padding:0;justify-content:center}
 .acct-menu{z-index:90}
+
+/* #196 : tâche qui attend une autre. */
+.kcard.kwaits{border-color:#f1c4bd}
+.kdanger{color:#c0392b;display:inline-grid;position:relative}
+.kdanger[data-tip]:hover::after{content:attr(data-tip);position:absolute;right:0;bottom:calc(100% + 6px);white-space:nowrap;padding:5px 9px;border-radius:8px;background:var(--text);color:var(--surface);font-size:12px;z-index:60}
+.kwait{color:#a8321f}
+.linkbtn{background:none;border:0;padding:0;font:inherit;color:inherit;text-decoration:underline;cursor:pointer}

@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-22 · #196 · tâches bloquées sur le Kanban
+- Fait : onglet « Par personne » (Charge de la semaine, Qui bloque qui) retiré ; carte qui attend une autre tâche : bordure rouge, icône danger (infobulle « Bloquée par #N ») et « Attend #N · ne peut pas être prise » ; détail : encadré « Bloquée par » avec liens cliquables (TaskDrawer reçoit onOpen). Le refus de passer en cours existait déjà côté serveur.
+- Vérifié : navigateur (onglets, icône, glisser refusé avec message, lien vers #1), aucune erreur JS.
+
 ### 2026-11-22 · #209 · Tâches sans « Fichiers verrouillés »
 - Fait : onglet et composant Locks retirés de Tasks.tsx ; route /locks et webhook Lore gardés côté serveur.
 - Vérifié : tsc + vite build.
