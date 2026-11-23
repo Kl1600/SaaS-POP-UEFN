@@ -5,6 +5,7 @@ import { BillingSettings } from '../components/Billing'
 import { Account } from './Team'
 import { MapAgents } from './AI'
 import { AccountAI } from '../components/AiTokens'
+import { MapsStudios } from '../components/MapsStudios'
 import { lazy, Suspense } from 'react'
 const UefnLinkSettings = lazy(() => import('./Organizer').then(m => ({ default: m.UefnLinkSettings })))
 import { useApp } from '../state'
@@ -14,12 +15,13 @@ export default function Settings() {
   const { map } = useApp()
   const [sp, setSp] = useSearchParams()
   const o = sp.get('onglet')
-  const tab = o === 'ia' || o === 'uefn' ? o : 'compte'
+  const tab = o === 'ia' || o === 'uefn' || o === 'maps' ? o : 'compte'
   return (
     <main className="content">
       <PageHead title={tr("Paramètres")} help={tr("Votre compte et vos connexions.")} />
-      <Tabs value={tab} onChange={t => setSp(t === 'compte' ? {} : { onglet: t })} items={[['compte', tr("Mon compte")], ['ia', tr("IA connectées")], ['uefn', tr("UEFN Link")]]} />
+      <Tabs value={tab} onChange={t => setSp(t === 'compte' ? {} : { onglet: t })} items={[['compte', tr("Mon compte")], ['maps', tr("Maps et studios")], ['ia', tr("IA connectées")], ['uefn', tr("UEFN Link")]]} />
       {tab === 'compte' && <><BillingSettings /><Account /></>}
+      {tab === 'maps' && <MapsStudios />}
       {tab === 'ia' && <><AccountAI /><MapAgents /></>}
       {tab === 'uefn' && (map ? <Suspense fallback={null}><UefnLinkSettings /></Suspense> : <p className="muted">{tr("Ouvrez une map pour la relier à UEFN.")}</p>)}
     </main>

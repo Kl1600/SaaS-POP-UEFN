@@ -1096,3 +1096,23 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 .tree-resize{position:absolute;top:12px;bottom:12px;right:-10px;width:8px;cursor:col-resize;border-radius:4px;z-index:2}
 .tree-resize:hover,.tree-resize:active{background:color-mix(in srgb,var(--text) 12%,transparent)}
 @media (max-width:1180px){.tree-resize{display:none}}
+
+/* #269 : menu « ⋯ » des maps et des studios dans le sélecteur. */
+.mapsw-row{position:relative}
+.mapsw-row .mapsw-item{padding-right:34px}
+.mapsw-more{position:absolute;right:4px;top:5px;width:26px;height:26px;border:0;border-radius:6px;background:none;color:rgb(170,170,170);display:grid;place-items:center;cursor:pointer;opacity:0}
+.mapsw-studio{position:relative}
+.mapsw-studio .mapsw-more{position:static;opacity:.7;margin-left:2px}
+.mapsw-row:hover .mapsw-more,.mapsw-row.open .mapsw-more,.mapsw-more:focus-visible{opacity:1}
+.mapsw-more:hover,.mapsw-more[aria-expanded=true]{background:rgb(40,40,40);color:#fff;opacity:1}
+@media (hover:none){.mapsw-more{opacity:.8}}
+.mapsw-menu{margin:2px 6px 6px 34px;padding:4px;border-radius:10px;background:rgb(28,28,28);border:1px solid rgb(50,50,50);display:flex;flex-direction:column}
+.mapsw-studio + .mapsw-menu{margin-left:10px}
+.mapsw-menu button{display:flex;align-items:center;gap:8px;border:0;background:none;color:rgb(220,220,220);font:inherit;font-size:13px;padding:7px 8px;border-radius:7px;text-align:left;cursor:pointer}
+.mapsw-menu button:hover{background:rgb(44,44,44);color:#fff}
+.mapsw-menu button.danger{color:#F2777A}
+.mapsw-menu button.danger:hover{background:rgba(229,72,77,.16);color:#FF9A9C}
+.mapsw-note{font-size:12px;color:rgb(140,140,140);padding:6px 8px;line-height:1.35}
+.mapsw-rename{display:flex;gap:6px;padding:4px}
+.mapsw-rename .field{flex:1;height:30px;background:rgb(18,18,18);color:#fff;border-color:rgb(60,60,60)}
+.iconbtn:disabled{opacity:.35;cursor:not-allowed}
