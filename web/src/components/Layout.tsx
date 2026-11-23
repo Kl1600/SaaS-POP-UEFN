@@ -108,7 +108,7 @@ export default function Layout() {
           </button>
           {acct && (
             <div className="menu acct-menu">
-              <div className="small muted" style={{ padding: '6px 10px' }}>{app.me?.user.email}</div>
+              <div className="small muted acct-mail" title={app.me?.user.email}>{app.me?.user.email}</div>
               <div className="acct-plan small">{app.me?.trial_until ? tr("Essai Pro jusqu’au {0}", [new Date(app.me.trial_until.replace(' ', 'T') + 'Z').toLocaleDateString(LOCALE, { day: 'numeric', month: 'long' })]) : app.me?.plan === 'pro' ? tr("Plan Pro") : tr("Plan Starter")}</div>
               <button onClick={() => { setAcct(false); nav('/parametres') }}><Settings size={16} />{tr("Paramètres")}</button>
               <button onClick={() => { setAcct(false); nav('/aide') }}><LifeBuoy size={16} />{tr("Aide et support")}</button>

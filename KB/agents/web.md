@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-23 · #271 · menu du compte
+- Fait : adresse e-mail coupée par « … » avec l'adresse complète au survol (.acct-mail) ; menu borné à l'écran ; barre latérale repliée : le menu sort à droite de la barre (position fixe, 260 px) au lieu de faire 39 px de large.
+- Vérifié : navigateur (1440 px normal et replié, 1100 px, 390 px).
+
 ### 2026-11-23 · #269 · supprimer une map ou un studio
 - Fait : sélecteur de map, bouton « ⋯ » au survol d'une map (clic droit aussi) : Renommer (PATCH /api/maps/N), Déplacer vers… (previewMove + ConfirmMove), Supprimer la map ; « ⋯ » sur un studio d'équipe : Ouvrir, Paramètres, Supprimer le studio (propriétaire). Paramètres > onglet « Maps et studios » (components/MapsStudios.tsx) : studios et maps, Ouvrir, Supprimer, Quitter. Fenêtre commune components/DeleteDialog.tsx (ce qui sera perdu, Exporter le studio d'abord, nom à taper) qui remplace les prompt() de la page du studio. Dernière map perso supprimable depuis l'interface ; dernière map d'un studio d'équipe : explication au lieu du bouton.
 - Vérifié : navigateur (renommer, supprimer la map ouverte → accueil, dernière map, onglet, suppression du studio).

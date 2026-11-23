@@ -1116,3 +1116,8 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 .mapsw-rename{display:flex;gap:6px;padding:4px}
 .mapsw-rename .field{flex:1;height:30px;background:rgb(18,18,18);color:#fff;border-color:rgb(60,60,60)}
 .iconbtn:disabled{opacity:.35;cursor:not-allowed}
+
+/* Menu du compte : une adresse longue ne dépasse plus. */
+.acct-menu{box-sizing:border-box;max-width:calc(100vw - 16px);overflow:hidden}
+.acct-mail{padding:6px 10px;min-width:0;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.app.collapsed .acct-menu{position:fixed;left:76px;right:auto;bottom:14px;width:260px}
