@@ -118,6 +118,25 @@ pub struct MilestoneIn {
     title: String,
     date: String,
     kind: Option<String>,
+    /// Heure facultative « HH:MM » (#261).
+    time: Option<String>,
+    detail: Option<String>,
+}
+
+/// Heure « HH:MM » valide, ou rien (champ vide = pas d'heure).
+fn parse_time(t: &Option<String>) -> Result<Option<String>, AppError> {
+    let Some(t) = t.as_deref().map(str::trim).filter(|t| !t.is_empty()) else {
+        return Ok(None);
+    };
+    let ok = t.len() == 5
+        && t.as_bytes()[2] == b':'
+        && t[..2].parse::<u8>().is_ok_and(|h| h < 24)
+        && t[3..].parse::<u8>().is_ok_and(|m| m < 60);
+    if ok {
+        Ok(Some(t.to_string()))
+    } else {
+        Err(bad("Heure invalide (format HH:MM)."))
+    }
 }
 
 pub async fn add_milestone(
@@ -130,17 +149,52 @@ pub async fn add_milestone(
     ctx.require(Role::Member)?;
     check_len("Titre", &b.title, 1, 80)?;
     parse_date(&b.date).ok_or_else(|| bad("Date invalide."))?;
+    let time = parse_time(&b.time)?;
+    let detail = b.detail.as_deref().unwrap_or("").trim().to_string();
+    check_len("Détail", &detail, 0, 2000)?;
     let id: i64 = sqlx::query_scalar(
-        "INSERT INTO milestones (map_id, title, date, kind) VALUES (?, ?, ?, ?) RETURNING id",
+        "INSERT INTO milestones (map_id, title, date, kind, time, detail) VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(mid)
     .bind(b.title.trim())
     .bind(&b.date)
     .bind(b.kind.unwrap_or_else(|| "jalon".into()))
+    .bind(&time)
+    .bind(&detail)
     .fetch_one(&st.db)
     .await?;
     notify(&st, mid, json!({ "t": "refresh", "what": "plan" }));
     Ok(Json(json!({ "id": id })))
+}
+
+/// Modifier un objectif (#261) : titre, date, heure, détail.
+pub async fn update_milestone(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(id): Path<i64>,
+    Json(b): Json<MilestoneIn>,
+) -> ApiResult<Value> {
+    let (mid,): (i64,) = sqlx::query_as("SELECT map_id FROM milestones WHERE id = ?")
+        .bind(id)
+        .fetch_optional(&st.db)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    map_ctx(&st, &u, mid).await?.require(Role::Member)?;
+    check_len("Titre", &b.title, 1, 80)?;
+    parse_date(&b.date).ok_or_else(|| bad("Date invalide."))?;
+    let time = parse_time(&b.time)?;
+    let detail = b.detail.as_deref().unwrap_or("").trim().to_string();
+    check_len("Détail", &detail, 0, 2000)?;
+    sqlx::query("UPDATE milestones SET title = ?, date = ?, time = ?, detail = ? WHERE id = ?")
+        .bind(b.title.trim())
+        .bind(&b.date)
+        .bind(&time)
+        .bind(&detail)
+        .bind(id)
+        .execute(&st.db)
+        .await?;
+    notify(&st, mid, json!({ "t": "refresh", "what": "plan" }));
+    Ok(Json(json!({ "ok": true })))
 }
 
 pub async fn delete_milestone(
@@ -588,8 +642,8 @@ pub async fn timeline(
         critical.push(id);
         end = memo.get(&id).and_then(|v| v.1);
     }
-    let ms: Vec<(i64, String, String, String)> = sqlx::query_as(
-        "SELECT id, title, date, kind FROM milestones WHERE map_id = ? ORDER BY date",
+    let ms: Vec<(i64, String, String, String, Option<String>, String)> = sqlx::query_as(
+        "SELECT id, title, date, kind, time, detail FROM milestones WHERE map_id = ? ORDER BY date, time",
     )
     .bind(mid)
     .fetch_all(&st.db)
@@ -615,7 +669,7 @@ pub async fn timeline(
             "id": t.id, "number": t.number, "title": t.title, "tag": t.tag, "status": t.status, "assignee_id": t.assignee_id, "assignee": t.name,
             "planned_day": t.planned_day, "deps": deps.iter().filter(|(x, _)| *x == t.id).map(|(_, d)| d).collect::<Vec<_>>(), "critical": critical.contains(&t.id)
         })).collect::<Vec<_>>(),
-        "milestones": ms.into_iter().map(|(id, t, d, k)| json!({"id": id, "title": t, "date": d, "kind": k})).collect::<Vec<_>>(),
+        "milestones": ms.into_iter().map(|(id, t, d, k, h, det)| json!({"id": id, "title": t, "date": d, "kind": k, "time": h, "detail": det})).collect::<Vec<_>>(),
         "load": load,
     })))
 }
@@ -934,5 +988,84 @@ mod tests_dashboard {
         let Json(v) = overview(State(st.clone()), u, Path(mid)).await.unwrap();
         assert_eq!(v["tiles"]["playtest"]["players"], 0);
         assert_eq!(v["tiles"]["playtest"]["avg_minutes"], 0.0);
+    }
+}
+
+#[cfg(test)]
+mod tests_objectifs {
+    use super::*;
+
+    #[test]
+    fn heure_des_objectifs() {
+        assert_eq!(parse_time(&None).unwrap(), None);
+        assert_eq!(parse_time(&Some(" ".into())).unwrap(), None);
+        assert_eq!(
+            parse_time(&Some("09:30".into())).unwrap(),
+            Some("09:30".into())
+        );
+        for t in ["24:00", "9:30", "09:60", "ab:cd", "09h30"] {
+            assert!(parse_time(&Some(t.into())).is_err(), "{t}");
+        }
+    }
+
+    /// #261 : un objectif garde son heure et son détail, modifiables ensuite ; la fiche des objectifs les renvoie.
+    #[tokio::test]
+    async fn objectif_avec_heure_et_detail() {
+        let st = crate::test_state().await;
+        let sid: i64 = sqlx::query_scalar("INSERT INTO studios (name) VALUES ('S') RETURNING id")
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        let mid: i64 =
+            sqlx::query_scalar("INSERT INTO maps (studio_id, name) VALUES (?, 'M') RETURNING id")
+                .bind(sid)
+                .fetch_one(&st.db)
+                .await
+                .unwrap();
+        let uid: i64 = sqlx::query_scalar(
+            "INSERT INTO users (email, name, password_hash) VALUES ('a@a.fr', 'Ana', 'x') RETURNING id",
+        )
+        .fetch_one(&st.db)
+        .await
+        .unwrap();
+        sqlx::query("INSERT INTO memberships (studio_id, user_id, role) VALUES (?, ?, 'owner')")
+            .bind(sid)
+            .bind(uid)
+            .execute(&st.db)
+            .await
+            .unwrap();
+        let u = || AuthUser {
+            id: uid,
+            email: "a@a.fr".into(),
+            name: "Ana".into(),
+            sid: String::new(),
+        };
+        let mk = |t: &str| MilestoneIn {
+            title: "Démo".into(),
+            date: "2026-12-01".into(),
+            kind: None,
+            time: Some(t.into()),
+            detail: Some("Avec le studio".into()),
+        };
+        let Json(r) = add_milestone(State(st.clone()), u(), Path(mid), Json(mk("14:00")))
+            .await
+            .unwrap();
+        let id = r["id"].as_i64().unwrap();
+        assert!(
+            add_milestone(State(st.clone()), u(), Path(mid), Json(mk("25:00")))
+                .await
+                .is_err()
+        );
+        update_milestone(State(st.clone()), u(), Path(id), Json(mk("16:30")))
+            .await
+            .unwrap();
+        let (h, d): (Option<String>, String) =
+            sqlx::query_as("SELECT time, detail FROM milestones WHERE id = ?")
+                .bind(id)
+                .fetch_one(&st.db)
+                .await
+                .unwrap();
+        assert_eq!(h.as_deref(), Some("16:30"));
+        assert_eq!(d, "Avec le studio");
     }
 }
