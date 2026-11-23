@@ -161,6 +161,8 @@ const EN: Record<string, string> = {
  "Général": "General",
  "Vue d'ensemble": "Overview",
  "Dashboard": "Dashboard",
+ "Élargir l’arborescence": "Widen the page tree",
+ "Tirer pour élargir": "Drag to widen",
  "Tâche créée le {0}": "Task created on {0}",
  "Objectif modifié": "Goal updated",
  "Cliquer pour ajouter un objectif ou une tâche ce jour-là": "Click to add a goal or a task on this day",
