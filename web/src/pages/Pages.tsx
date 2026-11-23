@@ -120,7 +120,7 @@ export default function Pages() {
   const toggle = (pid: number) => { const c = new Set(closed); c.has(pid) ? c.delete(pid) : c.add(pid); saveClosed(c) }
   const collapseAll = () => saveClosed(new Set((tree ?? []).filter(x => (tree ?? []).some(y => y.parent_id === x.id)).map(x => x.id)))
   // guides[i] : l'ancêtre du niveau i+1 a encore des frères en dessous (la ligne verticale continue).
-  const MAXD = 5
+  const MAXD = 4
   const Node = ({ p, depth, last, guides }: { p: any; depth: number; last: boolean; guides: boolean[] }) => {
     const open = !closed.has(p.id)
     const setOpen = () => toggle(p.id)
