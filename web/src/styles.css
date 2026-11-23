@@ -1076,3 +1076,8 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 /* #151 : flèches entre objets. */
 .endhandle{position:absolute;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:#fff;border:2px solid #ED753E;cursor:grab;z-index:5;box-shadow:0 1px 4px rgba(0,0,0,.2)}
 .endhandle:hover{transform:scale(1.2)}
+
+/* #259 : outils de la barre du haut à droite. */
+.top .top-spacer{flex:1 1 auto;min-width:0}
+.top > .gsearch-wrap.open{flex:0 1 360px}
+.top > .gsearch-wrap:not(.open){flex:none;min-width:0}

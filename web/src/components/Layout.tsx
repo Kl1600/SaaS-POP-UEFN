@@ -2,8 +2,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import {
   Home, FileText, PenTool, CalendarDays, KanbanSquare, Rocket, Coins, Users, Settings, LifeBuoy, PanelLeft,
-  Search, Bell, Plus, ChevronDown, Hexagon, LogOut, ListTree, Bot, ChartNoAxesCombined, Hash, Flame, Sparkle, Layers, Lock, Lightbulb,
-} from 'lucide-react'
+  Search, Bell, Plus, ChevronDown, Hexagon, LogOut, ListTree, Bot, ChartNoAxesCombined, Hash, Flame, Sparkle, Layers, Lock, Lightbulb, Sun, Moon } from 'lucide-react'
 import { useApp, studioName } from '../state'
 import { ago, api } from '../api'
 import { Avatar } from './ui'
@@ -125,8 +124,10 @@ export default function Layout() {
           <button className="iconbtn" aria-label={tr("Replier la barre latérale")} onClick={() => setCollapsed(c => !c)}><PanelLeft size={20} strokeWidth={1.5} /></button>
           <nav className="crumb" aria-label={tr("Fil d'Ariane")}><span>{group}</span><span>/</span>{title}</nav>
           <button className={'upill ' + uefn.status} onClick={() => nav('/parametres?onglet=uefn')} title={uefn.project ? tr("Projet {0}", [uefn.project]) : 'UEFN Link'}><span className="udot" />{STATUS_LABEL[uefn.status]}{uefn.stale ? ` · ${tr("périmé")}` : ''}{uefn.pending ? ` · ${uefn.pending}` : ''}</button>
+          <span className="top-spacer" />
           <GlobalSearch />
           <Notifications />
+          <button className="iconbtn" aria-label={app.dark ? tr("Passer en mode clair") : tr("Passer en mode sombre")} data-tip={app.dark ? tr("Mode clair") : tr("Mode sombre")} onClick={app.toggleDark}>{app.dark ? <Sun size={20} strokeWidth={1.5} /> : <Moon size={20} strokeWidth={1.5} />}</button>
           <CreateMenu onTask={app.map && app.canEdit ? () => setNewTask(true) : undefined} />
         </header>
         <div className="scroll" id="contenu" tabIndex={-1}>{app.me?.announcement && <Announcement a={app.me.announcement} />}{app.me?.email_verified === false && <VerifyBanner email={app.me.user.email} />}<Outlet /></div>
