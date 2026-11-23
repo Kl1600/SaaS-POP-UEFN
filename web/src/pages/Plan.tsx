@@ -18,7 +18,6 @@ export default function Plan() {
   // Le Générateur de projet s'ouvre depuis le sélecteur de map (#194) : /planifier?vue=generateur.
   const [sp, setSp] = useSearchParams()
   const wizard = sp.get('vue') === 'generateur'
-  const [tab, setTab] = useState<'timeline' | 'calendar'>(() => sp.get('vue') === 'calendrier' ? 'calendar' : 'timeline')
   if (wizard) return (
     <main className="content">
       <PageHead title={tr("Générateur de projet")} help={tr("Découpe la map en tâches d'une heure, avec dépendances, jours, personnes et objectifs jusqu'à la sortie.")}>
@@ -29,10 +28,8 @@ export default function Plan() {
   )
   return (
     <main className="content">
-      <PageHead title={tr("Planifier")} help={tr("Découpez la map en tâches d'une heure, placez-les dans le temps et soyez prévenu en cas de retard.")} />
-      <Tabs value={tab} onChange={setTab} items={[['timeline', tr("Planning")], ['calendar', tr("Calendrier")]]} />
-      {tab === 'timeline' && <Timeline />}
-      {tab === 'calendar' && <PlanCalendar />}
+      <PageHead title={tr("Planifier")} help={tr("Objectifs, tâches et dates Fortnite sur un même calendrier. Glissez une tâche sur un jour pour la planifier.")} />
+      <PlanCalendar />
     </main>
   )
 }
@@ -139,83 +136,6 @@ function Wizard({ done }: { done: () => void }) {
   )
 }
 
-function Timeline() {
-  const { map, canEdit, toast } = useApp()
-  const nav = useNav()
-  const { data, reload } = useLoad<any>(map ? `/api/maps/${map.id}/plan/timeline` : null, [map?.id])
-  const [alerts, setAlerts] = useState<string[]>([])
-  const [shifted, setShifted] = useState<number[]>([])
-  const [hideDone, setHideDone] = useState(true)
-  const [ms, setMs] = useState({ title: '', date: '' })
-  const drag = useRef<any>(null)
-  const [ghost, setGhost] = useState<{ id: number; dx: number } | null>(null)
-  useLive(['tasks', 'plan'], reload)
-
-  const days = useMemo(() => {
-    if (!data) return []
-    const start = addDays(data.today, -7)
-    const end = [data.release_date, ...data.tasks.map((t: any) => t.planned_day), ...data.milestones.map((m: any) => m.date)].filter(Boolean).sort().pop() ?? addDays(data.today, 21)
-    const n = Math.min(120, Math.max(21, Math.round((new Date(end + 'T12:00').getTime() - new Date(start + 'T12:00').getTime()) / 864e5) + 4))
-    return Array.from({ length: n }, (_, i) => addDays(start, i))
-  }, [data])
-  if (!data) return null
-  const W = 100 / days.length
-  const pos = (d: string) => days.indexOf(d)
-  const tasks = data.tasks.filter((t: any) => t.planned_day && (!hideDone || t.status !== 'done'))
-
-  const onDown = (e: React.PointerEvent, t: any) => {
-    if (!canEdit) return
-    const track = (e.currentTarget.parentElement as HTMLElement).getBoundingClientRect()
-    drag.current = { id: t.id, x0: e.clientX, px: track.width / days.length, day: t.planned_day }
-    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
-  }
-  const onMove = (e: React.PointerEvent) => { const d = drag.current; if (d) setGhost({ id: d.id, dx: Math.round((e.clientX - d.x0) / d.px) }) }
-  const onUp = async () => {
-    const d = drag.current; drag.current = null
-    if (!d || !ghost || ghost.dx === 0) { setGhost(null); return }
-    try {
-      const r = await api.post(`/api/maps/${map!.id}/plan/move`, { task_id: d.id, planned_day: addDays(d.day, ghost!.dx) })
-      setAlerts(r.alerts); setShifted(r.shifted); reload()
-    } catch (e: any) { toast(e.message, true) } finally { setGhost(null) }
-  }
-
-  return <>
-    {alerts.length > 0 && <div className="warn" role="alert"><AlertTriangle size={18} /><div>{alerts.map((a, i) => <div key={i}>{a}</div>)}</div></div>}
-    {shifted.length > 0 && alerts.length === 0 && <div className="warn"><span>{tr("Recalcul : #{0} décalées pour respecter les dépendances. Aucun objectif dépassé.", [shifted.join(', #')])}</span></div>}
-    <section className="card">
-      <CardHead title={tr("Chronologie")} sub={tr("Glissez une barre pour la déplacer : les tâches qui en dépendent et les objectifs se recalculent.")}>
-        <label className="row small"><input type="checkbox" checked={hideDone} onChange={e => setHideDone(e.target.checked)} />{tr("Masquer les tâches faites")}</label>
-        {canEdit && <button className="btn" onClick={async () => { const r = await api.post(`/api/maps/${map!.id}/plan/recalc`); setAlerts(r.alerts); setShifted(r.shifted); reload() }}>{tr("Recalculer")}</button>}
-      </CardHead>
-      <div className="gwrap">
-        <div className="gantt" style={{ minWidth: Math.max(900, days.length * 26 + 250) }} onPointerMove={onMove} onPointerUp={onUp}>
-          <div className="grow"><span className="gname" /><div className="gtrack" style={{ height: 20 }}>{days.map((d, i) => (new Date(d + 'T12:00').getDay() === 1 || i === 0) && <span key={d} className="gday" style={{ left: `${i * W}%` }}>{frDate(d)}</span>)}</div></div>
-          {tasks.map((t: any) => {
-            const i = pos(t.planned_day) + (ghost && ghost.id === t.id ? ghost.dx : 0)
-            return (
-              <div key={t.id} className="grow">
-                <span className="gname" title={t.title}><span className="mono muted small">#{t.number}</span> {t.title}</span>
-                <div className="gtrack">
-                  {days.map((d, k) => <span key={d} className={'gcell' + ([0, 6].includes(new Date(d + 'T12:00').getDay()) ? ' we' : '')} style={{ left: `${k * W}%`, width: `${W}%` }} />)}
-                  <span className="today gline" style={{ left: `${(pos(data.today) + 0.5) * W}%` }} />
-                  {i >= 0 && <div className={'gbar' + (t.critical ? ' crit' : '') + (t.status === 'done' ? ' done' : '')} style={{ left: `${i * W}%`, width: `max(${W}%, 26px)`, outline: shifted.includes(t.number) ? tr("2px dashed var(--text)") : undefined }}
-                    onPointerDown={e => onDown(e, t)} onDoubleClick={() => nav(`/taches?q=%23${t.number}`)} title={`${t.title} · ${t.assignee ?? '—'} · ${frDate(t.planned_day)}${t.deps.length ? tr(" · dépend de ") + t.deps.length + tr(" tâche(s)") : ''}`}>
-                    {t.assignee && <span className="mono">{t.assignee.split(' ').map((w: string) => w[0]).join('')}</span>}
-                  </div>}
-                </div>
-              </div>
-            )
-          })}
-          <MilestoneRow items={data.milestones.filter((m: any) => pos(m.date) >= 0).map((m: any) => ({ id: m.id, title: m.title, date: m.date, x: (pos(m.date) + 0.5) * W / 100 }))} />
-        </div>
-      </div>
-      <p className="small muted">{tr("Barres pleines : chemin critique. Ligne rouge : aujourd'hui. Double-clic sur une barre : ouvrir la tâche.")}</p>
-    </section>
-  </>
-}
-
-/** Ligne « Objectifs » de la chronologie (#171) : chaque nom est mesuré, gardé dans la piste et posé sur
- * la première rangée où il ne touche aucun autre nom ; la ligne grandit avec le nombre de rangées. */
 function MilestoneRow({ items }: { items: { id: number; title: string; date: string; x: number }[] }) {
   const track = useRef<HTMLDivElement>(null)
   const [lay, setLay] = useState<{ left: number; row: number }[] | null>(null)

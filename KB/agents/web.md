@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-23 · #257 · Planifier : calendrier façon Apple
+- Fait : onglet Planning (Gantt) retiré, Planifier ouvre directement PlanCalendar. Colonne de gauche : mini-mois (point sur les jours chargés), « Calendriers » = filtres par type avec case de couleur (pop.cal.filters) + « Tâches finies » (pop.cal.done), « À planifier » (tâches sans jour, à glisser). En-tête : mois en gras + année, sélecteur Semaine / Mois / Année, flèches, Aujourd'hui, Recalculer, + Objectif. Glisser une tâche sur un jour → POST /plan/move (le serveur recalcule les dépendances : une tâche glissée sur un jour passé revient à aujourd'hui). Week-ends grisés, vue Année en 12 mini-mois.
+- Vérifié : navigateur (glisser, filtres mémorisés, 3 vues, sombre, 390 px).
+
 ### 2026-11-22 · #151 · flèches entre objets
 - Fait : tracé en glissant d'un objet à un autre (les deux clics restent possibles), ligne d'aperçu orange qui suit la souris, cadre orange sur l'objet de départ (plein) et l'objet visé (pointillé) ; Échap, clic dans le vide ou changement d'outil annulent ; flèche sélectionnée : 2 poignées (.endhandle, data-endhandle=id:from|to) pour raccrocher un bout à un autre objet (annulable). Objet sous le pointeur trouvé par elementFromPoint (marche pendant la capture du pointeur). Les bouts partent du bord (edge) et suivent les objets.
 - Vérifié : navigateur (geste, aperçu, Échap, clic vide, deux clics, raccrochage, annuler/rétablir, déplacement, 2e onglet).
