@@ -307,7 +307,10 @@ const KINDS: [&str; 10] = [
 /// Lien d'artefact Claude accepté dans un tableau (#207) : seulement https://claude.ai/…
 /// (claude.ai interdit l'affichage dans une iframe d'un autre site : POP en montre une carte).
 pub fn artifact_url_ok(u: &str) -> bool {
-    let re = regex::Regex::new(r"^https://claude\.ai/(artifact|public/artifacts|share)/[A-Za-z0-9_-]{6,80}/?$").unwrap();
+    let re = regex::Regex::new(
+        r"^https://claude\.ai/(artifact|public/artifacts|share)/[A-Za-z0-9_-]{6,80}/?$",
+    )
+    .unwrap();
     re.is_match(u)
 }
 
@@ -593,8 +596,12 @@ mod tests_artefact {
 
     #[test]
     fn seuls_les_liens_claude_ai_passent() {
-        assert!(artifact_url_ok("https://claude.ai/artifact/WiiU6vVRT3cMJFNtQGo87B"));
-        assert!(artifact_url_ok("https://claude.ai/public/artifacts/3f2a9c1e-1234-4abc-9def-001122334455"));
+        assert!(artifact_url_ok(
+            "https://claude.ai/artifact/WiiU6vVRT3cMJFNtQGo87B"
+        ));
+        assert!(artifact_url_ok(
+            "https://claude.ai/public/artifacts/3f2a9c1e-1234-4abc-9def-001122334455"
+        ));
         for u in [
             "http://claude.ai/artifact/WiiU6vVRT3cMJFNtQGo87B",
             "https://claude.ai.evil.com/artifact/WiiU6vVRT3cMJFNtQGo87B",
