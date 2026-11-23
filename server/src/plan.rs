@@ -63,7 +63,7 @@ pub async fn overview(
     let rev: Option<(String, i64, i64)> = sqlx::query_as("SELECT month, engagement_cents, sales_cents FROM revenues WHERE map_id = ? ORDER BY month DESC LIMIT 2").bind(mid).fetch_optional(&st.db).await?;
     let prev_rev: Option<(i64,)> = sqlx::query_as("SELECT engagement_cents + sales_cents FROM revenues WHERE map_id = ? ORDER BY month DESC LIMIT 1 OFFSET 1").bind(mid).fetch_optional(&st.db).await?;
     let playtest: Option<(i64, String, i64, f64)> = sqlx::query_as(
-        "SELECT l.id, l.created_at, COUNT(f.id), COALESCE(AVG(f.left_minute), 0) FROM playtest_listings l LEFT JOIN playtest_feedback f ON f.listing_id = l.id WHERE l.map_id = ? GROUP BY l.id ORDER BY l.id DESC LIMIT 1",
+        "SELECT l.id, l.created_at, COUNT(f.id), COALESCE(AVG(f.left_minute), 0.0) FROM playtest_listings l LEFT JOIN playtest_feedback f ON f.listing_id = l.id WHERE l.map_id = ? GROUP BY l.id ORDER BY l.id DESC LIMIT 1",
     )
     .bind(mid)
     .fetch_optional(&st.db)
@@ -885,5 +885,54 @@ mod tests_dependances {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests_dashboard {
+    use super::*;
+
+    /// #255 : une demande de test sans aucun retour ne doit pas faire planter le Dashboard
+    /// (AVG sans ligne donnait l'entier 0, illisible en f64).
+    #[tokio::test]
+    async fn dashboard_avec_demande_de_test_sans_retour() {
+        let st = crate::test_state().await;
+        let sid: i64 = sqlx::query_scalar("INSERT INTO studios (name) VALUES ('S') RETURNING id")
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        let mid: i64 =
+            sqlx::query_scalar("INSERT INTO maps (studio_id, name) VALUES (?, 'M') RETURNING id")
+                .bind(sid)
+                .fetch_one(&st.db)
+                .await
+                .unwrap();
+        let uid: i64 = sqlx::query_scalar(
+            "INSERT INTO users (email, name, password_hash) VALUES ('a@a.fr', 'Ana', 'x') RETURNING id",
+        )
+        .fetch_one(&st.db)
+        .await
+        .unwrap();
+        sqlx::query("INSERT INTO memberships (studio_id, user_id, role) VALUES (?, ?, 'owner')")
+            .bind(sid)
+            .bind(uid)
+            .execute(&st.db)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO playtest_listings (map_id, owner_id, minutes, reward, slots, island_code) VALUES (?, ?, 15, 20, 4, '')")
+            .bind(mid)
+            .bind(uid)
+            .execute(&st.db)
+            .await
+            .unwrap();
+        let u = AuthUser {
+            id: uid,
+            email: "a@a.fr".into(),
+            name: "Ana".into(),
+            sid: String::new(),
+        };
+        let Json(v) = overview(State(st.clone()), u, Path(mid)).await.unwrap();
+        assert_eq!(v["tiles"]["playtest"]["players"], 0);
+        assert_eq!(v["tiles"]["playtest"]["avg_minutes"], 0.0);
     }
 }
