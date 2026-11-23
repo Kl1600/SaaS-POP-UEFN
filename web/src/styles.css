@@ -1081,3 +1081,7 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 .top .top-spacer{flex:1 1 auto;min-width:0}
 .top > .gsearch-wrap.open{flex:0 1 360px}
 .top > .gsearch-wrap:not(.open){flex:none;min-width:0}
+
+/* #260 : logos des IA. */
+.ailogo{display:inline-grid;place-items:center;flex:none;color:var(--text)}
+.ailogo svg{display:block}

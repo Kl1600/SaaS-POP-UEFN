@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-23 · #260 · logos des IA
+- Fait : components/AiLogo.tsx, logos de @lobehub/icons-static-svg 1.106 (MIT), importés en ?raw (SVG du paquet, pas de saisie) : Claude Code, Claude, Codex, Copilot (VS Code), Gemini CLI en couleur ; Cursor, Windsurf et MCP (« Autre IA ») en une couleur qui suit le thème. Le logo Codex officiel est bleu-violet : c'est la couleur de la marque, pas de la DA de POP.
+- Vérifié : navigateur, clair et sombre.
+
 ### 2026-11-23 · #259 · barre du haut
 - Fait : loupe, cloche, bouton clair/sombre (Soleil/Lune, app.toggleDark) et + alignés à droite (.top-spacer) ; la recherche ouverte (Ctrl K) s'élargit vers la gauche.
 - Vérifié : navigateur (1440 et 390 px, bascule gardée après rechargement).
