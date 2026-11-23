@@ -177,7 +177,7 @@ button{font:inherit}
 .props{display:grid;grid-template-columns:130px 1fr;gap:10px 16px;align-items:center}
 .dsec{font-size:13px;color:var(--text2);margin:24px 0 8px}
 /* Pages editor */
-.doc{display:grid;grid-template-columns:250px minmax(0,1fr) 320px;gap:16px;align-items:start}
+.doc{display:grid;grid-template-columns:var(--treew,250px) minmax(0,1fr) 320px;gap:16px;align-items:start}
 .tree{padding:14px;display:flex;flex-direction:column;gap:2px}
 .tsec{font-size:12.5px;color:var(--text2);padding:12px 8px 4px}
 .titem{display:flex;align-items:center;gap:8px;height:34px;padding:0 8px;border-radius:8px;color:var(--text);font-size:14px;cursor:pointer;background:none;border:0;width:100%;text-align:left}
@@ -942,11 +942,11 @@ body.wb-fs .side,body.wb-fs .top{visibility:hidden}
 
 /* #198 : lignes de rattachement en angle droit entre une page et ses sous-pages. */
 .tnode{min-height:34px}
-.tguide,.telbow{flex:none;width:14px;align-self:stretch;position:relative;margin-left:11px}
-.tguide.on::before{content:'';position:absolute;left:0;top:0;bottom:0;border-left:1.5px solid var(--border2,#d4d4d4)}
-.telbow::before{content:'';position:absolute;left:0;top:0;bottom:0;border-left:1.5px solid var(--border2,#d4d4d4)}
+.tguide,.telbow{flex:none;width:9px;align-self:stretch;position:relative;margin-left:7px}
+.tguide.on::before{content:'';position:absolute;left:0;top:0;bottom:0;border-left:1.5px solid color-mix(in srgb,var(--text) 22%,transparent)}
+.telbow::before{content:'';position:absolute;left:0;top:0;bottom:0;border-left:1.5px solid color-mix(in srgb,var(--text) 22%,transparent)}
 .telbow.last::before{bottom:50%}
-.telbow::after{content:'';position:absolute;left:0;top:50%;width:10px;border-top:1.5px solid var(--border2,#d4d4d4)}
+.telbow::after{content:'';position:absolute;left:0;top:50%;width:7px;border-top:1.5px solid color-mix(in srgb,var(--text) 22%,transparent)}
 .tnode > .titem:nth-of-type(2){min-width:0;flex:1}
 
 /* #197 : icône de page à gauche du titre et panneau de choix. */
@@ -1088,3 +1088,11 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 
 /* #261 : heure des objectifs dans le calendrier. */
 .cev-t{font-weight:600;margin-right:2px;flex:none}
+
+/* #265 : arborescence compacte, profondeur plafonnée, colonne élargissable. */
+.tree{position:relative}
+.titem.tchev{width:16px;padding:0;justify-content:center;flex:none}
+.tdeep{flex:none;width:14px;align-self:center;font-size:11px;color:var(--text2);text-align:center}
+.tree-resize{position:absolute;top:12px;bottom:12px;right:-10px;width:8px;cursor:col-resize;border-radius:4px;z-index:2}
+.tree-resize:hover,.tree-resize:active{background:color-mix(in srgb,var(--text) 12%,transparent)}
+@media (max-width:1180px){.tree-resize{display:none}}

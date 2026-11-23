@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-23 · #265 · arborescence profonde
+- Fait : retrait 16 px par niveau (chevron .tchev 16 px, guides 9+7 px), au-delà de 5 niveaux le retrait est plafonné (marque « ⋯ », .tdeep), titre complet au survol (title), colonne élargissable 200–480 px en tirant son bord (.tree-resize, var --treew, pop.tree.width ; double-clic = 250), lignes en color-mix(--text 22 %) pour le sombre.
+- Vérifié : navigateur, 11 niveaux.
+
 ### 2026-11-23 · #261 · calendrier : heure, détail, tâches
 - Fait : migration 0035 (milestones.time HH:MM facultative, milestones.detail) ; add_milestone accepte time/detail, nouvelle route PATCH /api/milestones/{id} (update_milestone) ; /plan/timeline renvoie time et detail. Web : clic sur un jour ou « Ajouter » → fenêtre « Nouvel événement » : Objectif (titre, date, heure, détail) ou Tâche (titre, jour prévu, personne, via POST /tasks). Heure affichée en gras sur la pastille, détail dans la fiche, bouton Modifier.
 - Tests : tests_objectifs (format de l'heure, création, refus de 25:00, modification).

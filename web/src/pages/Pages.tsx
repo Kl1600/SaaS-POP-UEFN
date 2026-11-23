@@ -8,6 +8,7 @@ import { ago, api, frDate } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { Avatar, CardHead, Empty, PageHead, Tabs } from '../components/ui'
 import { tr } from '../i18n/t'
+import { uiScale } from '../zoom'
 import { IconPicker, PageIcon } from '../components/PageIcon'
 import { useNav } from '../routes'
 
@@ -110,6 +111,8 @@ export default function Pages() {
     try { await api.patch(`/api/pages/${p.id}`, { title: t }); setMenu(null); reloadTree() } catch (e: any) { toast(e.message, true) }
   }
   const children = (p: number | null) => (tree ?? []).filter(x => (x.parent_id ?? null) === p)
+  // Largeur de la colonne de l'arborescence, réglable en tirant son bord (#265).
+  const [treeW, setTreeW] = useState<number>(() => { try { return Math.max(200, Math.min(480, Number(localStorage.getItem('pop.tree.width')) || 250)) } catch { return 250 } })
   // Repli des pages mémorisé par map (#198).
   const closedKey = `pop.tree.closed.${map?.id}`
   const [closed, setClosed] = useState<Set<number>>(() => { try { return new Set(JSON.parse(localStorage.getItem(closedKey) ?? '[]')) } catch { return new Set() } })
@@ -117,16 +120,19 @@ export default function Pages() {
   const toggle = (pid: number) => { const c = new Set(closed); c.has(pid) ? c.delete(pid) : c.add(pid); saveClosed(c) }
   const collapseAll = () => saveClosed(new Set((tree ?? []).filter(x => (tree ?? []).some(y => y.parent_id === x.id)).map(x => x.id)))
   // guides[i] : l'ancêtre du niveau i+1 a encore des frères en dessous (la ligne verticale continue).
+  const MAXD = 5
   const Node = ({ p, depth, last, guides }: { p: any; depth: number; last: boolean; guides: boolean[] }) => {
     const open = !closed.has(p.id)
     const setOpen = () => toggle(p.id)
     const kids = children(p.id)
     return <>
       <div className="row tnode" style={{ gap: 0, position: 'relative' }}>
-        {guides.map((g, i) => <span key={i} className={'tguide' + (g ? ' on' : '')} aria-hidden="true" />)}
+        {/* #265 : au-delà de MAXD niveaux, le retrait n'augmente plus (« ⋯ » signale la profondeur). */}
+        {guides.length > MAXD && <span className="tdeep" aria-hidden="true">⋯</span>}
+        {guides.slice(-MAXD).map((g, i) => <span key={i} className={'tguide' + (g ? ' on' : '')} aria-hidden="true" />)}
         {depth > 0 && <span className={'telbow' + (last ? ' last' : '')} aria-hidden="true" />}
-        <button className="titem" style={{ width: 24, padding: 0, justifyContent: 'center', flex: 'none' }} aria-label={open ? tr("Replier") : tr("Déplier")} onClick={setOpen}>{kids.length ? (open ? <ChevronDown size={14} /> : <ChevronRight size={14} />) : null}</button>
-        <button className={'titem' + (p.id === id ? ' on' : '')} onClick={() => nav(`/pages/${p.id}`)} onContextMenu={e => { e.preventDefault(); setMenu(p.id) }}><span className="pico"><PageIcon icon={p.icon} size={12} /></span><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title || tr("Sans titre")}</span></button>
+        <button className="titem tchev" aria-label={open ? tr("Replier") : tr("Déplier")} onClick={setOpen}>{kids.length ? (open ? <ChevronDown size={14} /> : <ChevronRight size={14} />) : null}</button>
+        <button className={'titem' + (p.id === id ? ' on' : '')} title={p.title || tr("Sans titre")} onClick={() => nav(`/pages/${p.id}`)} onContextMenu={e => { e.preventDefault(); setMenu(p.id) }}><span className="pico"><PageIcon icon={p.icon} size={12} /></span><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title || tr("Sans titre")}</span></button>
         {canEdit && <span className="tacts">
           <button className="iconbtn" style={{ width: 26, height: 26 }} aria-label={tr("Ajouter une sous-page")} title={tr("Sous-page")} onClick={() => create(undefined, p.id)}><Plus size={14} /></button>
           <button className="iconbtn" style={{ width: 26, height: 26 }} aria-label={tr("Actions de la page")} title={tr("Actions")} onClick={() => setMenu(menu === p.id ? null : p.id)}><MoreHorizontal size={14} /></button>
@@ -152,8 +158,14 @@ export default function Pages() {
         </div>}
         {canEdit && <button className="btn pri" onClick={() => create()}><Plus size={18} />{tr("Nouvelle page")}</button>}
       </PageHead>
-      <div className="doc">
+      <div className="doc" style={{ ['--treew' as any]: `${treeW}px` }}>
         <nav className="card tree" aria-label={tr("Arborescence")}>
+          <div className="tree-resize" role="separator" aria-orientation="vertical" aria-label={tr("Élargir l’arborescence")} title={tr("Tirer pour élargir")}
+            onPointerDown={e => { const x0 = e.clientX, w0 = treeW; (e.target as HTMLElement).setPointerCapture(e.pointerId)
+              const mv = (ev: PointerEvent) => setTreeW(Math.max(200, Math.min(480, Math.round(w0 + (ev.clientX - x0) / uiScale()))))
+              const up = () => { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); setTreeW(w => { try { localStorage.setItem('pop.tree.width', String(w)) } catch { /* stockage indisponible */ } return w }) }
+              window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up) }}
+            onDoubleClick={() => { setTreeW(250); try { localStorage.removeItem('pop.tree.width') } catch { /* stockage indisponible */ } }} />
           <div className="tsec">{tr("Favoris")}</div>
           {tree?.filter(p => p.favorite).map(p => <button key={p.id} className={'titem' + (p.id === id ? ' on' : '')} onClick={() => nav(`/pages/${p.id}`)}><Star size={14} />{p.title}</button>)}
           <div className="tsec row" style={{ justifyContent: 'space-between' }}><span>{tr("Pages de la map")}</span>{closed.size < (tree ?? []).filter(x => (tree ?? []).some(y => y.parent_id === x.id)).length && <button className="linkbtn small muted" onClick={collapseAll}>{tr("Tout replier")}</button>}</div>
