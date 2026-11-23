@@ -6,10 +6,9 @@ import { ago, api } from '../api'
 import { useApp, useLoad } from '../state'
 import { CardHead, Modal } from './ui'
 import { tr } from '../i18n/t'
-import { Brand } from './Brand'
+import { AiLogo } from './AiLogo'
 
-const LOGO: Record<string, string> = { claude_code: 'claude', claude_desktop: 'claude', cursor: 'cursor', windsurf: 'windsurf', vscode: 'copilot', gemini: 'gemini' }
-export const ClientLogo = ({ kind, size }: { kind: string; size?: number }) => <Brand name={LOGO[kind] ?? ''} size={size} />
+export const ClientLogo = ({ kind, size }: { kind: string; size?: number }) => <AiLogo kind={kind} size={size} />
 
 type Client = { kind: string; name: string; where: string; config: (url: string, token: string) => string; note?: string }
 
