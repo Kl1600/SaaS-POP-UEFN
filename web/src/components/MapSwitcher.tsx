@@ -1,13 +1,14 @@
 // Sélecteur de map dans la barre latérale : changer de map, créer une map ou un studio sans quitter la page.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Check, ChevronsUpDown, Building2, LayoutGrid, User, Users, Sparkles } from 'lucide-react'
+import { Check, ChevronsUpDown, Building2, LayoutGrid, User, Users, Sparkles, MoreHorizontal, ArrowRight, Pencil, Trash2, Settings, LogIn } from 'lucide-react'
 import { api } from '../api'
 import { useApp, studioName } from '../state'
 import { Modal, ROLE } from './ui'
 import { tr } from '../i18n/t'
 import { ConfirmMove, isAdmin, previewMove, type Drag, type Pending } from './MoveMap'
 import { cssRect } from '../zoom'
+import { DeleteDialog, type DeleteTarget } from './DeleteDialog'
 
 type Create = { kind: 'map' | 'studio'; studioId?: number }
 
@@ -48,6 +49,16 @@ export function MapSwitcher() {
   const [drag, setDrag] = useState<Drag | null>(null)
   const [over, setOver] = useState<number | null>(null)
   const [pending, setPending] = useState<Pending | null>(null)
+  // Menu « ⋯ » d'une map ou d'un studio (#269), affiché sous sa ligne.
+  const [menu, setMenu] = useState<string | null>(null)
+  const [renaming, setRenaming] = useState<{ id: number; name: string } | null>(null)
+  const [del, setDel] = useState<DeleteTarget | null>(null)
+  useEffect(() => { if (!open) { setMenu(null); setRenaming(null) } }, [open])
+  const rename = async () => {
+    if (!renaming?.name.trim()) return
+    try { await api.patch(`/api/maps/${renaming.id}`, { name: renaming.name.trim() }); await app.reload(); app.toast(tr("Map renommée")); setRenaming(null); setMenu(null) } catch (er: any) { app.toast(er.message, true) }
+  }
+  const moveTo = async (d: Drag, to: number) => { setOpen(false); try { setPending(await previewMove(d, to)) } catch (er: any) { app.toast(er.message, true) } }
   const drop = async (to: number) => {
     const d = drag; setDrag(null); setOver(null)
     if (!d || d.from === to) return
@@ -71,13 +82,30 @@ export function MapSwitcher() {
           <span className="mapsw-gname">{s.personal ? tr('Mes maps (seul)') : s.name}</span>
           {!s.personal && <span className="mapsw-role">{ROLE[s.role] ?? s.role}</span>}
           <span className="mapsw-count">{s.maps.length}</span>
+          {!s.personal && <button className="mapsw-more" aria-label={tr("Actions du studio {0}", [s.name])} aria-expanded={menu === 's' + s.id} onClick={() => setMenu(menu === 's' + s.id ? null : 's' + s.id)}><MoreHorizontal size={15} /></button>}
         </div>
-        {s.maps.map(m => { const cur = m.id === app.map?.id; return <button key={m.id} role="menuitem" aria-current={cur ? 'true' : undefined} className={'mapsw-item' + (cur ? ' on' : '') + (drag?.id === m.id ? ' dragging' : '')} onClick={() => go(() => openMap(m.id))}
+        {menu === 's' + s.id && <div className="mapsw-menu" role="menu">
+          <button role="menuitem" onClick={() => go(() => nav(`/studio/${s.id}/maps`))}><LogIn size={14} />{tr("Ouvrir le studio")}</button>
+          {isAdmin(s) && <button role="menuitem" onClick={() => go(() => nav(`/studio/${s.id}/parametres`))}><Settings size={14} />{tr("Paramètres du studio")}</button>}
+          {s.role === 'owner' && <button role="menuitem" className="danger" onClick={() => { setOpen(false); setDel({ kind: 'studio', id: s.id, name: s.name, studioId: s.id, maps: s.maps.length }) }}><Trash2 size={14} />{tr("Supprimer le studio")}</button>}
+        </div>}
+        {s.maps.map(m => { const cur = m.id === app.map?.id; const k = 'm' + m.id; const lastTeam = !s.personal && s.maps.length <= 1; return <div key={m.id} className={'mapsw-row' + (menu === k ? ' open' : '')} onContextMenu={e => { if (!isAdmin(s)) return; e.preventDefault(); setMenu(k) }}><button role="menuitem" aria-current={cur ? 'true' : undefined} className={'mapsw-item' + (cur ? ' on' : '') + (drag?.id === m.id ? ' dragging' : '')} onClick={() => go(() => openMap(m.id))}
           draggable={isAdmin(s)} title={isAdmin(s) && studios.length > 1 ? tr('Glissez la map vers un autre groupe pour la déplacer') : undefined}
           onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(m.id)); setDrag({ id: m.id, name: m.name, from: s.id }) }}
           onDragEnd={() => { setDrag(null); setOver(null) }}>
           <span>{m.name}</span>{cur && <em className="mapsw-cur"><Check size={13} />{tr('Ouverte')}</em>}
-        </button> })}
+        </button>
+          {isAdmin(s) && <button className="mapsw-more" aria-label={tr("Actions de la map {0}", [m.name])} aria-expanded={menu === k} onClick={() => { setMenu(menu === k ? null : k); setRenaming(null) }}><MoreHorizontal size={15} /></button>}
+          {menu === k && <div className="mapsw-menu" role="menu">
+            {renaming?.id === m.id
+              ? <form className="mapsw-rename" onSubmit={e => { e.preventDefault(); rename() }}><input className="field" autoFocus maxLength={80} value={renaming.name} onChange={e => setRenaming({ id: m.id, name: e.target.value })} aria-label={tr("Nouveau nom")} /><button className="btn sm pri">{tr("OK")}</button></form>
+              : <button role="menuitem" onClick={() => setRenaming({ id: m.id, name: m.name })}><Pencil size={14} />{tr("Renommer")}</button>}
+            {studios.filter(t => t.id !== s.id && isAdmin(t)).map(t => <button key={t.id} role="menuitem" onClick={() => moveTo({ id: m.id, name: m.name, from: s.id }, t.id)}><ArrowRight size={14} />{tr("Déplacer vers {0}", [t.personal ? tr('Mes maps (seul)') : t.name])}</button>)}
+            {lastTeam
+              ? <div className="mapsw-note">{tr("Dernière map du studio : supprimez plutôt le studio, ou créez une autre map d’abord.")}</div>
+              : <button role="menuitem" className="danger" onClick={() => { setOpen(false); setDel({ kind: 'map', id: m.id, name: m.name, studioId: s.id }) }}><Trash2 size={14} />{tr("Supprimer la map")}</button>}
+          </div>}
+        </div> })}
         {s.maps.length === 0 && <div className="mapsw-empty">{s.personal ? tr('Les maps que vous faites seul.') : tr('Aucune map dans ce studio.')}</div>}
       </div> })}
       <div className="mapsw-foot">
@@ -93,6 +121,7 @@ export function MapSwitcher() {
       </div>
     </div>}
     {pending && app.me && <ConfirmMove p={pending} studios={app.me.studios} onClose={() => setPending(null)} />}
+    {del && <DeleteDialog t={del} onClose={() => setDel(null)} />}
   </div>
 }
 

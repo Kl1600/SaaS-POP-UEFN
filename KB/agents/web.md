@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-23 · #269 · supprimer une map ou un studio
+- Fait : sélecteur de map, bouton « ⋯ » au survol d'une map (clic droit aussi) : Renommer (PATCH /api/maps/N), Déplacer vers… (previewMove + ConfirmMove), Supprimer la map ; « ⋯ » sur un studio d'équipe : Ouvrir, Paramètres, Supprimer le studio (propriétaire). Paramètres > onglet « Maps et studios » (components/MapsStudios.tsx) : studios et maps, Ouvrir, Supprimer, Quitter. Fenêtre commune components/DeleteDialog.tsx (ce qui sera perdu, Exporter le studio d'abord, nom à taper) qui remplace les prompt() de la page du studio. Dernière map perso supprimable depuis l'interface ; dernière map d'un studio d'équipe : explication au lieu du bouton.
+- Vérifié : navigateur (renommer, supprimer la map ouverte → accueil, dernière map, onglet, suppression du studio).
+
 ### 2026-11-23 · #265 · arborescence profonde
 - Fait : retrait 16 px par niveau (chevron .tchev 16 px, guides 9+7 px), au-delà de 4 niveaux le retrait est plafonné (marque « ⋯ », .tdeep), titre complet au survol (title), colonne élargissable 200–480 px en tirant son bord (.tree-resize, var --treew, pop.tree.width ; double-clic = 250), lignes en color-mix(--text 22 %) pour le sombre.
 - Vérifié : navigateur, 11 niveaux.

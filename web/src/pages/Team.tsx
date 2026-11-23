@@ -9,6 +9,7 @@ import { Avatar, CardHead, PageHead, ROLE, Tabs } from '../components/ui'
 import { tr } from '../i18n/t'
 import LangPicker from '../components/LangPicker'
 import { openCreate } from '../components/MapSwitcher'
+import { DeleteDialog, type DeleteTarget } from '../components/DeleteDialog'
 
 /** Pages du studio (ou de l'espace perso) : /studio/:sid/equipe | integrations | maps. */
 export default function Team({ tab }: { tab: 'members' | 'integ' | 'maps' | 'settings' }) {
@@ -139,6 +140,7 @@ function Maps() {
   const { studio, isAdmin, reload: reloadMe, toast } = useApp()
   const nav = useNavigate()
   const [going, setGoing] = useState<number | null>(null)
+  const [del, setDel] = useState<DeleteTarget | null>(null)
   const { data, reload } = useLoad<any[]>(studio ? `/api/studios/${studio.id}/maps` : null, [studio?.id])
   const STATUS: Record<string, string> = { early_access: tr("Accès anticipé"), live: tr("Publiée") }
   return <section className="card">
@@ -160,12 +162,13 @@ function Maps() {
           <td className="small">{euros(m.last_gains_cents, 0)}</td>
           <td onClick={e => e.stopPropagation()}><div className="row" style={{ gap: 4, justifyContent: 'flex-end' }}>
             {studio?.personal && going !== m.id && <button className="btn sm" onClick={() => setGoing(m.id)}>{tr("Passer en équipe")}</button>}
-            {isAdmin && (data?.length ?? 0) > 1 && <button className="iconbtn" aria-label={tr("Supprimer {0}", [m.name])} onClick={async () => { const c = prompt(tr("Supprimer définitivement « {0} » et tout son contenu (tâches, pages, Verse, gains) ?\nTapez le nom de la map pour confirmer :", [m.name])); if (c === null) return; try { await api.del(`/api/maps/${m.id}`, { confirm: c }); toast(tr("Map supprimée")); reloadMe(); reload() } catch (e: any) { toast(e.message, true) } }}><Trash2 size={16} /></button>}
+            {isAdmin && (studio?.personal || (data?.length ?? 0) > 1) && <button className="iconbtn" aria-label={tr("Supprimer {0}", [m.name])} onClick={() => setDel({ kind: 'map', id: m.id, name: m.name, studioId: studio!.id })}><Trash2 size={16} /></button>}
           </div></td>
         </tr>
         {going === m.id && <tr><td colSpan={7}><GoTeam m={m} onDone={() => setGoing(null)} /></td></tr>}
       </Fragment>)}</tbody>
     </table></div>}
+    {del && <DeleteDialog t={del} onClose={() => { setDel(null); reload() }} />}
   </section>
 }
 
@@ -263,6 +266,7 @@ function StudioSettings() {
   const owner = me?.studios.find(s => s.id === studio?.id)?.role === 'owner'
   const { data } = useLoad<any>(studio ? `/api/studios/${studio.id}/members` : null, [studio?.id])
   const [name, setName] = useState(studio?.name ?? '')
+  const [delS, setDelS] = useState(false)
   const [to, setTo] = useState('')
   if (!studio) return null
   return <section className="card">
@@ -279,7 +283,8 @@ function StudioSettings() {
     <div className="dsec">{tr("Zone sensible")}</div>
     <div className="row" style={{ flexWrap: 'wrap' }}>
       {!owner && <button className="btn" onClick={async () => { if (!confirm(tr("Quitter le studio {0} ?", [studio.name]))) return; try { await api.post(`/api/studios/${studio.id}/leave`); await reloadMe(); location.href = '/' } catch (er: any) { toast(er.message, true) } }}>{tr("Quitter le studio")}</button>}
-      {owner && <button className="btn" style={{ color: 'var(--tr)' }} onClick={async () => { const c = prompt(tr("Supprimer définitivement le studio et TOUTES ses maps ?\nTapez « {0} » pour confirmer :", [studio.name])); if (c === null) return; try { await api.del(`/api/studios/${studio.id}`, { confirm: c }); await reloadMe(); location.href = '/' } catch (er: any) { toast(er.message, true) } }}>{tr("Supprimer le studio")}</button>}
+      {owner && <button className="btn" style={{ color: 'var(--tr)' }} onClick={() => setDelS(true)}>{tr("Supprimer le studio")}</button>}
+      {delS && <DeleteDialog t={{ kind: 'studio', id: studio.id, name: studio.name, studioId: studio.id, maps: studio.maps?.length }} onClose={() => setDelS(false)} />}
     </div>
   </section>
 }
