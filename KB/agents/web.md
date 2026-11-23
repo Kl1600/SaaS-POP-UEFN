@@ -2,6 +2,11 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-23 · #261 · calendrier : heure, détail, tâches
+- Fait : migration 0035 (milestones.time HH:MM facultative, milestones.detail) ; add_milestone accepte time/detail, nouvelle route PATCH /api/milestones/{id} (update_milestone) ; /plan/timeline renvoie time et detail. Web : clic sur un jour ou « Ajouter » → fenêtre « Nouvel événement » : Objectif (titre, date, heure, détail) ou Tâche (titre, jour prévu, personne, via POST /tasks). Heure affichée en gras sur la pastille, détail dans la fiche, bouton Modifier.
+- Tests : tests_objectifs (format de l'heure, création, refus de 25:00, modification).
+- Vérifié : navigateur.
+
 ### 2026-11-23 · #260 · logos des IA
 - Fait : components/AiLogo.tsx, logos de @lobehub/icons-static-svg 1.106 (MIT), importés en ?raw (SVG du paquet, pas de saisie) : Claude Code, Claude, Codex, Copilot (VS Code), Gemini CLI en couleur ; Cursor, Windsurf et MCP (« Autre IA ») en une couleur qui suit le thème. Le logo Codex officiel est bleu-violet : c'est la couleur de la marque, pas de la DA de POP.
 - Vérifié : navigateur, clair et sombre.

@@ -8,9 +8,12 @@ import { useApp, useLive, useLoad } from '../state'
 import { Modal } from '../components/ui'
 import { tr } from '../i18n/t'
 import { useNav } from '../routes'
+import { useMembers } from './Tasks'
 
 type Tag = 'objective' | 'release' | 'task' | 'aim' | 'avoid' | 'money'
-type Ev = { key: string; date: string; title: string; tag: Tag; id?: number; number?: number; status?: string; who?: string }
+type Ev = { key: string; date: string; title: string; tag: Tag; id?: number; number?: number; status?: string; who?: string; time?: string | null; detail?: string }
+// Fenêtre de création ou de modification (#261) : un objectif (titre, date, heure, détail) ou une tâche.
+type Draft = { kind: 'objective' | 'task'; id?: number; title: string; date: string; time: string; detail: string; who: string }
 type View = 'week' | 'month' | 'year'
 
 const TAG_INFO: Record<Tag, string> = {
@@ -51,7 +54,7 @@ export default function PlanCalendar() {
 
   const events = useMemo(() => {
     const out: Ev[] = []
-    for (const m of tl?.milestones ?? []) out.push({ key: 'm' + m.id, date: m.date, title: m.title, tag: 'objective', id: m.id })
+    for (const m of tl?.milestones ?? []) out.push({ key: 'm' + m.id, date: m.date, title: m.title, tag: 'objective', id: m.id, time: m.time, detail: m.detail })
     if (tl?.release_date) out.push({ key: 'release', date: tl.release_date, title: tr("Sortie de {0}", [map?.name ?? '']), tag: 'release' })
     for (const t of tl?.tasks ?? []) if (t.planned_day && !(hideDone && t.status === 'done')) out.push({ key: 't' + t.id, date: t.planned_day, title: `#${t.number} ${t.title}`, tag: 'task', id: t.id, number: t.number, status: t.status, who: t.assignee ?? undefined })
     for (const [i, e] of (seasons ?? []).entries()) if (e.kind !== 'map') out.push({ key: 's' + i, date: e.date, title: e.title, tag: e.kind as Tag })
@@ -75,11 +78,23 @@ export default function PlanCalendar() {
     : view === 'week' ? [cap(frDate(monday(anchor), { month: 'long' })), tr("semaine du {0}", [frDate(monday(anchor), { day: 'numeric', month: 'short' })])]
     : [cap(frDate(first(anchor), { month: 'long' })), anchor.slice(0, 4)]
 
-  const addObjective = async (date?: string) => {
-    if (!canEdit) return
-    const t = prompt(date ? tr("Nouvel objectif le {0}", [frDate(date, { day: 'numeric', month: 'long' })]) : tr("Nouvel objectif"))?.trim(); if (!t) return
-    const d = date ?? prompt(tr("Date (AAAA-MM-JJ)"), today)?.trim(); if (!d) return
-    try { await api.post(`/api/maps/${map!.id}/milestones`, { title: t, date: d }); reload(); toast(tr("Objectif ajouté")) } catch (er: any) { toast(er.message, true) }
+  const [draft, setDraft] = useState<Draft | null>(null)
+  const { data: team } = useMembers()
+  const addObjective = (date?: string) => { if (canEdit) setDraft({ kind: 'objective', title: '', date: date ?? today, time: '', detail: '', who: '' }) }
+  const saveDraft = async (d: Draft) => {
+    try {
+      if (d.kind === 'task') {
+        await api.post(`/api/maps/${map!.id}/tasks`, { title: d.title, planned_day: d.date, assignee_id: d.who ? Number(d.who) : null })
+        toast(tr("Tâche créée le {0}", [frDate(d.date, { day: 'numeric', month: 'short' })]))
+      } else if (d.id) {
+        await api.patch(`/api/milestones/${d.id}`, { title: d.title, date: d.date, time: d.time, detail: d.detail })
+        toast(tr("Objectif modifié"))
+      } else {
+        await api.post(`/api/maps/${map!.id}/milestones`, { title: d.title, date: d.date, time: d.time, detail: d.detail })
+        toast(tr("Objectif ajouté"))
+      }
+      setDraft(null); reload()
+    } catch (er: any) { toast(er.message, true) }
   }
   // Glisser une tâche sur un jour = la planifier ce jour-là (le serveur recalcule les tâches qui en dépendent).
   const plan = async (taskId: number, day: string) => {
@@ -100,7 +115,7 @@ export default function PlanCalendar() {
   } : {}
 
   const Pill = ({ e }: { e: Ev }) => <button className={'cev t-' + e.tag + (e.status === 'done' ? ' done' : '')} title={`${TAG_INFO[e.tag]} · ${e.title}`}
-    onClick={ev => { ev.stopPropagation(); setOpen(e) }} {...(e.tag === 'task' && e.id ? dragTask(e.id) : {})}><i />{e.title}</button>
+    onClick={ev => { ev.stopPropagation(); setOpen(e) }} {...(e.tag === 'task' && e.id ? dragTask(e.id) : {})}><i />{e.time && <b className="cev-t">{e.time}</b>}{e.title}</button>
 
   const Mini = ({ m, onPick, big }: { m: string; onPick: (d: string) => void; big?: boolean }) => <div className={'mcal' + (big ? ' big' : '')}>
     {MINI.map((w, i) => <span key={i} className="mcal-wd">{w}</span>)}
@@ -149,7 +164,7 @@ export default function PlanCalendar() {
             <button className="iconbtn" aria-label={tr("Suivant")} onClick={() => move(1)}><ChevronRight size={18} /></button>
           </div>
           {canEdit && <button className="iconbtn" aria-label={tr("Recalculer le planning")} data-tip={tr("Recalculer le planning")} onClick={async () => { try { const r = await api.post(`/api/maps/${map!.id}/plan/recalc`); setAlerts(r.alerts ?? []); reload(); toast(r.shifted?.length ? tr("#{0} décalées pour respecter les dépendances", [r.shifted.join(', #')]) : tr("Planning à jour")) } catch (er: any) { toast(er.message, true) } }}><RefreshCw size={16} /></button>}
-          {canEdit && <button className="btn pri sm" onClick={() => addObjective()}><Plus size={16} />{tr("Objectif")}</button>}
+          {canEdit && <button className="btn pri sm" onClick={() => addObjective()}><Plus size={16} />{tr("Ajouter")}</button>}
         </div>
       </div>
       {alerts.length > 0 && <div className="warn" role="alert" style={{ marginBottom: 12 }}><AlertTriangle size={18} /><div>{alerts.map((a, i) => <div key={i}>{a}</div>)}</div></div>}
@@ -167,7 +182,7 @@ export default function PlanCalendar() {
           const max = view === 'month' ? 3 : 40
           const we = i % 7 >= 5
           return <div key={d} className={'cal-day' + (out ? ' out' : '') + (we ? ' we' : '') + (d === today ? ' today' : '') + (canEdit ? ' can' : '') + (over === d ? ' drop' : '')}
-            onClick={() => addObjective(d)} title={canEdit ? tr("Cliquer pour ajouter un objectif ce jour-là") : undefined} {...dropProps(d)}>
+            onClick={() => addObjective(d)} title={canEdit ? tr("Cliquer pour ajouter un objectif ou une tâche ce jour-là") : undefined} {...dropProps(d)}>
             {view === 'week'
               ? <div className="cal-wh"><span>{WEEKDAYS[i]}</span><span className="cal-num">{Number(d.slice(8))}</span></div>
               : <span className="cal-num">{d.slice(8) === '01' ? frDate(d, { day: 'numeric', month: 'short' }) : Number(d.slice(8))}</span>}
@@ -185,14 +200,46 @@ export default function PlanCalendar() {
           <button className="iconbtn" aria-label={tr("Fermer")} onClick={() => setOpen(null)}><X size={18} /></button>
         </div>
         <h2 style={{ margin: 0, fontWeight: 500 }}>{open.title}</h2>
-        <div className="muted">{frDate(open.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}{open.who ? ` · ${open.who}` : ''}</div>
+        <div className="muted">{frDate(open.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}{open.time ? ` · ${open.time}` : ''}{open.who ? ` · ${open.who}` : ''}</div>
+        {open.detail && <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{open.detail}</p>}
         {open.tag === 'task' && canEdit && <label className="stack" style={{ gap: 4 }}><span className="small muted">{tr("Jour prévu")}</span>
           <input className="field" type="date" defaultValue={open.date} onChange={e => { if (e.target.value) { plan(open.id!, e.target.value); setOpen(null) } }} /></label>}
         <div className="row" style={{ justifyContent: 'flex-end' }}>
           {open.tag === 'task' && <button className="btn pri" onClick={() => nav(`/taches?q=%23${open.number}`)}>{tr("Ouvrir la tâche")}</button>}
+          {open.tag === 'objective' && canEdit && <button className="btn" onClick={() => { setDraft({ kind: 'objective', id: open.id, title: open.title, date: open.date, time: open.time ?? '', detail: open.detail ?? '', who: '' }); setOpen(null) }}>{tr("Modifier")}</button>}
           {open.tag === 'objective' && canEdit && <button className="btn" style={{ color: 'var(--tr)' }} onClick={async () => { if (!confirm(tr("Supprimer l’objectif « {0} » ?", [open.title]))) return; try { await api.del(`/api/milestones/${open.id}`); setOpen(null); reload() } catch (er: any) { toast(er.message, true) } }}><Trash2 size={16} />{tr("Supprimer")}</button>}
         </div>
       </div>
+    </Modal>}
+    {draft && <Modal onClose={() => setDraft(null)} label={draft.id ? tr("Modifier l’objectif") : tr("Nouvel événement")}>
+      <form className="stack" onSubmit={e => { e.preventDefault(); if (draft.title.trim()) saveDraft(draft) }}>
+        <div className="row" style={{ justifyContent: 'space-between' }}>
+          <h2 style={{ margin: 0, fontWeight: 500 }}>{draft.id ? tr("Modifier l’objectif") : tr("Nouvel événement")}</h2>
+          <button type="button" className="iconbtn" aria-label={tr("Fermer")} onClick={() => setDraft(null)}><X size={18} /></button>
+        </div>
+        {!draft.id && <div className="seg" role="tablist" aria-label={tr("Type")}>
+          {([['objective', tr("Objectif")], ['task', tr("Tâche")]] as const).map(([k, l]) => <button type="button" key={k} role="tab" aria-selected={draft.kind === k} className={draft.kind === k ? 'on' : ''} onClick={() => setDraft({ ...draft, kind: k })}>{l}</button>)}
+        </div>}
+        <label className="stack" style={{ gap: 4 }}><span className="small muted">{tr("Titre")}</span>
+          <input className="field" autoFocus required maxLength={draft.kind === 'task' ? 200 : 80} value={draft.title} onChange={e => setDraft({ ...draft, title: e.target.value })} placeholder={draft.kind === 'task' ? tr("Ex. Faire la boutique") : tr("Ex. Démo jouable au studio")} /></label>
+        <div className="row" style={{ gap: 10, alignItems: 'flex-end' }}>
+          <label className="stack" style={{ gap: 4, flex: 1 }}><span className="small muted">{draft.kind === 'task' ? tr("Jour prévu") : tr("Date")}</span>
+            <input className="field" type="date" required value={draft.date} onChange={e => setDraft({ ...draft, date: e.target.value })} /></label>
+          {draft.kind === 'objective' ? <label className="stack" style={{ gap: 4, width: 130 }}><span className="small muted">{tr("Heure (facultative)")}</span>
+            <input className="field" type="time" value={draft.time} onChange={e => setDraft({ ...draft, time: e.target.value })} /></label>
+            : <label className="stack" style={{ gap: 4, flex: 1 }}><span className="small muted">{tr("Personne")}</span>
+              <select className="field" value={draft.who} onChange={e => setDraft({ ...draft, who: e.target.value })}>
+                <option value="">{tr("Personne pour l’instant")}</option>
+                {(team?.members ?? []).map((m: any) => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select></label>}
+        </div>
+        {draft.kind === 'objective' && <label className="stack" style={{ gap: 4 }}><span className="small muted">{tr("Détail (facultatif)")}</span>
+          <textarea className="field" rows={4} maxLength={2000} value={draft.detail} onChange={e => setDraft({ ...draft, detail: e.target.value })} placeholder={tr("Ce qu’il faut avoir fini, qui est concerné…")} /></label>}
+        <div className="row" style={{ justifyContent: 'flex-end', gap: 8 }}>
+          <button type="button" className="btn" onClick={() => setDraft(null)}>{tr("Annuler")}</button>
+          <button className="btn pri" disabled={!draft.title.trim()}>{draft.id ? tr("Enregistrer") : draft.kind === 'task' ? tr("Créer la tâche") : tr("Créer l’objectif")}</button>
+        </div>
+      </form>
     </Modal>}
   </section>
 }

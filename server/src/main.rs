@@ -489,7 +489,10 @@ fn api() -> Router<AppState> {
         )
         // Planifier
         .route("/api/maps/{mid}/milestones", post(plan::add_milestone))
-        .route("/api/milestones/{id}", delete(plan::delete_milestone))
+        .route(
+            "/api/milestones/{id}",
+            delete(plan::delete_milestone).patch(plan::update_milestone),
+        )
         .route("/api/maps/{mid}/plan/preview", post(plan::preview))
         .route("/api/maps/{mid}/plan/apply", post(plan::apply))
         .route("/api/maps/{mid}/plan/timeline", get(plan::timeline))

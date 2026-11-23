@@ -1085,3 +1085,6 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 /* #260 : logos des IA. */
 .ailogo{display:inline-grid;place-items:center;flex:none;color:var(--text)}
 .ailogo svg{display:block}
+
+/* #261 : heure des objectifs dans le calendrier. */
+.cev-t{font-weight:600;margin-right:2px;flex:none}
