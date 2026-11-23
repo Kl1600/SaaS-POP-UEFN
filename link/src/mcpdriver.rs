@@ -427,6 +427,44 @@ impl Mcp {
             .ok_or_else(|| anyhow!("UEFN n'a pas confirmé la pose : {}", out.trim()))
     }
 
+    /// Pose un mesh (#148) : forme de base ou mesh du projet, avec échelle ; rend l'identifiant de l'acteur créé.
+    pub async fn spawn_mesh(&mut self, args: &Value) -> Result<String> {
+        let code = format!(
+            "ARGS = {}
+{}",
+            serde_json::to_string(&args.to_string())?,
+            PY_MESH
+        );
+        let out = self.python(&code).await?;
+        out.lines()
+            .rev()
+            .find_map(|l| l.trim().strip_prefix("SPAWNED=").map(String::from))
+            .ok_or_else(|| anyhow!("UEFN n'a pas confirmé la pose du mesh : {}", out.trim()))
+    }
+
+    /// Réglages de l'île (#148) : l'appareil « Réglages de l'île » du niveau et ses options (valeurs permises comprises).
+    pub async fn island_settings(&mut self) -> Result<(String, Value)> {
+        let out = self.python(PY_ISLAND).await?;
+        let id = out
+            .lines()
+            .rev()
+            .find_map(|l| l.trim().strip_prefix("ISLAND=").map(String::from))
+            .ok_or_else(|| anyhow!("Aucun appareil « Réglages de l'île » dans le niveau."))?;
+        let t = self.known("props_get").ok_or_else(|| {
+            anyhow!("UEFN n'expose pas l'outil des options d'appareils (ListClassicDeviceOptions).")
+        })?;
+        let txt = self
+            .call_tool(&t, json!({ "devicePath": { "refPath": id } }))
+            .await?;
+        let list: Value = serde_json::from_str(txt.trim()).map_err(|_| {
+            anyhow!(
+                "réponse illisible : {}",
+                txt.chars().take(200).collect::<String>()
+            )
+        })?;
+        Ok((id, list))
+    }
+
     /// Importe `file` (fichier sur ce PC) dans le dossier `folder` du projet ; rend les chemins des assets créés.
     pub async fn import(&mut self, file: &str, folder: &str, project: &str) -> Result<Vec<String>> {
         let args = json!({ "file": file, "folder": folder, "project": project }).to_string();
@@ -1100,6 +1138,37 @@ if rot: act.set_actor_rotation(unreal.Rotator(roll=rot[2], pitch=rot[0], yaw=rot
 if A.get('name'): act.set_actor_label(A['name'])
 if A.get('folder'): act.set_folder_path(A['folder'])
 print('SPAWNED=' + act.get_path_name())
+"#;
+
+/// Pose un mesh (#148) : le chemin doit désigner un StaticMesh (forme de base /Engine/BasicShapes/… ou mesh importé).
+/// Position en cm, rotation [pitch, yaw, roll], échelle [x, y, z].
+const PY_MESH: &str = r#"import unreal, json
+sub = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+A = json.loads(ARGS)
+obj = unreal.EditorAssetLibrary.load_asset(A['mesh'])
+if obj is None: raise Exception('Mesh introuvable : ' + A['mesh'])
+if not isinstance(obj, unreal.StaticMesh): raise Exception("Ce n'est pas un mesh (StaticMesh) : " + A['mesh'] + ' ; pour un appareil, utilisez place_device.')
+act = sub.spawn_actor_from_object(obj, unreal.Vector(0, 0, 0), unreal.Rotator(0, 0, 0))
+if act is None: raise Exception('UEFN refuse de poser ce mesh : ' + A['mesh'])
+loc = A.get('location')
+if loc: act.set_actor_location(unreal.Vector(*loc), False, False)
+rot = A.get('rotation')
+if rot: act.set_actor_rotation(unreal.Rotator(roll=rot[2], pitch=rot[0], yaw=rot[1]), False)
+sc = A.get('scale')
+if sc: act.set_actor_scale3d(unreal.Vector(*sc))
+if A.get('name'): act.set_actor_label(A['name'])
+if A.get('folder'): act.set_folder_path(A['folder'])
+print('SPAWNED=' + act.get_path_name())
+"#;
+
+/// Trouve l'appareil « Réglages de l'île » du niveau (#148) : Device_ExperienceSettings_V2_UEFN_C dans UEFN 43.
+const PY_ISLAND: &str = r#"import unreal
+sub = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+for a in sub.get_all_level_actors():
+    c = a.get_class().get_name()
+    if 'ExperienceSettings' in c or 'IslandSettings' in c:
+        print('ISLAND=' + a.get_path_name())
+        break
 "#;
 
 /// Importe un fichier dans le projet (#90) : AssetImportTask automatique, sans remplacer un asset existant.

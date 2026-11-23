@@ -3,6 +3,14 @@
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
 ```
+FAIT | #148 MCP · Construire le décor d'une map | 23/11 22:30
+Owner : benybens | Sur la tâche : Claude Code, pour benybens
+Fait : place_mesh (mesh_spawn), get/set_island_settings, mesh importé en Verse par Scene Graph (KB/UEFN.md)
+Reste : rien ; pas de make_prop (prop BuildingProp absent du digest)
+Bloque : rien
+```
+
+```
 EN COURS | #81 Forge F7 · Relais et serveur : poser un appareil classique | 21/11 01:30
 Owner : Kl1600 | Sur la tâche : Claude Code, pour Kl1600
 Fait : action actor_spawn (asset ou modèle du niveau), MCP place_device, annulation par IA soumise à validation

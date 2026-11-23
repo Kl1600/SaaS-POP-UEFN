@@ -737,7 +737,7 @@ pub struct Origin<'a> {
 fn role_for(action: &str) -> Role {
     match action {
         "actor_delete" | "delete_file" | "asset_delete" => Role::Member,
-        "refresh_actors" | "render_topview" | "session_output" => Role::Viewer,
+        "refresh_actors" | "render_topview" | "session_output" | "island_settings" => Role::Viewer,
         _ => Role::Freelance,
     }
 }
@@ -749,6 +749,98 @@ fn short(v: &Value) -> String {
         Value::Array(a) => a.iter().map(short).collect::<Vec<_>>().join(", "),
         other => other.to_string(),
     }
+}
+
+/// Formes de base d'Unreal, posables par leur nom français (#148) ; chacune mesure 1 m de côté (le plan : 1 m × 1 m).
+pub const SHAPES: &[(&str, &str)] = &[
+    ("plan", "/Engine/BasicShapes/Plane"),
+    ("cube", "/Engine/BasicShapes/Cube"),
+    ("sphere", "/Engine/BasicShapes/Sphere"),
+    ("cylindre", "/Engine/BasicShapes/Cylinder"),
+    ("cone", "/Engine/BasicShapes/Cone"),
+];
+
+/// Valide une pose de mesh avant tout envoi à UEFN (#148) et remplace `shape` par le chemin du mesh.
+/// Rend le libellé du journal. Positions en cm (±20 km), rotation en degrés (±3 600), échelle de 0,001 à 1 000.
+pub fn check_mesh_args(args: &mut Value) -> Result<String, AppError> {
+    let shape = args["shape"].as_str().unwrap_or("").trim().to_lowercase();
+    let mesh = args["mesh"].as_str().unwrap_or("").trim().to_string();
+    let chemin = match (shape.is_empty(), mesh.is_empty()) {
+        (false, true) => SHAPES
+            .iter()
+            .find(|(n, _)| *n == shape)
+            .map(|(_, p)| p.to_string())
+            .ok_or_else(|| {
+                bad(format!(
+                    "Forme inconnue : « {shape} ». Formes possibles : plan, cube, sphere, cylindre, cone."
+                ))
+            })?,
+        (true, false) => {
+            if !mesh.starts_with('/') || mesh.len() > 400 {
+                return Err(bad("mesh : chemin du Content Browser attendu (ex. /Game/… ou /<projet>/POP/…)."));
+            }
+            mesh
+        }
+        _ => return Err(bad("Indiquez soit shape (plan, cube, sphere, cylindre, cone), soit mesh (chemin d’un mesh importé).")),
+    };
+    let nom = args["name"].as_str().unwrap_or("").trim().to_string();
+    if nom.chars().count() > 120 {
+        return Err(bad("Nom : 120 caractères au plus."));
+    }
+    if let Some(f) = args["folder"].as_str() {
+        if f.chars().count() > 200 {
+            return Err(bad("Dossier : 200 caractères au plus."));
+        }
+    }
+    let trois = |k: &str, min: f64, max: f64, quoi: &str| -> Result<(), AppError> {
+        if args[k].is_null() {
+            return Ok(());
+        }
+        let ok = args[k]
+            .as_array()
+            .map(|v| {
+                v.len() == 3
+                    && v.iter().all(|x| {
+                        x.as_f64()
+                            .map(|n| n.is_finite() && n >= min && n <= max)
+                            .unwrap_or(false)
+                    })
+            })
+            .unwrap_or(false);
+        if ok {
+            Ok(())
+        } else {
+            Err(bad(format!("{k} : trois nombres attendus, {quoi}.")))
+        }
+    };
+    trois(
+        "location",
+        -2_000_000.0,
+        2_000_000.0,
+        "en cm, entre -2 000 000 et 2 000 000 (20 km)",
+    )?;
+    trois(
+        "rotation",
+        -3600.0,
+        3600.0,
+        "en degrés [pitch, yaw, roll], entre -3 600 et 3 600",
+    )?;
+    trois(
+        "scale",
+        0.001,
+        1000.0,
+        "entre 0,001 et 1 000 (1 = taille d’origine)",
+    )?;
+    let modele = chemin.rsplit('/').next().unwrap_or(&chemin).to_string();
+    args["mesh"] = json!(chemin);
+    if let Some(o) = args.as_object_mut() {
+        o.remove("shape");
+    }
+    Ok(if nom.is_empty() {
+        modele
+    } else {
+        format!("{nom} ({modele})")
+    })
 }
 
 /// Prépare une action : contrôle des droits et des verrous, état « avant », action inverse pour l'annulation.
@@ -948,6 +1040,16 @@ async fn prepare(
             };
             Ok((format!("Pose : {quoi}"), Value::Null, None))
         }
+
+        "mesh_spawn" => {
+            // Poser un mesh (#148) : forme de base ou mesh du Content Browser, avec échelle.
+            let quoi = check_mesh_args(args)?;
+            if let Some(f) = args["folder"].as_str().filter(|f| !f.is_empty()) {
+                check_lock(f)?;
+            }
+            Ok((format!("Pose du mesh : {quoi}"), Value::Null, None))
+        }
+        "island_settings" => Ok(("Lecture des réglages de l’île".into(), Value::Null, None)),
 
         "actor_organize" => {
             // Rangement du niveau (#84) : nom et dossier propres à chaque acteur, en une action annulable.
@@ -1186,7 +1288,7 @@ pub async fn exec(
     let mid = o.ctx.map_id;
     let journal = !matches!(
         action,
-        "refresh_actors" | "render_topview" | "session_output"
+        "refresh_actors" | "render_topview" | "session_output" | "island_settings"
     );
     // La session de test ne se met pas en attente : sans UEFN, rien n'est envoyé (#82).
     if matches!(action, "start_session" | "stop_session") && !ready(st, mid, action) {
@@ -1278,7 +1380,7 @@ async fn run_action(
                         );
                     }
                 }
-                if action == "actor_duplicate" || action == "actor_spawn" {
+                if matches!(action, "actor_duplicate" | "actor_spawn" | "mesh_spawn") {
                     if let Some(ids) = data.get("created_ids") {
                         extra_undo = Some(
                             json!({ "action": "actor_delete", "args": { "ids": ids } }).to_string(),

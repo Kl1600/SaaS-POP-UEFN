@@ -119,6 +119,9 @@ fn tools() -> Value {
         tool("get_actor", "Détails d'un acteur : transformation, tags, options, propriétés Verse, liens d'événements.", json!({ "id": { "type": "string" } }), &["id"]),
         tool("update_actors", "Modifie un ou plusieurs acteurs. changes peut contenir name, folder, hidden, transform {location,rotation,scale}, options {clé: valeur}, props {clé: valeur}, tags_add, tags_remove, events.", json!({ "ids": ids, "changes": { "type": "object" }, "task": task }), &["ids", "changes"]),
         tool("place_device", "Pose un appareil dans le niveau. Soit asset (chemin de l'appareil dans le Content Browser d'UEFN, ex. /Game/…), soit like (identifiant d'un appareil du niveau à copier avec ses réglages). Facultatifs : name, folder, location [x, y, z] et rotation [pitch, yaw, roll] en coordonnées du moteur. Journalisé et annulable (l'annulation demandée par une IA attend un humain).", json!({ "asset": { "type": "string" }, "like": { "type": "string" }, "name": { "type": "string" }, "folder": { "type": "string" }, "location": { "type": "array", "items": { "type": "number" } }, "rotation": { "type": "array", "items": { "type": "number" } }, "task": task }), &[]),
+        tool("place_mesh", "Pose un mesh dans le niveau (décor : sol, mur, bloc, mesh importé). Soit shape : forme de base d'1 m de côté (plan, cube, sphere, cylindre, cone ; un plan de 20 m × 20 m = shape plan, scale [20, 20, 1]), soit mesh : chemin d'un mesh du Content Browser (ex. un mesh importé par import_asset). Facultatifs : name, folder, location [x, y, z] en cm, rotation [pitch, yaw, roll] en degrés, scale [x, y, z]. Journalisé et annulable. Un mesh importé est aussi utilisable en Verse (Scene Graph) : voir KB « mesh importé en Verse ».", json!({ "shape": { "type": "string", "enum": ["plan", "cube", "sphere", "cylindre", "cone"] }, "mesh": { "type": "string" }, "name": { "type": "string" }, "folder": { "type": "string" }, "location": { "type": "array", "items": { "type": "number" } }, "rotation": { "type": "array", "items": { "type": "number" } }, "scale": { "type": "array", "items": { "type": "number" } }, "task": task }), &[]),
+        tool("get_island_settings", "Lit les réglages de l'île (appareil Réglages de l'île) : nom, libellé, valeur actuelle et valeurs permises. names : noms à lire (ex. [\"MaxPlayers\"]) ; sans names, la liste complète sans les valeurs permises.", json!({ "names": { "type": "array", "items": { "type": "string" } } }), &[]),
+        tool("set_island_settings", "Change des réglages de l'île, ex. settings {\"MaxPlayers\": \"16\"}. Chaque nom et chaque valeur sont vérifiés avant l'envoi (get_island_settings donne les valeurs permises). Journalisé et annulable (l'annulation remet les anciennes valeurs).", json!({ "settings": { "type": "object" }, "task": task }), &["settings"]),
         tool("import_asset", "Importe un fichier (FBX, OBJ, PNG, JPG, TGA, WAV, OGG, MP3 ; 200 Mo au plus) dans le projet UEFN ouvert. local_path : chemin du fichier sur le PC d'UEFN ; ou url : adresse sur le serveur POP. folder : dossier du Content Browser (facultatif, sinon /<projet>/POP). Journalisé ; l'annulation retire l'asset s'il n'est pas utilisé (demandée par une IA, elle attend un humain).", json!({ "local_path": { "type": "string" }, "url": { "type": "string" }, "filename": { "type": "string" }, "folder": { "type": "string" }, "task": task }), &[]),
         tool("duplicate_actors", "Duplique des acteurs.", json!({ "ids": ids }), &["ids"]),
         tool("delete_actors", "Demande la suppression d'acteurs. Un humain doit valider dans POP avant l'exécution.", json!({ "ids": ids }), &["ids"]),
@@ -575,6 +578,60 @@ async fn call_as(
                 o(),
                 "actor_spawn",
                 json!({ "asset": a["asset"], "like": a["like"], "name": a["name"], "folder": a["folder"], "location": a["location"], "rotation": a["rotation"] }),
+            )
+            .await
+        }
+        "place_mesh" => {
+            exec(
+                st,
+                o(),
+                "mesh_spawn",
+                json!({ "shape": a["shape"], "mesh": a["mesh"], "name": a["name"], "folder": a["folder"], "location": a["location"], "rotation": a["rotation"], "scale": a["scale"] }),
+            )
+            .await
+        }
+        "get_island_settings" => {
+            let r = exec(st, o(), "island_settings", json!({})).await?;
+            let names: Vec<String> = a["names"]
+                .as_array()
+                .cloned()
+                .unwrap_or_default()
+                .iter()
+                .filter_map(|x| x.as_str().map(String::from))
+                .collect();
+            Ok(island_view(&r, &names))
+        }
+        "set_island_settings" => {
+            let wanted = a["settings"]
+                .as_object()
+                .filter(|m| !m.is_empty() && m.len() <= 50)
+                .cloned()
+                .ok_or_else(|| bad("settings : au moins un réglage, ex. {\"MaxPlayers\": \"16\"}."))?;
+            let r = exec(st, o(), "island_settings", json!({})).await?;
+            let (id, options, current) = island_check(&r, &wanted)?;
+            // L'annulation repart des valeurs actuelles : on les mémorise dans le dernier état connu.
+            let snap = snapshot(st, mid).await?;
+            let mut all = snap.actors.clone();
+            let x = all
+                .iter_mut()
+                .find(|x| x["id"].as_str() == Some(id.as_str()))
+                .ok_or_else(|| bad("Réglages de l’île absents du dernier état connu : actualisez les acteurs."))?;
+            if !x["options"].is_object() {
+                x["options"] = json!({});
+            }
+            for (k, v) in current {
+                x["options"][k] = v;
+            }
+            sqlx::query("UPDATE uefn_state SET actors = ? WHERE map_id = ?")
+                .bind(json!(all).to_string())
+                .bind(mid)
+                .execute(&st.db)
+                .await?;
+            exec(
+                st,
+                o(),
+                "actor_update",
+                json!({ "ids": [id], "changes": { "options": options } }),
             )
             .await
         }
@@ -1266,6 +1323,87 @@ mod tests_dependances {
     }
 }
 
+/// Réglages de l'île rendus à l'IA (#148) : valeurs permises seulement pour les noms demandés (la liste complète
+/// en compte des centaines).
+fn island_view(r: &Value, names: &[String]) -> Value {
+    let list = r["settings"].as_array().cloned().unwrap_or_default();
+    let out: Vec<Value> = list
+        .iter()
+        .filter(|o| names.is_empty() || names.iter().any(|n| o["name"].as_str() == Some(n.as_str())))
+        .map(|o| {
+            let mut v = json!({ "name": o["name"], "label": o["displayName"], "value": o["currentValue"], "value_label": o["currentLabel"] });
+            if !names.is_empty() {
+                v["description"] = o["description"].clone();
+                v["allowed"] = json!(o["allowedValues"].as_array().cloned().unwrap_or_default().iter().map(|x| x["value"].clone()).collect::<Vec<_>>());
+            }
+            v
+        })
+        .collect();
+    json!({ "device": r["id"], "count": out.len(), "settings": out })
+}
+
+/// Vérifie les réglages demandés contre ceux d'UEFN (#148) : nom connu, valeur permise (valeur ou libellé).
+/// Rend l'acteur, les options à envoyer et leurs valeurs actuelles.
+fn island_check(
+    r: &Value,
+    wanted: &serde_json::Map<String, Value>,
+) -> Result<(String, Value, Vec<(String, Value)>), AppError> {
+    let id = r["id"]
+        .as_str()
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| bad("Aucun appareil « Réglages de l’île » dans le niveau."))?
+        .to_string();
+    let list = r["settings"].as_array().cloned().unwrap_or_default();
+    let mut options = json!({});
+    let mut current = vec![];
+    for (k, v) in wanted {
+        let o = list
+            .iter()
+            .find(|o| o["name"].as_str() == Some(k.as_str()))
+            .ok_or_else(|| {
+                bad(format!(
+                    "Réglage de l’île inconnu : « {k} » (voir get_island_settings)."
+                ))
+            })?;
+        let txt = match v {
+            Value::String(s) => s.trim().to_string(),
+            Value::Number(n) => n.to_string(),
+            Value::Bool(b) => b.to_string(),
+            _ => return Err(bad(format!("{k} : valeur texte ou nombre attendue."))),
+        };
+        let allowed = o["allowedValues"].as_array().cloned().unwrap_or_default();
+        let value = if allowed.is_empty() {
+            txt.clone()
+        } else {
+            allowed
+                .iter()
+                .find(|a| {
+                    a["value"].as_str() == Some(txt.as_str())
+                        || a["label"]
+                            .as_str()
+                            .map(|l| l.eq_ignore_ascii_case(&txt))
+                            .unwrap_or(false)
+                })
+                .and_then(|a| a["value"].as_str().map(String::from))
+                .ok_or_else(|| {
+                    let ex: Vec<String> = allowed
+                        .iter()
+                        .take(12)
+                        .filter_map(|a| a["label"].as_str().map(String::from))
+                        .collect();
+                    bad(format!(
+                        "{k} : valeur « {txt} » refusée. Valeurs permises : {}{}.",
+                        ex.join(", "),
+                        if allowed.len() > 12 { "…" } else { "" }
+                    ))
+                })?
+        };
+        options[k] = json!(value);
+        current.push((k.clone(), o["currentValue"].clone()));
+    }
+    Ok((id, options, current))
+}
+
 #[cfg(test)]
 mod tests_compte {
     //! #145 : un jeton MCP par compte, map de travail choisie par list_maps / use_map.
@@ -1632,5 +1770,76 @@ mod tests_compte {
                 .await
                 .unwrap();
         assert_eq!(agent, None);
+    }
+}
+
+#[cfg(test)]
+mod tests_decor {
+    use super::*;
+    use crate::uefn::check_mesh_args;
+
+    /// Poser un mesh (#148) : arguments refusés en français avant tout envoi, forme de base traduite en chemin.
+    #[test]
+    fn mesh_valide_ou_refuse() {
+        let mut a =
+            json!({ "shape": "plan", "name": "Sol", "location": [0, 0, 0], "scale": [20, 20, 1] });
+        assert_eq!(check_mesh_args(&mut a).unwrap(), "Sol (Plane)");
+        assert_eq!(a["mesh"], "/Engine/BasicShapes/Plane");
+        assert!(a.get("shape").is_none());
+        let mut a = json!({ "mesh": "/Projet/POP/Bloc" });
+        assert_eq!(check_mesh_args(&mut a).unwrap(), "Bloc");
+        for bad in [
+            json!({}),
+            json!({ "shape": "plan", "mesh": "/Game/X" }),
+            json!({ "shape": "pyramide" }),
+            json!({ "mesh": "Game/X" }),
+            json!({ "shape": "cube", "scale": [0, 1, 1] }),
+            json!({ "shape": "cube", "scale": [1, 1, 5000] }),
+            json!({ "shape": "cube", "scale": [1, 1] }),
+            json!({ "shape": "cube", "location": [0, 0, 3_000_000] }),
+            json!({ "shape": "cube", "location": ["a", 0, 0] }),
+            json!({ "shape": "cube", "rotation": [0, 9999, 0] }),
+        ] {
+            let mut b = bad.clone();
+            let e = check_mesh_args(&mut b)
+                .err()
+                .unwrap_or_else(|| panic!("accepté : {bad}"));
+            assert!(matches!(e, AppError::BadRequest(_)), "{bad}");
+        }
+    }
+
+    fn reglages() -> Value {
+        json!({ "id": "L.Ile", "settings": [
+            { "name": "MaxPlayers", "displayName": "Max Players", "currentValue": "16", "currentLabel": "16",
+              "allowedValues": [{ "label": "12", "value": "12" }, { "label": "16", "value": "16" }] },
+            { "name": "TeamMode", "displayName": "Teams", "currentValue": "0", "currentLabel": "Free for all",
+              "allowedValues": [{ "label": "Free for all", "value": "0" }, { "label": "Teams", "value": "1" }] }
+        ] })
+    }
+
+    /// Réglages de l'île (#148) : nom inconnu ou valeur non permise refusés, libellé accepté, ancienne valeur gardée.
+    #[test]
+    fn reglages_de_l_ile() {
+        let r = reglages();
+        let w = |v: Value| v.as_object().unwrap().clone();
+        let (id, opts, cur) =
+            island_check(&r, &w(json!({ "MaxPlayers": 12, "TeamMode": "teams" }))).unwrap();
+        assert_eq!(id, "L.Ile");
+        assert_eq!(opts, json!({ "MaxPlayers": "12", "TeamMode": "1" }));
+        assert!(cur.contains(&("MaxPlayers".into(), json!("16"))));
+        assert!(island_check(&r, &w(json!({ "MaxPlayers": "17" }))).is_err());
+        assert!(island_check(&r, &w(json!({ "Inconnu": "1" }))).is_err());
+        assert!(island_check(&r, &w(json!({ "MaxPlayers": [1] }))).is_err());
+        assert!(island_check(
+            &json!({ "settings": [] }),
+            &w(json!({ "MaxPlayers": "12" }))
+        )
+        .is_err());
+        // Vue rendue à l'IA : valeurs permises seulement pour les noms demandés.
+        let v = island_view(&r, &[]);
+        assert_eq!(v["count"], 2);
+        assert!(v["settings"][0].get("allowed").is_none());
+        let v = island_view(&r, &["MaxPlayers".into()]);
+        assert_eq!(v["settings"][0]["allowed"], json!(["12", "16"]));
     }
 }
