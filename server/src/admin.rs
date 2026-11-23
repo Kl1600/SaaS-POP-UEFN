@@ -133,7 +133,7 @@ pub async fn join(
         if crate::mail::configured() {
             let to = email.clone();
             tokio::spawn(async move {
-                let body = format!("Bonjour,\n\nQuelqu'un (sans doute vous) a demandé l'accès à la bêta de POP avec cette adresse. Vous avez déjà un compte POP : connectez-vous ici :\n{}/connexion\n\nMot de passe oublié ? Utilisez « Mot de passe oublié » sur cette page.\n\nSi vous n'avez rien demandé, ignorez ce message.", crate::mail::public_url());
+                let body = format!("Bonjour,\n\nQuelqu'un (sans doute vous) a demandé l'accès à la bêta de POP avec cette adresse. Vous avez déjà un compte POP : connectez-vous ici :\n{}/connexion\n\nMot de passe oublié ? Utilisez « Mot de passe oublié » sur cette page.\n\nSi vous n'avez rien demandé, ignorez ce message.\n\nL’équipe POP", crate::mail::public_url());
                 if let Err(e) =
                     crate::mail::send(&to, "POP · vous avez déjà un compte", &body).await
                 {
@@ -207,7 +207,8 @@ pub async fn send_digest(st: &AppState) -> Result<usize, AppError> {
     }
     body += &format!(
         "
-Répondre : {}/admin",
+Pour les traiter :
+{}/admin",
         crate::mail::public_url()
     );
     let admins: Vec<(i64, String)> =

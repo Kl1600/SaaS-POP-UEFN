@@ -214,7 +214,7 @@ pub async fn forgot(State(st): State<AppState>, Json(b): Json<ForgotIn>) -> ApiR
         let link = format!("{}{}", mail::public_url(), new_reset(&st, uid).await?);
         let to = b.email.trim().to_lowercase();
         tokio::spawn(async move {
-            if let Err(e) = mail::send(&to, "POP · réinitialiser votre mot de passe", &format!("Bonjour,\n\nPour choisir un nouveau mot de passe, ouvrez ce lien (valable 2 heures) :\n{link}\n\nSi vous n'avez rien demandé, ignorez ce message.")).await {
+            if let Err(e) = mail::send(&to, "POP · réinitialiser votre mot de passe", &format!("Bonjour,\n\nPour choisir un nouveau mot de passe, ouvrez ce lien (valable 2 heures) :\n{link}\n\nSi vous n'avez rien demandé, ignorez ce message : votre mot de passe ne change pas.\n\nL’équipe POP")).await {
                 tracing::warn!("e-mail de réinitialisation : {e:#}");
             }
         });

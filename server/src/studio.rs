@@ -594,7 +594,7 @@ pub async fn invite(
             .fetch_one(&st.db)
             .await?;
         let link = format!("{}/invitation/{token}", crate::mail::public_url());
-        mailed = crate::mail::send(b.email.trim(), &format!("{} vous invite dans {sname} sur POP", u.name), &format!("Bonjour,\n\n{} vous invite à rejoindre le studio {sname} sur POP.\n\nRejoindre : {link}\n\nLe lien expire dans 7 jours.", u.name)).await.is_ok();
+        mailed = crate::mail::send(b.email.trim(), &format!("{} vous invite dans {sname} sur POP", u.name), &format!("Bonjour,\n\n{} vous invite à rejoindre le studio {sname} sur POP.\n\nPour accepter l’invitation, ouvrez ce lien (valable 7 jours) :\n{link}\n\nL’équipe POP", u.name)).await.is_ok();
     }
     Ok(Json(
         json!({ "token": token, "link": format!("/invitation/{token}"), "mailed": mailed }),
