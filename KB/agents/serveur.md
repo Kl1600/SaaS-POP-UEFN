@@ -130,3 +130,8 @@ Bloque : rien
 - Fait : migration 0034 (`api_tokens.map_id` facultatif = map de travail, `ON DELETE SET NULL`) ; outils MCP `list_maps` et `use_map` (permis en lecture seule) ; appartenance vérifiée à chaque appel ; `use_map` libère une tâche réservée dans l'autre map. Routes `/api/me/tokens` (les routes de jetons par map sont retirées). Web : Paramètres → IA connectées (onglet de #205) gère les jetons du compte et montre les IA de la map ouverte.
 - Vérifié : `cargo test` (7 tests `tests_compte`, dont la migration sur des données d'avant), navigateur en local, `claude mcp add` réel puis révocation.
 - Leçon : sqlx 0.8 exécute chaque migration SQLite dans une transaction (`-- no-transaction` ignoré) : impossible d'y couper les clés étrangères, et `DROP TABLE` déclenche les `ON DELETE` des tables filles. Garder les colonnes filles de côté et les remettre.
+
+### 2026-11-23 · #274 · e-mails en HTML aux couleurs de POP
+- Fait : `mail::send` envoie texte brut + HTML (`multipart/alternative`). `mail::render_html` construit le HTML depuis le texte : bandeau noir avec `logo.png` (servi par le site), carte blanche, titre = objet sans « POP · », une adresse seule sur sa ligne devient un bouton orange (libellé selon la page : `/reinitialiser`, `/activer`, `/invitation`…), lien de secours en bas, signature en gris, tout échappé. Textes harmonisés (signature, lien sur sa propre ligne).
+- Convention : pour un nouvel e-mail, mettre le lien d'action **seul sur sa ligne** et finir par « L’équipe POP » ; ajouter son chemin dans `button_label` si besoin.
+- Vérifié : 3 tests `tests_mail`, rendu navigateur ordinateur et téléphone.
