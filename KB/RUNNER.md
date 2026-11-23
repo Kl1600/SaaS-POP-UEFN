@@ -4,6 +4,12 @@ Quand les minutes gratuites de GitHub Actions du compte Kl1600 sont épuisées (
 GitHub ne lance plus aucun job : le CI ne passe plus et `task.py done` ne fusionne plus rien. Un runner
 « self-hosted » sur un PC de l'équipe fait tourner les jobs Linux à la place, sans consommer ces minutes.
 
+**État au 23/11/2026** : le dépôt est public, donc les minutes de GitHub Actions sont gratuites et illimitées
+(0 ms facturée, Linux et Windows). La variable `RUNNER` est **absente** et doit le rester : tous les jobs tournent
+chez GitHub, Forge comprise. Le runner local ne sert plus que si le dépôt redevient privé. Les échecs
+« User interaction is not allowed (-25308) » de « déployer » le 22/11 venaient d'un runner local (trousseau d'un
+Mac) : sans `RUNNER`, ils ne se produisent plus (déploiement 45256109076 vert).
+
 ## Comment ça marche
 
 Chaque workflow choisit son runner avec `runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}` :
