@@ -262,6 +262,17 @@ impl Link {
                 out["actors"] = json!(self.mcp.list_actors().await?);
             }
 
+            "mesh_spawn" => {
+                self.need_uefn()?;
+                out["created_ids"] = json!([self.mcp.spawn_mesh(a).await?]);
+                out["actors"] = json!(self.mcp.list_actors().await?);
+            }
+            "island_settings" => {
+                self.need_uefn()?;
+                let (id, list) = self.mcp.island_settings().await?;
+                out["id"] = json!(id);
+                out["settings"] = list;
+            }
             "asset_import" => {
                 self.need_uefn()?;
                 let (file, temp) = fichier_a_importer(&self.cfg.server, a).await?;

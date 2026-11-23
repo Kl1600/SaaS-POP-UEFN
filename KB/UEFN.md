@@ -148,3 +148,48 @@ concernée ; corrigez une ligne fausse en le disant.
   import, on ignore les références internes au lot et on retire le mesh avant ses matériaux.
 - `EditorAssetLibrary.delete_directory` retire un dossier vide du Content Browser ; le dossier reste sur le disque
   jusqu'à ce qu'on le supprime.
+
+## Décor : meshes, réglages de l'île, mesh en Verse (testé le 23/11/2026, projet TestPopHub, UEFN 43.12, #148)
+
+**Toolsets repérés** (62 au total) :
+- `EditorToolset.LevelToolset` : `AddToSceneFromAsset` / `AddToSceneFromClass` (poser), `ReplaceActorsWithAsset`,
+  `SetActorFolder`, `RemoveFromScene`, `TraceWorld`, dossiers, data layers.
+- `EditorToolset.StaticMeshToolset` : `ImportFile` (FBX, OBJ, glTF → StaticMesh), `GetBounds`, matériaux, LOD,
+  collisions, Nanite. `EditorToolset.ActorToolset` : transformations, labels, composants.
+- `ValkyrieToolset.EntityToolset` / `PrefabToolset` (Scene Graph : entités, composants, prefabs Verse),
+  `PCGToolset`, `geometry_toolset.geometry_ops.GeometryTools` (hors périmètre de #148).
+- **Aucun toolset Landscape ni « île »** : les réglages de l'île passent par `DeviceToolset` (voir plus bas).
+
+**Poser un mesh** (`place_mesh`, action relais `mesh_spawn`) : `EditorActorSubsystem.spawn_actor_from_object` avec
+un `StaticMesh` crée un `FortStaticMeshActor`, puis position, rotation et `set_actor_scale3d`.
+- Formes de base disponibles dans UEFN : `/Engine/BasicShapes/Plane|Cube|Sphere|Cylinder|Cone`, toutes de **1 m**
+  (le plan : 1 m × 1 m, épaisseur nulle). Plan de 20 m × 20 m = échelle `[20, 20, 1]` (vérifié : bornes 2 000 cm).
+- Un mesh importé (`StaticMeshToolset.ImportFile` ou `import_asset`) se pose de la même façon à sa taille d'origine
+  × l'échelle (OBJ de 2 m, échelle 2 → 4 m vérifié).
+- L'annulation supprime l'acteur créé (`actor_delete`), comme `place_device`.
+
+**Réglages de l'île** : ce sont les options d'un appareil classique, `IslandSettings0`
+(`Device_ExperienceSettings_V2_UEFN_C`, chemin `…:PersistentLevel.IslandSettings_0`). `ListClassicDeviceOptions`
+en rend **287** avec valeur actuelle et valeurs permises (réponse de 177 Ko) ; `MaxPlayers` accepte 1 à 16, puis
+20, 24, 30, 32, 40, 48, 50, 60…100. `set_island_settings` vérifie nom et valeur, puis passe par `actor_update`
+(`SetClassicDeviceOption`) : 16 → 12 puis annulation → 16 vérifiés dans UEFN.
+
+**Un mesh importé utilisable par le Verse, sans manipulation** : avec le Scene Graph activé (par défaut sur
+TestPopHub : `EnableSceneGraph` dans le `.uplugin`), chaque StaticMesh du projet apparaît dans
+`Assets.digest.verse` comme un composant `NomDuMesh := class(mesh_component)` (et `NomDuMesh_asset:mesh`) dans le
+module de son dossier. Testé en session : ce Verse fait apparaître le mesh importé `POP_TEST/POP_Bloc`, et le
+`Print` est arrivé sans erreur :
+```verse
+if (Racine := GetSimulationEntity[]):
+    E := entity{}
+    Racine.AddEntities(array{E})
+    E.AddComponents(array{POP_TEST.POP_Bloc{Entity := E}})
+    E.SetGlobalTransform(transform{Translation := vector3{Forward := 0.0, Left := 0.0, Up := 400.0}})
+```
+(`using { /Verse.org/SceneGraph }`, `{ /Verse.org/SpatialMath }`, `{ /Verse.org/Simulation }`). Le Verse
+compilé, le digest se met à jour à la compilation suivante (`BuildAll`).
+
+**Ce qui ne marche pas** : un blueprint créé en Python avec pour parent `BuildingProp` (mesh réglé sur le CDO,
+compilé, enregistré) **n'apparaît pas** comme `creative_prop_asset` dans le digest, donc `SpawnProp` ne peut pas
+l'utiliser. Pas d'outil `make_prop` : la voie Scene Graph ci-dessus suffit. Pour `SpawnProp` (ancienne API), il
+faut un prop de la galerie Fortnite (`creative_prop_asset` du digest Fortnite), pas un mesh importé.
