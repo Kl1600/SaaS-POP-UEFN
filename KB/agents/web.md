@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-23 · #259 · barre du haut
+- Fait : loupe, cloche, bouton clair/sombre (Soleil/Lune, app.toggleDark) et + alignés à droite (.top-spacer) ; la recherche ouverte (Ctrl K) s'élargit vers la gauche.
+- Vérifié : navigateur (1440 et 390 px, bascule gardée après rechargement).
+
 ### 2026-11-23 · #257 · Planifier : calendrier façon Apple
 - Fait : onglet Planning (Gantt) retiré, Planifier ouvre directement PlanCalendar. Colonne de gauche : mini-mois (point sur les jours chargés), « Calendriers » = filtres par type avec case de couleur (pop.cal.filters) + « Tâches finies » (pop.cal.done), « À planifier » (tâches sans jour, à glisser). En-tête : mois en gras + année, sélecteur Semaine / Mois / Année, flèches, Aujourd'hui, Recalculer, + Objectif. Glisser une tâche sur un jour → POST /plan/move (le serveur recalcule les dépendances : une tâche glissée sur un jour passé revient à aujourd'hui). Week-ends grisés, vue Année en 12 mini-mois.
 - Vérifié : navigateur (glisser, filtres mémorisés, 3 vues, sombre, 390 px).
