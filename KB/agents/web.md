@@ -232,3 +232,9 @@ Bloque : rien
 - Fait : migration 0043 (`admin_stats_day`, photo quotidienne des comptes actifs et des plans, mise à jour chaque minute par `digest_loop` et à l'ouverture de la vue générale) ; `GET /api/admin/overview?days=30|90` rend `stats` (inscriptions, comptes actifs, demandes par jour ; Starter, Pro, essais et leur évolution). « Actif » = connecté ou a agi (tâche, page, UEFN) ce jour-là. Web : courbes en barres (`Barres`), choix 30 / 90 jours, carte Abonnements.
 - Limite : l'évolution des plans commence le jour de la mise en service (la base ne gardait pas l'historique des plans).
 - Vérifié : `cargo test` (`admin::stats_tests`) ; Chrome sans tête en clair et en sombre, 90 barres.
+
+### 2026-11-24 · #134 · « Mes IA » sur l'accueil (au lieu de « Connecte ton IA » par map)
+- Fait (périmètre changé par l'humain, voir les commentaires de #134) : section « Mes IA » sous les maps (`components/ConnectAI.tsx`, `AiSection`) : une carte par IA du compte, « en attente de connexion » tant que `last_used` est vide, « connectée » au premier appel MCP, × pour retirer une tentative ; « Connecter une IA » : prompt à coller avec clé incluse (l'IA s'ajoute POP), en un clic et clé API repliés. Pastille d'état dans la barre du haut (`AiPill`, mène à `/#ia`). Paramètres → IA connectées réutilise le même bouton (`ConnectAiButton`). Aucune migration.
+- Corrigé en passant : `AiLogo` suffixe les id des dégradés (un logo caché rendait les autres copies invisibles).
+- Vérifié : `cargo test` (`agent_en_attente_puis_connecte`) ; navigateur en local, appels MCP réels par HTTP ; testé par l'humain avec Claude Code et le prompt.
+- Leçon : un mot = une chose ; « IA » = l'outil connecté au compte, « agent » = une IA au travail sur une tâche (rôle, `claim_task`).
