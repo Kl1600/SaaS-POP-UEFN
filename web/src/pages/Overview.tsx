@@ -212,7 +212,8 @@ function Parcours({ mapId }: { mapId: number }) {
   }
   const faites = qs.filter(x => x.answer).length
   if (!q) {
-    return (
+    return (<>
+      <OnLance mapId={mapId} />
       <section className="card">
         <CardHead icon={<CheckCircle2 size={22} strokeWidth={1.5} />} title={tr("Cadrage de la map")} sub={tr("{0} réponses · modifiables à tout moment", [faites])} />
         {voir ? <div className="list">
@@ -224,7 +225,7 @@ function Parcours({ mapId }: { mapId: number }) {
         </div> : null}
         <button className="btn more" onClick={() => setVoir(!voir)}>{voir ? tr("Masquer les réponses") : tr("Voir les réponses")}<ArrowRight size={16} strokeWidth={1.5} /></button>
       </section>
-    )
+    </>)
   }
   const precedente = i > 0 ? i - 1 : null
   return (
@@ -248,3 +249,51 @@ function Parcours({ mapId }: { mapId: number }) {
     </section>
   )
 }
+
+/** « On lance ? » (#136) : à la fin du parcours, résumé de ce que POP crée (tâches, jalons, premières tâches de
+ * l'IA) et un seul bouton. Sur une map qui a déjà des tâches, POP demande quoi faire au lieu de créer des doublons. */
+function OnLance({ mapId }: { mapId: number }) {
+  const { toast } = useApp()
+  const nav = useNav()
+  const { data, reload } = useLoad<any>(`/api/maps/${mapId}/lancement`, [mapId])
+  useLive(['tasks', 'questions'], reload)
+  const [ouvert, setOuvert] = useState(false)
+  const [occupe, setOccupe] = useState(false)
+  const [fait, setFait] = useState<any>(null)
+  const [cache, setCache] = useState(false)
+  if (!data || !data.ready || data.can_launch === false) return null
+  const lancer = async (mode: string) => {
+    setOccupe(true)
+    try { const r = await api.post<any>(`/api/maps/${mapId}/lancement`, { mode }); setFait(r); setOuvert(false); reload() } catch (e: any) { toast(e.message, true) } finally { setOccupe(false) }
+  }
+  if (fait) return (
+    <section className="card">
+      <CardHead icon={<Rocket size={22} strokeWidth={1.5} />} title={tr("C'est parti")} sub={fait.created ? tr("{0} tâches et {1} jalons créés", [fait.created, fait.milestones]) : tx(fait.message)} />
+      {fait.for_ai?.length > 0 && <p className="muted" style={{ marginTop: 0 }}>{tr("Votre IA a reçu ses premières tâches : {0}", [fait.for_ai.map((x: any) => `#${x.number} ${x.title}`).join(' · ')])}</p>}
+      <div className="row" style={{ gap: 8 }}><button className="btn" onClick={() => nav('/taches')}>{tr("Voir les tâches")}</button><button className="btn" onClick={() => nav('/planifier')}>{tr("Voir le planning")}</button><button className="btn" onClick={() => setFait(null)}>{tr("Fermer")}</button></div>
+    </section>
+  )
+  if ((data.launched || cache) && !ouvert) return (
+    <div className="row" style={{ justifyContent: 'flex-end', marginBottom: -8 }}>
+      <button className="btn" onClick={() => setOuvert(true)}><Rocket size={16} strokeWidth={1.5} />{tr("Relancer la mise en route")}</button>
+    </div>
+  )
+  const deja = data.existing > 0
+  return (
+    <section className="card" aria-live="polite">
+      <CardHead icon={<Rocket size={22} strokeWidth={1.5} />} title={tr("On lance ?")} sub={tr("POP prépare la production à partir de vos réponses, sans IA externe")} />
+      <ul style={{ margin: '0 0 12px', paddingLeft: 20, display: 'grid', gap: 4 }}>
+        <li>{tr("{0} tâches d'environ une heure, rangées par lot, avec leurs dépendances", [data.tasks])}</li>
+        <li>{tr("{0} jalons, jusqu'à la sortie le {1}", [data.milestones, frDate(data.release_date, { day: 'numeric', month: 'long', year: 'numeric' })])}</li>
+        <li>{data.agent ? tr("Les {0} premières tâches pour votre IA « {1} »", [data.for_ai, data.agent]) : tr("Aucune IA ne travaille sur cette map : les tâches restent à prendre")}</li>
+      </ul>
+      {deja && <p className="small" style={{ marginTop: 0 }}>{tr("Cette map a déjà {0} tâches. {1} tâches du plan n'existent pas encore.", [data.existing, data.missing])}</p>}
+      <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+        {deja ? <button className="btn pri" disabled={occupe || data.missing === 0} onClick={() => lancer('manquantes')}>{tr("Ajouter seulement ce qui manque")}</button>
+          : <button className="btn pri" disabled={occupe} onClick={() => lancer('tout')}><Rocket size={16} strokeWidth={1.5} />{tr("Lancer")}</button>}
+        {deja && <button className="btn" onClick={() => { setOuvert(false); setCache(true) }}>{tr("Ne rien créer")}</button>}
+      </div>
+    </section>
+  )
+}
+

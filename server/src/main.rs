@@ -19,6 +19,7 @@ mod fil;
 mod guide;
 mod ideas;
 mod integrations;
+mod lancement;
 mod launch;
 mod legal;
 mod library;
@@ -587,6 +588,10 @@ fn api() -> Router<AppState> {
         .route("/api/maps/{mid}/agents/activity", get(agents::activite))
         .route("/api/maps/{mid}/fil", get(fil::route))
         .route("/api/maps/{mid}/questions", get(questions::route_liste))
+        .route(
+            "/api/maps/{mid}/lancement",
+            get(lancement::route_apercu).post(lancement::route_lancer),
+        )
         .route(
             "/api/maps/{mid}/questions/{qid}",
             post(questions::route_repondre),
