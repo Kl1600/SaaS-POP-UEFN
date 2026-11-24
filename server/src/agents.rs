@@ -20,6 +20,7 @@ pub async fn list(
     Path(mid): Path<i64>,
 ) -> ApiResult<Value> {
     map_ctx(&st, &u, mid).await?;
+    liberer_silencieux(&st).await?;
     let rows: Vec<(i64, String, String, String, String, Option<String>, i64, Option<i64>, Option<String>, Option<String>, Option<String>, Option<String>)> = sqlx::query_as(
         "SELECT a.id, a.name, a.kind, u.name, a.scope, a.last_used, a.calls, t.number, t.title, t.status, a.task_since,
                 (SELECT x.summary FROM uefn_actions x WHERE x.agent_id = a.id ORDER BY x.id DESC LIMIT 1)
@@ -39,8 +40,131 @@ pub async fn list(
         .collect::<Vec<_>>())))
 }
 
+/// Délai sans aucun appel MCP au-delà duquel la réservation d'un agent se libère seule (#114).
+pub const SILENCE: &str = "-2 hours";
+
+/// Libère les tâches des agents silencieux depuis plus de 2 h, en laissant une note de reprise pour le suivant.
+/// Appelée à la demande (claim_task, next_task, liste des agents) : pas de tâche de fond à surveiller.
+pub async fn liberer_silencieux(st: &AppState) -> Result<u64, AppError> {
+    let mut tx = st.db.begin().await?;
+    let r = sqlx::query(
+        "INSERT INTO task_progress (task_id, agent_id, agent_name, todo, auto)
+         SELECT task_id, id, name, 'Réservation libérée par POP : agent « ' || name || ' » sans activité depuis ' || COALESCE(last_used, task_since) || ' (UTC). Relisez la note précédente et le journal avant de reprendre.', 1
+         FROM api_tokens WHERE task_id IS NOT NULL AND COALESCE(last_used, task_since) < datetime('now', ?)",
+    )
+    .bind(SILENCE)
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query("UPDATE api_tokens SET task_id = NULL, task_since = NULL WHERE task_id IS NOT NULL AND COALESCE(last_used, task_since) < datetime('now', ?)")
+        .bind(SILENCE)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    Ok(r.rows_affected())
+}
+
+/// La note de reprise la plus récente d'une tâche, s'il y en a une, avec la précédente note d'un agent quand la
+/// dernière vient de POP (libération automatique).
+pub async fn reprise(st: &AppState, task_id: i64) -> Result<Value, AppError> {
+    let rows: Vec<(String, String, String, String, bool, String)> = sqlx::query_as(
+        "SELECT agent_name, done, todo, files, auto, created_at FROM task_progress WHERE task_id = ? ORDER BY id DESC LIMIT 2",
+    )
+    .bind(task_id)
+    .fetch_all(&st.db)
+    .await?;
+    let note = |r: &(String, String, String, String, bool, String)| json!({ "par": r.0, "fait": r.1, "reste": r.2, "fichiers": serde_json::from_str::<Value>(&r.3).unwrap_or(json!([])), "automatique": r.4, "le": r.5 });
+    Ok(match rows.as_slice() {
+        [] => Value::Null,
+        [d, p, ..] if d.4 && !p.4 => json!({ "derniere": note(d), "precedente": note(p) }),
+        [d, ..] => json!({ "derniere": note(d) }),
+    })
+}
+
+/// `save_progress` : l'agent note où il en est sur sa tâche réservée (fait, reste, fichiers).
+pub async fn save_progress(st: &AppState, agent: i64, a: &Value) -> Result<Value, AppError> {
+    let t: Option<(Option<i64>, String)> =
+        sqlx::query_as("SELECT task_id, name FROM api_tokens WHERE id = ?")
+            .bind(agent)
+            .fetch_optional(&st.db)
+            .await?;
+    let (Some(tid), nom) = t.unwrap_or((None, String::new())) else {
+        return Err(bad(
+            "Aucune tâche réservée : réservez-la d'abord (claim_task).",
+        ));
+    };
+    let texte = |k: &str| -> Result<String, AppError> {
+        let v = a[k].as_str().unwrap_or("").trim().to_string();
+        if v.chars().count() > 2000 {
+            return Err(bad(format!("{k} : 2 000 caractères au plus.")));
+        }
+        Ok(v)
+    };
+    let (fait, reste) = (texte("done")?, texte("todo")?);
+    if fait.is_empty() && reste.is_empty() {
+        return Err(bad(
+            "Écrivez au moins ce qui est fait (done) ou ce qui reste (todo).",
+        ));
+    }
+    let fichiers: Vec<String> = a["files"]
+        .as_array()
+        .map(|f| {
+            f.iter()
+                .filter_map(|x| x.as_str())
+                .take(50)
+                .map(|x| x.chars().take(300).collect())
+                .collect()
+        })
+        .unwrap_or_default();
+    sqlx::query("INSERT INTO task_progress (task_id, agent_id, agent_name, done, todo, files) VALUES (?, ?, ?, ?, ?, ?)")
+        .bind(tid)
+        .bind(agent)
+        .bind(&nom)
+        .bind(&fait)
+        .bind(&reste)
+        .bind(json!(fichiers).to_string())
+        .execute(&st.db)
+        .await?;
+    Ok(
+        json!({ "message": "Progression enregistrée : un agent qui reprend cette tâche la recevra." }),
+    )
+}
+
+/// La tâche réservée par l'agent sur cette map, avec sa note de reprise ; et les tâches libres interrompues (avec
+/// une note), à reprendre de préférence. Pour next_task.
+pub async fn pour_next_task(st: &AppState, agent: i64, mid: i64) -> Result<Value, AppError> {
+    liberer_silencieux(st).await?;
+    let mienne: Option<(i64, i64, String)> = sqlx::query_as(
+        "SELECT t.id, t.number, t.title FROM api_tokens a JOIN tasks t ON t.id = a.task_id WHERE a.id = ? AND t.map_id = ?",
+    )
+    .bind(agent)
+    .bind(mid)
+    .fetch_optional(&st.db)
+    .await?;
+    let mienne = match mienne {
+        Some((id, n, titre)) => {
+            json!({ "number": n, "title": titre, "reprise": reprise(st, id).await? })
+        }
+        None => Value::Null,
+    };
+    let libres: Vec<(i64, i64, String)> = sqlx::query_as(
+        "SELECT t.id, t.number, t.title FROM tasks t WHERE t.map_id = ? AND t.status <> 'done'
+           AND EXISTS (SELECT 1 FROM task_progress p WHERE p.task_id = t.id)
+           AND NOT EXISTS (SELECT 1 FROM api_tokens a WHERE a.task_id = t.id)
+         ORDER BY t.number LIMIT 10",
+    )
+    .bind(mid)
+    .fetch_all(&st.db)
+    .await?;
+    let mut a_reprendre = vec![];
+    for (id, n, titre) in libres {
+        a_reprendre.push(json!({ "number": n, "title": titre, "reprise": reprise(st, id).await? }));
+    }
+    Ok(json!({ "ta_tache": mienne, "a_reprendre": a_reprendre }))
+}
+
 /// `claim_task` : l'agent réserve la tâche n° `number` de la map (et libère sa tâche précédente).
 pub async fn claim(st: &AppState, agent: i64, mid: i64, number: i64) -> Result<Value, AppError> {
+    liberer_silencieux(st).await?;
     let t: Option<(i64, String, String)> =
         sqlx::query_as("SELECT id, title, status FROM tasks WHERE map_id = ? AND number = ?")
             .bind(mid)
@@ -75,9 +199,13 @@ pub async fn claim(st: &AppState, agent: i64, mid: i64, number: i64) -> Result<V
                 "La tâche #{number} vient d'être prise par un autre agent."
             ))
         })?;
-    Ok(
-        json!({ "number": number, "title": title, "message": format!("Tâche #{number} réservée pour cet agent.") }),
-    )
+    let reprise = reprise(st, tid).await?;
+    let message = if reprise.is_null() {
+        format!("Tâche #{number} réservée pour cet agent.")
+    } else {
+        format!("Tâche #{number} réservée pour cet agent. Elle a été commencée : lisez la note de reprise avant de travailler.")
+    };
+    Ok(json!({ "number": number, "title": title, "message": message, "reprise": reprise }))
 }
 
 /// `release_task` : l'agent libère sa tâche.
@@ -175,6 +303,61 @@ mod tests {
             a,
             b,
         }
+    }
+
+    /// #114 : note de reprise rendue à l'agent qui reprend ; réservation silencieuse libérée après 2 h, avec une note.
+    #[tokio::test]
+    async fn reprise_d_une_tache() {
+        let m = monde().await;
+        // Sans tâche réservée : refus clair.
+        assert!(save_progress(&m.st, m.a, &json!({ "done": "x" }))
+            .await
+            .is_err());
+        claim(&m.st, m.a, m.mid, 1).await.unwrap();
+        assert!(save_progress(&m.st, m.a, &json!({})).await.is_err());
+        save_progress(&m.st, m.a, &json!({ "done": "Minuteur écrit", "todo": "Brancher le HUD", "files": ["minuteur.verse"] })).await.unwrap();
+        let n = pour_next_task(&m.st, m.a, m.mid).await.unwrap();
+        assert_eq!(
+            n["ta_tache"]["reprise"]["derniere"]["reste"],
+            "Brancher le HUD"
+        );
+        release(&m.st, m.a).await.unwrap();
+
+        // Un autre agent reprend la tâche : il reçoit la note, et next_task la lui proposait.
+        let n = pour_next_task(&m.st, m.b, m.mid).await.unwrap();
+        assert_eq!(n["a_reprendre"][0]["number"], 1);
+        let r = claim(&m.st, m.b, m.mid, 1).await.unwrap();
+        assert_eq!(r["reprise"]["derniere"]["fait"], "Minuteur écrit");
+        assert_eq!(r["reprise"]["derniere"]["fichiers"][0], "minuteur.verse");
+        assert!(r["message"].as_str().unwrap().contains("note de reprise"));
+
+        // Silencieux depuis plus de 2 h : la tâche se libère seule, avec une note automatique et la note de l'agent.
+        sqlx::query("UPDATE api_tokens SET last_used = datetime('now', '-3 hours'), task_since = datetime('now', '-3 hours') WHERE id = ?")
+            .bind(m.b).execute(&m.st.db).await.unwrap();
+        save_progress(&m.st, m.b, &json!({ "todo": "Tester en session" }))
+            .await
+            .unwrap();
+        // Actif il y a 1 h : rien ne bouge.
+        sqlx::query("UPDATE api_tokens SET last_used = datetime('now', '-1 hours') WHERE id = ?")
+            .bind(m.b)
+            .execute(&m.st.db)
+            .await
+            .unwrap();
+        assert_eq!(liberer_silencieux(&m.st).await.unwrap(), 0);
+        sqlx::query("UPDATE api_tokens SET last_used = datetime('now', '-3 hours') WHERE id = ?")
+            .bind(m.b)
+            .execute(&m.st.db)
+            .await
+            .unwrap();
+        let r = claim(&m.st, m.a, m.mid, 1).await.unwrap();
+        assert_eq!(r["reprise"]["derniere"]["automatique"], true, "{r}");
+        assert_eq!(r["reprise"]["precedente"]["reste"], "Tester en session");
+        let libre: Option<i64> = sqlx::query_scalar("SELECT task_id FROM api_tokens WHERE id = ?")
+            .bind(m.b)
+            .fetch_one(&m.st.db)
+            .await
+            .unwrap();
+        assert_eq!(libre, None);
     }
 
     #[tokio::test]

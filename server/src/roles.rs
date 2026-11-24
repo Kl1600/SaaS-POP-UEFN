@@ -27,6 +27,7 @@ const COMMUNS: &[&str] = &[
 const TACHES: &[&str] = &[
     "claim_task",
     "release_task",
+    "save_progress",
     "set_task_status",
     "create_task",
 ];

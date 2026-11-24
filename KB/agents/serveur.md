@@ -147,3 +147,7 @@ Bloque : rien
 - Fait : migration 0037 (`api_tokens.role`), `server/src/roles.rs` (7 rôles : consignes + outils permis ; sans rôle = tous les outils), MCP : consignes du rôle à `initialize`, `tools/list` filtré, refus clair à `tools/call` ; routes `POST /api/tokens/{id}/role`, `GET /api/agent-roles` ; choix du rôle dans Paramètres → IA connectées.
 - Vérifié : `cargo test` (`roles::droits`, `mcp::roles_des_agents`) ; en local avec curl (refus du Relecteur, consignes) et capture de la liste « Vos IA ».
 - Choix : le Relecteur et l'Analyste gardent `comment_task` (c'est leur façon de rendre leur avis) ; aucun autre outil qui modifie.
+
+### 2026-11-24 · #114 F28 · reprise d'une tâche interrompue
+- Fait : migration 0038 (`task_progress`), outil MCP `save_progress` (fait, reste, fichiers), note rendue par `claim_task` et `next_task` (`ta_tache`, `a_reprendre`) ; une réservation sans aucun appel MCP depuis 2 h se libère seule avec une note automatique (vérifié à la demande : claim_task, next_task, liste des agents ; pas de tâche de fond).
+- Vérifié : `cargo test` (`agents::reprise_d_une_tache`) et scénario MCP réel en local (agent A note puis libère, agent B reprend et reçoit la note).

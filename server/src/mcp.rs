@@ -189,6 +189,7 @@ fn tools() -> Value {
         tool("set_task_lot", "Range une tâche dans une fonctionnalité (lot), par exemple « Herbe » ou « Boutique ». lot vide : « Sans fonctionnalité ».", json!({ "number": { "type": "integer" }, "lot": { "type": "string" } }), &["number", "lot"]),
         tool("set_task_status", "Change le statut d'une tâche : todo (à faire), doing (en cours), blocked (bloquée), done (faite). Passer en cours exige que ses dépendances soient faites. note : commentaire facultatif (ce qui a été fait, ce qui bloque). Une tâche UEFN ne passe à done qu'avec un check-in Lore réellement archivé sur la map : checkin = son message exact (« #n … »), ou celui du check-in d'une autre tâche où son travail est parti (noté dans l'historique). Inutile si vous avez archivé par lore_checkin « #n … » depuis que vous l'avez réservée : un check-in « #3 #5 … » ferme d'ailleurs seul chaque tâche UEFN en cours qu'il cite.", json!({ "number": { "type": "integer" }, "status": { "type": "string", "enum": ["todo", "doing", "blocked", "done"] }, "note": { "type": "string" }, "checkin": { "type": "string" } }), &["number", "status"]),
         tool("claim_task", "Réserve une tâche POP pour vous (agent IA) : une seule tâche à la fois, et une tâche n'a qu'un agent. À faire avant de travailler dessus ; refusé si un autre agent l'a déjà. Vos fichiers Verse de cette tâche ne peuvent pas être modifiés par un autre agent.", json!({ "number": { "type": "integer" } }), &["number"]),
+        tool("save_progress", "Note où vous en êtes sur votre tâche réservée, pour qu'un autre agent puisse la reprendre : done (ce qui est fait), todo (ce qui reste), files (fichiers touchés). À faire avant de vous arrêter et à chaque étape importante. La note est rendue par claim_task et next_task.", json!({ "done": { "type": "string" }, "todo": { "type": "string" }, "files": { "type": "array", "items": { "type": "string" } } }), &[]),
         tool("release_task", "Libère la tâche que vous avez réservée (claim_task), quand vous arrêtez sans la finir.", json!({}), &[]),
         tool("comment_task", "Ajoute un commentaire à une tâche.", json!({ "number": { "type": "integer" }, "text": { "type": "string" } }), &["number", "text"]),
         tool("search_library", "Cherche dans la bibliothèque Verse du studio (modules prêts : économie, équipes, minuteur, HUD, sauvegarde…). À faire AVANT d'écrire du Verse neuf : réutilisez un module existant quand il convient. Filtres facultatifs : query (texte du nom ou de la description), category (economie, equipes, minuteur, hud, sauvegarde, interface, jeu, outils, autre).", json!({ "query": { "type": "string" }, "category": { "type": "string" } }), &[]),
@@ -303,7 +304,7 @@ pub async fn mcp(
                 "protocolVersion": req["params"]["protocolVersion"].as_str().unwrap_or("2025-06-18"),
                 "capabilities": { "tools": {} },
                 "serverInfo": { "name": "pop", "version": "0.1.0" },
-                "instructions": consignes(role.as_deref(), "Commencez par list_maps puis use_map pour choisir la map de travail (gardée par POP). Outils POP : gérer les tâches de la map (list_tasks, next_task, create_task, set_task_status, comment_task) et piloter UEFN via le relais du créateur. Avant de travailler, lisez les compétences utiles (list_skills, get_skill : la méthode de POP et les règles du studio), prenez une tâche avec next_task et passez-la en cours ; quand elle est finie, passez-la en done avec une note. Toute action UEFN est journalisée et annulable ; les suppressions attendent une validation humaine.")
+                "instructions": consignes(role.as_deref(), "Commencez par list_maps puis use_map pour choisir la map de travail (gardée par POP). Outils POP : gérer les tâches de la map (list_tasks, next_task, create_task, set_task_status, comment_task) et piloter UEFN via le relais du créateur. Avant de travailler, lisez les compétences utiles (list_skills, get_skill : la méthode de POP et les règles du studio), prenez une tâche avec next_task et passez-la en cours ; notez votre progression avec save_progress à chaque étape et avant de vous arrêter (un autre agent pourra reprendre) ; quand elle est finie, passez-la en done avec une note. Toute action UEFN est journalisée et annulable ; les suppressions attendent une validation humaine.")
             }),
         ),
         m if m.starts_with("notifications/") => StatusCode::ACCEPTED.into_response(),
@@ -503,6 +504,7 @@ async fn call_as(
             crate::agents::claim(st, agent_requis()?, mid, n).await
         }
         "release_task" => crate::agents::release(st, agent_requis()?).await,
+        "save_progress" => crate::agents::save_progress(st, agent_requis()?, &a).await,
         "list_skills" => Ok(json!(crate::skills::liste(st, ctx.studio_id).await?)),
         "get_skill" => {
             crate::skills::lire(st, ctx.studio_id, a["name"].as_str().unwrap_or("")).await
@@ -532,7 +534,14 @@ async fn call_as(
                 axum::extract::Query(Default::default()),
             )
             .await?;
-            Ok(json!({ "résumé": v["points"], "suggestions": v["suggestions"] }))
+            let mut r = json!({ "résumé": v["points"], "suggestions": v["suggestions"] });
+            // #114 : la tâche réservée par l'agent et les tâches interrompues à reprendre, avec leur note.
+            if let Some(ag) = agent {
+                let p = crate::agents::pour_next_task(st, ag, mid).await?;
+                r["ta_tache"] = p["ta_tache"].clone();
+                r["a_reprendre"] = p["a_reprendre"].clone();
+            }
+            Ok(r)
         }
         "create_task" => {
             ctx.can_edit()?;
