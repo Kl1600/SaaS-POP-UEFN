@@ -1,5 +1,5 @@
 import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import {
   GripVertical, Plus, Star, FileText, Copy, Trash2, Type, Heading1, Heading2, Heading3, List, ListOrdered, CheckSquare, ChevronRight, ChevronDown, MoreHorizontal,
   AlertCircle, Quote, Code, Table, Image, Video, Paperclip, Columns2, ListTree, Link2, PenTool, Database, Minus, Download, History, Share2, MessageSquare, RotateCcw, X,
@@ -36,21 +36,61 @@ function newBlock(type: string): Block {
   return b
 }
 
-/** Champ de texte éditable sans perdre le curseur quand l'état se met à jour. */
-function Editable({ value, onChange, onKeyDown, className, ph, focusKey, disabled, onFocus }: {
-  value: string; onChange: (v: string) => void; onKeyDown?: (e: React.KeyboardEvent<HTMLDivElement>) => void; className?: string; ph?: string; focusKey?: string; disabled?: boolean; onFocus?: () => void
+// Mise en forme Markdown dans le texte d'un bloc (#129) : gras, italique, code et liens s'affichent ; le texte reste
+// en Markdown (il s'exporte tel quel) et redevient brut pendant la saisie.
+const INLINE = /(\*\*[^*\n]+\*\*)|(`[^`\n]+`)|(\[[^\]\n]+\]\([^)\s]+\))|((?<![\w*])\*[^*\s][^*\n]*\*(?![\w*]))|((?<!\w)_[^_\s][^_\n]*_(?!\w))/g
+const hasInline = (t: string) => { INLINE.lastIndex = 0; return INLINE.test(t) }
+const safeHref = (u: string) => /^(https?:\/\/|mailto:|\/(?!\/))/i.test(u) ? u : null
+
+/** Texte d'un bloc avec sa mise en forme Markdown (affichage seulement). */
+export function Inline({ text }: { text: string }) {
+  const navigate = useNavigate()
+  const out: React.ReactNode[] = []
+  let last = 0
+  INLINE.lastIndex = 0
+  for (const m of text.matchAll(INLINE)) {
+    const s = m[0], i = m.index ?? 0
+    if (i > last) out.push(text.slice(last, i))
+    if (m[1]) out.push(<strong key={i}>{s.slice(2, -2)}</strong>)
+    else if (m[2]) out.push(<code key={i} className="b-inline-code">{s.slice(1, -1)}</code>)
+    else if (m[3]) {
+      const [, label, url] = s.match(/^\[([^\]]+)\]\(([^)]+)\)$/) ?? []
+      const href = safeHref(url ?? '')
+      out.push(href
+        ? <a key={i} href={href} target={href.startsWith('/') ? undefined : '_blank'} rel="noopener noreferrer"
+            onClick={e => { if (href.startsWith('/')) { e.preventDefault(); navigate(href) } }}>{label}</a>
+        : s)
+    } else out.push(<em key={i}>{s.slice(1, -1)}</em>)
+    last = i + s.length
+  }
+  if (last < text.length) out.push(text.slice(last))
+  return <>{out}</>
+}
+
+/** Champ de texte éditable sans perdre le curseur quand l'état se met à jour. Avec du gras, de l'italique, du code ou
+ * un lien en Markdown, le texte s'affiche mis en forme et redevient brut dès qu'on clique pour l'écrire (#129). */
+function Editable({ value, onChange, onKeyDown, className, ph, focusKey, disabled, onFocus, plain }: {
+  value: string; onChange: (v: string) => void; onKeyDown?: (e: React.KeyboardEvent<HTMLDivElement>) => void; className?: string; ph?: string; focusKey?: string; disabled?: boolean; onFocus?: () => void; plain?: boolean
 }) {
   const ref = useRef<HTMLDivElement>(null)
-  useLayoutEffect(() => { if (ref.current && ref.current.innerText !== value) ref.current.innerText = value }, [value])
+  const [edit, setEdit] = useState(false)
+  const [focusNow, setFocusNow] = useState(0)
+  const riche = !plain && !edit && hasInline(value)
+  useLayoutEffect(() => { if (!riche && ref.current && ref.current.innerText !== value) ref.current.innerText = value }, [value, riche])
+  useEffect(() => { if (focusKey) { setEdit(true); setFocusNow(n => n + 1) } }, [focusKey])
   useEffect(() => {
-    if (focusKey && ref.current) {
+    if (focusNow && ref.current && !riche) {
       ref.current.focus()
       const r = document.createRange(); r.selectNodeContents(ref.current); r.collapse(false)
       const s = window.getSelection(); s?.removeAllRanges(); s?.addRange(r)
     }
-  }, [focusKey])
-  return <div ref={ref} className={'btext ' + (className ?? '')} contentEditable={!disabled} suppressContentEditableWarning data-ph={ph}
-    onInput={e => onChange((e.target as HTMLDivElement).innerText)} onKeyDown={onKeyDown} onFocus={onFocus}
+  }, [focusNow, riche])
+  // Clés différentes : React remplace l'élément au lieu de réutiliser le texte posé à la main pendant la saisie.
+  if (riche) return <div key="riche" className={'btext ' + (className ?? '')} tabIndex={disabled ? undefined : 0}
+    onMouseDown={e => { if (disabled || (e.target as HTMLElement).closest('a')) return; e.preventDefault(); setEdit(true); setFocusNow(n => n + 1) }}
+    onKeyDown={e => { if (!disabled && (e.key === 'Enter' || e.key.length === 1)) { e.preventDefault(); setEdit(true); setFocusNow(n => n + 1) } }}><Inline text={value} /></div>
+  return <div key="saisie" ref={ref} className={'btext ' + (className ?? '')} contentEditable={!disabled} suppressContentEditableWarning data-ph={ph}
+    onInput={e => onChange((e.target as HTMLDivElement).innerText)} onKeyDown={onKeyDown} onFocus={onFocus} onBlur={() => setEdit(false)}
     onPaste={e => { e.preventDefault(); document.execCommand('insertText', false, e.clipboardData.getData('text/plain')) }} />
 }
 
@@ -72,17 +112,17 @@ function AutoText({ value, onChange, className, ...rest }: { value: string; onCh
 export function BlockView({ b }: { b: Block }) {
   const t = b.text ?? ''
   switch (b.type) {
-    case 'h1': return <h1>{t}</h1>
-    case 'h2': return <h2>{t}</h2>
-    case 'h3': return <h3>{t}</h3>
-    case 'bullet': return <p>• {t}</p>
-    case 'todo': return <p>{b.checked ? '☑' : '☐'} {t}</p>
-    case 'quote': case 'callout': return <blockquote className="b-callout">{t}</blockquote>
+    case 'h1': return <h1><Inline text={t} /></h1>
+    case 'h2': return <h2><Inline text={t} /></h2>
+    case 'h3': return <h3><Inline text={t} /></h3>
+    case 'bullet': return <p>• <Inline text={t} /></p>
+    case 'todo': return <p>{b.checked ? '☑' : '☐'} <Inline text={t} /></p>
+    case 'quote': case 'callout': return <blockquote className="b-callout"><Inline text={t} /></blockquote>
     case 'code': return <pre className="b-code">{t}</pre>
     case 'divider': return <hr />
     case 'table': return <table className="tbl"><tbody>{b.rows?.map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j}>{c}</td>)}</tr>)}</tbody></table>
     case 'toggle': return <details><summary>{t}</summary><p>{b.body}</p></details>
-    default: return t ? <p>{t}</p> : null
+    default: return t ? <p><Inline text={t} /></p> : null
   }
 }
 
@@ -95,6 +135,24 @@ export default function Pages() {
   const { data: tree, reload: reloadTree } = useLoad<any[]>(map ? `/api/maps/${map.id}/pages` : null, [map?.id])
   const { data: templates } = useLoad<any[]>('/api/page-templates')
   const [tplOpen, setTplOpen] = useState(false)
+  const [impOpen, setImpOpen] = useState(false)
+  const fichiersMd = useRef<HTMLInputElement>(null)
+  const dossierMd = useRef<HTMLInputElement>(null)
+  // Import de fichiers Markdown ou d'un dossier entier (#129) : le dossier garde son arborescence en sous-pages.
+  const importer = async (liste: FileList | null) => {
+    const files = Array.from(liste ?? [])
+    if (!files.length || !map) return
+    const md = files.filter(f => /\.(md|markdown)$/i.test(f.name))
+    const autres = files.length - md.length
+    if (!md.length) { toast(tr("Aucun fichier Markdown (.md) dans ce choix."), true); return }
+    try {
+      const contenus = await Promise.all(md.map(async f => ({ path: (f as any).webkitRelativePath || f.name, content: await f.text() })))
+      const r = await api.post(`/api/maps/${map.id}/pages/import`, { files: contenus })
+      await reloadTree()
+      toast(tr("{0} page(s) importée(s)", [r.pages]) + (autres ? ' · ' + tr("{0} fichier(s) qui ne sont pas du Markdown ignoré(s)", [autres]) : ''))
+      if (r.first) nav(`/pages/${r.first}`)
+    } catch (e: any) { toast(e.message, true) }
+  }
   useLive(['pages'], reloadTree)
   const id = pid ? Number(pid) : tree?.find(p => p.favorite)?.id ?? tree?.[0]?.id
 
@@ -155,6 +213,15 @@ export default function Pages() {
         {canEdit && <div style={{ position: 'relative' }}>
           <button className="btn" onClick={() => setTplOpen(o => !o)}>{tr("Modèles UEFN")}</button>
           {tplOpen && <div className="menu" style={{ right: 0, top: 48 }}>{templates?.map(t => <button key={t.key} onClick={() => create(t.key)}><span className="sico">{t.icon}</span>{t.title}</button>)}</div>}
+        </div>}
+        {canEdit && <div style={{ position: 'relative' }}>
+          <button className="btn" onClick={() => setImpOpen(o => !o)} aria-haspopup="menu" aria-expanded={impOpen}><Download size={16} style={{ transform: 'rotate(180deg)' }} />{tr("Importer")}</button>
+          {impOpen && <div className="menu" role="menu" style={{ right: 0, top: 48 }}>
+            <button role="menuitem" onClick={() => { setImpOpen(false); fichiersMd.current?.click() }}><FileText size={16} />{tr("Fichiers Markdown (.md)")}</button>
+            <button role="menuitem" onClick={() => { setImpOpen(false); dossierMd.current?.click() }}><ListTree size={16} />{tr("Un dossier entier")}</button>
+          </div>}
+          <input ref={fichiersMd} type="file" accept=".md,.markdown,text/markdown" multiple hidden onChange={e => { importer(e.target.files); e.target.value = '' }} />
+          <input ref={dossierMd} type="file" hidden {...({ webkitdirectory: '', directory: '' } as any)} onChange={e => { importer(e.target.files); e.target.value = '' }} />
         </div>}
         {canEdit && <button className="btn pri" onClick={() => create()}><Plus size={18} />{tr("Nouvelle page")}</button>}
       </PageHead>
@@ -322,7 +389,7 @@ function Editor({ id, tree, onNewChild, onTree }: { id: number; tree: any[]; onN
               {b.type === 'toggle' && <button className="handle" style={{ opacity: 1 }} aria-label={b.open ? tr("Replier") : tr("Déplier")} onClick={() => setB(b.id, { open: !b.open })}>{b.open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}</button>}
               {isText && (
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <Editable value={b.text ?? ''} focusKey={fk} disabled={disabled} onFocus={() => setSelBlock(b.id)}
+                  <Editable value={b.text ?? ''} focusKey={fk} disabled={disabled} onFocus={() => setSelBlock(b.id)} plain={b.type === 'code'}
                     className={({ h1: 'b-h1', h2: 'b-h2', h3: 'b-h3', quote: 'b-quote', callout: 'b-callout', code: 'b-code' } as any)[b.type] + (b.type === 'todo' && b.checked ? ' done' : '')}
                     ph={b.type === 'p' ? tr("Tapez « / » pour insérer un bloc, « @ » pour mentionner") : tr("Texte")}
                     onChange={v => onText(b, v)} onKeyDown={e => onKey(b, e)} />

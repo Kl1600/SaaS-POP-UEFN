@@ -2835,5 +2835,11 @@ const EN: Record<string, string> = {
  "Votre compte : nom, mot de passe, abonnement, IA connectées, données personnelles.": "Your account: name, password, subscription, connected AIs, personal data.",
  "IA sur « {0} »": "AIs on “{0}”",
  "Les IA dont c’est la map de travail en ce moment, avec la tâche réservée et la dernière action. Pour en mettre une sur cette map, demandez-lui de travailler sur « {0} » : elle la choisit elle-même.": "AIs whose working map this is right now, with their claimed task and last action. To put one on this map, ask it to work on “{0}”: it picks it by itself.",
+ "Aucun fichier Markdown (.md) dans ce choix.": "No Markdown (.md) file in this selection.",
+ "{0} page(s) importée(s)": "{0} page(s) imported",
+ "{0} fichier(s) qui ne sont pas du Markdown ignoré(s)": "{0} non-Markdown file(s) skipped",
+ "Importer": "Import",
+ "Fichiers Markdown (.md)": "Markdown files (.md)",
+ "Un dossier entier": "A whole folder",
 }
 export default EN
