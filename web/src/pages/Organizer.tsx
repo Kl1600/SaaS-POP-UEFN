@@ -405,6 +405,21 @@ function Pairing({ status, tools }: { status: string; tools: any }) {
 
 /** Paramètres → UEFN Link (#210) : l'Organiseur est retiré ; restent le relais, les validations de suppression
  *  demandées par une IA, et le journal des actions UEFN avec l'annulation. */
+/** Réglage du studio (#302) : « Les IA peuvent supprimer seules ». Désactivé par défaut ; un admin le change. */
+function AiDeleteSetting() {
+  const { studio, role, toast } = useApp()
+  const { data, reload } = useLoad<{ enabled: boolean }>(studio ? `/api/studios/${studio.id}/ai-delete` : null, [studio?.id])
+  if (!data || !studio) return null
+  const admin = ['owner', 'admin'].includes(role)
+  return <section className="card">
+    <CardHead title={tr("Suppressions demandées par une IA")} sub={tr("Réglage du studio. Désactivé : chaque suppression attend la validation d’un humain. Activé : les IA suppriment seules, toujours journalisé et restaurable depuis le journal. Jamais sur un élément verrouillé dans Lore par quelqu’un d’autre.")} />
+    <label className="li" style={{ cursor: admin ? 'pointer' : 'default' }}>
+      <span style={{ flex: 1 }}>{tr("Les IA peuvent supprimer seules")}{!admin && <span className="small muted"> · {tr("réservé aux admins du studio")}</span>}</span>
+      <input type="checkbox" checked={data.enabled} disabled={!admin} onChange={async e => { try { await api.put(`/api/studios/${studio.id}/ai-delete`, { enabled: e.target.checked }); reload() } catch (er: any) { toast(er.message, true) } }} style={{ width: 18, height: 18, accentColor: '#ED753E' }} />
+    </label>
+  </section>
+}
+
 export function UefnLinkSettings() {
   const { map, canEdit, role, toast } = useApp()
   const { data: st, reload } = useLoad<any>(map ? `/api/maps/${map.id}/uefn` : null, [map?.id])
@@ -430,6 +445,7 @@ export function UefnLinkSettings() {
         <button className="btn" onClick={async () => { try { await api.post(`/api/approvals/${p.id}/refuse`); reload() } catch (e: any) { toast(e.message, true) } }}><X size={15} />{tr("Refuser")}</button></>}
       </div>)}
     </section>}
+    <AiDeleteSetting />
     <Pairing status={st.status} tools={st.tools} />
     <section className="card">
       <CardHead title={tr("Journal des actions UEFN")} sub={tr("Ce que vous et vos IA avez fait dans le niveau ; chaque action s’annule.")} />

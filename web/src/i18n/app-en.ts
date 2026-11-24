@@ -1,6 +1,10 @@
 // Traduction anglaise de l'application. Clé = texte français de l'interface (ou du serveur), valeur = anglais.
 // Généré à partir des textes enveloppés dans tr(...) ; à compléter quand on ajoute des textes.
 const EN: Record<string, string> = {
+ "Suppressions demandées par une IA": "Deletions requested by an AI",
+ "Réglage du studio. Désactivé : chaque suppression attend la validation d’un humain. Activé : les IA suppriment seules, toujours journalisé et restaurable depuis le journal. Jamais sur un élément verrouillé dans Lore par quelqu’un d’autre.": "Studio setting. Off: every deletion waits for a human's approval. On: AIs delete on their own, always logged and restorable from the log. Never on an item locked in Lore by someone else.",
+ "Les IA peuvent supprimer seules": "AIs can delete on their own",
+ "réservé aux admins du studio": "studio admins only",
  "Sans rôle : tous les outils de POP.": "No role: every POP tool.",
  "Sans rôle": "No role",
  "Orchestrateur": "Orchestrator",

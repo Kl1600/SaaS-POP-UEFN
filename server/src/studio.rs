@@ -979,3 +979,52 @@ mod tests {
         );
     }
 }
+
+#[derive(serde::Deserialize)]
+pub struct AiDeleteIn {
+    pub(crate) enabled: bool,
+}
+
+/// Réglage « Les IA peuvent supprimer seules » du studio (#302) : lu par tout membre, changé par un admin ou le
+/// propriétaire, avec une ligne dans le journal d'audit.
+pub async fn ai_delete(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(sid): Path<i64>,
+) -> ApiResult<Value> {
+    crate::access::studio_role(&st, &u, sid).await?;
+    let on: i64 = sqlx::query_scalar("SELECT ai_can_delete FROM studios WHERE id = ?")
+        .bind(sid)
+        .fetch_one(&st.db)
+        .await?;
+    Ok(Json(json!({ "enabled": on == 1 })))
+}
+
+pub async fn set_ai_delete(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(sid): Path<i64>,
+    Json(b): Json<AiDeleteIn>,
+) -> ApiResult<Value> {
+    if crate::access::studio_role(&st, &u, sid).await? < crate::access::Role::Admin {
+        return Err(AppError::Forbidden);
+    }
+    sqlx::query("UPDATE studios SET ai_can_delete = ? WHERE id = ?")
+        .bind(b.enabled as i64)
+        .bind(sid)
+        .execute(&st.db)
+        .await?;
+    crate::security::audit(
+        &st,
+        Some(u.id),
+        if b.enabled {
+            "ia_suppression_activée"
+        } else {
+            "ia_suppression_désactivée"
+        },
+        &format!("studio {sid}"),
+        "",
+    )
+    .await;
+    Ok(Json(json!({ "enabled": b.enabled })))
+}
