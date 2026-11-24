@@ -142,3 +142,8 @@ Bloque : rien
 - Web : page `/autoriser` (Authorize.tsx, avant onboarding/paywall ; si déconnecté, la page de connexion s'affiche sur la même adresse puis revient) ; Paramètres → IA connectées : bloc « collez cette adresse », cartes renommées « Clé API ».
 - Vérifié : 4 tests `tests_oauth` ; en local avec Claude Code 2.1.331 (`claude mcp add --transport http` puis `claude mcp login` → « Connected ») et le client OAuth du SDK officiel MCP 1.32.2 (outils listés, `list_maps` appelé, lecture seule respectée : 16 outils au lieu de 39).
 - Piège : `claude mcp login --no-browser` exige un vrai terminal (pty) et affiche l'adresse avec un lien OSC 8 (la couper avant `\x1b`).
+
+### 2026-11-24 · #111 F25 · rôles des agents IA
+- Fait : migration 0037 (`api_tokens.role`), `server/src/roles.rs` (7 rôles : consignes + outils permis ; sans rôle = tous les outils), MCP : consignes du rôle à `initialize`, `tools/list` filtré, refus clair à `tools/call` ; routes `POST /api/tokens/{id}/role`, `GET /api/agent-roles` ; choix du rôle dans Paramètres → IA connectées.
+- Vérifié : `cargo test` (`roles::droits`, `mcp::roles_des_agents`) ; en local avec curl (refus du Relecteur, consignes) et capture de la liste « Vos IA ».
+- Choix : le Relecteur et l'Analyste gardent `comment_task` (c'est leur façon de rendre leur avis) ; aucun autre outil qui modifie.
