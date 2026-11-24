@@ -21,22 +21,184 @@ pub async fn list(
 ) -> ApiResult<Value> {
     map_ctx(&st, &u, mid).await?;
     liberer_silencieux(&st).await?;
-    let rows: Vec<(i64, String, String, String, String, Option<String>, i64, Option<i64>, Option<String>, Option<String>, Option<String>, Option<String>)> = sqlx::query_as(
+    let rows: Vec<(i64, String, String, String, String, Option<String>, i64, Option<i64>, Option<String>, Option<String>, Option<String>, Option<String>, Option<i64>, Option<String>)> = sqlx::query_as(
         "SELECT a.id, a.name, a.kind, u.name, a.scope, a.last_used, a.calls, t.number, t.title, t.status, a.task_since,
-                (SELECT x.summary FROM uefn_actions x WHERE x.agent_id = a.id ORDER BY x.id DESC LIMIT 1)
+                (SELECT x.summary FROM uefn_actions x WHERE x.agent_id = a.id ORDER BY x.id DESC LIMIT 1), a.task_id, a.role
          FROM api_tokens a JOIN users u ON u.id = a.user_id LEFT JOIN tasks t ON t.id = a.task_id
          WHERE a.map_id = ? ORDER BY a.last_used IS NULL, a.last_used DESC, a.id DESC",
     )
     .bind(mid)
     .fetch_all(&st.db)
     .await?;
+    let mut out = vec![];
+    for r in rows {
+        // Étape de la tâche (#298) : écrit, compilé, testé, relu.
+        let step = match r.12 {
+            Some(tid) => etape(&st, r.0, tid).await?,
+            None => None,
+        };
+        out.push(json!({
+            "id": r.0, "name": r.1, "kind": r.2, "owner": r.3, "scope": r.4, "last_used": r.5, "calls": r.6,
+            "task": r.7.map(|n| json!({ "number": n, "title": r.8, "status": r.9, "since": r.10, "step": step })),
+            "last_action": r.11, "role": r.13,
+        }));
+    }
+    Ok(Json(json!(out)))
+}
+
+/// Événement d'agent dans l'historique de la tâche (« IA ») et rafraîchissement du kanban du site (#298).
+async fn evenement(st: &AppState, agent: i64, task_id: i64, quoi: &str) -> Result<(), AppError> {
+    let r: Option<(i64, String, i64)> = sqlx::query_as(
+        "SELECT a.user_id, a.name, t.map_id FROM api_tokens a, tasks t WHERE a.id = ? AND t.id = ?",
+    )
+    .bind(agent)
+    .bind(task_id)
+    .fetch_optional(&st.db)
+    .await?;
+    if let Some((uid, nom, mid)) = r {
+        sqlx::query("INSERT INTO task_events (task_id, user_id, what, via) VALUES (?, ?, ?, 'IA')")
+            .bind(task_id)
+            .bind(uid)
+            .bind(format!("{quoi} (agent « {nom} »)"))
+            .execute(&st.db)
+            .await?;
+        crate::access::notify(st, mid, json!({ "t": "refresh", "what": "tasks" }));
+    }
+    Ok(())
+}
+
+/// Note un appel d'outil MCP d'un agent sur sa map de travail (#298) : fil en direct de Forge (WebSocket de la map),
+/// étape de la tâche, et notifications (tâche bloquée, compilation en échec) au compte de l'agent, sur le site comme
+/// dans Forge. `cible` : la tâche visée par comment_task ou set_task_status (sinon la tâche réservée).
+pub async fn noter_appel(
+    st: &AppState,
+    agent: i64,
+    mid: i64,
+    tool: &str,
+    a: &Value,
+    res: Result<&Value, ()>,
+) {
+    let ok = res.is_ok();
+    let erreurs = res
+        .ok()
+        .and_then(|r| r["diagnostics"].as_array())
+        .map(|d| d.iter().filter(|x| x["severity"] == "error").count())
+        .unwrap_or(0);
+    let r: Result<(), AppError> = async {
+        let (uid, nom, reservee): (i64, String, Option<i64>) =
+            sqlx::query_as("SELECT user_id, name, task_id FROM api_tokens WHERE id = ?")
+                .bind(agent)
+                .fetch_one(&st.db)
+                .await?;
+        let cible: Option<i64> = match a["number"].as_i64() {
+            Some(n) if matches!(tool, "comment_task" | "set_task_status") => {
+                sqlx::query_scalar("SELECT id FROM tasks WHERE map_id = ? AND number = ?")
+                    .bind(mid)
+                    .bind(n)
+                    .fetch_optional(&st.db)
+                    .await?
+            }
+            _ => reservee,
+        };
+        // Compilation qui passe en échec : on prévient une fois, pas à chaque essai.
+        let avant: Option<bool> = sqlx::query_scalar("SELECT ok FROM agent_calls WHERE agent_id = ? AND tool = 'compile_verse' ORDER BY id DESC LIMIT 1")
+            .bind(agent)
+            .fetch_optional(&st.db)
+            .await?;
+        let ok_appel = ok && erreurs == 0;
+        let id: i64 = sqlx::query_scalar("INSERT INTO agent_calls (agent_id, map_id, task_id, tool, ok) VALUES (?, ?, ?, ?, ?) RETURNING id")
+            .bind(agent)
+            .bind(mid)
+            .bind(cible)
+            .bind(tool)
+            .bind(ok_appel)
+            .fetch_one(&st.db)
+            .await?;
+        sqlx::query("DELETE FROM agent_calls WHERE map_id = ? AND at < datetime('now', '-7 days')")
+            .bind(mid)
+            .execute(&st.db)
+            .await?;
+        crate::access::notify(st, mid, json!({ "t": "agent", "id": id, "agent": agent, "tool": tool, "ok": ok_appel }));
+        if tool == "compile_verse" && ok && erreurs > 0 && avant != Some(false) {
+            let texte = format!("Compilation en échec ({erreurs} erreur(s)) pour l'agent « {nom} »");
+            crate::account::notify_user(st, uid, mid, &texte, &format!("/map/{mid}")).await;
+        }
+        if tool == "set_task_status" && ok && a["status"] == "blocked" {
+            if let (Some(_), Some(n)) = (cible, a["number"].as_i64()) {
+                let texte = format!("Tâche #{n} bloquée par l'agent « {nom} »");
+                crate::account::notify_user(st, uid, mid, &texte, &format!("/map/{mid}/taches?q=%23{n}")).await;
+            }
+        }
+        Ok(())
+    }
+    .await;
+    if let Err(e) = r {
+        tracing::warn!("fil d'activité de l'agent {agent} : {e}");
+    }
+}
+
+/// Étape de la tâche réservée d'un agent, d'après ses appels depuis qu'il l'a prise : écrit, compilé, testé, relu.
+async fn etape(st: &AppState, agent: i64, task_id: i64) -> Result<Option<&'static str>, AppError> {
+    let outils: Vec<(String, bool)> = sqlx::query_as(
+        "SELECT c.tool, c.ok FROM agent_calls c JOIN api_tokens a ON a.id = c.agent_id
+         WHERE c.agent_id = ? AND c.task_id = ? AND c.at >= COALESCE(a.task_since, c.at)",
+    )
+    .bind(agent)
+    .bind(task_id)
+    .fetch_all(&st.db)
+    .await?;
+    let relu: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM agent_calls c JOIN api_tokens a ON a.id = c.agent_id WHERE c.task_id = ? AND c.tool = 'comment_task' AND c.ok AND a.role = 'relecteur'",
+    )
+    .bind(task_id)
+    .fetch_one(&st.db)
+    .await?;
+    let a = |noms: &[&str]| {
+        outils
+            .iter()
+            .any(|(t, ok)| *ok && noms.contains(&t.as_str()))
+    };
+    Ok(if relu > 0 {
+        Some("relu")
+    } else if a(&["start_session", "push_to_session", "session_output"]) && a(&["compile_verse"]) {
+        Some("testé")
+    } else if a(&["compile_verse"]) {
+        Some("compilé")
+    } else if a(&[
+        "write_verse_file",
+        "create_widget",
+        "update_actors",
+        "duplicate_actors",
+        "place_device",
+        "place_mesh",
+        "import_asset",
+        "set_island_settings",
+    ]) {
+        Some("écrit")
+    } else {
+        None
+    })
+}
+
+/// Fil d'activité des agents de la map (#298) : les 50 derniers appels, le plus récent d'abord. `?after=` pour la suite.
+pub async fn activite(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(mid): Path<i64>,
+    axum::extract::Query(q): axum::extract::Query<std::collections::HashMap<String, i64>>,
+) -> ApiResult<Value> {
+    map_ctx(&st, &u, mid).await?;
+    let rows: Vec<(i64, String, Option<String>, String, bool, String, Option<i64>)> = sqlx::query_as(
+        "SELECT c.id, a.name, a.role, c.tool, c.ok, c.at, t.number FROM agent_calls c JOIN api_tokens a ON a.id = c.agent_id
+         LEFT JOIN tasks t ON t.id = c.task_id WHERE c.map_id = ? AND c.id > ? ORDER BY c.id DESC LIMIT 50",
+    )
+    .bind(mid)
+    .bind(q.get("after").copied().unwrap_or(0))
+    .fetch_all(&st.db)
+    .await?;
     Ok(Json(json!(rows
         .into_iter()
-        .map(|r| json!({
-            "id": r.0, "name": r.1, "kind": r.2, "owner": r.3, "scope": r.4, "last_used": r.5, "calls": r.6,
-            "task": r.7.map(|n| json!({ "number": n, "title": r.8, "status": r.9, "since": r.10 })),
-            "last_action": r.11,
-        }))
+        .map(|(id, nom, role, tool, ok, at, n)| json!({ "id": id, "agent": nom, "role": role, "tool": tool, "ok": ok, "at": at, "task": n }))
         .collect::<Vec<_>>())))
 }
 
@@ -199,6 +361,7 @@ pub async fn claim(st: &AppState, agent: i64, mid: i64, number: i64) -> Result<V
                 "La tâche #{number} vient d'être prise par un autre agent."
             ))
         })?;
+    evenement(st, agent, tid, "Prise").await?;
     let reprise = reprise(st, tid).await?;
     let message = if reprise.is_null() {
         format!("Tâche #{number} réservée pour cet agent.")
@@ -210,6 +373,14 @@ pub async fn claim(st: &AppState, agent: i64, mid: i64, number: i64) -> Result<V
 
 /// `release_task` : l'agent libère sa tâche.
 pub async fn release(st: &AppState, agent: i64) -> Result<Value, AppError> {
+    let t: Option<i64> = sqlx::query_scalar("SELECT task_id FROM api_tokens WHERE id = ?")
+        .bind(agent)
+        .fetch_optional(&st.db)
+        .await?
+        .flatten();
+    if let Some(tid) = t {
+        evenement(st, agent, tid, "Libérée").await?;
+    }
     sqlx::query("UPDATE api_tokens SET task_id = NULL, task_since = NULL WHERE id = ?")
         .bind(agent)
         .execute(&st.db)
@@ -358,6 +529,137 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(libre, None);
+    }
+
+    /// #298 : historique « IA » et kanban prévenus, fil d'activité, étape de la tâche, notifications.
+    #[tokio::test]
+    async fn fil_d_activite() {
+        let m = monde().await;
+        let mut rx = m.st.hub.subscribe(m.mid);
+        claim(&m.st, m.a, m.mid, 1).await.unwrap();
+        let hist: Vec<(String, String)> = sqlx::query_as("SELECT what, via FROM task_events e JOIN tasks t ON t.id = e.task_id WHERE t.number = 1")
+            .fetch_all(&m.st.db).await.unwrap();
+        assert!(
+            hist.iter()
+                .any(|(w, v)| w.starts_with("Prise") && w.contains("Claude") && v == "IA"),
+            "{hist:?}"
+        );
+        let mut vu = false;
+        while let Ok(msg) = rx.try_recv() {
+            vu |= msg.contains("\"tasks\"");
+        }
+        assert!(vu, "le kanban du site doit être prévenu");
+
+        // Écrit, puis compilé avec une erreur (notification une seule fois), puis compilé sans erreur, puis testé.
+        let ok = json!({});
+        noter_appel(&m.st, m.a, m.mid, "write_verse_file", &json!({}), Ok(&ok)).await;
+        let l = list(State(m.st.clone()), m.humain.clone(), Path(m.mid))
+            .await
+            .unwrap()
+            .0;
+        assert_eq!(
+            l.as_array()
+                .unwrap()
+                .iter()
+                .find(|x| x["id"] == m.a)
+                .unwrap()["task"]["step"],
+            "écrit"
+        );
+        let ko = json!({ "diagnostics": [{ "severity": "error" }] });
+        noter_appel(&m.st, m.a, m.mid, "compile_verse", &json!({}), Ok(&ko)).await;
+        noter_appel(&m.st, m.a, m.mid, "compile_verse", &json!({}), Ok(&ko)).await;
+        let n: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM notifications WHERE text LIKE 'Compilation en échec%'",
+        )
+        .fetch_one(&m.st.db)
+        .await
+        .unwrap();
+        assert_eq!(n, 1);
+        noter_appel(&m.st, m.a, m.mid, "compile_verse", &json!({}), Ok(&ok)).await;
+        let l = list(State(m.st.clone()), m.humain.clone(), Path(m.mid))
+            .await
+            .unwrap()
+            .0;
+        assert_eq!(
+            l.as_array()
+                .unwrap()
+                .iter()
+                .find(|x| x["id"] == m.a)
+                .unwrap()["task"]["step"],
+            "compilé"
+        );
+        noter_appel(&m.st, m.a, m.mid, "start_session", &json!({}), Ok(&ok)).await;
+        let l = list(State(m.st.clone()), m.humain.clone(), Path(m.mid))
+            .await
+            .unwrap()
+            .0;
+        assert_eq!(
+            l.as_array()
+                .unwrap()
+                .iter()
+                .find(|x| x["id"] == m.a)
+                .unwrap()["task"]["step"],
+            "testé"
+        );
+
+        // Un relecteur commente la tâche : relu.
+        sqlx::query("UPDATE api_tokens SET role = 'relecteur' WHERE id = ?")
+            .bind(m.b)
+            .execute(&m.st.db)
+            .await
+            .unwrap();
+        noter_appel(
+            &m.st,
+            m.b,
+            m.mid,
+            "comment_task",
+            &json!({ "number": 1 }),
+            Ok(&ok),
+        )
+        .await;
+        let l = list(State(m.st.clone()), m.humain.clone(), Path(m.mid))
+            .await
+            .unwrap()
+            .0;
+        assert_eq!(
+            l.as_array()
+                .unwrap()
+                .iter()
+                .find(|x| x["id"] == m.a)
+                .unwrap()["task"]["step"],
+            "relu"
+        );
+
+        // Tâche bloquée par un agent : notification.
+        noter_appel(
+            &m.st,
+            m.a,
+            m.mid,
+            "set_task_status",
+            &json!({ "number": 1, "status": "blocked" }),
+            Ok(&ok),
+        )
+        .await;
+        let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM notifications WHERE text = 'Tâche #1 bloquée par l''agent « Claude »'").fetch_one(&m.st.db).await.unwrap();
+        assert_eq!(n, 1);
+
+        // Le fil : le plus récent d'abord, avec l'agent et la tâche.
+        let f = activite(
+            State(m.st.clone()),
+            m.humain.clone(),
+            Path(m.mid),
+            axum::extract::Query(Default::default()),
+        )
+        .await
+        .unwrap()
+        .0;
+        assert_eq!(f[0]["tool"], "set_task_status");
+        assert_eq!(f.as_array().unwrap().len(), 7);
+        assert!(f
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|x| x["tool"] == "compile_verse" && x["ok"] == false));
     }
 
     #[tokio::test]
