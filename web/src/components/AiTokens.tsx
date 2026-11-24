@@ -1,13 +1,14 @@
 // IA connectées du compte (#145) : un jeton MCP par IA, lié au compte et pas à une map. L'IA choisit sa map de
 // travail elle-même (outils list_maps puis use_map). Depuis #285, l'IA peut aussi se connecter seule par OAuth
 // (on colle l'adresse /mcp, POP demande « Autoriser ») ; la clé API reste pour les autres.
-import { useEffect, useState } from 'react'
-import { Check, Copy, Trash2, Lock, Unlock, X } from 'lucide-react'
+import { useState } from 'react'
+import { Check, Copy, Trash2, Lock, Unlock } from 'lucide-react'
 import { ago, api } from '../api'
 import { useApp, useLoad } from '../state'
-import { CardHead, Modal } from './ui'
+import { CardHead } from './ui'
 import { tr } from '../i18n/t'
 import { AiLogo } from './AiLogo'
+import { ConnectAgent, useAccountAI } from './ConnectAI'
 
 export const ClientLogo = ({ kind, size }: { kind: string; size?: number }) => <AiLogo kind={kind} size={size} />
 
@@ -27,47 +28,20 @@ export const CLIENTS: Client[] = [
 
 export const clientName = (kind: string) => CLIENTS.find(c => c.kind === kind)?.name ?? tr("Autre")
 
-/** Paramètres du compte → IA connectées : connecter, lister, passer en lecture seule, révoquer. */
+/** Paramètres du compte → IA connectées : lister, rôle, lecture seule, déconnecter ; connecter un agent comme sur
+ *  l'accueil (« Mes agents », #134 : prompt à coller d'abord, en un clic et clé API repliés). */
 export function AccountAI() {
-  const { toast } = useApp()
-  const { data, reload } = useLoad<any[]>('/api/me/tokens', [])
+  const ai = useAccountAI(false)
+  const data = ai.tokens, reload = ai.reload
   // Rôles d'agents (#111) : consignes et outils permis, choisis par IA.
   const { data: roles } = useLoad<{ id: string; name: string; instructions: string }[]>('/api/agent-roles', [])
-  const [open, setOpen] = useState<{ c: Client; token: string; id: number } | null>(null)
-  const url = `${location.origin}/mcp`
   // Une IA ne compte comme connectée qu'une fois qu'elle a appelé POP (#280) ; les autres jetons sont « en attente ».
-  const live = (data ?? []).filter(t => t.last_used)
-  const pending = (data ?? []).filter(t => !t.last_used)
-  const connect = async (c: Client) => {
-    try {
-      // Un seul jeton en attente par IA : l'ancien, jamais utilisé, est remplacé.
-      for (const t of pending.filter(t => t.kind === c.kind)) await api.del(`/api/tokens/${t.id}`)
-      const used = live.filter(t => t.kind === c.kind).length
-      const r = await api.post('/api/me/tokens', { name: used ? `${c.name} ${used + 1}` : c.name, kind: c.kind, scope: 'write' })
-      setOpen({ c, token: r.token, id: r.id }); reload()
-    } catch (e: any) { toast(e.message, true) }
-  }
-  const linked = !!open && live.some(t => t.id === open.id)
-  // Pendant que la fenêtre est ouverte, on regarde toutes les 3 s si l'IA a appelé POP.
-  useEffect(() => {
-    if (!open || linked) return
-    const h = setInterval(reload, 3000)
-    return () => clearInterval(h)
-  }, [open, linked])
+  const live = ai.live
+  const pending = ai.pending
   return (<>
     <section className="card">
       <CardHead title={tr("IA connectées")} sub={tr("Connectez votre IA (Claude, Cursor, Codex…) une seule fois pour tout votre compte : elle voit vos maps perso et celles de vos studios, et choisit elle-même la map sur laquelle travailler.")} />
-      <OneClick url={url} />
-      <p className="small muted" style={{ margin: '14px 0 8px' }}>{tr("Votre IA ne propose pas de se connecter ? Créez une clé API pour elle :")}</p>
-      <div className="aigrid">
-        {CLIENTS.map(c => {
-          const n = live.filter(t => t.kind === c.kind && !t.oauth).length
-          return <button key={c.kind} className="aicard" onClick={() => connect(c)}>
-            <ClientLogo kind={c.kind} size={20} /><span style={{ flex: 1, textAlign: 'left' }}><b style={{ fontWeight: 500 }}>{c.name}</b>{n > 0 && <span className="small muted">{' '}{tr("· {0} connectée{1}", [n, n > 1 ? 's' : ''])}</span>}</span><span className="small">{tr("Clé API")}</span>
-          </button>
-        })}
-      </div>
-      <h3 style={{ fontWeight: 500, fontSize: 15, margin: '20px 0 8px' }}>{tr("Vos IA")}</h3>
+      <h3 style={{ fontWeight: 500, fontSize: 15, margin: '4px 0 8px' }}>{tr("Vos IA")}</h3>
       <p className="small muted" style={{ marginTop: 0 }}>{tr("Lecture seule : l’IA voit vos maps sans rien modifier, sur toutes les maps. Les suppressions d’acteurs attendent toujours votre validation dans Paramètres → UEFN Link.")}</p>
       {data && live.length === 0 && <p className="muted">{tr("Aucune IA connectée pour l’instant.")}</p>}
       <div className="list">{live.map(t => (
@@ -87,9 +61,8 @@ export function AccountAI() {
         {tr("En attente de connexion : {0}.", [pending.map(t => clientName(t.kind)).join(', ')])}{' '}
         <button className="linkbtn" onClick={async () => { for (const t of pending) await api.del(`/api/tokens/${t.id}`); reload() }}>{tr("Annuler")}</button>
       </p>}
+      <div style={{ marginTop: 16 }}><ConnectAgent /></div>
     </section>
-
-    {open && <KeyModal c={open.c} token={open.token} linked={linked} onClose={() => setOpen(null)} />}
   </>)
 }
 
@@ -110,13 +83,6 @@ export function KeyPanel({ c, token, linked }: { c: Client; token: string; linke
     <div className={'aiwait' + (linked ? ' ok' : '')}>{linked ? <><Check size={16} />{tr("{0} est connectée à POP.", [c.name])}</> : <><span className="aiwait-dot" />{tr("En attente de connexion… L’IA apparaîtra dans « Vos IA » dès son premier appel.")}</>}</div>
     <p className="small muted">{tr("Redémarrez l’IA puis demandez-lui par exemple : « Travaille sur ma map POP GrassCutter ». Elle liste vos maps (list_maps) et choisit la bonne (use_map) ; vous pourrez lui faire changer de map sans la reconnecter.")}</p>
   </>
-}
-
-function KeyModal({ c, token, linked, onClose }: { c: Client; token: string; linked: boolean; onClose: () => void }) {
-  return <Modal onClose={onClose} label={tr("Connecter {0}", [c.name])}>
-    <div className="row" style={{ justifyContent: 'space-between' }}><h2 style={{ margin: 0, fontWeight: 500, fontSize: 20 }}>{tr("Connecter {0}", [c.name])}</h2><button className="iconbtn" aria-label={tr("Fermer")} onClick={onClose}><X size={18} /></button></div>
-    <KeyPanel c={c} token={token} linked={linked} />
-  </Modal>
 }
 
 /** Connexion en un clic par IA (#290) : l'IA ne connaît que l'adresse /mcp ; POP demande ensuite « Autoriser ». */

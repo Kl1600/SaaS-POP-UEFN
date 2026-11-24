@@ -110,6 +110,17 @@ export function AgentsSection() {
   </section>
 }
 
+/** « Connecter un agent » replié en bouton, déplié d'office tant que le compte n'a aucune IA (Paramètres → IA connectées). */
+export function ConnectAgent() {
+  const [open, setOpen] = useState(false)
+  const ai = useAccountAI(open)
+  const none = !!ai.tokens && ai.tokens.length === 0
+  useEffect(() => { if (none) setOpen(true) }, [none])
+  if (!ai.tokens) return null
+  if (!open && !none) return <button className="btn" onClick={() => setOpen(true)}><Plus size={16} />{tr("Connecter un agent")}</button>
+  return <div className="card agents-connect"><ConnectPanel ai={ai} onClose={none ? undefined : () => setOpen(false)} /></div>
+}
+
 const KEY_KINDS = ['claude_desktop', 'claude_code', 'cursor', 'codex', 'autre']
 
 /** Connexion d'un agent, dépliée dans la section. Passe seule à « connectée » dès le premier appel MCP d'une nouvelle IA. */
