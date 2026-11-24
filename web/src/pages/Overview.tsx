@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  Clock, Ban, CheckSquare, Flag, Coins, Users, Zap, Activity, ArrowRight, Upload, FileText, PenTool, AlertTriangle, MessageSquare, CheckCircle2, Rocket,
+  Clock, Ban, CheckSquare, Flag, Coins, Users, Zap, Activity, ArrowRight, Upload, FileText, PenTool, AlertTriangle, MessageSquare, CheckCircle2, Rocket, Bot, User, Radio,
 } from 'lucide-react'
 import { ago, api, euros, frDate } from '../api'
 import { useApp, useLive, useLoad } from '../state'
@@ -99,6 +99,8 @@ export default function Overview() {
         </section>
       </div>
 
+      {map && <FilAvancement mapId={map.id} />}
+
       <section className="card">
         <CardHead icon={<Activity size={22} strokeWidth={1.5} />} title={tr("Journal d'activités")} sub={tr("Dernières actions et événements de l'équipe")} />
         <Feed items={data.activity.slice(0, 5)} />
@@ -129,5 +131,55 @@ function Feed({ items }: { items: any[] }) {
         )
       })}
     </div>
+  )
+}
+
+/** Fil d'avancement (#137) : ce que l'IA et POP font sur la map, en direct, avec « Annuler » sur chaque action
+ * annulable et « Valider » / « Refuser » sur les suppressions demandées par une IA. */
+function FilAvancement({ mapId }: { mapId: number }) {
+  const { toast } = useApp()
+  const { data, reload } = useLoad<{ items: any[]; pending: number }>(`/api/maps/${mapId}/fil`, [mapId])
+  useLive(['uefn', 'agent', 'tasks'], reload)
+  const [tout, setTout] = useState(false)
+  const [occupe, setOccupe] = useState<string | null>(null)
+  const agir = async (cle: string, url: string, ok: string) => {
+    setOccupe(cle)
+    try { await api.post(url); toast(ok); reload() } catch (e: any) { toast(e.message, true) } finally { setOccupe(null) }
+  }
+  if (!data) return null
+  const items = tout ? data.items : data.items.slice(0, 8)
+  const etat = (x: any) => x.kind === 'validation'
+    ? (x.status === 'pending' ? tr("en attente de validation") : x.status === 'approved' ? tr("validée") : tr("refusée"))
+    : x.status === 'queued' ? tr("en attente d'envoi") : x.status === 'error' ? tr("échec") : x.status === 'undone' ? tr("annulée") : null
+  return (
+    <section className="card" aria-live="polite">
+      <CardHead icon={<Radio size={22} strokeWidth={1.5} />} title={tr("Fil d'avancement")} sub={data.pending ? tr("{0} suppression(s) demandée(s) par une IA à valider", [data.pending]) : tr("Ce que l'IA et POP font sur la map, en direct")} />
+      {items.length === 0 ? <Empty text={tr("Rien pour l'instant : les actions de l'IA apparaîtront ici dès qu'elle travaille.")} /> : (
+        <div className="list feed">
+          {items.map(x => {
+            const e = etat(x)
+            const I = x.ia ? Bot : User
+            const cle = x.kind + x.id
+            return (
+              <div key={cle} className="li">
+                <span className={'ico ' + (x.status === 'error' ? 'i-r' : x.kind === 'validation' && x.status === 'pending' ? 'i-o' : 'i-n')}><I size={20} strokeWidth={1.5} /></span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ textDecoration: x.status === 'undone' ? 'line-through' : undefined }}>
+                    {x.kind === 'tache' && <span className="mono muted">#{x.task} </span>}{tx(x.text)}{x.kind === 'tache' && <span className="muted"> · {x.title}</span>}
+                  </div>
+                  <div className="small muted">{[x.who, ago(x.at), e, x.kind === 'uefn' && x.task ? tr("tâche #{0}", [x.task]) : null, x.error].filter(Boolean).join(' · ')}</div>
+                </div>
+                {x.kind === 'uefn' && x.undoable && <button className="btn" disabled={occupe !== null} onClick={() => agir(cle, `/api/uefn-actions/${x.id}/undo`, tr("Action annulée"))}>{tr("Annuler")}</button>}
+                {x.kind === 'validation' && x.status === 'pending' && <>
+                  <button className="btn" disabled={occupe !== null} onClick={() => agir(cle, `/api/approvals/${x.id}/refuse`, tr("Suppression refusée"))}>{tr("Refuser")}</button>
+                  <button className="btn pri" disabled={occupe !== null} onClick={() => agir(cle, `/api/approvals/${x.id}/approve`, tr("Suppression validée"))}>{tr("Valider")}</button>
+                </>}
+              </div>
+            )
+          })}
+        </div>
+      )}
+      {data.items.length > 8 && <button className="btn more" onClick={() => setTout(!tout)}>{tout ? tr("Voir moins") : tr("Voir plus ({0})", [data.items.length - 8])}<ArrowRight size={16} strokeWidth={1.5} /></button>}
+    </section>
   )
 }

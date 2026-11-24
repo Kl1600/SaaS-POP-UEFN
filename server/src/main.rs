@@ -15,6 +15,7 @@ mod checks;
 mod discover;
 mod engine;
 mod error;
+mod fil;
 mod guide;
 mod ideas;
 mod integrations;
@@ -583,6 +584,7 @@ fn api() -> Router<AppState> {
         .route("/api/maps/{mid}/level-checks", get(checks::get))
         .route("/api/maps/{mid}/agents", get(agents::list))
         .route("/api/maps/{mid}/agents/activity", get(agents::activite))
+        .route("/api/maps/{mid}/fil", get(fil::route))
         .route("/api/uefn-actions/{id}/undo", post(uefn::undo))
         .route("/api/approvals/{id}/{verdict}", post(uefn::decide))
         .route(
