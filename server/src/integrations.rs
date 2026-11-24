@@ -15,7 +15,7 @@ use axum::{
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-async fn config(st: &AppState, sid: i64, kind: &str) -> Result<Option<Value>, AppError> {
+pub(crate) async fn config(st: &AppState, sid: i64, kind: &str) -> Result<Option<Value>, AppError> {
     let r: Option<(i64, String)> =
         sqlx::query_as("SELECT enabled, config FROM integrations WHERE studio_id = ? AND kind = ?")
             .bind(sid)
@@ -26,7 +26,12 @@ async fn config(st: &AppState, sid: i64, kind: &str) -> Result<Option<Value>, Ap
         .map(|r| serde_json::from_str(&r.1).unwrap_or(json!({}))))
 }
 
-async fn save_config(st: &AppState, sid: i64, kind: &str, cfg: &Value) -> Result<(), AppError> {
+pub(crate) async fn save_config(
+    st: &AppState,
+    sid: i64,
+    kind: &str,
+    cfg: &Value,
+) -> Result<(), AppError> {
     sqlx::query("UPDATE integrations SET config = ? WHERE studio_id = ? AND kind = ?")
         .bind(cfg.to_string())
         .bind(sid)
@@ -314,7 +319,12 @@ pub async fn discord_hook(
 
 // ---------- GitHub ----------
 
-fn gh(st: &AppState, method: reqwest::Method, url: String, token: &str) -> reqwest::RequestBuilder {
+pub(crate) fn gh(
+    st: &AppState,
+    method: reqwest::Method,
+    url: String,
+    token: &str,
+) -> reqwest::RequestBuilder {
     st.http
         .request(method, url)
         .header("authorization", format!("Bearer {token}"))
@@ -323,7 +333,7 @@ fn gh(st: &AppState, method: reqwest::Method, url: String, token: &str) -> reqwe
         .header("x-github-api-version", "2022-11-28")
 }
 
-fn repo_ok(r: &str) -> bool {
+pub(crate) fn repo_ok(r: &str) -> bool {
     let p: Vec<&str> = r.split('/').collect();
     p.len() == 2
         && p.iter().all(|x| {
@@ -526,6 +536,14 @@ pub async fn github_hook(
     let v: Value = serde_json::from_slice(&body).map_err(|_| bad("JSON invalide"))?;
     if v["repository"]["full_name"].as_str() != cfg["repo"].as_str() {
         return Ok(Json(json!({ "ignored": true })));
+    }
+    // CI GitHub Actions (#217) : runs et jobs.
+    let quoi = headers
+        .get("x-github-event")
+        .and_then(|h| h.to_str().ok())
+        .unwrap_or("");
+    if matches!(quoi, "workflow_run" | "workflow_job") {
+        return Ok(Json(crate::ci::evenement(&st, sid, &cfg, quoi, &v).await?));
     }
     let (action, n) = (
         v["action"].as_str().unwrap_or(""),
