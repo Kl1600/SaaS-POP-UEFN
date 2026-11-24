@@ -262,6 +262,12 @@ impl Link {
                 out["actors"] = json!(self.mcp.list_actors().await?);
             }
 
+            "actor_grid" => {
+                self.need_uefn()?;
+                // Ligne par ligne : la case (i, j) est à l'indice i × cols + j (#164).
+                out["created_ids"] = json!(self.mcp.grid(a).await?);
+                out["actors"] = json!(self.mcp.list_actors().await?);
+            }
             "mesh_spawn" => {
                 self.need_uefn()?;
                 out["created_ids"] = json!([self.mcp.spawn_mesh(a).await?]);

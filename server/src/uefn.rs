@@ -872,22 +872,44 @@ async fn prepare(
     };
     match action {
         "actor_update" => {
-            // Modification d'un ou plusieurs acteurs ; la même valeur s'applique à tous.
-            let ids: Vec<String> = args["ids"]
-                .as_array()
-                .cloned()
-                .unwrap_or_default()
-                .iter()
-                .filter_map(|x| x.as_str().map(String::from))
-                .collect();
-            if ids.is_empty() || ids.len() > 500 {
-                return Err(bad("Sélection vide ou trop grande."));
+            // Modification d'un ou plusieurs acteurs : les mêmes changements pour tous (`ids` + `changes`), ou des
+            // changements propres à chaque acteur (`per_actor` : [{ id, changes }], #164).
+            let pairs: Vec<(String, Value)> = match args["per_actor"].as_array() {
+                Some(list) => list
+                    .iter()
+                    .map(|p| {
+                        let id = p["id"].as_str().unwrap_or("").to_string();
+                        if id.is_empty() || !p["changes"].is_object() {
+                            return Err(bad("per_actor : chaque élément attend id et changes."));
+                        }
+                        Ok((id, p["changes"].clone()))
+                    })
+                    .collect::<Result<_, AppError>>()?,
+                None => args["ids"]
+                    .as_array()
+                    .cloned()
+                    .unwrap_or_default()
+                    .iter()
+                    .filter_map(|x| {
+                        x.as_str()
+                            .map(|id| (id.to_string(), args["changes"].clone()))
+                    })
+                    .collect(),
+            };
+            if pairs.is_empty() {
+                return Err(bad("Sélection vide."));
             }
-            let ch = args["changes"].clone();
+            if pairs.len() > MAX_ACTEURS {
+                return Err(bad(format!(
+                    "{} acteurs dans une seule action : {MAX_ACTEURS} au plus. Découpez en plusieurs appels.",
+                    pairs.len()
+                )));
+            }
+            let ids: Vec<String> = pairs.iter().map(|p| p.0.clone()).collect();
             let mut patches = vec![];
             let mut undo = vec![];
             let mut lines = vec![];
-            for id in &ids {
+            for (id, ch) in &pairs {
                 check_lock(id)?;
                 let a = by_id(id).ok_or_else(|| bad(format!("Acteur introuvable : {id}")))?;
                 let name = a["name"].as_str().unwrap_or(id).to_string();
@@ -930,18 +952,44 @@ async fn prepare(
                 for (field, label) in [("options", "option"), ("props", "propriété")] {
                     if let Some(m) = ch[field].as_object() {
                         let mut prev = json!({});
+                        let mut nouv = json!({});
                         for (k, v) in m {
+                            // Réglage Verse vers des props ou des appareils du niveau (#164) : le relais crée les
+                            // références que UEFN attend ; POP vérifie seulement que les acteurs existent.
+                            if let Some((liste, refs)) = (field == "props")
+                                .then(|| acteurs_cites(v, &by_id))
+                                .flatten()
+                            {
+                                if refs.len() > MAX_ACTEURS {
+                                    return Err(bad(format!(
+                                        "« {k} » : {MAX_ACTEURS} acteurs au plus."
+                                    )));
+                                }
+                                let ancien = &a[field][k];
+                                prev[k] = if ancien.is_null() && liste {
+                                    json!([])
+                                } else {
+                                    ancien.clone()
+                                };
+                                lines.push(format!(
+                                    "{name} · {label} {k} : {} acteur(s) relié(s)",
+                                    refs.len()
+                                ));
+                                nouv[k] = json!({ "$acteurs": refs, "liste": liste });
+                                continue;
+                            }
                             if field == "props" {
                                 check_prop_type(k, &a[field][k], v)?;
                             }
                             prev[k] = a[field][k].clone();
+                            nouv[k] = v.clone();
                             lines.push(format!(
                                 "{name} · {label} {k} : {} → {}",
                                 short(&a[field][k]),
                                 short(v)
                             ));
                         }
-                        p[field] = ch[field].clone();
+                        p[field] = nouv;
                         u[field] = prev;
                     }
                 }
@@ -986,7 +1034,14 @@ async fn prepare(
                 undo.push(json!({ "id": id, "changes": u }));
             }
             *args = json!({ "ids": ids, "patches": patches });
-            let summary = if lines.len() > 3 {
+            let seulement_bouger = pairs.iter().all(|(_, c)| {
+                c.as_object()
+                    .map(|o| o.len() == 1 && o.contains_key("transform"))
+                    .unwrap_or(false)
+            });
+            let summary = if pairs.len() > 3 && seulement_bouger {
+                format!("Déplacement de {} acteurs", pairs.len())
+            } else if lines.len() > 3 {
                 format!(
                     "{} · et {} autres changements",
                     lines[..3].join(" ; "),
@@ -1041,6 +1096,18 @@ async fn prepare(
             Ok((format!("Pose : {quoi}"), Value::Null, None))
         }
 
+        "actor_grid" => {
+            // Grille de props ou d'appareils (#164) : N × M copies en une action ; l'annulation retire tout le lot.
+            let quoi = check_grid_args(args)?;
+            if let Some(like) = args["like"].as_str().filter(|l| !l.is_empty()) {
+                by_id(like)
+                    .ok_or_else(|| bad(format!("Modèle introuvable dans le niveau : {like}")))?;
+            }
+            if let Some(f) = args["folder"].as_str().filter(|f| !f.is_empty()) {
+                check_lock(f)?;
+            }
+            Ok((quoi, Value::Null, None))
+        }
         "mesh_spawn" => {
             // Poser un mesh (#148) : forme de base ou mesh du Content Browser, avec échelle.
             let quoi = check_mesh_args(args)?;
@@ -1347,8 +1414,8 @@ async fn run_action(
             | "asset_import"
     ) {
         120
-    } else if action == "start_session" {
-        // Démarrer une session peut prendre plusieurs minutes (chargement du niveau).
+    } else if matches!(action, "start_session" | "actor_grid") {
+        // Démarrer une session peut prendre plusieurs minutes (chargement du niveau) ; une grille de 2 000 acteurs aussi.
         300
     } else {
         30
@@ -1380,7 +1447,10 @@ async fn run_action(
                         );
                     }
                 }
-                if matches!(action, "actor_duplicate" | "actor_spawn" | "mesh_spawn") {
+                if matches!(
+                    action,
+                    "actor_duplicate" | "actor_spawn" | "mesh_spawn" | "actor_grid"
+                ) {
                     if let Some(ids) = data.get("created_ids") {
                         extra_undo = Some(
                             json!({ "action": "actor_delete", "args": { "ids": ids } }).to_string(),
@@ -1492,6 +1562,78 @@ async fn run_action(
 /// Un réglage @editable garde son type : un entier reste entier, un booléen reste un booléen, un texte reste un
 /// texte. UEFN arrondirait 2,5 en 2 sans rien dire (vérifié le 18/11/2026) : POP refuse avant d'envoyer.
 /// Une valeur actuelle inconnue (null, référence) ne bloque rien : UEFN tranche.
+/// Acteurs touchés par une seule action (#164) : au-delà, l'IA découpe en plusieurs appels.
+pub const MAX_ACTEURS: usize = 2000;
+
+/// Valeur d'un réglage Verse qui désigne des acteurs du niveau (#164) : un identifiant d'acteur seul
+/// (`creative_prop`, appareil) ou une liste d'identifiants (`[]creative_prop`, `[]mutator_zone_device`). Rend
+/// (liste ?, identifiants) ; `None` si ce n'est pas une référence à des acteurs connus (ex. un `[]string`).
+fn acteurs_cites(v: &Value, by_id: &dyn Fn(&str) -> Option<Value>) -> Option<(bool, Vec<String>)> {
+    let (liste, ids): (bool, Vec<&str>) = match v {
+        Value::String(s) => (false, vec![s.as_str()]),
+        Value::Array(a) if !a.is_empty() => {
+            (true, a.iter().map(|x| x.as_str()).collect::<Option<_>>()?)
+        }
+        _ => return None,
+    };
+    ids.iter()
+        .all(|id| by_id(id).is_some())
+        .then(|| (liste, ids.into_iter().map(String::from).collect()))
+}
+
+/// Vérifie une grille (#164) et rend le résumé du journal. Lignes le long de Y (`i`), colonnes le long de X (`j`).
+pub fn check_grid_args(args: &mut Value) -> Result<String, AppError> {
+    let asset = args["asset"].as_str().unwrap_or("").trim().to_string();
+    let like = args["like"].as_str().unwrap_or("").trim().to_string();
+    let modele = match (asset.is_empty(), like.is_empty()) {
+        (false, true) if asset.starts_with('/') && asset.len() <= 400 => {
+            asset.rsplit(['/', '.']).next().unwrap_or(&asset).to_string()
+        }
+        (true, false) => like.rsplit(['/', '.']).next().unwrap_or(&like).to_string(),
+        _ => return Err(bad("Indiquez soit asset (chemin du prop ou de l’appareil dans le Content Browser, ex. /CRG_Props/…/CP_Grass_Tall_01.CP_Grass_Tall_01_C), soit like (acteur du niveau à copier).")),
+    };
+    let n = |k: &str| args[k].as_u64().filter(|n| (1..=500).contains(n));
+    let (Some(rows), Some(cols)) = (n("rows"), n("cols")) else {
+        return Err(bad(
+            "rows et cols : nombre de lignes et de colonnes, de 1 à 500.",
+        ));
+    };
+    if (rows * cols) as usize > MAX_ACTEURS {
+        return Err(bad(format!(
+            "Grille de {rows} × {cols} = {} acteurs : {MAX_ACTEURS} au plus par action. Découpez-la en plusieurs grilles.",
+            rows * cols
+        )));
+    }
+    let nombres = |k: &str, len: usize, requis: bool| -> Result<(), AppError> {
+        if args[k].is_null() && !requis {
+            return Ok(());
+        }
+        let ok = args[k]
+            .as_array()
+            .map(|v| {
+                v.len() == len
+                    && v.iter()
+                        .all(|x| x.as_f64().map(f64::is_finite).unwrap_or(false))
+            })
+            .unwrap_or(false);
+        if ok {
+            Ok(())
+        } else {
+            Err(bad(format!("{k} : {len} nombres attendus.")))
+        }
+    };
+    nombres("origin", 3, true)?;
+    nombres("step", 2, true)?;
+    nombres("rotation", 3, false)?;
+    nombres("scale", 3, false)?;
+    let nom = args["name"].as_str().unwrap_or("").trim().to_string();
+    check_len("Nom", &nom, 0, 120)?;
+    if let Some(f) = args["folder"].as_str() {
+        check_len("Dossier", f, 0, 200)?;
+    }
+    Ok(format!("Grille {rows} × {cols} : {modele}"))
+}
+
 fn check_prop_type(k: &str, cur: &Value, new: &Value) -> Result<(), AppError> {
     let int = |v: &Value| v.is_i64() || v.is_u64();
     let expected = if int(cur) {

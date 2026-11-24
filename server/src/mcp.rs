@@ -162,7 +162,8 @@ fn tools() -> Value {
         tool("uefn_status", "État du relais et d'UEFN (connecté, fermé, hors ligne) et nombre d'actions en attente.", json!({}), &[]),
         tool("list_actors", "Liste les acteurs du niveau. Filtre facultatif : texte cherché dans le nom, le type, le dossier, les tags et les options.", json!({ "query": { "type": "string" } }), &[]),
         tool("get_actor", "Détails d'un acteur : transformation, tags, options, propriétés Verse, liens d'événements.", json!({ "id": { "type": "string" } }), &["id"]),
-        tool("update_actors", "Modifie un ou plusieurs acteurs. changes peut contenir name, folder, hidden, transform {location,rotation,scale}, options {clé: valeur}, props {clé: valeur}, tags_add, tags_remove, events.", json!({ "ids": ids, "changes": { "type": "object" }, "task": task }), &["ids", "changes"]),
+        tool("update_actors", "Modifie un ou plusieurs acteurs, en une action journalisée et annulable (2 000 acteurs au plus). Les mêmes changements pour tous : ids + changes. Des changements différents par acteur (positions, échelles…) : per_actor [{ id, changes }]. changes peut contenir name, folder, hidden, transform {location,rotation,scale}, options {clé: valeur}, props {clé: valeur}, tags_add, tags_remove, events. Relier des props ou des appareils à un réglage Verse : props { casesHerbe: [<identifiants d'acteurs>] } pour un []creative_prop ou un []mutator_zone_device, props { cible: \"<identifiant>\" } pour un seul ; POP crée lui-même les références qu'UEFN attend (dans l'ordre donné).", json!({ "ids": ids, "changes": { "type": "object" }, "per_actor": { "type": "array", "items": { "type": "object", "properties": { "id": { "type": "string" }, "changes": { "type": "object" } }, "required": ["id", "changes"] } }, "task": task }), &[]),
+        tool("place_grid", "Pose rows × cols copies d'un prop ou d'un appareil en grille, en une seule action journalisée ; l'annulation retire tout le lot (2 000 acteurs au plus). Soit asset (classe du Content Browser, ex. /CRG_Props/SetupAssets/Blueprints/CP_Grass_Tall_01.CP_Grass_Tall_01_C), soit like (acteur du niveau à copier avec ses réglages). origin [x, y, z] en cm : centre de la case (0, 0) ; step [dx, dy] en cm : écart entre colonnes (le long de X) et entre lignes (le long de Y). Facultatifs : rotation [pitch, yaw, roll], scale [x, y, z], folder, name (modèle, ex. « Herbe_Parc_{i}_{j} », i = ligne, j = colonne, à partir de 0). Les identifiants créés sont rendus ligne par ligne : la case (i, j) est à l'indice i × cols + j, comme dans un tableau Verse.", json!({ "asset": { "type": "string" }, "like": { "type": "string" }, "rows": { "type": "integer" }, "cols": { "type": "integer" }, "origin": { "type": "array", "items": { "type": "number" } }, "step": { "type": "array", "items": { "type": "number" } }, "rotation": { "type": "array", "items": { "type": "number" } }, "scale": { "type": "array", "items": { "type": "number" } }, "folder": { "type": "string" }, "name": { "type": "string" }, "task": task }), &["rows", "cols", "origin", "step"]),
         tool("place_device", "Pose un appareil dans le niveau. Soit asset (chemin de l'appareil dans le Content Browser d'UEFN, ex. /Game/…), soit like (identifiant d'un appareil du niveau à copier avec ses réglages). Facultatifs : name, folder, location [x, y, z] et rotation [pitch, yaw, roll] en coordonnées du moteur. Journalisé et annulable (l'annulation demandée par une IA attend un humain).", json!({ "asset": { "type": "string" }, "like": { "type": "string" }, "name": { "type": "string" }, "folder": { "type": "string" }, "location": { "type": "array", "items": { "type": "number" } }, "rotation": { "type": "array", "items": { "type": "number" } }, "task": task }), &[]),
         tool("place_mesh", "Pose un mesh dans le niveau (décor : sol, mur, bloc, mesh importé). Soit shape : forme de base d'1 m de côté (plan, cube, sphere, cylindre, cone ; un plan de 20 m × 20 m = shape plan, scale [20, 20, 1]), soit mesh : chemin d'un mesh du Content Browser (ex. un mesh importé par import_asset). Facultatifs : name, folder, location [x, y, z] en cm, rotation [pitch, yaw, roll] en degrés, scale [x, y, z]. Journalisé et annulable. Un mesh importé est aussi utilisable en Verse (Scene Graph) : voir KB « mesh importé en Verse ».", json!({ "shape": { "type": "string", "enum": ["plan", "cube", "sphere", "cylindre", "cone"] }, "mesh": { "type": "string" }, "name": { "type": "string" }, "folder": { "type": "string" }, "location": { "type": "array", "items": { "type": "number" } }, "rotation": { "type": "array", "items": { "type": "number" } }, "scale": { "type": "array", "items": { "type": "number" } }, "task": task }), &[]),
         tool("get_island_settings", "Lit les réglages de l'île (appareil Réglages de l'île) : nom, libellé, valeur actuelle et valeurs permises. names : noms à lire (ex. [\"MaxPlayers\"]) ; sans names, la liste complète sans les valeurs permises.", json!({ "names": { "type": "array", "items": { "type": "string" } } }), &[]),
@@ -686,9 +687,16 @@ async fn call_as(
                 st,
                 o(),
                 "actor_update",
-                json!({ "ids": a["ids"], "changes": a["changes"] }),
+                json!({ "ids": a["ids"], "changes": a["changes"], "per_actor": a["per_actor"] }),
             )
             .await
+        }
+        "place_grid" => {
+            let mut g = a.clone();
+            if let Some(o) = g.as_object_mut() {
+                o.remove("task");
+            }
+            exec(st, o(), "actor_grid", g).await
         }
         "place_device" => {
             exec(
@@ -2322,5 +2330,209 @@ mod tests_decor {
         assert!(v["settings"][0].get("allowed").is_none());
         let v = island_view(&r, &["MaxPlayers".into()]);
         assert_eq!(v["settings"][0]["allowed"], json!(["12", "16"]));
+    }
+}
+
+#[cfg(test)]
+mod tests_grille {
+    use super::*;
+
+    async fn monde() -> (AppState, AuthUser, i64) {
+        let st = crate::test_state().await;
+        let sid: i64 = sqlx::query_scalar("INSERT INTO studios (name) VALUES ('S') RETURNING id")
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        let mid: i64 =
+            sqlx::query_scalar("INSERT INTO maps (studio_id, name) VALUES (?, 'M') RETURNING id")
+                .bind(sid)
+                .fetch_one(&st.db)
+                .await
+                .unwrap();
+        let uid: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash) VALUES ('ia@a.fr', 'Yanis', 'x') RETURNING id")
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO memberships (studio_id, user_id, role) VALUES (?, ?, 'member')")
+            .bind(sid)
+            .bind(uid)
+            .execute(&st.db)
+            .await
+            .unwrap();
+        // Niveau connu : un appareil Verse et 3 props d'herbe.
+        crate::uefn::snapshot(&st, mid).await.unwrap();
+        let t = |l: [i64; 3]| json!({ "location": l, "rotation": [0, 0, 0], "scale": [1, 1, 1] });
+        let mut acteurs = vec![
+            json!({ "id": "L.Gestion", "name": "Gestion", "transform": t([0, 0, 0]), "props": {}, "options": {} }),
+        ];
+        for k in 0..3 {
+            acteurs.push(json!({ "id": format!("L.Herbe{k}"), "name": format!("Herbe {k}"), "transform": t([k * 100, 0, 0]), "props": {}, "options": {} }));
+        }
+        sqlx::query("UPDATE uefn_state SET actors = ? WHERE map_id = ?")
+            .bind(json!(acteurs).to_string())
+            .bind(mid)
+            .execute(&st.db)
+            .await
+            .unwrap();
+        let u = AuthUser {
+            id: uid,
+            email: "ia@a.fr".into(),
+            name: "Yanis".into(),
+            sid: String::new(),
+        };
+        (st, u, mid)
+    }
+
+    async fn derniere(st: &AppState) -> (String, String, String) {
+        sqlx::query_as("SELECT summary, args, undo FROM uefn_actions ORDER BY id DESC LIMIT 1")
+            .fetch_one(&st.db)
+            .await
+            .unwrap()
+    }
+
+    /// #164 : grille validée puis journalisée ; refus au-delà de 2 000 acteurs ; annulation = tout le lot.
+    #[tokio::test]
+    async fn grille_de_props() {
+        let (st, u, mid) = monde().await;
+        let g = |extra: Value| {
+            let mut v = json!({ "asset": "/CRG_Props/SetupAssets/Blueprints/CP_Grass_Tall_01.CP_Grass_Tall_01_C", "rows": 14, "cols": 14, "origin": [1000, 2000, 0], "step": [500, 500] });
+            for (k, x) in extra.as_object().unwrap() {
+                v[k] = x.clone();
+            }
+            v
+        };
+        for (mauvais, attendu) in [
+            (g(json!({ "rows": 50, "cols": 41 })), "2000 au plus"),
+            (g(json!({ "step": [500] })), "step"),
+            (g(json!({ "asset": "", "like": "" })), "asset"),
+            (
+                g(json!({ "asset": null, "like": "L.Absent" })),
+                "introuvable",
+            ),
+        ] {
+            let e = call(&st, &u, mid, "place_grid", mauvais).await.unwrap_err();
+            assert!(format!("{e}").contains(attendu), "{e}");
+        }
+        let r = call(
+            &st,
+            &u,
+            mid,
+            "place_grid",
+            g(json!({ "name": "Herbe_Parc_{i}_{j}", "folder": "Herbe/Parc" })),
+        )
+        .await
+        .unwrap();
+        assert_eq!(r["queued"], true, "relais absent : en attente");
+        let (resume, args, _) = derniere(&st).await;
+        assert_eq!(resume, "Grille 14 × 14 : CP_Grass_Tall_01_C");
+        assert!(args.contains("Herbe_Parc_{i}_{j}"));
+        // Réponse du relais : les 196 acteurs créés ; l'annulation les supprime tous.
+        let ids: Vec<String> = (0..196).map(|k| format!("L.Case{k}")).collect();
+        let aid: i64 =
+            sqlx::query_scalar("SELECT id FROM uefn_actions WHERE action = 'actor_grid'")
+                .fetch_one(&st.db)
+                .await
+                .unwrap();
+        sqlx::query("UPDATE uefn_actions SET status = 'done', undo = ? WHERE id = ?")
+            .bind(json!({ "action": "actor_delete", "args": { "ids": ids } }).to_string())
+            .bind(aid)
+            .execute(&st.db)
+            .await
+            .unwrap();
+        let (_, _, undo) = derniere(&st).await;
+        assert_eq!(
+            serde_json::from_str::<Value>(&undo).unwrap()["args"]["ids"]
+                .as_array()
+                .unwrap()
+                .len(),
+            196
+        );
+    }
+
+    /// #164 : positions différentes par acteur en un appel ; refs Verse vers des props ; limite.
+    #[tokio::test]
+    async fn changements_par_acteur_et_props_relies() {
+        let (st, u, mid) = monde().await;
+        call(
+            &st,
+            &u,
+            mid,
+            "update_actors",
+            json!({ "per_actor": [
+            { "id": "L.Herbe0", "changes": { "transform": { "location": [10, 0, 0] } } },
+            { "id": "L.Herbe1", "changes": { "transform": { "location": [20, 0, 0] } } },
+            { "id": "L.Herbe2", "changes": { "transform": { "location": [30, 5, 0] } } },
+        ] }),
+        )
+        .await
+        .unwrap();
+        let (resume, args, undo) = derniere(&st).await;
+        let p: Value = serde_json::from_str(&args).unwrap();
+        let x: Vec<Value> = p["patches"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|p| p["changes"]["transform"]["location"].clone())
+            .collect();
+        assert_eq!(
+            x,
+            vec![json!([10, 0, 0]), json!([20, 0, 0]), json!([30, 5, 0])]
+        );
+        assert!(
+            undo.contains("[200,0,0]"),
+            "l'annulation remet chaque position : {undo}"
+        );
+        assert!(resume.contains("Herbe 2 · position"), "{resume}");
+        // Relier 3 props à un []creative_prop, et un seul à un creative_prop.
+        call(
+            &st,
+            &u,
+            mid,
+            "update_actors",
+            json!({ "ids": ["L.Gestion"], "changes": { "props": {
+            "casesHerbe": ["L.Herbe0", "L.Herbe1", "L.Herbe2"], "cible": "L.Herbe1", "titre": "Parc"
+        } } }),
+        )
+        .await
+        .unwrap();
+        let (resume, args, undo) = derniere(&st).await;
+        let p: Value = serde_json::from_str(&args).unwrap();
+        let props = &p["patches"][0]["changes"]["props"];
+        assert_eq!(
+            props["casesHerbe"],
+            json!({ "$acteurs": ["L.Herbe0", "L.Herbe1", "L.Herbe2"], "liste": true })
+        );
+        assert_eq!(
+            props["cible"],
+            json!({ "$acteurs": ["L.Herbe1"], "liste": false })
+        );
+        assert_eq!(props["titre"], "Parc", "un texte reste un texte");
+        assert!(
+            resume.contains("casesHerbe : 3 acteur(s) relié(s)"),
+            "{resume}"
+        );
+        let u0: Value = serde_json::from_str(&undo).unwrap();
+        assert_eq!(
+            u0["args"]["patches"][0]["changes"]["props"]["casesHerbe"],
+            json!([])
+        );
+        // Un acteur inconnu dans la liste : ce n'est pas une liste d'acteurs (texte libre) ; trop d'acteurs : refus.
+        let trop: Vec<Value> = (0..2001)
+            .map(|k| json!({ "id": format!("L.X{k}"), "changes": {} }))
+            .collect();
+        let e = call(&st, &u, mid, "update_actors", json!({ "per_actor": trop }))
+            .await
+            .unwrap_err();
+        assert!(format!("{e}").contains("2000 au plus"), "{e}");
+        let e = call(
+            &st,
+            &u,
+            mid,
+            "update_actors",
+            json!({ "per_actor": [{ "id": "L.Herbe0" }] }),
+        )
+        .await
+        .unwrap_err();
+        assert!(format!("{e}").contains("per_actor"), "{e}");
     }
 }
