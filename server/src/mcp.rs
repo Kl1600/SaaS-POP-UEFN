@@ -190,6 +190,9 @@ fn tools() -> Value {
         tool("set_task_status", "Change le statut d'une tâche : todo (à faire), doing (en cours), blocked (bloquée), done (faite). Passer en cours exige que ses dépendances soient faites. note : commentaire facultatif (ce qui a été fait, ce qui bloque). Une tâche UEFN ne passe à done qu'avec un check-in Lore réellement archivé sur la map : checkin = son message exact (« #n … »), ou celui du check-in d'une autre tâche où son travail est parti (noté dans l'historique). Inutile si vous avez archivé par lore_checkin « #n … » depuis que vous l'avez réservée : un check-in « #3 #5 … » ferme d'ailleurs seul chaque tâche UEFN en cours qu'il cite.", json!({ "number": { "type": "integer" }, "status": { "type": "string", "enum": ["todo", "doing", "blocked", "done"] }, "note": { "type": "string" }, "checkin": { "type": "string" } }), &["number", "status"]),
         tool("claim_task", "Réserve une tâche POP pour vous (agent IA) : une seule tâche à la fois, et une tâche n'a qu'un agent. À faire avant de travailler dessus ; refusé si un autre agent l'a déjà. Vos fichiers Verse de cette tâche ne peuvent pas être modifiés par un autre agent.", json!({ "number": { "type": "integer" } }), &["number"]),
         tool("save_progress", "Note où vous en êtes sur votre tâche réservée, pour qu'un autre agent puisse la reprendre : done (ce qui est fait), todo (ce qui reste), files (fichiers touchés). À faire avant de vous arrêter et à chaque étape importante. La note est rendue par claim_task et next_task.", json!({ "done": { "type": "string" }, "todo": { "type": "string" }, "files": { "type": "array", "items": { "type": "string" } } }), &[]),
+        tool("list_agents", "Agents IA de la map : identifiant, nom, rôle, tâche en cours, actif ou non, et lequel est l'Orchestrateur.", json!({}), &[]),
+        tool("plan_tasks", "Réservé à l'Orchestrateur. Découpe une demande en tâches d'environ une heure, créées d'un coup. Chaque tâche : title, description, tag (code, carte, conception, test), lot, uefn, key (nom court pour s'y référer plus bas), depends_on (numéros de tâches existantes ou key d'une tâche plus haut dans le plan), agent (identifiant ou nom d'un agent de la map, voir list_agents : la tâche lui est attribuée). Tout est vérifié avant de créer quoi que ce soit.", json!({ "tasks": { "type": "array", "items": { "type": "object", "properties": { "key": { "type": "string" }, "title": { "type": "string" }, "description": { "type": "string" }, "tag": { "type": "string" }, "lot": { "type": "string" }, "uefn": { "type": "boolean" }, "depends_on": { "type": "array", "items": { "type": ["integer", "string"] } }, "agent": { "type": ["integer", "string"] } }, "required": ["title"] } } }), &["tasks"]),
+        tool("assign_task", "Réservé à l'Orchestrateur. Attribue une tâche à un agent de la map (identifiant ou nom, voir list_agents) : lui seul pourra la réserver. agent vide ou null : la tâche redevient libre. Refusé si un autre agent travaille déjà dessus.", json!({ "number": { "type": "integer" }, "agent": { "type": ["integer", "string", "null"] } }), &["number"]),
         tool("release_task", "Libère la tâche que vous avez réservée (claim_task), quand vous arrêtez sans la finir.", json!({}), &[]),
         tool("comment_task", "Ajoute un commentaire à une tâche.", json!({ "number": { "type": "integer" }, "text": { "type": "string" } }), &["number", "text"]),
         tool("search_library", "Cherche dans la bibliothèque Verse du studio (modules prêts : économie, équipes, minuteur, HUD, sauvegarde…). À faire AVANT d'écrire du Verse neuf : réutilisez un module existant quand il convient. Filtres facultatifs : query (texte du nom ou de la description), category (economie, equipes, minuteur, hud, sauvegarde, interface, jeu, outils, autre).", json!({ "query": { "type": "string" }, "category": { "type": "string" } }), &[]),
@@ -229,6 +232,7 @@ const READ_TOOLS: &[&str] = &[
     "get_library_module",
     "list_skills",
     "get_skill",
+    "list_agents",
 ];
 
 fn rpc_ok(id: Value, result: Value) -> Response {
@@ -296,6 +300,11 @@ pub async fn mcp(
         name,
         sid: String::new(),
     };
+    // Orchestrateur de la map (#112) : rôle choisi par un humain, sinon le premier agent Claude actif.
+    let orch = crate::orchestre::est(&st, agent, mid).await;
+    let permis = |n: &str| {
+        crate::roles::allows(role.as_deref(), n) || (orch && crate::orchestre::OUTILS.contains(&n))
+    };
     let method = req["method"].as_str().unwrap_or("");
     match method {
         "initialize" => rpc_ok(
@@ -304,28 +313,27 @@ pub async fn mcp(
                 "protocolVersion": req["params"]["protocolVersion"].as_str().unwrap_or("2025-06-18"),
                 "capabilities": { "tools": {} },
                 "serverInfo": { "name": "pop", "version": "0.1.0" },
-                "instructions": consignes(role.as_deref(), "Commencez par list_maps puis use_map pour choisir la map de travail (gardée par POP). Outils POP : gérer les tâches de la map (list_tasks, next_task, create_task, set_task_status, comment_task) et piloter UEFN via le relais du créateur. Avant de travailler, lisez les compétences utiles (list_skills, get_skill : la méthode de POP et les règles du studio), prenez une tâche avec next_task et passez-la en cours ; notez votre progression avec save_progress à chaque étape et avant de vous arrêter (un autre agent pourra reprendre) ; quand elle est finie, passez-la en done avec une note. Toute action UEFN est journalisée et annulable ; les suppressions attendent une validation humaine.")
+                "instructions": consignes(role.as_deref(), orch, "Commencez par list_maps puis use_map pour choisir la map de travail (gardée par POP). Outils POP : gérer les tâches de la map (list_tasks, next_task, create_task, set_task_status, comment_task) et piloter UEFN via le relais du créateur. Avant de travailler, lisez les compétences utiles (list_skills, get_skill : la méthode de POP et les règles du studio), prenez une tâche avec next_task et passez-la en cours ; notez votre progression avec save_progress à chaque étape et avant de vous arrêter (un autre agent pourra reprendre) ; quand elle est finie, passez-la en done avec une note. Toute action UEFN est journalisée et annulable ; les suppressions attendent une validation humaine.")
             }),
         ),
         m if m.starts_with("notifications/") => StatusCode::ACCEPTED.into_response(),
         "ping" => rpc_ok(id, json!({})),
         "tools/list" => rpc_ok(
             id,
-            json!({ "tools": tools().as_array().cloned().unwrap_or_default().into_iter().filter(|t| { let n = t["name"].as_str().unwrap_or(""); (scope != "read" || READ_TOOLS.contains(&n)) && crate::roles::allows(role.as_deref(), n) }).collect::<Vec<_>>() }),
+            json!({ "tools": tools().as_array().cloned().unwrap_or_default().into_iter().filter(|t| { let n = t["name"].as_str().unwrap_or(""); (scope != "read" || READ_TOOLS.contains(&n)) && permis(n) }).collect::<Vec<_>>() }),
         ),
         "tools/call" => {
             let name = req["params"]["name"].as_str().unwrap_or("");
             if scope == "read" && !READ_TOOLS.contains(&name) {
                 return rpc_ok(id, text("Cette IA est en lecture seule dans POP (IA connectées → autoriser les modifications).", true));
             }
-            if !crate::roles::allows(role.as_deref(), name) {
-                return rpc_ok(
-                    id,
-                    text(
-                        crate::roles::refus(role.as_deref().unwrap_or(""), name),
-                        true,
-                    ),
-                );
+            if !permis(name) {
+                let msg = if crate::orchestre::OUTILS.contains(&name) {
+                    crate::orchestre::refus(name)
+                } else {
+                    crate::roles::refus(role.as_deref().unwrap_or(""), name)
+                };
+                return rpc_ok(id, text(msg, true));
             }
             let args = req["params"]["arguments"].clone();
             let res = token_call(&st, &user, mid, agent, name, args.clone()).await;
@@ -364,13 +372,15 @@ pub async fn mcp(
     }
 }
 
-/// Consignes d'initialisation : celles de POP, précédées de celles du rôle de l'agent (#111).
-fn consignes(role: Option<&str>, base: &str) -> String {
+/// Consignes d'initialisation : celles de POP, précédées de celles du rôle de l'agent (#111), et du rôle
+/// d'Orchestrateur par défaut quand l'agent l'a sans l'avoir reçu d'un humain (#112).
+fn consignes(role: Option<&str>, orch: bool, base: &str) -> String {
     match role.and_then(crate::roles::get) {
         Some(r) => format!(
             "Votre rôle dans l'équipe : {}. {}\n\n{base}",
             r.nom, r.consignes
         ),
+        None if orch => format!("Vous êtes aussi l'Orchestrateur de cette map (premier agent Claude lancé) : quand l'humain fait une demande qui demande plusieurs tâches, découpez-la en tâches d'environ une heure avec plan_tasks, puis attribuez-les aux agents selon leur rôle (list_agents, assign_task). Un humain peut confier ce rôle à un autre agent.\n\n{base}"),
         None => base.to_string(),
     }
 }
@@ -517,19 +527,22 @@ async fn call_as(
             crate::agents::claim(st, agent_requis()?, mid, n).await
         }
         "release_task" => crate::agents::release(st, agent_requis()?).await,
+        "list_agents" => crate::orchestre::liste(st, mid).await,
+        "plan_tasks" => crate::orchestre::plan(st, &ctx, agent_requis()?, &a).await,
+        "assign_task" => crate::orchestre::assign(st, &ctx, agent_requis()?, &a).await,
         "save_progress" => crate::agents::save_progress(st, agent_requis()?, &a).await,
         "list_skills" => Ok(json!(crate::skills::liste(st, ctx.studio_id).await?)),
         "get_skill" => {
             crate::skills::lire(st, ctx.studio_id, a["name"].as_str().unwrap_or("")).await
         }
         "list_tasks" => {
-            let rows: Vec<(i64, String, String, String, Option<String>, Option<i64>, Option<String>, i64)> = sqlx::query_as(
-                "SELECT t.number, t.title, t.status, t.tag, u.name, t.assignee_id, t.planned_day, t.id FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id WHERE t.map_id = ? ORDER BY t.status = 'done', t.planned_day IS NULL, t.planned_day, t.number",
+            let rows: Vec<(i64, String, String, String, Option<String>, Option<i64>, Option<String>, i64, Option<String>)> = sqlx::query_as(
+                "SELECT t.number, t.title, t.status, t.tag, u.name, t.assignee_id, t.planned_day, t.id, g.name FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id LEFT JOIN api_tokens g ON g.id = t.agent_id WHERE t.map_id = ? ORDER BY t.status = 'done', t.planned_day IS NULL, t.planned_day, t.number",
             ).bind(mid).fetch_all(&st.db).await?;
             let deps: Vec<(i64, i64)> = sqlx::query_as("SELECT d.task_id, o.number FROM task_deps d JOIN tasks o ON o.id = d.depends_on JOIN tasks t ON t.id = d.task_id WHERE t.map_id = ? AND o.status != 'done'").bind(mid).fetch_all(&st.db).await?;
             let q = a["query"].as_str().unwrap_or("").to_lowercase();
             let out: Vec<Value> = rows.into_iter().filter(|r| a["status"].as_str().map(|s| s == r.2).unwrap_or(true) && (!a["mine"].as_bool().unwrap_or(false) || r.5 == Some(user.id)) && (q.is_empty() || r.1.to_lowercase().contains(&q)))
-                .take(200).map(|r| json!({ "number": r.0, "title": r.1, "status": r.2, "tag": r.3, "assignee": r.4, "planned_day": r.6, "waiting_on": deps.iter().filter(|d| d.0 == r.7).map(|d| d.1).collect::<Vec<_>>() })).collect();
+                .take(200).map(|r| json!({ "number": r.0, "title": r.1, "status": r.2, "tag": r.3, "assignee": r.4, "planned_day": r.6, "agent": r.8, "waiting_on": deps.iter().filter(|d| d.0 == r.7).map(|d| d.1).collect::<Vec<_>>() })).collect();
             Ok(json!(out))
         }
         "get_task" => {
@@ -553,6 +566,7 @@ async fn call_as(
                 let p = crate::agents::pour_next_task(st, ag, mid).await?;
                 r["ta_tache"] = p["ta_tache"].clone();
                 r["a_reprendre"] = p["a_reprendre"].clone();
+                r["attribuees"] = p["attribuees"].clone();
             }
             Ok(r)
         }
@@ -1870,6 +1884,214 @@ mod tests_compte {
             .await,
             Err(AppError::NotFound)
         ));
+    }
+
+    /// Agent de test sur la map `map` : type et rôle donnés ; `il_y_a` : heure de son dernier appel (SQLite).
+    async fn agent(
+        m: &Monde,
+        map: i64,
+        nom: &str,
+        kind: &str,
+        role: Option<&str>,
+        il_y_a: &str,
+    ) -> (String, i64) {
+        let t = format!("pop_test_{}", random_token());
+        let id: i64 = sqlx::query_scalar("INSERT INTO api_tokens (user_id, map_id, name, token_hash, kind, role, created_at, last_used) VALUES (?, ?, ?, ?, ?, ?, datetime('now', ?), datetime('now', ?)) RETURNING id")
+            .bind(m.uid).bind(map).bind(nom).bind(sha256_hex(&t)).bind(kind).bind(role).bind(il_y_a).bind(il_y_a)
+            .fetch_one(&m.st.db).await.unwrap();
+        (t, id)
+    }
+
+    async fn outils_visibles(st: &AppState, token: &str) -> String {
+        let mut h = HeaderMap::new();
+        h.insert("authorization", format!("Bearer {token}").parse().unwrap());
+        let r = mcp(
+            State(st.clone()),
+            h,
+            axum::extract::Query(McpQ { token: None }),
+            Json(json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/list" })),
+        )
+        .await;
+        String::from_utf8(
+            axum::body::to_bytes(r.into_body(), usize::MAX)
+                .await
+                .unwrap()
+                .to_vec(),
+        )
+        .unwrap()
+    }
+
+    /// #112, critères 1 et 2 : l'Orchestrateur (premier Claude lancé) crée 3 tâches liées et les attribue à deux
+    /// agents, qui les voient avec next_task ; les autres agents ne peuvent ni planifier ni attribuer.
+    #[tokio::test]
+    async fn orchestrateur_planifie_et_attribue() {
+        let m = monde().await;
+        let (orch, _) = agent(
+            &m,
+            m.equipe,
+            "Claude chef",
+            "claude_code",
+            None,
+            "-30 minutes",
+        )
+        .await;
+        let (verse, _) = agent(
+            &m,
+            m.equipe,
+            "Codex Verse",
+            "codex",
+            Some("codeur_verse"),
+            "-5 minutes",
+        )
+        .await;
+        let (ld, ld_id) = agent(
+            &m,
+            m.equipe,
+            "Claude niveau",
+            "claude_code",
+            Some("level_designer"),
+            "-5 minutes",
+        )
+        .await;
+        let (err, txt) = mcp_call(&m.st, &orch, "plan_tasks", json!({ "tasks": [
+            { "key": "zone", "title": "Poser la zone de capture", "tag": "carte", "agent": "Claude niveau" },
+            { "key": "score", "title": "Compter les captures en Verse", "depends_on": ["zone"], "agent": "Codex Verse" },
+            { "title": "Afficher le score", "depends_on": ["score", 1], "agent": ld_id },
+        ] })).await;
+        assert!(!err, "{txt}");
+        let v: Value = serde_json::from_str(&txt).unwrap();
+        let n: Vec<i64> = v["tasks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|t| t["number"].as_i64().unwrap())
+            .collect();
+        assert_eq!(n, vec![2, 3, 4]);
+        // Dépendances : 3 attend 2, 4 attend 3 et 1.
+        let deps: Vec<(i64, i64)> = sqlx::query_as("SELECT t.number, o.number FROM task_deps d JOIN tasks t ON t.id = d.task_id JOIN tasks o ON o.id = d.depends_on WHERE t.map_id = ? ORDER BY 1, 2")
+            .bind(m.equipe).fetch_all(&m.st.db).await.unwrap();
+        assert_eq!(deps, vec![(3, 2), (4, 1), (4, 3)]);
+        // Chacun voit les siennes avec next_task.
+        let (_, txt) = mcp_call(&m.st, &verse, "next_task", json!({})).await;
+        let v: Value = serde_json::from_str(&txt).unwrap();
+        assert_eq!(v["attribuees"][0]["number"], 3, "{txt}");
+        assert_eq!(v["attribuees"][0]["waiting_on"], json!([2]));
+        let (_, txt) = mcp_call(&m.st, &ld, "next_task", json!({})).await;
+        let v: Value = serde_json::from_str(&txt).unwrap();
+        let siennes: Vec<i64> = v["attribuees"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|t| t["number"].as_i64().unwrap())
+            .collect();
+        assert_eq!(siennes, vec![2, 4], "{txt}");
+        // Une tâche attribuée ne se réserve que par son agent.
+        let (err, msg) = mcp_call(&m.st, &verse, "claim_task", json!({ "number": 2 })).await;
+        assert!(
+            err && msg.contains("attribuée à l'agent « Claude niveau »"),
+            "{msg}"
+        );
+        let (err, msg) = mcp_call(&m.st, &ld, "claim_task", json!({ "number": 2 })).await;
+        assert!(!err, "{msg}");
+        // Critère 2 : un agent qui n'est pas l'Orchestrateur ne peut pas attribuer, ni planifier.
+        for (t, outil, args) in [
+            (
+                &verse,
+                "assign_task",
+                json!({ "number": 4, "agent": "Codex Verse" }),
+            ),
+            (&ld, "plan_tasks", json!({ "tasks": [{ "title": "Non" }] })),
+        ] {
+            let (err, msg) = mcp_call(&m.st, t, outil, args).await;
+            assert!(
+                err && msg.contains("réservé à l'Orchestrateur"),
+                "{outil} : {msg}"
+            );
+            assert!(!outils_visibles(&m.st, t).await.contains(outil));
+        }
+        assert!(outils_visibles(&m.st, &orch).await.contains("assign_task"));
+        // On n'arrache pas une tâche en cours ; une tâche libre se réattribue, et l'historique le garde.
+        let (err, msg) = mcp_call(
+            &m.st,
+            &orch,
+            "assign_task",
+            json!({ "number": 2, "agent": "Codex Verse" }),
+        )
+        .await;
+        assert!(
+            err && msg.contains("en cours chez l'agent « Claude niveau »"),
+            "{msg}"
+        );
+        let (err, msg) = mcp_call(
+            &m.st,
+            &orch,
+            "assign_task",
+            json!({ "number": 4, "agent": null }),
+        )
+        .await;
+        assert!(!err, "{msg}");
+        let (err, msg) = mcp_call(&m.st, &verse, "claim_task", json!({ "number": 4 })).await;
+        assert!(!err, "{msg}");
+        let hist: Vec<String> = sqlx::query_scalar("SELECT e.what FROM task_events e JOIN tasks t ON t.id = e.task_id WHERE t.map_id = ? AND t.number = 4 ORDER BY e.id")
+            .bind(m.equipe).fetch_all(&m.st.db).await.unwrap();
+        assert!(
+            hist.iter()
+                .any(|h| h.starts_with("Attribuée à l'agent « Claude niveau »"))
+                && hist.iter().any(|h| h.starts_with("Rendue libre")),
+            "{hist:?}"
+        );
+        // Un plan invalide ne crée rien.
+        let (err, msg) = mcp_call(
+            &m.st,
+            &orch,
+            "plan_tasks",
+            json!({ "tasks": [{ "title": "A" }, { "title": "B", "depends_on": ["inconnue"] }] }),
+        )
+        .await;
+        assert!(err && msg.contains("dépendance"), "{msg}");
+        assert_eq!(
+            q(
+                &m.st,
+                &format!("SELECT COUNT(*) FROM tasks WHERE map_id = {}", m.equipe)
+            )
+            .await,
+            4
+        );
+    }
+
+    /// Décision du 24/11 : le premier Claude lancé et actif est l'Orchestrateur ; s'il s'arrête, le Claude suivant
+    /// reprend ; un rôle « Orchestrateur » donné par un humain passe avant.
+    #[tokio::test]
+    async fn qui_est_orchestrateur() {
+        let m = monde().await;
+        let (_, premier) =
+            agent(&m, m.equipe, "Claude 1", "claude_desktop", None, "-3 hours").await;
+        let (_, second) = agent(&m, m.equipe, "Claude 2", "claude_code", None, "-1 hours").await;
+        agent(&m, m.equipe, "Codex", "codex", None, "-1 minutes").await;
+        // Claude 1 est silencieux depuis 3 h : Claude 2 reprend.
+        assert_eq!(
+            crate::orchestre::de_la_map(&m.st, m.equipe).await.unwrap(),
+            Some(second)
+        );
+        sqlx::query("UPDATE api_tokens SET last_used = datetime('now') WHERE id = ?")
+            .bind(premier)
+            .execute(&m.st.db)
+            .await
+            .unwrap();
+        assert_eq!(
+            crate::orchestre::de_la_map(&m.st, m.equipe).await.unwrap(),
+            Some(premier)
+        );
+        // Choix d'un humain : le Codex devient Orchestrateur.
+        sqlx::query("UPDATE api_tokens SET role = 'orchestrateur' WHERE name = 'Codex'")
+            .execute(&m.st.db)
+            .await
+            .unwrap();
+        let codex: i64 = q(&m.st, "SELECT id FROM api_tokens WHERE name = 'Codex'").await;
+        assert_eq!(
+            crate::orchestre::de_la_map(&m.st, m.equipe).await.unwrap(),
+            Some(codex)
+        );
     }
 
     /// #298, critère 5 : next_task ne propose pas une tâche dont une dépendance n'est pas faite.

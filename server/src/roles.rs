@@ -21,6 +21,7 @@ const COMMUNS: &[&str] = &[
     "list_skills",
     "get_skill",
     "comment_task",
+    "list_agents",
 ];
 
 /// Ce qu'un agent fait de ses tâches : réserver, passer en cours ou fini, signaler un problème par une tâche.
@@ -51,8 +52,8 @@ pub const ROLES: &[Role] = &[
     Role {
         id: "orchestrateur",
         nom: "Orchestrateur",
-        consignes: "Vous êtes l'Orchestrateur de l'équipe. Vous ne codez pas et ne touchez pas au niveau : vous transformez la demande de l'humain en tâches POP d'environ une heure, liées par leurs dépendances (create_task, set_task_lot), vous suivez l'avancement (list_tasks) et vous relisez ce que les autres agents ont fait (commentaires des tâches). Quand une tâche bloque, commentez-la et prévenez l'humain.",
-        outils: &[TACHES, &["set_task_lot"]],
+        consignes: "Vous êtes l'Orchestrateur de l'équipe. Vous ne codez pas et ne touchez pas au niveau : vous transformez la demande de l'humain en tâches POP d'environ une heure, liées par leurs dépendances (plan_tasks), vous les attribuez aux agents selon leur rôle (list_agents, assign_task), vous suivez l'avancement (list_tasks) et vous relisez ce que les autres agents ont fait (commentaires des tâches). Quand une tâche bloque, commentez-la et prévenez l'humain.",
+        outils: &[TACHES, &["set_task_lot"], crate::orchestre::OUTILS],
     },
     Role {
         id: "codeur_verse",
@@ -118,7 +119,8 @@ pub fn get(id: &str) -> Option<&'static Role> {
 /// L'outil est-il permis à ce rôle ? Un agent sans rôle (ou un rôle inconnu) a tous les outils.
 pub fn allows(role: Option<&str>, tool: &str) -> bool {
     match role.and_then(get) {
-        None => true,
+        // Sans rôle : tout, sauf l'orchestration, que mcp.rs n'ouvre qu'à l'Orchestrateur par défaut de la map.
+        None => !crate::orchestre::OUTILS.contains(&tool),
         Some(r) => COMMUNS.contains(&tool) || r.outils.iter().any(|g| g.contains(&tool)),
     }
 }
@@ -135,8 +137,12 @@ mod tests {
 
     #[test]
     fn droits() {
-        // Sans rôle : tout.
-        assert!(allows(None, "delete_actors"));
+        // Sans rôle : tout, sauf l'orchestration.
+        assert!(allows(None, "delete_actors") && !allows(None, "assign_task"));
+        assert!(
+            allows(Some("orchestrateur"), "plan_tasks")
+                && !allows(Some("codeur_verse"), "assign_task")
+        );
         // Le Relecteur ne modifie rien.
         for t in [
             "write_verse_file",

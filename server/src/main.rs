@@ -28,6 +28,7 @@ mod mcp;
 mod model;
 mod money;
 mod oauth;
+mod orchestre;
 mod pages;
 mod plan;
 mod privstats;

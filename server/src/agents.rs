@@ -30,6 +30,7 @@ pub async fn list(
     .bind(mid)
     .fetch_all(&st.db)
     .await?;
+    let orch = crate::orchestre::de_la_map(&st, mid).await?;
     let mut out = vec![];
     for r in rows {
         // Étape de la tâche (#298) : écrit, compilé, testé, relu.
@@ -40,14 +41,19 @@ pub async fn list(
         out.push(json!({
             "id": r.0, "name": r.1, "kind": r.2, "owner": r.3, "scope": r.4, "last_used": r.5, "calls": r.6,
             "task": r.7.map(|n| json!({ "number": n, "title": r.8, "status": r.9, "since": r.10, "step": step })),
-            "last_action": r.11, "role": r.13,
+            "last_action": r.11, "role": r.13, "orchestrator": Some(r.0) == orch,
         }));
     }
     Ok(Json(json!(out)))
 }
 
 /// Événement d'agent dans l'historique de la tâche (« IA ») et rafraîchissement du kanban du site (#298).
-async fn evenement(st: &AppState, agent: i64, task_id: i64, quoi: &str) -> Result<(), AppError> {
+pub(crate) async fn evenement(
+    st: &AppState,
+    agent: i64,
+    task_id: i64,
+    quoi: &str,
+) -> Result<(), AppError> {
     let r: Option<(i64, String, i64)> = sqlx::query_as(
         "SELECT a.user_id, a.name, t.map_id FROM api_tokens a, tasks t WHERE a.id = ? AND t.id = ?",
     )
@@ -321,7 +327,26 @@ pub async fn pour_next_task(st: &AppState, agent: i64, mid: i64) -> Result<Value
     for (id, n, titre) in libres {
         a_reprendre.push(json!({ "number": n, "title": titre, "reprise": reprise(st, id).await? }));
     }
-    Ok(json!({ "ta_tache": mienne, "a_reprendre": a_reprendre }))
+    // #112 : tâches que l'Orchestrateur a attribuées à cet agent, pas encore faites, avec ce qu'elles attendent.
+    let a_moi: Vec<(i64, i64, String, String)> = sqlx::query_as(
+        "SELECT t.id, t.number, t.title, t.status FROM tasks t WHERE t.map_id = ? AND t.agent_id = ? AND t.status <> 'done' ORDER BY t.number LIMIT 20",
+    )
+    .bind(mid)
+    .bind(agent)
+    .fetch_all(&st.db)
+    .await?;
+    let mut attribuees = vec![];
+    for (id, n, titre, statut) in a_moi {
+        let attend: Vec<i64> = sqlx::query_scalar(
+            "SELECT o.number FROM task_deps d JOIN tasks o ON o.id = d.depends_on WHERE d.task_id = ? AND o.status <> 'done' ORDER BY o.number",
+        )
+        .bind(id)
+        .fetch_all(&st.db)
+        .await?;
+        attribuees
+            .push(json!({ "number": n, "title": titre, "status": statut, "waiting_on": attend }));
+    }
+    Ok(json!({ "ta_tache": mienne, "a_reprendre": a_reprendre, "attribuees": attribuees }))
 }
 
 /// `claim_task` : l'agent réserve la tâche n° `number` de la map (et libère sa tâche précédente).
@@ -337,6 +362,19 @@ pub async fn claim(st: &AppState, agent: i64, mid: i64, number: i64) -> Result<V
         t.ok_or_else(|| bad(format!("Tâche #{number} introuvable dans cette map.")))?;
     if status == "done" {
         return Err(bad(format!("La tâche #{number} est déjà faite.")));
+    }
+    // #112 : une tâche attribuée par l'Orchestrateur ne se réserve que par son agent.
+    let attribuee: Option<(i64, String)> = sqlx::query_as(
+        "SELECT a.id, a.name FROM tasks t JOIN api_tokens a ON a.id = t.agent_id WHERE t.id = ? AND a.id <> ?",
+    )
+    .bind(tid)
+    .bind(agent)
+    .fetch_optional(&st.db)
+    .await?;
+    if let Some((_, nom)) = attribuee {
+        return Err(AppError::Conflict(format!(
+            "La tâche #{number} est attribuée à l'agent « {nom} » par l'Orchestrateur. Prenez une de vos tâches (next_task)."
+        )));
     }
     let autre: Option<(i64, String, String)> = sqlx::query_as(
         "SELECT a.id, a.name, u.name FROM api_tokens a JOIN users u ON u.id = a.user_id WHERE a.task_id = ? AND a.id <> ?",
