@@ -3,6 +3,14 @@
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
 ```
+EN REVUE | #164 UEFN : poser des props en grille et les relier à un appareil Verse | 24/11 18:30
+Owner : Kl1600 | Sur la tâche : Claude Code, pour Kl1600
+Fait : place_grid (action actor_grid, PY_GRID, rows × cols ≤ 2 000, ordre ligne par ligne, retrait de tout le lot en cas d'erreur, annulation = actor_delete du lot) ; update_actors per_actor [{id, changes}] (2 000 max) ; props vers des acteurs ({"$acteurs": [...], "liste"}) reliés par le relais (refPath direct, sinon sous-objets Devices_* via PY_WRAP, relu par GetDeviceProperties) ; tests serveur et relais, scripts Python essayés sur un faux module unreal
+Reste : test avec le vrai UEFN (4 critères) ; recompiler pop-link.exe sous Windows et le copier dans web/public/downloads (sinon le CI de main passe au rouge)
+Bloque : rien
+```
+
+```
 FAIT | #148 MCP · Construire le décor d'une map | 23/11 22:30
 Owner : benybens | Sur la tâche : Claude Code, pour benybens
 Fait : place_mesh (mesh_spawn), get/set_island_settings, mesh importé en Verse par Scene Graph (KB/UEFN.md)

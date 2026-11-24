@@ -177,6 +177,7 @@ async fn etape(st: &AppState, agent: i64, task_id: i64) -> Result<Option<&'stati
         "duplicate_actors",
         "place_device",
         "place_mesh",
+        "place_grid",
         "import_asset",
         "set_island_settings",
     ]) {

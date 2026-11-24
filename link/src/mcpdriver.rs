@@ -322,6 +322,15 @@ impl Mcp {
     pub async fn patch(&mut self, patches: &Value) -> Result<()> {
         // Options d'appareils : DeviceToolset d'UEFN quand il existe, sinon outil trouvé par mots-clés, sinon Python.
         let mut patches = patches.clone();
+        let relie_des_acteurs = patches.as_array().into_iter().flatten().any(|p| {
+            p["changes"]["props"]
+                .as_object()
+                .map(|m| m.values().any(|v| v.get("$acteurs").is_some()))
+                .unwrap_or(false)
+        });
+        if relie_des_acteurs && self.known("verse_props_set").is_none() {
+            bail!("UEFN n'expose pas SetDeviceProperty : impossible de relier des acteurs à un réglage Verse (voir pop-link diagnostic).");
+        }
         if self.device_tools() {
             let mut classes: HashMap<String, String> = HashMap::new();
             if let Ok(list) = self.list_actors().await {
@@ -344,6 +353,18 @@ impl Mcp {
                             .map(|c| c.contains("verse") || c.contains("scriptdevice"))
                             .unwrap_or(false);
                     for (k, v) in &m {
+                        // Réglage Verse vers des acteurs du niveau (#164) : POP crée les références attendues.
+                        if let Some(ids) = v.get("$acteurs").and_then(|x| x.as_array()) {
+                            let ids: Vec<String> = ids
+                                .iter()
+                                .filter_map(|x| x.as_str().map(String::from))
+                                .collect();
+                            let liste = v["liste"].as_bool().unwrap_or(true);
+                            self.relier(&id, k, &ids, liste)
+                                .await
+                                .map_err(|e| anyhow!("réglage {k} : {e}"))?;
+                            continue;
+                        }
                         // Un appareil Verse a ses réglages @editable et aussi des options classiques
                         // (« Enabled at Game Start »…) : on tente le réglage Verse, puis l'option classique.
                         let mut err = None;
@@ -411,6 +432,86 @@ impl Mcp {
             bail!("UEFN a refusé ces options : {}", f.replace('|', " ; "));
         }
         Ok(())
+    }
+
+    /// Relie des acteurs du niveau au réglage Verse `k` de l'appareil `dev` (#164), dans l'ordre donné.
+    /// 1. Références directes `{refPath: acteur}` : ce qu'attend un réglage vers un appareil (`[]mutator_zone_device`).
+    /// 2. Sinon, sous-objets `Devices_creative_prop_N` dont `SavedActor` pointe vers l'acteur : ce qu'attend un
+    ///    `creative_prop` (KB/UEFN.md). UEFN peut accepter une valeur invalide et garder `null` : on relit toujours.
+    async fn relier(&mut self, dev: &str, k: &str, ids: &[String], liste: bool) -> Result<()> {
+        let set = self
+            .known("verse_props_set")
+            .ok_or_else(|| anyhow!("UEFN n'expose pas SetDeviceProperty."))?;
+        let valeur = |refs: Vec<Value>| -> Value {
+            if liste {
+                json!(refs)
+            } else {
+                refs.into_iter().next().unwrap_or(Value::Null)
+            }
+        };
+        let direct = valeur(ids.iter().map(|i| json!({ "refPath": i })).collect());
+        let premier = self
+            .call_tool(&set, json!({ "device": { "refPath": dev }, "propertyName": k, "value": direct.to_string() }))
+            .await;
+        if premier.is_ok() && compte_refs(&self.lire_prop(dev, k).await?, liste) == ids.len() {
+            return Ok(());
+        }
+        let erreur = premier.err().map(|e| e.to_string()).unwrap_or_default();
+        let existants: Vec<String> = refs_de(&self.lire_prop(dev, k).await.unwrap_or(Value::Null));
+        let args = json!({ "device": dev, "ids": ids, "existants": existants, "erreur": erreur })
+            .to_string();
+        let code = format!("ARGS = {}\n{}", serde_json::to_string(&args)?, PY_WRAP);
+        let out = self.python(&code).await?;
+        let line = out
+            .lines()
+            .rev()
+            .find_map(|l| l.trim().strip_prefix("WRAPPED=").map(String::from))
+            .ok_or_else(|| anyhow!("UEFN n'a pas créé les références : {}", out.trim()))?;
+        let wrapped: Vec<String> = serde_json::from_str(&line)?;
+        let v = valeur(wrapped.iter().map(|w| json!({ "refPath": w })).collect());
+        self.call_tool(
+            &set,
+            json!({ "device": { "refPath": dev }, "propertyName": k, "value": v.to_string() }),
+        )
+        .await?;
+        let relus = compte_refs(&self.lire_prop(dev, k).await?, liste);
+        if relus != ids.len() {
+            bail!("UEFN n'a gardé que {relus} référence(s) sur {} : vérifiez le type du réglage (creative_prop ou appareil).", ids.len());
+        }
+        Ok(())
+    }
+
+    /// Valeur actuelle d'un réglage Verse d'un appareil (`GetDeviceProperties`).
+    async fn lire_prop(&mut self, dev: &str, k: &str) -> Result<Value> {
+        let get = self
+            .known("verse_props_get")
+            .ok_or_else(|| anyhow!("UEFN n'expose pas GetDeviceProperties."))?;
+        let txt = self
+            .call_tool(
+                &get,
+                json!({ "device": { "refPath": dev }, "propertyNames": [k] }),
+            )
+            .await?;
+        Ok(valeur_prop(
+            &serde_json::from_str(txt.trim()).unwrap_or(Value::Null),
+            k,
+        ))
+    }
+
+    /// Pose une grille de props ou d'appareils (#164) ; rend les identifiants ligne par ligne.
+    pub async fn grid(&mut self, args: &Value) -> Result<Vec<String>> {
+        let code = format!(
+            "ARGS = {}\n{}",
+            serde_json::to_string(&args.to_string())?,
+            PY_GRID
+        );
+        let out = self.python(&code).await?;
+        let line = out
+            .lines()
+            .rev()
+            .find_map(|l| l.trim().strip_prefix("GRID=").map(String::from))
+            .ok_or_else(|| anyhow!("UEFN n'a pas confirmé la grille : {}", out.trim()))?;
+        Ok(serde_json::from_str(&line)?)
     }
 
     /// Pose un appareil et rend l'identifiant de l'acteur créé.
@@ -1218,6 +1319,131 @@ while reste:
 print('DELETED')
 "#;
 
+/// Valeur du réglage `k` dans une réponse de `GetDeviceProperties` : `{k: v}`, `{properties: {k: v}}` ou
+/// `[{name, value}]`.
+fn valeur_prop(r: &Value, k: &str) -> Value {
+    match r {
+        Value::Array(l) => l
+            .iter()
+            .find(|p| p["name"].as_str().or(p["propertyName"].as_str()) == Some(k))
+            .and_then(|p| p.get("value").cloned())
+            .unwrap_or(Value::Null),
+        Value::Object(m) => m
+            .get("properties")
+            .and_then(|p| p.get(k))
+            .or_else(|| m.get(k))
+            .cloned()
+            .unwrap_or(Value::Null),
+        _ => Value::Null,
+    }
+}
+
+/// Nombre de références non vides relues : éléments non nuls d'une liste, ou 1 pour une référence seule.
+fn compte_refs(v: &Value, liste: bool) -> usize {
+    match v {
+        Value::Array(l) if liste => l.iter().filter(|x| !x.is_null()).count(),
+        Value::Null => 0,
+        _ if !liste => 1,
+        _ => 0,
+    }
+}
+
+/// Chemins des références déjà présentes (`{refPath}` ou texte), pour retrouver la classe et le parent des sous-objets.
+fn refs_de(v: &Value) -> Vec<String> {
+    let un = |x: &Value| {
+        x["refPath"]
+            .as_str()
+            .or(x.as_str())
+            .map(String::from)
+            .filter(|s| !s.is_empty())
+    };
+    match v {
+        Value::Array(l) => l.iter().filter_map(un).collect(),
+        other => un(other).into_iter().collect(),
+    }
+}
+
+/// Grille (#164) : `asset` (classe ou asset du Content Browser) ou `like` (acteur du niveau copié avec ses réglages).
+/// Case (i, j) : origine + j × step[0] en X, + i × step[1] en Y. Une erreur en cours de route retire ce qui a été posé.
+const PY_GRID: &str = r#"import unreal, json
+sub = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+A = json.loads(ARGS)
+src = None
+obj = None
+if A.get('like'):
+    src = [a for a in sub.get_all_level_actors() if a.get_path_name() == A['like']]
+    if not src: raise Exception('Modèle introuvable dans le niveau : ' + A['like'])
+else:
+    obj = unreal.EditorAssetLibrary.load_asset(A['asset']) or unreal.load_class(None, A['asset'])
+    if obj is None: raise Exception('Asset introuvable : ' + A['asset'])
+o = A['origin']; s = A['step']; rot = A.get('rotation'); sc = A.get('scale')
+r = unreal.Rotator(roll=rot[2], pitch=rot[0], yaw=rot[1]) if rot else unreal.Rotator(0, 0, 0)
+ids = []
+faits = []
+try:
+    with unreal.ScopedEditorTransaction('POP grille'):
+        for i in range(A['rows']):
+            for j in range(A['cols']):
+                loc = unreal.Vector(o[0] + j * s[0], o[1] + i * s[1], o[2])
+                if src: act = (sub.duplicate_actors(src, None, unreal.Vector(0, 0, 0)) or [None])[0]
+                else: act = sub.spawn_actor_from_object(obj, loc, r)
+                if act is None: raise Exception('UEFN refuse de poser la case ' + str(i) + ', ' + str(j))
+                faits.append(act)
+                act.set_actor_location(loc, False, False)
+                if rot or src is None: act.set_actor_rotation(r, False)
+                if sc: act.set_actor_scale3d(unreal.Vector(*sc))
+                if A.get('name'): act.set_actor_label(A['name'].replace('{i}', str(i)).replace('{j}', str(j)))
+                if A.get('folder'): act.set_folder_path(A['folder'])
+                ids.append(act.get_path_name())
+except Exception:
+    if faits: sub.destroy_actors(faits)
+    raise
+print('GRID=' + json.dumps(ids))
+"#;
+
+/// Sous-objets de référence d'un réglage Verse vers des props (#164, KB « Réglage @editable vers des props ») :
+/// classe et parent repris d'une référence existante, sinon classe nommée par le refus d'UEFN et parent
+/// `<appareil>.<classe Verse>_0`. Chaque sous-objet pointe vers son acteur par `SavedActor`.
+const PY_WRAP: &str = r#"import unreal, json, re
+sub = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+A = json.loads(ARGS)
+by_id = {a.get_path_name(): a for a in sub.get_all_level_actors()}
+dev = by_id.get(A['device'])
+if dev is None: raise Exception('Appareil introuvable : ' + A['device'])
+cls = None
+outer = None
+for r in A['existants']:
+    x = unreal.find_object(None, r)
+    if x:
+        cls = x.get_class(); outer = x.get_outer(); break
+if cls is None:
+    m = re.search(r'(Devices_\w+)', A.get('erreur') or '')
+    nom = m.group(1) if m else 'Devices_creative_prop'
+    cls = unreal.load_class(None, '/VerseDevices/_Verse/VNI/VerseDevices.' + nom)
+    if cls is None: raise Exception('Type de référence introuvable : ' + nom)
+if outer is None:
+    c = dev.get_class().get_name()
+    for n in [c + '_0', (c[:-2] + '_0') if c.endswith('_C') else '']:
+        x = unreal.find_object(None, A['device'] + '.' + n) if n else None
+        if x:
+            outer = x; break
+if outer is None:
+    raise Exception("objet Verse de l'appareil introuvable : reliez une première case à la main (pipette du panneau Détails), puis réessayez")
+base = cls.get_name()
+n = 0
+out = []
+with unreal.ScopedEditorTransaction('POP références'):
+    for i in A['ids']:
+        act = by_id.get(i)
+        if act is None: raise Exception('Acteur introuvable : ' + i)
+        while unreal.find_object(None, outer.get_path_name() + '.' + base + '_' + str(n)): n += 1
+        w = unreal.new_object(cls, outer=outer, name=base + '_' + str(n))
+        w.set_editor_property('SavedActor', act)
+        out.append(w.get_path_name())
+        n += 1
+print('WRAPPED=' + json.dumps(out))
+"#;
+
 const PY_DUP: &str = r#"import unreal, json
 sub = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 src = [a for a in sub.get_all_level_actors() if a.get_path_name() in IDS]
@@ -1268,6 +1494,27 @@ mod t {
         );
         assert_eq!(super::unwrap_return(r#"{"returnValue":[1,2]}"#), "[1,2]");
         assert_eq!(super::unwrap_return("texte"), "texte");
+    }
+
+    #[test]
+    fn references_relues() {
+        use serde_json::json;
+        let r = json!({ "casesHerbe": [{ "refPath": "D.V_0.Devices_creative_prop_0" }, null] });
+        let v = super::valeur_prop(&r, "casesHerbe");
+        assert_eq!(super::compte_refs(&v, true), 1);
+        assert_eq!(super::refs_de(&v), vec!["D.V_0.Devices_creative_prop_0"]);
+        let r = json!([{ "name": "cible", "value": { "refPath": "Z" } }]);
+        assert_eq!(
+            super::compte_refs(&super::valeur_prop(&r, "cible"), false),
+            1
+        );
+        assert_eq!(
+            super::compte_refs(
+                &super::valeur_prop(&json!({ "cible": null }), "cible"),
+                false
+            ),
+            0
+        );
     }
 
     #[test]

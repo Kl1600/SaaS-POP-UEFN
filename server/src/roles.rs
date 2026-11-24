@@ -74,6 +74,7 @@ pub const ROLES: &[Role] = &[
                 "delete_actors",
                 "place_device",
                 "place_mesh",
+                "place_grid",
                 "set_island_settings",
                 "get_island_settings",
                 "import_asset",
