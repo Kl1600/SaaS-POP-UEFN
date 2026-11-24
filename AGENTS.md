@@ -145,11 +145,15 @@ Une branche longue qui mélange plusieurs sujets ne se relit pas, ne se teste pa
 - **Style** : inspiré du template Addveo (barre latérale noire, grand panneau blanc arrondi, cartes blanches
   bordées), sobre, noir et blanc, thèmes clair et sombre. **Pas de violet.**
 - **Pas de données de démo ni de simulation** : tout ce qu'on voit est réel et testable.
-- **L'IA de POP reste locale** (`server/src/engine.rs`, algorithmes) : aucun appel à une API d'IA externe.
+- **IA externe seulement en option** : l'IA de POP reste locale (`server/src/engine.rs`, algorithmes) ; une IA
+  externe n'intervient qu'en option, choisie par l'utilisateur : son IA connectée par MCP, ou les crédits IA POP
+  (`server/src/aipop.rs`). Rien dans POP ne doit en dépendre (décision du 24/11).
 - **Sécurité** : requêtes SQL paramétrées ; chaque route vérifie l'appartenance au studio et le rôle ; en-tête
   anti-CSRF `x-pop: 1` sur toute requête autre que GET ; jamais de secret dans un fichier, une issue ou un commit.
 - **UEFN** : chaque action est journalisée et annulable ; rien sur un fichier ou un acteur verrouillé dans Lore par
-  un autre ; une suppression demandée par une IA attend la validation d'un humain.
+  un autre ; une suppression demandée par une IA attend la validation d'un humain, sauf si un admin du studio a
+  activé « Les IA peuvent supprimer seules » (réglage par studio, décision du 24/11) : elle reste alors journalisée et
+  restaurable.
 - **Base de données** : une table ou une colonne = une **nouvelle** migration numérotée à la suite dans
   `server/migrations/`. On ne modifie jamais une migration existante (le CI le refuse).
 - **`web/dist` est versionné** : après un changement dans `web/`, reconstruisez (`npm run build`) et commitez
