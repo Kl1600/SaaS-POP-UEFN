@@ -10,6 +10,7 @@ mod announce;
 mod auth;
 mod billing;
 mod boards;
+mod builds;
 mod catalog;
 mod checks;
 mod discover;
@@ -591,6 +592,8 @@ fn api() -> Router<AppState> {
         .route("/api/maps/{mid}/verse/file", get(verse::file))
         .route("/api/maps/{mid}/verse/all", get(verse::all_contents))
         .route("/api/maps/{mid}/verse/versions", get(verse::versions))
+        .route("/api/maps/{mid}/verse/builds", get(builds::liste))
+        .route("/api/verse-builds/{id}/restore", post(builds::restaurer))
         .route("/api/verse-versions/{id}", get(verse::version))
         .route("/api/verse-versions/{id}/revert", post(verse::revert))
         .route("/api/maps/{mid}/verse/symbols", get(verse::symbols))
