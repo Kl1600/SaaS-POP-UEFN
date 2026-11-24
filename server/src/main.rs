@@ -27,6 +27,7 @@ mod manage;
 mod mcp;
 mod model;
 mod money;
+mod oauth;
 mod pages;
 mod plan;
 mod privstats;
@@ -104,6 +105,35 @@ pub async fn test_state() -> AppState {
 
 /// Protection CSRF : toute requête qui modifie des données doit porter l'en-tête « X-POP: 1 »,
 /// qu'un autre site ne peut pas ajouter sans autorisation CORS (que l'on ne donne jamais).
+/// CORS des points publics de connexion des IA (#285) : sans cookie, donc sans risque pour les comptes.
+async fn cors_public(req: Request<Body>, next: Next) -> Response {
+    if !oauth::is_public_path(req.uri().path()) {
+        return next.run(req).await;
+    }
+    let mut res = if req.method() == Method::OPTIONS {
+        StatusCode::NO_CONTENT.into_response()
+    } else {
+        next.run(req).await
+    };
+    let h = res.headers_mut();
+    h.insert("access-control-allow-origin", "*".parse().unwrap());
+    h.insert(
+        "access-control-allow-methods",
+        "GET, POST, OPTIONS".parse().unwrap(),
+    );
+    h.insert(
+        "access-control-allow-headers",
+        "authorization, content-type, mcp-protocol-version, mcp-session-id"
+            .parse()
+            .unwrap(),
+    );
+    h.insert(
+        "access-control-expose-headers",
+        "www-authenticate, mcp-session-id".parse().unwrap(),
+    );
+    res
+}
+
 async fn csrf(req: Request<Body>, next: Next) -> Response {
     let m = req.method().clone();
     // HTTPS forcé : derrière le proxy (Caddy, Nginx, Cloudflare…), une requête arrivée en http est renvoyée en https.
@@ -142,6 +172,7 @@ async fn csrf(req: Request<Body>, next: Next) -> Response {
         && !path.starts_with("/api/hooks/")
         && !path.starts_with("/api/relay/")
         && path != "/mcp"
+        && !(path.starts_with("/oauth/") && path != "/oauth/authorize")
     {
         let ok = req.headers().get("x-pop").and_then(|v| v.to_str().ok()) == Some("1");
         if !ok {
@@ -582,6 +613,30 @@ fn api() -> Router<AppState> {
         .route("/api/tokens/{id}/scope", post(mcp::set_scope))
         .route("/api/tokens/{id}", delete(mcp::delete_token))
         .route("/mcp", post(mcp::mcp))
+        .route(
+            "/.well-known/oauth-protected-resource",
+            get(oauth::protected_resource),
+        )
+        .route(
+            "/.well-known/oauth-protected-resource/mcp",
+            get(oauth::protected_resource),
+        )
+        .route(
+            "/.well-known/oauth-authorization-server",
+            get(oauth::authorization_server),
+        )
+        .route(
+            "/.well-known/oauth-authorization-server/mcp",
+            get(oauth::authorization_server),
+        )
+        .route("/oauth/register", post(oauth::register))
+        .route("/oauth/authorize", get(oauth::authorize_start))
+        .route("/oauth/token", post(oauth::token))
+        .route("/oauth/revoke", post(oauth::revoke))
+        .route(
+            "/api/oauth/authorize",
+            get(oauth::authorize_info).post(oauth::authorize_decide),
+        )
 }
 
 /// Nomme ou retire un administrateur de la plateforme. Seul quelqu'un qui a accès à la machine du serveur (et à sa
@@ -716,6 +771,7 @@ async fn main() -> anyhow::Result<()> {
     let app = api()
         .fallback_service(spa)
         .layer(middleware::from_fn(csrf))
+        .layer(middleware::from_fn(cors_public))
         .layer(RequestBodyLimitLayer::new(16 * 1024 * 1024))
         .layer(tower_http::catch_panic::CatchPanicLayer::custom(|_| {
             tracing::error!("erreur interne (panic) pendant une requête");

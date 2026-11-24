@@ -33,6 +33,7 @@ import { AnalyseGate, AnalyseVideos, StudioMarket } from './components/Access'
 import { tr } from './i18n/t'
 const Landing = lazy(() => import('./pages/Landing'))
 const Admin = lazy(() => import('./pages/Admin'))
+const Authorize = lazy(() => import('./pages/Authorize'))
 const Organizer = lazy(() => import('./pages/Organizer'))
 const L = (C: any) => <Suspense fallback={<main className="content"><p className="muted" style={{ padding: 28 }}>{tr("Chargement…")}</p></main>}><C /></Suspense>
 
@@ -47,6 +48,8 @@ function Gate() {
     <Route path="/inscription" element={<Signup />} />
     <Route path="*" element={<Login />} />
   </Routes>
+  // Connexion OAuth d'une IA (#285) : la page « Autoriser » passe avant tout le reste de l'application.
+  if (loc.pathname === '/autoriser' && !me.must_change_password) return <Suspense fallback={<div className="auth" />}><Authorize /></Suspense>
   if (me.must_change_password) return <FirstPassword />
   if (me.billing_state === 'expired') return <Paywall />
   // Connecté depuis la page de connexion : on part sur l'accueil (l'adresse ne reste pas « /connexion »).

@@ -1144,3 +1144,13 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 .grecap-task{display:flex;align-items:center;gap:8px;padding:6px 6px 6px 10px;border-radius:10px;background:var(--surface);border:1px solid var(--border)}
 .grecap-t{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:1px;background:none;border:0;padding:0;font:inherit;font-size:13.5px;color:inherit;text-align:left;cursor:pointer}
 .grecap-task .btn{height:30px;flex:none}
+/* Page « Autoriser » de la connexion OAuth des IA (#285). */
+.oauth-card{max-width:440px;width:100%}
+.oauth-h{margin:0;font-size:21px;font-weight:500;display:flex;align-items:center;gap:8px}
+.oauth-who{display:flex;gap:12px;align-items:center}
+.oauth-logo{width:46px;height:46px;border-radius:12px;border:1px solid var(--border);display:grid;place-items:center;flex:none}
+.oauth-list ul{margin:0;padding-left:18px;display:grid;gap:4px}
+.oauth-seg{display:flex;width:100%}
+.oauth-seg button{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.aiurl{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;padding:14px 16px;border:1px solid var(--border);border-radius:14px;background:var(--hover)}
+.aiurl-v{display:block;font-size:13px;padding:7px 10px;border-radius:8px;background:var(--surface);border:1px solid var(--border);word-break:break-all;user-select:all}

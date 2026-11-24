@@ -669,6 +669,7 @@ pub async fn backup_loop(st: AppState, db_url: String) {
                 }
             }
         }
+        crate::oauth::cleanup(&st).await;
         tokio::time::sleep(std::time::Duration::from_secs(3600)).await;
     }
 }

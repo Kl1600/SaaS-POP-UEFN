@@ -1,5 +1,6 @@
 // IA connectées du compte (#145) : un jeton MCP par IA, lié au compte et pas à une map. L'IA choisit sa map de
-// travail elle-même (outils list_maps puis use_map).
+// travail elle-même (outils list_maps puis use_map). Depuis #285, l'IA peut aussi se connecter seule par OAuth
+// (on colle l'adresse /mcp, POP demande « Autoriser ») ; la clé API reste pour les autres.
 import { useEffect, useState } from 'react'
 import { Check, Copy, Trash2, Lock, Unlock, X } from 'lucide-react'
 import { ago, api } from '../api'
@@ -56,11 +57,20 @@ export function AccountAI() {
   return (<>
     <section className="card">
       <CardHead title={tr("IA connectées")} sub={tr("Connectez votre IA (Claude, Cursor, Codex…) une seule fois pour tout votre compte : elle voit vos maps perso et celles de vos studios, et choisit elle-même la map sur laquelle travailler.")} />
+      <div className="aiurl">
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <b style={{ fontWeight: 500 }}>{tr("Le plus simple : collez cette adresse dans votre IA")}</b>
+          <p className="small muted" style={{ margin: '2px 0 8px' }}>{tr("Claude, ChatGPT, Cursor, VS Code… : ajoutez un serveur MCP avec cette adresse. L’IA ouvre POP, vous cliquez sur « Autoriser », c’est connecté.")}</p>
+          <code className="aiurl-v">{url}</code>
+        </div>
+        <button className="btn" onClick={async () => { try { await navigator.clipboard.writeText(url); toast(tr("Adresse copiée")) } catch { toast(tr("Copie impossible : sélectionnez le texte."), true) } }}><Copy size={15} />{tr("Copier")}</button>
+      </div>
+      <p className="small muted" style={{ margin: '14px 0 8px' }}>{tr("Votre IA ne propose pas de se connecter ? Créez une clé API pour elle :")}</p>
       <div className="aigrid">
         {CLIENTS.map(c => {
-          const n = live.filter(t => t.kind === c.kind).length
+          const n = live.filter(t => t.kind === c.kind && !t.oauth).length
           return <button key={c.kind} className="aicard" onClick={() => connect(c)}>
-            <ClientLogo kind={c.kind} size={20} /><span style={{ flex: 1, textAlign: 'left' }}><b style={{ fontWeight: 500 }}>{c.name}</b>{n > 0 && <span className="small muted">{' '}{tr("· {0} connectée{1}", [n, n > 1 ? 's' : ''])}</span>}</span><span className="small">{tr("Connecter")}</span>
+            <ClientLogo kind={c.kind} size={20} /><span style={{ flex: 1, textAlign: 'left' }}><b style={{ fontWeight: 500 }}>{c.name}</b>{n > 0 && <span className="small muted">{' '}{tr("· {0} connectée{1}", [n, n > 1 ? 's' : ''])}</span>}</span><span className="small">{tr("Clé API")}</span>
           </button>
         })}
       </div>
@@ -70,7 +80,7 @@ export function AccountAI() {
       <div className="list">{live.map(t => (
         <div key={t.id} className="li" style={{ flexWrap: 'wrap' }}>
           <ClientLogo kind={t.kind} />
-          <span style={{ flex: 1, minWidth: 180 }}>{t.name}<span className="small muted"> · {clientName(t.kind)} · {t.map ? tr("travaille sur « {0} »", [t.map.name]) : tr("aucune map choisie")}</span></span>
+          <span style={{ flex: 1, minWidth: 180 }}>{t.name}<span className="small muted"> · {t.oauth ? tr("autorisée depuis l’IA") : clientName(t.kind)} · {t.map ? tr("travaille sur « {0} »", [t.map.name]) : tr("aucune map choisie")}</span></span>
           <span className={'badge ' + (t.last_used ? 'b-g' : '')}>{t.last_used ? tr("Utilisée {0} · {1} appel{2}", [ago(t.last_used), t.calls, t.calls > 1 ? 's' : '']) : tr("Jamais utilisée")}</span>
           <button className="btn" style={{ height: 34 }} onClick={async () => { await api.post(`/api/tokens/${t.id}/scope`, { scope: t.scope === 'read' ? 'write' : 'read' }); reload() }}>{t.scope === 'read' ? <><Lock size={14} />{tr("Lecture seule")}</> : <><Unlock size={14} />{tr("Peut modifier")}</>}</button>
           <button className="iconbtn" aria-label={tr("Déconnecter {0}", [t.name])} title={tr("Déconnecter")} onClick={async () => { if (confirm(tr("Déconnecter {0} ? Son jeton ne marchera plus.", [t.name]))) { await api.del(`/api/tokens/${t.id}`); reload() } }}><Trash2 size={16} /></button>
