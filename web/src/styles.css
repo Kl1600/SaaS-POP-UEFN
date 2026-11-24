@@ -1164,3 +1164,9 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 .gask-main:focus-within{box-shadow:0 0 0 4px rgba(237,117,62,.16),0 6px 22px rgba(237,117,62,.2)}
 .grecap-goal{margin:4px 0 10px}
 .grecap-tasks{margin-top:2px}
+/* Connexion en un clic par IA (#290). */
+.aiurl{display:block}
+.aiquick{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.aiquick button{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface);color:var(--text);font:inherit;font-size:13px;cursor:pointer}
+.aiquick button.on{border-color:var(--accent,#ED753E);box-shadow:0 0 0 3px rgba(237,117,62,.14)}
+.aisteps{margin:0 0 12px;padding-left:20px;display:grid;gap:4px;color:var(--text2,inherit)}

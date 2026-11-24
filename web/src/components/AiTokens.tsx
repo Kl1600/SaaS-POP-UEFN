@@ -57,14 +57,7 @@ export function AccountAI() {
   return (<>
     <section className="card">
       <CardHead title={tr("IA connectées")} sub={tr("Connectez votre IA (Claude, Cursor, Codex…) une seule fois pour tout votre compte : elle voit vos maps perso et celles de vos studios, et choisit elle-même la map sur laquelle travailler.")} />
-      <div className="aiurl">
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <b style={{ fontWeight: 500 }}>{tr("Le plus simple : collez cette adresse dans votre IA")}</b>
-          <p className="small muted" style={{ margin: '2px 0 8px' }}>{tr("Claude, ChatGPT, Cursor, VS Code… : ajoutez un serveur MCP avec cette adresse. L’IA ouvre POP, vous cliquez sur « Autoriser », c’est connecté.")}</p>
-          <code className="aiurl-v">{url}</code>
-        </div>
-        <button className="btn" onClick={async () => { try { await navigator.clipboard.writeText(url); toast(tr("Adresse copiée")) } catch { toast(tr("Copie impossible : sélectionnez le texte."), true) } }}><Copy size={15} />{tr("Copier")}</button>
-      </div>
+      <OneClick url={url} />
       <p className="small muted" style={{ margin: '14px 0 8px' }}>{tr("Votre IA ne propose pas de se connecter ? Créez une clé API pour elle :")}</p>
       <div className="aigrid">
         {CLIENTS.map(c => {
@@ -105,4 +98,50 @@ export function AccountAI() {
       <p className="small muted">{tr("Redémarrez l’IA puis demandez-lui par exemple : « Travaille sur ma map POP GrassCutter ». Elle liste vos maps (list_maps) et choisit la bonne (use_map) ; vous pourrez lui faire changer de map sans la reconnecter.")}</p>
     </Modal>}
   </>)
+}
+
+/** Connexion en un clic par IA (#290) : l'IA ne connaît que l'adresse /mcp ; POP demande ensuite « Autoriser ». */
+type Quick = { id: string; kind: string; name: string; steps: string[]; action: string; run: (url: string) => string | void }
+const QUICK: Quick[] = [
+  { id: 'claude', kind: 'claude_desktop', name: 'Claude', action: tr("Copier et ouvrir Claude"),
+    steps: [tr("Dans Claude : Paramètres → Connecteurs → « Ajouter un connecteur personnalisé »."), tr("Nom : POP, adresse : collez-la (elle est copiée), puis « Ajouter » et « Connecter »."), tr("Dans la page POP qui s’ouvre, cliquez « Autoriser ». Activez POP avec le bouton + sous le message.")],
+    run: () => { window.open('https://claude.ai/settings/connectors', '_blank', 'noopener') } },
+  { id: 'chatgpt', kind: 'codex', name: 'ChatGPT', action: tr("Copier l’adresse"),
+    steps: [tr("Dans ChatGPT : Paramètres → Applications et connecteurs → Avancé : activez le mode développeur."), tr("« Créer » un connecteur : nom POP, adresse : collez-la, authentification OAuth."), tr("Dans la page POP qui s’ouvre, cliquez « Autoriser ».")],
+    run: () => {} },
+  { id: 'cursor', kind: 'cursor', name: 'Cursor', action: tr("Installer dans Cursor"),
+    steps: [tr("Cursor s’ouvre et propose d’installer POP : acceptez."), tr("Dans Cursor (Réglages → MCP), cliquez « Connect » à côté de POP."), tr("Dans la page POP qui s’ouvre, cliquez « Autoriser ».")],
+    run: u => `cursor://anysphere.cursor-deeplink/mcp/install?name=POP&config=${encodeURIComponent(btoa(JSON.stringify({ url: u })))}` },
+  { id: 'vscode', kind: 'vscode', name: 'VS Code', action: tr("Installer dans VS Code"),
+    steps: [tr("VS Code s’ouvre et propose d’installer POP : cliquez « Install »."), tr("Au premier usage, VS Code demande de vous connecter : acceptez."), tr("Dans la page POP qui s’ouvre, cliquez « Autoriser ».")],
+    run: u => `vscode:mcp/install?${encodeURIComponent(JSON.stringify({ name: 'pop', type: 'http', url: u }))}` },
+  { id: 'cc', kind: 'claude_code', name: 'Claude Code', action: tr("Copier la commande"),
+    steps: [tr("Collez la commande dans un terminal, dans le dossier de votre projet."), tr("Lancez Claude Code, tapez /mcp, choisissez pop puis « Authenticate »."), tr("Dans la page POP qui s’ouvre, cliquez « Autoriser ».")],
+    run: () => {} },
+  { id: 'autre', kind: 'autre', name: tr("Autre IA"), action: tr("Copier l’adresse"),
+    steps: [tr("Ajoutez un serveur MCP « HTTP » (ou « Streamable HTTP ») avec cette adresse."), tr("Si l’IA propose de se connecter, acceptez et cliquez « Autoriser » dans POP."), tr("Sinon, créez une clé API ci-dessous.")],
+    run: () => {} },
+]
+
+function OneClick({ url }: { url: string }) {
+  const { toast } = useApp()
+  const [sel, setSel] = useState('claude')
+  const q = QUICK.find(x => x.id === sel)!
+  const copyText = q.id === 'cc' ? `claude mcp add --transport http pop ${url}` : url
+  const go = async () => {
+    if (q.id === 'cursor' || q.id === 'vscode') { location.href = q.run(url) as string; return }
+    // On copie d'abord : ouvrir un onglet ferait perdre le focus, et la copie échouerait.
+    try { await navigator.clipboard.writeText(copyText); toast(q.id === 'cc' ? tr("Commande copiée") : tr("Adresse copiée")) } catch { toast(tr("Copie impossible : sélectionnez le texte."), true) }
+    q.run(url)
+  }
+  return <div className="aiurl">
+    <b style={{ fontWeight: 500 }}>{tr("Connecter une IA en un clic")}</b>
+    <p className="small muted" style={{ margin: '2px 0 10px' }}>{tr("Choisissez votre IA : elle ouvre POP, vous cliquez sur « Autoriser », c’est connecté. Aucune clé à copier.")}</p>
+    <div className="aiquick" role="tablist">{QUICK.map(x => <button key={x.id} role="tab" aria-selected={x.id === sel} className={x.id === sel ? 'on' : ''} onClick={() => setSel(x.id)}><ClientLogo kind={x.kind} size={16} />{x.name}</button>)}</div>
+    <ol className="aisteps small">{q.steps.map((t, i) => <li key={i}>{t}</li>)}</ol>
+    <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+      <code className="aiurl-v" style={{ flex: 1, minWidth: 200 }}>{copyText}</code>
+      <button className="btn pri" onClick={go}>{q.id === 'cursor' || q.id === 'vscode' ? null : <Copy size={15} />}{q.action}</button>
+    </div>
+  </div>
 }
