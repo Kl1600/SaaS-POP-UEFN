@@ -28,6 +28,7 @@ import Help from './pages/Help'
 import Settings from './pages/Settings'
 import { Market, Trending, Launches } from './pages/Analysis'
 import Ideas from './pages/Ideas'
+import MapsToMake from './pages/MapsToMake'
 import { BillingSettings, Paywall } from './components/Billing'
 import { AnalyseGate, AnalyseVideos, StudioMarket } from './components/Access'
 import { tr } from './i18n/t'
@@ -86,6 +87,7 @@ function Gate() {
         <Route path="aide" element={<Help />} />
         <Route path="admin" element={L(Admin)} />
         <Route path="parametres" element={<Settings />} />
+        <Route path="analyse/a-faire" element={<AnalyseGate title={tr("Maps à faire")}><MapsToMake /></AnalyseGate>} />
         <Route path="analyse/idees" element={<AnalyseGate title={tr("Idées de maps")}><Ideas /></AnalyseGate>} />
         <Route path="analyse/marche" element={<AnalyseGate title={tr("Analyse du marché")}><Market /></AnalyseGate>} />
         <Route path="analyse/tendances" element={<AnalyseGate title={tr("Maps qui marchent")}><Trending /></AnalyseGate>} />

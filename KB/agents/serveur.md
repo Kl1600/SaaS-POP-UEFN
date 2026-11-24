@@ -173,3 +173,8 @@ Bloque : rien
 ### 2026-11-24 · #66 · journal des actions des admins et modérateurs
 - Fait : `GET /api/admin/journal` (admins seulement ; filtres `who` et `type` : attente, comptes, annonces, sécurité ; 50 par page, `more`) qui lit `audit_log` (actions `admin_*` et `annonce_*`), libellé lisible et compte ou demande visé ; nouvelles lignes : demande remise en attente, note sur une demande, crédits IA donnés ; refus et suppression d'une demande notent l'adresse au lieu du numéro. Web : onglet Administration → Journal (filtres, pages).
 - Vérifié : `cargo test` (`admin::journal_tests`) ; Chrome sans tête (onglet Journal après une invitation).
+
+### 2026-11-24 · #316 · sources X et Reddit pour l'analyse
+- Fait : `analytics.rs` : `collect_reddit` (API officielle, identifiants d'application `client_id` + `key`, jeton « client_credentials », r/FortniteCreative + recherches de la semaine) et `collect_x` (recherche récente v2 avec le Bearer de l'utilisateur, 3 recherches de 50 au plus, seulement avec la collecte TikTok car X facture chaque message lu). Rangés dans `tt_videos` (plateformes `reddit` et `x`), donc pris en compte par les tendances et le badge `tendance_video` des niches. `sources_on` donne l'état des 4 sources ; intégrations `reddit` et `x` ajoutées dans `studio.rs` (secrets masqués). Variables de test : `POP_REDDIT_AUTH`, `POP_REDDIT_API`, `POP_X_API`.
+- Pièges : Reddit ne délivre plus de nouveaux accès API depuis le 31/10/2026 (seuls les identifiants déjà approuvés marchent) ; X n'a plus d'accès gratuit en lecture (paiement à l'usage, environ 0,005 $ par message lu).
+- Vérifié : test `tests_sources` (lecture des réponses Reddit et X) ; collecte de bout en bout contre des serveurs simulés.

@@ -59,7 +59,7 @@ export function IslandDrawer({ code, onClose }: { code: string; onClose: () => v
   </Layer>
 }
 
-function useIsland() {
+export function useIsland() {
   const [code, setCode] = useState<string | null>(null)
   return { code, open: setCode, drawer: code ? <IslandDrawer code={code} onClose={() => setCode(null)} /> : null }
 }

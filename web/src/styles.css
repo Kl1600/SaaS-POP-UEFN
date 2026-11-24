@@ -1173,3 +1173,27 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 /* Code en ligne dans le texte d'une page (#129). */
 .app .b-inline-code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.88em;padding:1px 5px;border-radius:6px;background:var(--hover);border:1px solid var(--border)}
 .app .btext a{color:inherit;text-decoration:underline;text-underline-offset:3px}
+/* Analyse → Maps à faire (#316) : un salon simple. */
+.afaire{display:grid}
+.afaire-row{display:flex;align-items:center;gap:14px;padding:14px 4px;border-bottom:1px solid var(--border)}
+.afaire-row:last-child{border-bottom:0}
+.afaire-n{width:22px;text-align:right;color:var(--text3);flex:none}
+.afaire-t{font-weight:500;font-size:15px}
+.afaire-row .linkbtn{padding:0;margin-top:3px;text-align:left}
+.afaire-row .badge{flex:none}
+@media (max-width:600px){.afaire-row{flex-wrap:wrap}.afaire-row .badge{margin-left:36px}}
+.afaire{list-style:none;margin:0;padding:0}
+.afaire-row .btn{height:34px;flex:none}
+.afaire-start{max-width:560px;width:100%;align-self:center;margin-top:24px;display:flex;flex-direction:column;gap:16px}
+.afaire-h{margin:0;font-size:26px;font-weight:600;letter-spacing:-.3px}
+.afaire-srcs{display:grid;gap:10px}
+.afaire-src{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--border);border-radius:14px}
+.afaire-connect{margin-top:8px;padding:14px 16px;border:1px solid var(--border);border-radius:14px;background:var(--hover)}
+.afaire-connect ol{margin:8px 0 12px;padding-left:20px;display:grid;gap:4px}
+.afaire-pills{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:-6px}
+.afaire-pill{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--text);font:inherit;font-size:13px;cursor:pointer}
+.afaire-pill.always{background:var(--hover);cursor:default}
+.afaire-pill.on{background:var(--tg-bg);color:var(--tg);border-color:transparent}
+.afaire-pill.err{background:var(--tr-bg);color:var(--tr)}
+.afaire-more{margin-top:-8px;margin-bottom:0}
+.afaire-more .linkbtn{padding:0}
