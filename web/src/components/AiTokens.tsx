@@ -1,6 +1,6 @@
 // IA connectées du compte (#145) : un jeton MCP par IA, lié au compte et pas à une map. L'IA choisit sa map de
 // travail elle-même (outils list_maps puis use_map).
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Check, Copy, Trash2, Lock, Unlock, X } from 'lucide-react'
 import { ago, api } from '../api'
 import { useApp, useLoad } from '../state'
@@ -30,23 +30,35 @@ export const clientName = (kind: string) => CLIENTS.find(c => c.kind === kind)?.
 export function AccountAI() {
   const { toast } = useApp()
   const { data, reload } = useLoad<any[]>('/api/me/tokens', [])
-  const [open, setOpen] = useState<{ c: Client; token: string } | null>(null)
+  const [open, setOpen] = useState<{ c: Client; token: string; id: number } | null>(null)
   const [copied, setCopied] = useState(false)
   const url = `${location.origin}/mcp`
+  // Une IA ne compte comme connectée qu'une fois qu'elle a appelé POP (#280) ; les autres jetons sont « en attente ».
+  const live = (data ?? []).filter(t => t.last_used)
+  const pending = (data ?? []).filter(t => !t.last_used)
   const connect = async (c: Client) => {
-    const used = (data ?? []).filter(t => t.kind === c.kind).length
     try {
+      // Un seul jeton en attente par IA : l'ancien, jamais utilisé, est remplacé.
+      for (const t of pending.filter(t => t.kind === c.kind)) await api.del(`/api/tokens/${t.id}`)
+      const used = live.filter(t => t.kind === c.kind).length
       const r = await api.post('/api/me/tokens', { name: used ? `${c.name} ${used + 1}` : c.name, kind: c.kind, scope: 'write' })
-      setOpen({ c, token: r.token }); setCopied(false); reload()
+      setOpen({ c, token: r.token, id: r.id }); setCopied(false); reload()
     } catch (e: any) { toast(e.message, true) }
   }
+  const linked = !!open && live.some(t => t.id === open.id)
+  // Pendant que la fenêtre est ouverte, on regarde toutes les 3 s si l'IA a appelé POP.
+  useEffect(() => {
+    if (!open || linked) return
+    const h = setInterval(reload, 3000)
+    return () => clearInterval(h)
+  }, [open, linked])
   const copy = async (t: string) => { try { await navigator.clipboard.writeText(t); setCopied(true) } catch { toast(tr("Copie impossible : sélectionnez le texte."), true) } }
   return (<>
     <section className="card">
       <CardHead title={tr("IA connectées")} sub={tr("Connectez votre IA (Claude, Cursor, Codex…) une seule fois pour tout votre compte : elle voit vos maps perso et celles de vos studios, et choisit elle-même la map sur laquelle travailler.")} />
       <div className="aigrid">
         {CLIENTS.map(c => {
-          const n = (data ?? []).filter(t => t.kind === c.kind).length
+          const n = live.filter(t => t.kind === c.kind).length
           return <button key={c.kind} className="aicard" onClick={() => connect(c)}>
             <ClientLogo kind={c.kind} size={20} /><span style={{ flex: 1, textAlign: 'left' }}><b style={{ fontWeight: 500 }}>{c.name}</b>{n > 0 && <span className="small muted">{' '}{tr("· {0} connectée{1}", [n, n > 1 ? 's' : ''])}</span>}</span><span className="small">{tr("Connecter")}</span>
           </button>
@@ -54,8 +66,8 @@ export function AccountAI() {
       </div>
       <h3 style={{ fontWeight: 500, fontSize: 15, margin: '20px 0 8px' }}>{tr("Vos IA")}</h3>
       <p className="small muted" style={{ marginTop: 0 }}>{tr("Lecture seule : l’IA voit vos maps sans rien modifier, sur toutes les maps. Les suppressions d’acteurs attendent toujours votre validation dans Paramètres → UEFN Link.")}</p>
-      {data?.length === 0 && <p className="muted">{tr("Aucune IA connectée pour l’instant.")}</p>}
-      <div className="list">{data?.map(t => (
+      {data && live.length === 0 && <p className="muted">{tr("Aucune IA connectée pour l’instant.")}</p>}
+      <div className="list">{live.map(t => (
         <div key={t.id} className="li" style={{ flexWrap: 'wrap' }}>
           <ClientLogo kind={t.kind} />
           <span style={{ flex: 1, minWidth: 180 }}>{t.name}<span className="small muted"> · {clientName(t.kind)} · {t.map ? tr("travaille sur « {0} »", [t.map.name]) : tr("aucune map choisie")}</span></span>
@@ -64,6 +76,10 @@ export function AccountAI() {
           <button className="iconbtn" aria-label={tr("Déconnecter {0}", [t.name])} title={tr("Déconnecter")} onClick={async () => { if (confirm(tr("Déconnecter {0} ? Son jeton ne marchera plus.", [t.name]))) { await api.del(`/api/tokens/${t.id}`); reload() } }}><Trash2 size={16} /></button>
         </div>
       ))}</div>
+      {pending.length > 0 && <p className="small muted" style={{ marginBottom: 0 }}>
+        {tr("En attente de connexion : {0}.", [pending.map(t => clientName(t.kind)).join(', ')])}{' '}
+        <button className="linkbtn" onClick={async () => { for (const t of pending) await api.del(`/api/tokens/${t.id}`); reload() }}>{tr("Annuler")}</button>
+      </p>}
     </section>
 
     {open && <Modal onClose={() => setOpen(null)} label={tr("Connecter {0}", [open.c.name])}>
@@ -75,6 +91,7 @@ export function AccountAI() {
         <span className="small muted">{tr("Le jeton ne sera plus affiché : copiez-le maintenant.")}</span>
       </div>
       {open.c.note && <p className="small muted">{open.c.note}</p>}
+      <div className={'aiwait' + (linked ? ' ok' : '')}>{linked ? <><Check size={16} />{tr("{0} est connectée à POP.", [open.c.name])}</> : <><span className="aiwait-dot" />{tr("En attente de connexion… L’IA apparaîtra dans « Vos IA » dès son premier appel.")}</>}</div>
       <p className="small muted">{tr("Redémarrez l’IA puis demandez-lui par exemple : « Travaille sur ma map POP GrassCutter ». Elle liste vos maps (list_maps) et choisit la bonne (use_map) ; vous pourrez lui faire changer de map sans la reconnecter.")}</p>
     </Modal>}
   </>)
