@@ -1214,3 +1214,43 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 .connectai-ptext{font-size:12px;max-height:220px;overflow:auto;white-space:pre-wrap;margin:0 0 10px}
 .connectai-more{margin-top:16px}.connectai-more>summary{cursor:pointer;color:var(--muted)}
 .connectai-more[open]>summary{margin-bottom:12px}
+
+/* Scène du studio (#176) : noir et blanc, traits fins, animations coupées si l'utilisateur les réduit. */
+.scene{padding-top:14px}
+.scene-tete{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;padding:0;color:var(--text);cursor:pointer;text-align:left;font:inherit}
+.scene-titre{font-size:17px;font-weight:500}
+.scene-cadre{position:relative;margin-top:10px;overflow-x:auto}
+.scene-cadre > svg{width:100%;min-width:640px;height:auto;display:block}
+.scene-tete svg{flex:none}
+.scene-sol{fill:var(--hover);stroke:var(--border)}
+.scene-mur{stroke:var(--border);stroke-width:2}
+.scene-meuble{fill:var(--surface);stroke:var(--text3);stroke-width:1}
+.scene-ecran{fill:var(--text);opacity:.85}
+.scene-maquette{fill:none;stroke:var(--text2);stroke-width:1.2}
+.scene-tableau{fill:var(--surface);stroke:var(--text2);stroke-width:1.2}
+.scene-zone{font-size:11px;fill:var(--text3);text-anchor:middle}
+.scene-perso{cursor:pointer;outline:none}
+.scene-perso:focus-visible .scene-tete-perso{stroke:#ED753E;stroke-width:2}
+.scene-buste{fill:var(--text2)}
+.scene-tete-perso{fill:var(--surface);stroke:var(--text);stroke-width:1.2}
+.scene-tete-perso.moi{stroke:#ED753E;stroke-width:1.6}
+.scene-init{font-size:9px;fill:var(--text);text-anchor:middle;font-weight:600;pointer-events:none}
+.scene-nom{font-size:10px;fill:var(--text);text-anchor:middle}
+.scene-pastille{fill:#ED753E}
+.scene-pastille-t{font-size:7px;fill:#fff;text-anchor:middle;font-weight:700}
+.scene-manette{fill:var(--text)}
+.scene-progres{fill:#ED753E;transform-origin:-12px 0}
+.scene-vapeur{fill:none;stroke:var(--text3);stroke-width:1.2}
+.scene-bulle{position:absolute;top:8px;right:8px;max-width:300px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 12px;box-shadow:0 8px 24px rgba(0,0,0,.12);display:flex;flex-direction:column;gap:4px;z-index:2}
+@keyframes scene-tape{0%,100%{transform:translateY(0)}50%{transform:translateY(-1.5px)}}
+@keyframes scene-manette{0%,100%{transform:rotate(0)}25%{transform:rotate(-4deg)}75%{transform:rotate(4deg)}}
+@keyframes scene-progres{0%{transform:scaleX(.1)}100%{transform:scaleX(1)}}
+@keyframes scene-vapeur{0%{opacity:0;transform:translateY(2px)}50%{opacity:1}100%{opacity:0;transform:translateY(-4px)}}
+@keyframes scene-respire{0%,100%{transform:translateY(0)}50%{transform:translateY(-1px)}}
+.act-code .scene-corps,.act-envoie .scene-corps{animation:scene-tape .5s ease-in-out infinite}
+.act-teste .scene-corps{animation:scene-manette .6s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
+.act-compile .scene-progres{animation:scene-progres 1.6s linear infinite}
+.act-pause .scene-vapeur{animation:scene-vapeur 2s ease-in-out infinite}
+.act-construit .scene-corps,.act-planifie .scene-corps,.act-dessine .scene-corps,.act-pilote .scene-corps,.act-studio .scene-corps{animation:scene-respire 2.4s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.scene *{animation:none!important}}
+@media (max-width:600px){.scene-bulle{position:static;max-width:none;margin-top:8px}}
