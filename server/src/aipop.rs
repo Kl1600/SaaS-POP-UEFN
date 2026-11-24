@@ -233,5 +233,18 @@ pub async fn admin_grant(
     .bind(u.id.to_string())
     .execute(&st.db)
     .await?;
+    // Journal des actions d'administration (#66).
+    let email: String = sqlx::query_scalar("SELECT email FROM users WHERE id = ?")
+        .bind(id)
+        .fetch_one(&st.db)
+        .await?;
+    crate::security::audit(
+        &st,
+        Some(u.id),
+        "admin_crédits_ia",
+        &format!("{email} : {:+} crédits", b.credits),
+        "",
+    )
+    .await;
     Ok(axum::Json(json!({ "ok": true })))
 }

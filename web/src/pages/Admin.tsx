@@ -263,6 +263,31 @@ function Audit() {
   </section>
 }
 
+/** Journal des actions des admins et modérateurs (#66) : qui a fait quoi, sur quel compte, quand ; filtres et pages. */
+function Journal() {
+  const [who, setWho] = useState('')
+  const [type, setType] = useState('')
+  const [page, setPage] = useState(1)
+  const { data } = useLoad<any>(`/api/admin/journal?page=${page}${who ? `&who=${who}` : ''}${type ? `&type=${type}` : ''}`, [who, type, page])
+  const heure = (at: string) => new Date(at.replace(' ', 'T') + 'Z').toLocaleString(LOCALE, { dateStyle: 'short', timeStyle: 'short' })
+  return <section className="card"><CardHead title={tr("Journal des actions")} sub={tr("Ce que les administrateurs et modérateurs ont fait : liste d’attente, comptes, annonces. Le plus récent en haut.")} />
+    <div className="row" style={{ flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
+      <label className="label" style={{ minWidth: 200 }}>{tr("Auteur")}<select className="field" value={who} onChange={e => { setWho(e.target.value); setPage(1) }}>
+        <option value="">{tr("Tout le monde")}</option>{data?.authors.map((a: any) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
+      <label className="label" style={{ minWidth: 200 }}>{tr("Type d’action")}<select className="field" value={type} onChange={e => { setType(e.target.value); setPage(1) }}>
+        <option value="">{tr("Toutes")}</option>{data?.types.map((t: any) => <option key={t.key} value={t.key}>{tr(t.label)}</option>)}</select></label>
+    </div>
+    {!data ? null : data.rows.length === 0 ? <Empty text={tr("Aucune action pour ce choix.")} /> :
+      <div style={{ overflowX: 'auto' }}><table className="tbl"><thead><tr><th>{tr("Date et heure")}</th><th>{tr("Auteur")}</th><th>{tr("Action")}</th><th>{tr("Compte ou demande visé")}</th></tr></thead>
+        <tbody>{data.rows.map((r: any) => <tr key={r.id}><td className="small" style={{ whiteSpace: 'nowrap' }}>{heure(r.at)}</td><td>{r.who ?? '—'}</td><td>{tr(r.label)}</td><td className="small">{r.target || '—'}</td></tr>)}</tbody></table></div>}
+    {data && (page > 1 || data.more) && <div className="row" style={{ justifyContent: 'flex-end', marginTop: 10 }}>
+      <button className="btn" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>{tr("Plus récentes")}</button>
+      <span className="small muted">{tr("Page {0}", [page])}</span>
+      <button className="btn" disabled={!data.more} onClick={() => setPage(p => p + 1)}>{tr("Plus anciennes")}</button>
+    </div>}
+  </section>
+}
+
 /** Accès à l'administration : confirmer son mot de passe (valable 30 minutes). */
 function Gate({ code, msg, onOk }: { code: string; msg: string; onOk: () => void }) {
   const { toast } = useApp()
@@ -282,7 +307,7 @@ export default function Admin() {
   // Modérateur (#65) : seulement la liste d'attente et les utilisateurs.
   const staff = !!(me?.admin || me?.moderator)
   const mod = staff && !me?.admin
-  const [tab, setTab] = useState<'overview' | 'waitlist' | 'create' | 'users' | 'ia' | 'audit' | 'money' | 'legal' | 'announce'>(mod || me?.admin_pending ? 'waitlist' : 'overview')
+  const [tab, setTab] = useState<'overview' | 'waitlist' | 'create' | 'users' | 'ia' | 'audit' | 'journal' | 'money' | 'legal' | 'announce'>(mod || me?.admin_pending ? 'waitlist' : 'overview')
   const [gate, setGate] = useState<{ code: string; msg: string } | null | 'ok'>(null)
   const check = () => api.get(mod ? '/api/admin/waitlist?status=pending' : '/api/admin/overview').then(() => setGate('ok')).catch((e: any) => setGate({ code: e.code ?? 'forbidden', msg: e.message }))
   useEffect(() => { if (staff) check() }, [staff])
@@ -293,7 +318,7 @@ export default function Admin() {
     </PageHead>
     {gate === null ? null : gate !== 'ok' ? <Gate code={gate.code} msg={gate.msg} onOk={() => { setGate(null); check() }} /> : <>
       <div className="tabs" role="tablist" style={{ alignSelf: 'flex-start' }}>
-        {([['overview', tr("Vue générale")], ['waitlist', tr("Liste d’attente{0}", [me.admin_pending ? ` (${me.admin_pending})` : ''])], ['create', tr("Créer un compte")], ['users', tr("Utilisateurs")], ['ia', tr("Apprentissage de l’IA")], ['audit', tr("Sécurité")], ['money', tr("Paiements et IA")], ['legal', tr("Infos légales")], ['announce', tr("Annonce")]] as const).filter(([k]) => !mod || k === 'waitlist' || k === 'users').map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}
+        {([['overview', tr("Vue générale")], ['waitlist', tr("Liste d’attente{0}", [me.admin_pending ? ` (${me.admin_pending})` : ''])], ['create', tr("Créer un compte")], ['users', tr("Utilisateurs")], ['ia', tr("Apprentissage de l’IA")], ['audit', tr("Sécurité")], ['journal', tr("Journal")], ['money', tr("Paiements et IA")], ['legal', tr("Infos légales")], ['announce', tr("Annonce")]] as const).filter(([k]) => !mod || k === 'waitlist' || k === 'users').map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}
       </div>
       {tab === 'overview' && <Overview />}
       {tab === 'waitlist' && <Waitlist />}
@@ -301,6 +326,7 @@ export default function Admin() {
       {tab === 'users' && <Users />}
       {tab === 'ia' && <Learning />}
       {tab === 'audit' && <Audit />}
+      {tab === 'journal' && <Journal />}
       {tab === 'money' && <Money />}
       {tab === 'legal' && <LegalInfo />}
       {tab === 'announce' && <AnnounceAdmin />}
