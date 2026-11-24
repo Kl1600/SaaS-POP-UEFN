@@ -174,6 +174,8 @@ pub struct NewMap {
     name: String,
     genre: Option<String>,
     release_date: Option<String>,
+    /// Équipe de la map à la création (#149) : qui, combien d'heures par semaine, indisponibilités, début, marge.
+    team: Option<crate::faisabilite::EquipeIn>,
 }
 
 pub async fn create_map(
@@ -194,7 +196,20 @@ pub async fn create_map(
         b.release_date.as_deref(),
     )
     .await?;
-    Ok(Json(json!({ "map_id": mid })))
+    let mut avis = Value::Null;
+    if let Some(eq) = &b.team {
+        let ctx = map_ctx(&st, &u, mid).await?;
+        // Équipe invalide : la map n'est pas créée à moitié.
+        if let Err(e) = crate::faisabilite::enregistrer(&st, &ctx, eq).await {
+            sqlx::query("DELETE FROM maps WHERE id = ?")
+                .bind(mid)
+                .execute(&st.db)
+                .await?;
+            return Err(e);
+        }
+        avis = crate::faisabilite::avis_de_la_map(&st, mid).await?;
+    }
+    Ok(Json(json!({ "map_id": mid, "avis": avis })))
 }
 
 #[derive(Deserialize)]

@@ -15,6 +15,7 @@ mod checks;
 mod discover;
 mod engine;
 mod error;
+mod faisabilite;
 mod fil;
 mod guide;
 mod ideas;
@@ -589,6 +590,10 @@ fn api() -> Router<AppState> {
         .route("/api/maps/{mid}/agents/activity", get(agents::activite))
         .route("/api/maps/{mid}/fil", get(fil::route))
         .route("/api/maps/{mid}/questions", get(questions::route_liste))
+        .route(
+            "/api/maps/{mid}/faisabilite",
+            get(faisabilite::route_lire).put(faisabilite::route_ecrire),
+        )
         .route("/api/maps/{mid}/suggestions", get(suggestions::liste))
         .route(
             "/api/maps/{mid}/suggestions/{cle}",

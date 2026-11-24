@@ -7,6 +7,7 @@ import { useApp, useLive, useLoad } from '../state'
 import { CardHead, Drawer, Empty, PageHead, tagLabel } from '../components/ui'
 import { tr, tx } from '../i18n/t'
 import { useNav } from '../routes'
+import { AvisFaisabilite } from '../components/Faisabilite'
 
 const ICON: Record<string, [any, string]> = {
   checkin: [Upload, 'i-g'], board: [PenTool, 'i-n'], page: [FileText, 'i-n'], blocked: [Ban, 'i-r'], done: [CheckCircle2, 'i-g'],
@@ -66,6 +67,8 @@ export default function Overview() {
         <div className="card"><div className="lab"><Coins size={18} strokeWidth={1.5} />{tr("Gains du dernier mois")}</div><div className="num">{t.revenue ? euros(t.revenue.cents, 0) : '—'}</div><div className="muted">{t.revenue ? `${frDate(t.revenue.month + '-01', { month: 'long', year: 'numeric' })}${t.revenue_prev_cents ? ` · ${t.revenue.cents >= t.revenue_prev_cents ? '+' : ''}${Math.round((t.revenue.cents / t.revenue_prev_cents - 1) * 100)} %` : ''}` : tr("aucun import")}</div></div>
         <div className="card"><div className="lab"><Users size={18} strokeWidth={1.5} />{tr("Joueurs · dernier playtest")}</div><div className="num">{t.playtest ? t.playtest.players : '—'}</div><div className="muted">{t.playtest ? tr("décrochage moyen à {0} min", [Math.round(t.playtest.avg_minutes)]) : tr("aucun playtest")}</div></div>
       </section>
+
+      {map && <AvisFaisabilite mapId={map.id} onEdit={() => nav('/planifier?vue=equipe')} />}
 
       <div className="two">
         <section className="card">

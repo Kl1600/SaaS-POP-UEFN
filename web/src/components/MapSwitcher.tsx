@@ -3,9 +3,10 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Check, ChevronsUpDown, Building2, LayoutGrid, User, Users, Sparkles, MoreHorizontal, ArrowRight, Pencil, Trash2, Settings, LogIn } from 'lucide-react'
 import { api } from '../api'
-import { useApp, studioName } from '../state'
+import { useApp, useLoad, studioName } from '../state'
 import { Modal, ROLE } from './ui'
-import { tr } from '../i18n/t'
+import { tr, tx } from '../i18n/t'
+import { ChoixEquipe, versEnvoi } from './Faisabilite'
 import { ConfirmMove, isAdmin, previewMove, type Drag, type Pending } from './MoveMap'
 import { cssRect } from '../zoom'
 import { DeleteDialog, type DeleteTarget } from './DeleteDialog'
@@ -148,16 +149,26 @@ function CreateModal({ c, onClose }: { c: Create; onClose: () => void }) {
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   const solo = sid === personal?.id
+  // Équipe de la map (#149) : membres du studio choisi, heures par semaine sur cette map, début, part de l'IA.
+  const { data: membres } = useLoad<any>(kind === 'map' && sid ? `/api/studios/${sid}/members` : null, [sid, kind])
+  const [equipe, setEquipe] = useState<Record<number, any>>({})
+  const [debut, setDebut] = useState('')
+  const [partIa, setPartIa] = useState(0)
+  useEffect(() => {
+    if (!membres || !me) return
+    setEquipe({ [me.user.id]: { on: true, hours: Math.min(10, membres.members.find((m: any) => m.id === me.user.id)?.hours_per_week ?? 10), absences: [] } })
+  }, [membres, me])
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); if (busy) return
     setBusy(true); setErr('')
     try {
       const r = kind === 'map'
-        ? await api.post(`/api/studios/${sid}/maps`, { name: f.name, genre: f.genre, release_date: f.release_date || null })
+        ? await api.post(`/api/studios/${sid}/maps`, { name: f.name, genre: f.genre, release_date: f.release_date || null, team: { start_date: debut, margin_pct: 20, ai_share_pct: partIa, staff: versEnvoi(equipe) } })
         : await api.post('/api/studios', f.name.trim() ? { name: f.studio, map_name: f.name, genre: f.genre, release_date: f.release_date || null } : { name: f.studio })
       await reload()
       if (r.map_id) { setMapId(r.map_id); nav(`/map/${r.map_id}`) } else nav(`/studio/${r.studio_id}/equipe`)
       toast(kind === 'map' ? tr('Map « {0} » créée', [f.name]) : tr('Studio « {0} » créé', [f.studio]))
+      for (const o of r.avis?.overloads ?? []) toast(tx(o.text), true)
       onClose()
     } catch (er: any) { setErr(er.message); setBusy(false) }
   }
@@ -187,6 +198,14 @@ function CreateModal({ c, onClose }: { c: Create; onClose: () => void }) {
         <label className="label">{tr('Genre')}<input className="field" value={f.genre} onChange={e => setF({ ...f, genre: e.target.value })} placeholder={tr('Tycoon, box fight…')} /></label>
         <label className="label">{tr('Sortie visée')}<input className="field" type="date" value={f.release_date} onChange={e => setF({ ...f, release_date: e.target.value })} /></label>
       </div>}
+      {kind === 'map' && membres && <>
+        <div className="grid2" style={{ gridTemplateColumns: '1fr 1fr' }}>
+          <label className="label">{tr('Date de début')}<input className="field" type="date" value={debut} onChange={e => setDebut(e.target.value)} /></label>
+          <label className="label">{tr("Part des tâches pour l'IA (%)")}<input className="field" type="number" min={0} max={100} value={partIa} onChange={e => setPartIa(Number(e.target.value))} /></label>
+        </div>
+        <div className="label">{tr('Qui travaille dessus, et combien d’heures par semaine ?')}</div>
+        <ChoixEquipe compact members={membres.members.filter((m: any) => m.role !== 'viewer').map((m: any) => ({ user_id: m.id, name: m.name, studio_hours: m.hours_per_week }))} value={equipe} onChange={setEquipe} />
+      </>}
       {err && <div className="err">{err}</div>}
       <div className="row" style={{ justifyContent: 'flex-end' }}>
         <button type="button" className="btn" onClick={onClose}>{tr('Annuler')}</button>
