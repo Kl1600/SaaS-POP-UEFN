@@ -155,3 +155,7 @@ Bloque : rien
 ### 2026-11-24 · #298 · fil d'activité des agents et temps réel avec le kanban
 - Fait : migration 0039 (`agent_calls`, sans arguments, gardés 7 jours) ; chaque appel MCP d'un agent sur sa map est noté et poussé sur le WebSocket de la map (`{"t":"agent"}`) ; `GET /api/maps/{mid}/agents/activity` ; étape de la tâche dans `/agents` (écrit, compilé, testé, relu) ; `claim_task`, `release_task`, `save_progress` écrivent dans l'historique (via « IA ») et rafraîchissent le kanban ; notifications : compilation qui passe en échec, tâche bloquée par un agent, validation demandée (texte et lien vers Paramètres → UEFN Link, plus l'Organiseur retiré).
 - Vérifié : `cargo test` (`agents::fil_d_activite`, `mcp::next_task_respecte_les_dependances`) ; `next_task` respectait déjà les dépendances (`guide.rs`).
+
+### 2026-11-24 · #302 · suppression par une IA : réglage par studio
+- Fait : migration 0041 (`studios.ai_can_delete`, désactivé par défaut) ; `GET/PUT /api/studios/{sid}/ai-delete` (admin ou propriétaire, journal d'audit) ; `delete_actors` et les annulations qui retirent des éléments s'exécutent tout de suite si le réglage est actif (journalisé, restaurable), sinon attendent une validation ; textes MCP, `KB/UEFN.md` ; case à cocher dans Paramètres → UEFN Link.
+- Vérifié : `cargo test` (`mcp::tests_pose::poser_et_annuler` étendu). Pas vérifié : 12 acteurs supprimés puis restaurés avec le vrai UEFN (PC de benybens).

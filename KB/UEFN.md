@@ -115,6 +115,8 @@ concernée ; corrigez une ligne fausse en le disant.
   son `FortPlayerStartCreative`, que la suppression du Spawn Pad retire avec lui.
 - Annulation depuis le journal (humain) : l'appareil disparaît du niveau. Annulation par une IA (`undo_action`) :
   rien n'est supprimé avant la validation d'un humain (`/api/approvals/{id}/approve`).
+  Depuis le 24/11 (#302), si le studio a activé « Les IA peuvent supprimer seules », la suppression et cette
+  annulation partent tout de suite (journalisées ; « Annuler » recrée les acteurs depuis la sauvegarde du relais).
 
 ## Interface de jeu (HUD, menus) créée par une IA (recherche puis test du 21/11/2026, projet TestPopHub, #115)
 
