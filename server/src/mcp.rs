@@ -190,6 +190,16 @@ fn tools() -> Value {
         tool("set_task_status", "Change le statut d'une tâche : todo (à faire), doing (en cours), blocked (bloquée), done (faite). Passer en cours exige que ses dépendances soient faites. note : commentaire facultatif (ce qui a été fait, ce qui bloque). Une tâche UEFN ne passe à done qu'avec un check-in Lore réellement archivé sur la map : checkin = son message exact (« #n … »), ou celui du check-in d'une autre tâche où son travail est parti (noté dans l'historique). Inutile si vous avez archivé par lore_checkin « #n … » depuis que vous l'avez réservée : un check-in « #3 #5 … » ferme d'ailleurs seul chaque tâche UEFN en cours qu'il cite.", json!({ "number": { "type": "integer" }, "status": { "type": "string", "enum": ["todo", "doing", "blocked", "done"] }, "note": { "type": "string" }, "checkin": { "type": "string" } }), &["number", "status"]),
         tool("claim_task", "Réserve une tâche POP pour vous (agent IA) : une seule tâche à la fois, et une tâche n'a qu'un agent. À faire avant de travailler dessus ; refusé si un autre agent l'a déjà. Vos fichiers Verse de cette tâche ne peuvent pas être modifiés par un autre agent.", json!({ "number": { "type": "integer" } }), &["number"]),
         tool("save_progress", "Note où vous en êtes sur votre tâche réservée, pour qu'un autre agent puisse la reprendre : done (ce qui est fait), todo (ce qui reste), files (fichiers touchés). À faire avant de vous arrêter et à chaque étape importante. La note est rendue par claim_task et next_task.", json!({ "done": { "type": "string" }, "todo": { "type": "string" }, "files": { "type": "array", "items": { "type": "string" } } }), &[]),
+        tool("list_boards", "Tableaux blancs de la map (identifiant, titre).", json!({}), &[]),
+        tool("get_board", "Objets d'un tableau blanc : post-it (sticky), cadres (frame), textes, formes, connecteurs, images… avec id, kind, x, y, w, h, text.", json!({ "board": { "type": "integer" } }), &["board"]),
+        tool("create_board", "Crée un tableau blanc. Facultatifs : title, template (modèle de l'interface : brainstorm, etc.).", json!({ "title": { "type": "string" }, "template": { "type": "string" } }), &[]),
+        tool("upsert_board_objects", "Crée ou modifie des objets d'un tableau blanc (200 au plus), visibles en direct par les membres qui l'ont ouvert. Chaque objet : kind (sticky, text, shape, frame, connector, image, comment…), x, y, w, h en pixels du tableau, text (2 000 caractères au plus) ; id facultatif pour un nouvel objet, obligatoire pour modifier. sticky : shade 0 à 5 pour la couleur. Les objets invalides sont ignorés et comptés.", json!({ "board": { "type": "integer" }, "objects": { "type": "array", "items": { "type": "object" } } }), &["board", "objects"]),
+        tool("delete_board_objects", "Retire des objets d'un tableau blanc par leurs identifiants.", json!({ "board": { "type": "integer" }, "ids": ids }), &["board", "ids"]),
+        tool("list_pages", "Pages de la documentation de la map (identifiant, titre, page parente).", json!({}), &[]),
+        tool("read_page", "Lit une page de la documentation, en Markdown.", json!({ "page": { "type": "integer" } }), &["page"]),
+        tool("write_page", "Écrit une page de la documentation en Markdown (titres #, listes -, cases - [ ], citations >, code ```, tableaux |, ---). Sans page : crée une page (title, parent facultatif). Avec page : remplace son contenu ; l'ancienne version reste dans l'historique de la page.", json!({ "page": { "type": "integer" }, "title": { "type": "string" }, "markdown": { "type": "string" }, "parent": { "type": "integer" } }), &["markdown"]),
+        tool("list_milestones", "Jalons et objectifs du planning de la map (date, heure, type, détail).", json!({}), &[]),
+        tool("add_milestone", "Ajoute un jalon au planning : title, date AAAA-MM-JJ ; facultatifs : time HH:MM, detail, kind (jalon par défaut).", json!({ "title": { "type": "string" }, "date": { "type": "string" }, "time": { "type": "string" }, "detail": { "type": "string" }, "kind": { "type": "string" } }), &["title", "date"]),
         tool("list_agents", "Agents IA de la map : identifiant, nom, rôle, tâche en cours, actif ou non, et lequel est l'Orchestrateur.", json!({}), &[]),
         tool("plan_tasks", "Réservé à l'Orchestrateur. Découpe une demande en tâches d'environ une heure, créées d'un coup. Chaque tâche : title, description, tag (code, carte, conception, test), lot, uefn, key (nom court pour s'y référer plus bas), depends_on (numéros de tâches existantes ou key d'une tâche plus haut dans le plan), agent (identifiant ou nom d'un agent de la map, voir list_agents : la tâche lui est attribuée). Tout est vérifié avant de créer quoi que ce soit.", json!({ "tasks": { "type": "array", "items": { "type": "object", "properties": { "key": { "type": "string" }, "title": { "type": "string" }, "description": { "type": "string" }, "tag": { "type": "string" }, "lot": { "type": "string" }, "uefn": { "type": "boolean" }, "depends_on": { "type": "array", "items": { "type": ["integer", "string"] } }, "agent": { "type": ["integer", "string"] } }, "required": ["title"] } } }), &["tasks"]),
         tool("assign_task", "Réservé à l'Orchestrateur. Attribue une tâche à un agent de la map (identifiant ou nom, voir list_agents) : lui seul pourra la réserver. agent vide ou null : la tâche redevient libre. Refusé si un autre agent travaille déjà dessus.", json!({ "number": { "type": "integer" }, "agent": { "type": ["integer", "string", "null"] } }), &["number"]),
@@ -233,6 +243,11 @@ const READ_TOOLS: &[&str] = &[
     "list_skills",
     "get_skill",
     "list_agents",
+    "list_boards",
+    "get_board",
+    "list_pages",
+    "read_page",
+    "list_milestones",
 ];
 
 fn rpc_ok(id: Value, result: Value) -> Response {
@@ -464,6 +479,273 @@ async fn token_call(
     }
 }
 
+/// Tableaux blancs pour les IA (#147) : mêmes contrôles que l'interface et la WebSocket ; les changements partent en
+/// direct aux membres qui ont le tableau ouvert.
+async fn tableau(
+    st: &AppState,
+    ctx: &crate::access::MapCtx,
+    name: &str,
+    a: &Value,
+) -> Result<Value, AppError> {
+    let mid = ctx.map_id;
+    let u = &ctx.user;
+    let du_tableau = || async {
+        let bid = a["board"]
+            .as_i64()
+            .ok_or_else(|| bad("Identifiant du tableau manquant (board, voir list_boards)."))?;
+        let ok: Option<i64> = sqlx::query_scalar(
+            "SELECT id FROM boards WHERE id = ? AND map_id = ? AND deleted_at IS NULL",
+        )
+        .bind(bid)
+        .bind(mid)
+        .fetch_optional(&st.db)
+        .await?;
+        ok.ok_or_else(|| {
+            bad(format!(
+                "Tableau {bid} introuvable dans cette map (list_boards)."
+            ))
+        })
+    };
+    match name {
+        "list_boards" => {
+            let crate::Json(v) =
+                crate::boards::list(State(st.clone()), u.clone(), axum::extract::Path(mid)).await?;
+            Ok(v)
+        }
+        "get_board" => {
+            let bid = du_tableau().await?;
+            let crate::Json(mut v) =
+                crate::boards::get(State(st.clone()), u.clone(), axum::extract::Path(bid)).await?;
+            let objets: Vec<Value> = v["objects"]
+                .as_object()
+                .map(|m| {
+                    m.iter()
+                        .filter(|(k, _)| *k != "__meta")
+                        .map(|(_, o)| o.clone())
+                        .collect()
+                })
+                .unwrap_or_default();
+            v["objects"] = json!(objets);
+            Ok(v)
+        }
+        "create_board" => {
+            let b =
+                serde_json::from_value(json!({ "title": a["title"], "template": a["template"] }))
+                    .map_err(|_| bad("title et template : du texte."))?;
+            let crate::Json(v) = crate::boards::create(
+                State(st.clone()),
+                u.clone(),
+                axum::extract::Path(mid),
+                crate::Json(b),
+            )
+            .await?;
+            notify(st, mid, json!({ "t": "refresh", "what": "boards" }));
+            Ok(
+                json!({ "board": v["id"], "message": "Tableau créé : ajoutez des objets avec upsert_board_objects." }),
+            )
+        }
+        "upsert_board_objects" => {
+            ctx.can_edit()?;
+            let bid = du_tableau().await?;
+            let list = a["objects"]
+                .as_array()
+                .filter(|l| !l.is_empty())
+                .ok_or_else(|| bad("objects : au moins un objet."))?;
+            if list.len() > 200 {
+                return Err(bad("200 objets au plus par appel."));
+            }
+            let mut objs = vec![];
+            let mut refus = vec![];
+            for (i, o) in list.iter().enumerate() {
+                let mut o = o.clone();
+                let kind = o["kind"].as_str().unwrap_or("");
+                let raison = if !o.is_object() || !crate::boards::KINDS.contains(&kind) {
+                    Some(format!("type « {kind} » inconnu"))
+                } else if o["text"]
+                    .as_str()
+                    .map(|t| t.chars().count() > 2000)
+                    .unwrap_or(false)
+                {
+                    Some("texte de plus de 2 000 caractères".to_string())
+                } else if o["url"]
+                    .as_str()
+                    .map(|t| t.len() > 200_000)
+                    .unwrap_or(false)
+                {
+                    Some("image de plus de 200 Ko".to_string())
+                } else if kind == "stroke" {
+                    Some("dessin à main levée non pris en charge".to_string())
+                } else {
+                    None
+                };
+                if let Some(r) = raison {
+                    refus.push(format!("objet {} : {r}", i + 1));
+                    continue;
+                }
+                if o["id"].as_str().map(|s| s.is_empty()).unwrap_or(true) {
+                    o["id"] = json!(crate::boards::oid());
+                }
+                objs.push(o);
+            }
+            let out = if objs.is_empty() {
+                json!({ "objs": [] })
+            } else {
+                crate::boards::apply_op(
+                    st,
+                    u,
+                    mid,
+                    &json!({ "board": bid, "op": "upsert", "objs": objs }),
+                )
+                .await?
+            };
+            let gardes: Vec<Value> = out["objs"].as_array().cloned().unwrap_or_default();
+            let ids: Vec<Value> = gardes.iter().map(|o| o["id"].clone()).collect();
+            let ignores = list.len() - gardes.len();
+            if gardes.is_empty() {
+                return Err(bad(format!(
+                    "Aucun objet gardé : {}.",
+                    if refus.is_empty() {
+                        "objets invalides".to_string()
+                    } else {
+                        refus.join(" ; ")
+                    }
+                )));
+            }
+            Ok(
+                json!({ "ids": ids, "ignored": ignores, "details": refus, "message": format!("{} objet(s) enregistrés{}.", gardes.len(), if ignores > 0 { format!(", {ignores} ignoré(s)") } else { String::new() }) }),
+            )
+        }
+        "delete_board_objects" => {
+            ctx.can_edit()?;
+            let bid = du_tableau().await?;
+            let out = crate::boards::apply_op(
+                st,
+                u,
+                mid,
+                &json!({ "board": bid, "op": "delete", "ids": a["ids"] }),
+            )
+            .await?;
+            Ok(
+                json!({ "message": format!("{} objet(s) retiré(s).", out["ids"].as_array().map(|x| x.len()).unwrap_or(0)) }),
+            )
+        }
+        _ => Err(bad("Outil inconnu.")),
+    }
+}
+
+/// Documentation pour les IA (#147) : lecture en Markdown ; écriture d'une page, avec une version gardée à chaque
+/// écriture (l'interface n'en garde qu'une toutes les 2 minutes).
+async fn documentation(
+    st: &AppState,
+    ctx: &crate::access::MapCtx,
+    name: &str,
+    a: &Value,
+) -> Result<Value, AppError> {
+    let mid = ctx.map_id;
+    let u = &ctx.user;
+    let page_de_la_map = |pid: i64| async move {
+        let crate::Json(p) =
+            crate::pages::get(State(st.clone()), u.clone(), axum::extract::Path(pid)).await?;
+        if p["map_id"].as_i64() != Some(mid) {
+            return Err(bad(format!(
+                "Page {pid} introuvable dans cette map (list_pages)."
+            )));
+        }
+        Ok::<Value, AppError>(p)
+    };
+    match name {
+        "list_pages" => {
+            let crate::Json(v) =
+                crate::pages::tree(State(st.clone()), u.clone(), axum::extract::Path(mid)).await?;
+            Ok(v)
+        }
+        "read_page" => {
+            let pid = a["page"]
+                .as_i64()
+                .ok_or_else(|| bad("Identifiant de la page manquant (page)."))?;
+            let p = page_de_la_map(pid).await.map_err(|e| match e {
+                AppError::NotFound => bad(format!(
+                    "Page {pid} introuvable dans cette map (list_pages)."
+                )),
+                e => e,
+            })?;
+            Ok(
+                json!({ "id": pid, "title": p["title"], "version": p["version"], "updated_at": p["updated_at"], "markdown": crate::pages::page_markdown(&p) }),
+            )
+        }
+        "write_page" => {
+            ctx.can_edit()?;
+            let md = a["markdown"].as_str().unwrap_or("");
+            if md.len() > 1_000_000 {
+                return Err(bad("Page trop volumineuse (1 Mo de Markdown au plus)."));
+            }
+            let mut blocks = crate::pages::from_markdown(md);
+            // Un titre « # … » en tête devient le titre de la page s'il n'est pas donné.
+            let mut titre = a["title"]
+                .as_str()
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty());
+            if titre.is_none() && blocks.first().map(|b| b["type"] == "h1").unwrap_or(false) {
+                titre = blocks
+                    .first()
+                    .and_then(|b| b["text"].as_str())
+                    .map(String::from);
+                blocks.remove(0);
+            }
+            let pid = match a["page"].as_i64() {
+                Some(pid) => {
+                    page_de_la_map(pid).await?;
+                    pid
+                }
+                None => {
+                    let nb = serde_json::from_value(json!({ "title": titre.clone().unwrap_or_else(|| "Sans titre".into()), "parent_id": a["parent"] }))
+                        .map_err(|_| bad("parent : identifiant de page."))?;
+                    let crate::Json(v) = crate::pages::create(
+                        State(st.clone()),
+                        u.clone(),
+                        axum::extract::Path(mid),
+                        crate::Json(nb),
+                    )
+                    .await?;
+                    v["id"].as_i64().unwrap_or(0)
+                }
+            };
+            let patch = serde_json::from_value(
+                json!({ "title": titre, "blocks": blocks, "client": "mcp" }),
+            )
+            .map_err(|_| bad("Page invalide."))?;
+            let crate::Json(r) = crate::pages::update(
+                State(st.clone()),
+                u.clone(),
+                axum::extract::Path(pid),
+                crate::Json(patch),
+            )
+            .await?;
+            let version = r["version"].as_i64().unwrap_or(1);
+            let deja: Option<i64> = sqlx::query_scalar(
+                "SELECT id FROM page_versions WHERE page_id = ? AND version = ?",
+            )
+            .bind(pid)
+            .bind(version)
+            .fetch_optional(&st.db)
+            .await?;
+            if deja.is_none() {
+                let (t, b): (String, String) =
+                    sqlx::query_as("SELECT title, blocks FROM pages WHERE id = ?")
+                        .bind(pid)
+                        .fetch_one(&st.db)
+                        .await?;
+                crate::pages::snapshot(st, pid, version, &t, &b, u.id).await?;
+            }
+            notify(st, mid, json!({ "t": "refresh", "what": "pages" }));
+            Ok(
+                json!({ "page": pid, "version": version, "message": format!("Page enregistrée (version {version}).") }),
+            )
+        }
+        _ => Err(bad("Outil inconnu.")),
+    }
+}
+
 #[cfg(test)]
 async fn call(
     st: &AppState,
@@ -528,6 +810,24 @@ async fn call_as(
         }
         "release_task" => crate::agents::release(st, agent_requis()?).await,
         "list_agents" => crate::orchestre::liste(st, mid).await,
+        "list_boards" | "get_board" | "create_board" | "upsert_board_objects"
+        | "delete_board_objects" => tableau(st, &ctx, name, &a).await,
+        "list_pages" | "read_page" | "write_page" => documentation(st, &ctx, name, &a).await,
+        "list_milestones" => {
+            let rows: Vec<(i64, String, String, String, Option<String>, String)> = sqlx::query_as(
+                "SELECT id, title, date, kind, time, detail FROM milestones WHERE map_id = ? ORDER BY date, id",
+            )
+            .bind(mid)
+            .fetch_all(&st.db)
+            .await?;
+            Ok(json!(rows.into_iter().map(|r| json!({ "id": r.0, "title": r.1, "date": r.2, "kind": r.3, "time": r.4, "detail": r.5 })).collect::<Vec<_>>()))
+        }
+        "add_milestone" => {
+            let b = serde_json::from_value(json!({ "title": a["title"].as_str().unwrap_or(""), "date": a["date"].as_str().unwrap_or(""), "kind": a["kind"], "time": a["time"], "detail": a["detail"] }))
+                .map_err(|_| bad("title et date (AAAA-MM-JJ) attendus."))?;
+            let crate::Json(v) = crate::plan::add_milestone(State(st.clone()), user.clone(), axum::extract::Path(mid), crate::Json(b)).await?;
+            Ok(json!({ "id": v["id"], "message": format!("Jalon « {} » ajouté au {}.", a["title"].as_str().unwrap_or(""), a["date"].as_str().unwrap_or("")) }))
+        }
         "plan_tasks" => crate::orchestre::plan(st, &ctx, agent_requis()?, &a).await,
         "assign_task" => crate::orchestre::assign(st, &ctx, agent_requis()?, &a).await,
         "save_progress" => crate::agents::save_progress(st, agent_requis()?, &a).await,
@@ -2092,6 +2392,152 @@ mod tests_compte {
             crate::orchestre::de_la_map(&m.st, m.equipe).await.unwrap(),
             Some(codex)
         );
+    }
+
+    /// #147 : tableau blanc, documentation et jalons depuis une IA ; diffusion en direct ; lecture seule.
+    #[tokio::test]
+    async fn conception_par_l_ia() {
+        let m = monde().await;
+        let t = jeton(&m, Some(m.equipe), "write").await;
+        let mut ws = m.st.hub.subscribe(m.equipe);
+        let (err, txt) = mcp_call(
+            &m.st,
+            &t,
+            "create_board",
+            json!({ "title": "Principe de jeu" }),
+        )
+        .await;
+        assert!(!err, "{txt}");
+        let bid = serde_json::from_str::<Value>(&txt).unwrap()["board"]
+            .as_i64()
+            .unwrap();
+        let (err, txt) = mcp_call(&m.st, &t, "upsert_board_objects", json!({ "board": bid, "objects": [
+            { "kind": "frame", "x": 0, "y": 0, "w": 800, "h": 400, "text": "Boucle de jeu" },
+            { "kind": "sticky", "x": 20, "y": 60, "w": 160, "h": 120, "text": "Couper l'herbe", "shade": 2 },
+            { "kind": "sticky", "x": 200, "y": 60, "w": 160, "h": 120, "text": "Vendre" },
+            { "kind": "inconnu", "x": 0, "y": 0, "text": "non" },
+            { "kind": "sticky", "x": 0, "y": 0, "text": "x".repeat(2001) },
+        ] }))
+        .await;
+        assert!(!err, "{txt}");
+        let r: Value = serde_json::from_str(&txt).unwrap();
+        assert_eq!(r["ignored"], 2, "{txt}");
+        assert!(
+            r["details"].to_string().contains("inconnu")
+                && r["details"].to_string().contains("2 000")
+        );
+        // Critère 1 : diffusé en direct aux membres qui ont le tableau ouvert.
+        let mut vu = false;
+        while let Ok(msg) = ws.try_recv() {
+            let v: Value = serde_json::from_str(&msg).unwrap_or(Value::Null);
+            if v["t"] == "board"
+                && v["board"] == bid
+                && v["objs"].as_array().map(|o| o.len()) == Some(3)
+            {
+                vu = true;
+            }
+        }
+        assert!(vu, "op « board » diffusée");
+        // Critère 2 : relire, modifier un texte, retirer.
+        let id = r["ids"][1].as_str().unwrap().to_string();
+        let (_, txt) = mcp_call(&m.st, &t, "get_board", json!({ "board": bid })).await;
+        assert!(
+            txt.contains("Couper l'herbe") && !txt.contains("__meta"),
+            "{txt}"
+        );
+        let (err, txt) = mcp_call(&m.st, &t, "upsert_board_objects", json!({ "board": bid, "objects": [{ "id": id, "kind": "sticky", "x": 20, "y": 60, "text": "Couper et ramasser" }] })).await;
+        assert!(!err, "{txt}");
+        let (_, txt) = mcp_call(&m.st, &t, "get_board", json!({ "board": bid })).await;
+        assert!(txt.contains("Couper et ramasser") && !txt.contains("Couper l'herbe"));
+        let (err, _) = mcp_call(
+            &m.st,
+            &t,
+            "delete_board_objects",
+            json!({ "board": bid, "ids": [id] }),
+        )
+        .await;
+        assert!(!err);
+        let (_, txt) = mcp_call(&m.st, &t, "get_board", json!({ "board": bid })).await;
+        assert!(!txt.contains("Couper et ramasser") && txt.contains("Vendre"));
+        // Un tableau d'une autre map reste introuvable.
+        let autre: i64 = q(&m.st, &format!("INSERT INTO boards (map_id, title, objects) VALUES ({}, 'Secret', '{{}}') RETURNING id", m.autre)).await;
+        let (err, msg) = mcp_call(&m.st, &t, "get_board", json!({ "board": autre })).await;
+        assert!(err && msg.contains("introuvable"), "{msg}");
+        // Critère 4 : documentation en Markdown, avec l'ancienne version gardée.
+        let (err, txt) = mcp_call(&m.st, &t, "write_page", json!({ "markdown": "# Règles\n\n## Objectif\nCouper toute l'herbe.\n\n- Un joueur\n- [ ] Tester\n\n| Pièce | Prix |\n| --- | --- |\n| Faux | 10 |" })).await;
+        assert!(!err, "{txt}");
+        let pid = serde_json::from_str::<Value>(&txt).unwrap()["page"]
+            .as_i64()
+            .unwrap();
+        let (err, txt) = mcp_call(
+            &m.st,
+            &t,
+            "write_page",
+            json!({ "page": pid, "markdown": "## Objectif\nCouper l'herbe en 5 minutes." }),
+        )
+        .await;
+        assert!(!err, "{txt}");
+        let (_, txt) = mcp_call(&m.st, &t, "read_page", json!({ "page": pid })).await;
+        assert!(
+            txt.contains("# Règles") && txt.contains("5 minutes"),
+            "{txt}"
+        );
+        let versions: Vec<String> =
+            sqlx::query_scalar("SELECT blocks FROM page_versions WHERE page_id = ? ORDER BY id")
+                .bind(pid)
+                .fetch_all(&m.st.db)
+                .await
+                .unwrap();
+        assert!(
+            versions.iter().any(|b| b.contains("Couper toute l'herbe")),
+            "ancienne version gardée"
+        );
+        assert!(versions.last().unwrap().contains("5 minutes"));
+        let (_, txt) = mcp_call(&m.st, &t, "list_pages", json!({})).await;
+        assert!(txt.contains("Règles"));
+        // Critère 5 : jalon visible dans le planning.
+        let (err, txt) = mcp_call(
+            &m.st,
+            &t,
+            "add_milestone",
+            json!({ "title": "Bêta fermée", "date": "2026-12-15", "time": "18:00" }),
+        )
+        .await;
+        assert!(!err, "{txt}");
+        let (_, txt) = mcp_call(&m.st, &t, "list_milestones", json!({})).await;
+        assert!(
+            txt.contains("Bêta fermée") && txt.contains("2026-12-15"),
+            "{txt}"
+        );
+        let (err, msg) = mcp_call(
+            &m.st,
+            &t,
+            "add_milestone",
+            json!({ "title": "Sans date", "date": "demain" }),
+        )
+        .await;
+        assert!(err && msg.contains("Date invalide"), "{msg}");
+        // Critère 6 : en lecture seule, les écritures sont absentes et refusées ; les lectures marchent.
+        let l = jeton(&m, Some(m.equipe), "read").await;
+        let outils = outils_visibles(&m.st, &l).await;
+        for o in [
+            "create_board",
+            "upsert_board_objects",
+            "delete_board_objects",
+            "write_page",
+            "add_milestone",
+        ] {
+            assert!(
+                !outils.contains(&format!("\"{o}\"")),
+                "{o} visible en lecture seule"
+            );
+            let (err, msg) = mcp_call(&m.st, &l, o, json!({ "board": bid, "objects": [], "ids": [], "markdown": "x", "title": "x", "date": "2026-12-01" })).await;
+            assert!(err && msg.contains("lecture seule"), "{o} : {msg}");
+        }
+        for o in ["list_boards", "get_board", "list_pages", "list_milestones"] {
+            let (err, msg) = mcp_call(&m.st, &l, o, json!({ "board": bid })).await;
+            assert!(!err, "{o} : {msg}");
+        }
     }
 
     /// #298, critère 5 : next_task ne propose pas une tâche dont une dépendance n'est pas faite.

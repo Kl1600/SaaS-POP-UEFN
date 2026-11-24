@@ -12,7 +12,7 @@ use axum::{
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
 
-fn oid() -> String {
+pub fn oid() -> String {
     random_token()[..12].to_string()
 }
 
@@ -291,7 +291,7 @@ async fn save(st: &AppState, bid: i64, objs: &Map<String, Value>) -> Result<(), 
     Ok(())
 }
 
-const KINDS: [&str; 10] = [
+pub const KINDS: [&str; 10] = [
     "artifact",
     "sticky",
     "text",
@@ -314,8 +314,14 @@ pub fn artifact_url_ok(u: &str) -> bool {
     re.is_match(u)
 }
 
-/// Applique une opération reçue par WebSocket puis la diffuse aux autres membres.
-pub async fn apply_op(st: &AppState, u: &AuthUser, map_id: i64, v: &Value) -> Result<(), AppError> {
+/// Applique une opération reçue par WebSocket (ou par le MCP, #147) puis la diffuse aux membres ; rend le message
+/// diffusé (objets gardés, identifiants retirés).
+pub async fn apply_op(
+    st: &AppState,
+    u: &AuthUser,
+    map_id: i64,
+    v: &Value,
+) -> Result<Value, AppError> {
     let bid = v["board"].as_i64().ok_or_else(|| bad("board"))?;
     let _guard = st.board_lock.lock().await;
     let mut objs = load(st, bid, map_id).await?;
@@ -435,8 +441,8 @@ pub async fn apply_op(st: &AppState, u: &AuthUser, map_id: i64, v: &Value) -> Re
         _ => return Err(bad("op inconnue")),
     }
     save(st, bid, &objs).await?;
-    notify(st, map_id, out);
-    Ok(())
+    notify(st, map_id, out.clone());
+    Ok(out)
 }
 
 #[derive(Deserialize)]
