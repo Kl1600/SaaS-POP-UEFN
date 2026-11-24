@@ -158,6 +158,12 @@ fn tools() -> Value {
     let task = json!({ "type": "integer", "description": "N° de la tâche POP liée (facultatif)" });
     json!([
         tool("list_maps", "Liste les maps auxquelles votre compte a accès (espace perso et studios), avec votre rôle ; current : la map de travail actuelle de cette IA.", json!({}), &[]),
+        tool("create_map", "Crée une nouvelle map (comme « Nouvelle map » dans POP) et en fait la map de travail de cette IA : les autres outils agissent ensuite sur elle, sans reconnexion. Sans studio, la map est créée dans votre espace perso. Il faut être admin du studio.", json!({
+            "name": { "type": "string", "description": "Nom de la map (60 caractères au plus)" },
+            "genre": { "type": "string", "description": "Genre (facultatif), par exemple « Tycoon » ou « Box fight »" },
+            "release_target": { "type": "string", "description": "Sortie visée (facultatif), AAAA-MM-JJ" },
+            "studio": { "description": "Studio (facultatif) : identifiant ou nom, tel que list_maps le montre ; sans lui, l'espace perso" }
+        }), &["name"]),
         tool("use_map", "Choisit la map de travail de cette IA (identifiant donné par list_maps). Tous les autres outils agissent ensuite sur cette map ; le choix est gardé par POP, même après un redémarrage de l'IA.", json!({ "map": { "type": "integer", "description": "Identifiant de la map (list_maps)" } }), &["map"]),
         tool("uefn_status", "État du relais et d'UEFN (connecté, fermé, hors ligne) et nombre d'actions en attente.", json!({}), &[]),
         tool("list_actors", "Liste les acteurs du niveau. Filtre facultatif : texte cherché dans le nom, le type, le dossier, les tags et les options.", json!({ "query": { "type": "string" } }), &[]),
@@ -353,7 +359,8 @@ pub async fn mcp(
             let args = req["params"]["arguments"].clone();
             let res = token_call(&st, &user, mid, agent, name, args.clone()).await;
             // Fil d'activité de l'agent (#298) : seulement sur une map de travail, pas pour list_maps / use_map.
-            if let (Some(m), false) = (mid, matches!(name, "list_maps" | "use_map")) {
+            if let (Some(m), false) = (mid, matches!(name, "list_maps" | "use_map" | "create_map"))
+            {
                 crate::agents::noter_appel(
                     &st,
                     agent,
@@ -402,6 +409,85 @@ fn consignes(role: Option<&str>, orch: bool, base: &str) -> String {
 
 const SANS_MAP: &str = "Aucune map de travail choisie pour cette IA. Appelez list_maps pour voir vos maps, puis use_map avec l'identifiant de la map sur laquelle travailler.";
 
+/// `create_map` (#144) : mêmes règles que « Nouvelle map » dans POP (admin du studio, nom de 1 à 60 caractères,
+/// date AAAA-MM-JJ), ligne dans le fil d'activité de la map, puis la map devient la map de travail du jeton.
+async fn create_map(
+    st: &AppState,
+    user: &AuthUser,
+    work_map: Option<i64>,
+    agent: i64,
+    a: &Value,
+) -> Result<Value, AppError> {
+    let nom = a["name"].as_str().unwrap_or("").trim().to_string();
+    if nom.is_empty() {
+        return Err(bad("Donnez un nom à la map (name)."));
+    }
+    crate::error::check_len("Nom de la map", &nom, 1, 60)?;
+    let genre = a["genre"].as_str().unwrap_or("").trim().to_string();
+    crate::error::check_len("Genre", &genre, 0, 60)?;
+    let sortie = a["release_target"].as_str().map(str::trim);
+    let mes_studios: Vec<(i64, String, i64, String)> = sqlx::query_as(
+        "SELECT s.id, s.name, s.personal, ms.role FROM studios s JOIN memberships ms ON ms.studio_id = s.id AND ms.user_id = ?
+         ORDER BY s.personal DESC, s.id",
+    )
+    .bind(user.id)
+    .fetch_all(&st.db)
+    .await?;
+    let studio = match &a["studio"] {
+        Value::Null => mes_studios.iter().find(|s| s.2 != 0),
+        Value::Number(n) => mes_studios.iter().find(|s| Some(s.0) == n.as_i64()),
+        Value::String(s) if s.trim().parse::<i64>().is_ok() => {
+            let id = s.trim().parse::<i64>().ok();
+            mes_studios.iter().find(|x| Some(x.0) == id)
+        }
+        Value::String(s) => {
+            let s = s.trim().to_lowercase();
+            mes_studios.iter().find(|x| {
+                x.1.to_lowercase() == s || (x.2 != 0 && (s == "espace perso" || s == "perso"))
+            })
+        }
+        _ => None,
+    }
+    .ok_or_else(|| {
+        bad("Studio introuvable, ou vous n'en êtes pas membre. Appelez list_maps pour voir vos studios, ou omettez studio pour votre espace perso.")
+    })?;
+    let role = crate::access::Role::parse(&studio.3).unwrap_or(crate::access::Role::Freelance);
+    if role < crate::access::Role::Admin {
+        return Err(bad(format!(
+            "Votre rôle dans « {} » ne permet pas de créer une map : il faut être admin du studio. Demandez à un admin de la créer dans POP.",
+            if studio.2 != 0 { "Espace perso" } else { &studio.1 }
+        )));
+    }
+    let mid = crate::studio::insert_map(st, studio.0, &nom, &genre, sortie).await?;
+    let detail = if genre.is_empty() {
+        String::new()
+    } else {
+        format!("Genre : {genre}")
+    };
+    crate::access::log_activity(
+        st,
+        mid,
+        Some(user.id),
+        "map",
+        &format!("Map « {nom} » créée par l'IA"),
+        &detail,
+    )
+    .await?;
+    sqlx::query("UPDATE api_tokens SET map_id = ?, task_id = NULL, task_since = NULL WHERE id = ?")
+        .bind(mid)
+        .bind(agent)
+        .execute(&st.db)
+        .await?;
+    if let Some(old) = work_map {
+        notify(st, old, json!({ "t": "refresh", "what": "ai" }));
+    }
+    notify(st, mid, json!({ "t": "refresh", "what": "ai" }));
+    Ok(json!({
+        "map": { "id": mid, "name": nom, "studio": if studio.2 != 0 { "Espace perso".to_string() } else { studio.1.clone() } },
+        "message": format!("Map « {nom} » créée : c'est maintenant la map de travail, les outils agissent sur elle."),
+    }))
+}
+
 /// Appel d'un outil par un jeton MCP du compte (#145) : `list_maps` et `use_map` choisissent la map de travail ;
 /// les autres outils agissent sur elle, après vérification de l'appartenance et du rôle à chaque appel.
 async fn token_call(
@@ -429,6 +515,7 @@ async fn token_call(
                 "message": "Choisissez la map de travail avec use_map { \"map\": <id> }.",
             }))
         }
+        "create_map" => create_map(st, user, work_map, agent, &a).await,
         "use_map" => {
             let mid = a["map"]
                 .as_i64()
@@ -1847,6 +1934,16 @@ mod tests_compte {
         autre: i64,
     }
 
+    impl Monde {
+        async fn perso_studio(&self) -> i64 {
+            q(
+                &self.st,
+                &format!("SELECT studio_id FROM maps WHERE id = {}", self.perso),
+            )
+            .await
+        }
+    }
+
     async fn q(st: &AppState, sql: &str) -> i64 {
         sqlx::query_scalar(sql).fetch_one(&st.db).await.unwrap()
     }
@@ -1989,6 +2086,95 @@ mod tests_compte {
         assert!(
             err && msg.contains("list_maps") && msg.contains("use_map"),
             "{msg}"
+        );
+    }
+
+    /// #144 : create_map crée la map (espace perso ou studio dont on est admin), la journalise et en fait la map
+    /// de travail ; refus clair pour un rôle insuffisant, un nom vide ou un studio inconnu, sans rien créer.
+    #[tokio::test]
+    async fn creer_une_map_par_le_mcp() {
+        let m = monde().await;
+        let t = jeton(&m, None, "write").await;
+        let combien = || async { q(&m.st, "SELECT COUNT(*) FROM maps").await };
+        let avant = combien().await;
+        let (err, msg) = mcp_call(&m.st, &t, "create_map", json!({ "name": "  " })).await;
+        assert!(err && msg.contains("nom"), "{msg}");
+        let (err, msg) = mcp_call(&m.st, &t, "create_map", json!({ "name": "x".repeat(61) })).await;
+        assert!(err, "{msg}");
+        let (err, msg) = mcp_call(
+            &m.st,
+            &t,
+            "create_map",
+            json!({ "name": "Arène", "studio": "Equipe" }),
+        )
+        .await;
+        assert!(
+            err && msg.contains("admin"),
+            "membre du studio : refusé : {msg}"
+        );
+        let (err, msg) = mcp_call(
+            &m.st,
+            &t,
+            "create_map",
+            json!({ "name": "Arène", "studio": "Ailleurs" }),
+        )
+        .await;
+        assert!(
+            err && msg.contains("introuvable"),
+            "studio d'un autre : {msg}"
+        );
+        let (err, msg) = mcp_call(
+            &m.st,
+            &t,
+            "create_map",
+            json!({ "name": "Arène", "release_target": "bientôt" }),
+        )
+        .await;
+        assert!(err && msg.contains("AAAA-MM-JJ"), "{msg}");
+        assert_eq!(combien().await, avant, "rien n'est créé en cas de refus");
+
+        let (err, msg) = mcp_call(
+            &m.st,
+            &t,
+            "create_map",
+            json!({ "name": "Grass Cutter", "genre": "Tycoon", "release_target": "2027-02-01" }),
+        )
+        .await;
+        assert!(!err, "{msg}");
+        let r: Value = serde_json::from_str(&msg).unwrap();
+        let mid = r["map"]["id"].as_i64().unwrap();
+        assert_eq!(r["map"]["studio"], "Espace perso");
+        let (sid, genre, sortie): (i64, String, Option<String>) =
+            sqlx::query_as("SELECT studio_id, genre, release_date FROM maps WHERE id = ?")
+                .bind(mid)
+                .fetch_one(&m.st.db)
+                .await
+                .unwrap();
+        assert_eq!(
+            (sid, genre.as_str(), sortie.as_deref()),
+            (m.perso_studio().await, "Tycoon", Some("2027-02-01"))
+        );
+        let journal = q(
+            &m.st,
+            &format!("SELECT COUNT(*) FROM activity WHERE map_id = {mid} AND kind = 'map'"),
+        )
+        .await;
+        assert_eq!(
+            journal, 1,
+            "la création est dans le fil d'activité de la map"
+        );
+        // Map de travail : list_tasks répond sur elle sans use_map.
+        let (err, msg) = mcp_call(&m.st, &t, "list_tasks", json!({})).await;
+        assert!(!err, "{msg}");
+        let (_, l) = mcp_call(&m.st, &t, "list_maps", json!({})).await;
+        let l: Value = serde_json::from_str(&l).unwrap();
+        assert!(
+            l["maps"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|x| x["id"] == mid && x["current"] == true),
+            "{l}"
         );
     }
 
