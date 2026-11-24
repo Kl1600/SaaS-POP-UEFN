@@ -249,7 +249,7 @@ mod tests {
         .map(|(_, Json(v))| v)
     }
     async fn col(st: &AppState, q: &str, id: i64) -> Option<String> {
-        sqlx::query_scalar(q)
+        sqlx::query_scalar(sqlx::AssertSqlSafe(q.to_string()))
             .bind(id)
             .fetch_one(&st.db)
             .await

@@ -304,7 +304,7 @@ async fn rows_in(
     binds: &[i64],
 ) -> Result<Value, AppError> {
     let cols: Vec<(i64, String, String, i64, Option<String>, i64)> =
-        sqlx::query_as(&format!("PRAGMA table_info({table})"))
+        sqlx::query_as(crate::sql!("PRAGMA table_info({table})"))
             .fetch_all(db)
             .await?;
     let only = allowed_columns(table);
@@ -323,7 +323,7 @@ async fn rows_in(
     let sql = format!(
         "SELECT COALESCE(json_group_array(json_object({obj})), '[]') FROM {table} WHERE {cond}"
     );
-    let mut q = sqlx::query_scalar::<_, String>(&sql);
+    let mut q = sqlx::query_scalar::<_, String>(sqlx::AssertSqlSafe(sql.as_str()));
     for b in binds {
         q = q.bind(*b);
     }
@@ -643,7 +643,7 @@ pub async fn backup_loop(st: AppState, db_url: String) {
         let file = dir.join(format!("pop-{day}.db"));
         if !file.exists() && std::fs::create_dir_all(&dir).is_ok() {
             crate::legal::purge(&st).await;
-            match sqlx::query(&format!(
+            match sqlx::query(crate::sql!(
                 "VACUUM INTO '{}'",
                 file.to_string_lossy().replace('\'', "''")
             ))
