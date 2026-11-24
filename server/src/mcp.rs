@@ -965,7 +965,14 @@ async fn call_as(
             .bind(mid)
             .fetch_one(&st.db)
             .await?;
-            Ok(json!({ "status": st.relays.status(mid), "pending": pending }))
+            let status = crate::uefn::statut(st, mid).await?;
+            let message = match status {
+                "connected" => "UEFN est ouvert et relié : les actions partent tout de suite.",
+                "closed" => "Le relais tourne mais UEFN est fermé : les actions attendent son ouverture.",
+                "unlinked" => "Aucun projet UEFN n'est relié à cette map : demandez à l'humain de relier son projet (Organiseur → UEFN Link → code d'appairage). Les actions UEFN seront mises en attente.",
+                _ => "Le relais de cette map est hors ligne : les actions attendent qu'il revienne.",
+            };
+            Ok(json!({ "status": status, "pending": pending, "message": message }))
         }
         "list_actors" => {
             let snap = snapshot(st, mid).await?;
@@ -2538,6 +2545,18 @@ mod tests_compte {
             let (err, msg) = mcp_call(&m.st, &l, o, json!({ "board": bid })).await;
             assert!(!err, "{o} : {msg}");
         }
+    }
+
+    /// #152, critère 5 : uefn_status d'une map jamais reliée renvoie « unlinked » avec une phrase claire.
+    #[tokio::test]
+    async fn statut_map_non_reliee() {
+        let m = monde().await;
+        let t = jeton(&m, Some(m.equipe), "read").await;
+        let (err, txt) = mcp_call(&m.st, &t, "uefn_status", json!({})).await;
+        assert!(!err, "{txt}");
+        let v: Value = serde_json::from_str(&txt).unwrap();
+        assert_eq!(v["status"], "unlinked");
+        assert!(v["message"].as_str().unwrap().contains("Aucun projet UEFN"));
     }
 
     /// #298, critère 5 : next_task ne propose pas une tâche dont une dépendance n'est pas faite.

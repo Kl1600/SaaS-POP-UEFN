@@ -183,6 +183,8 @@ pub async fn pair(State(st): State<AppState>, Json(b): Json<PairIn>) -> ApiResul
         .bind(mid)
         .fetch_one(&st.db)
         .await?;
+    // La map n'est plus « sans projet » (#152) : l'interface relit son état sans recharger.
+    notify(&st, mid, json!({ "t": "uefn", "what": "status" }));
     Ok(Json(json!({ "token": token, "map_id": mid, "map": name })))
 }
 
@@ -665,6 +667,35 @@ pub async fn props(
     ))
 }
 
+/// État UEFN d'une map pour l'interface et les IA (#152) : `connected`, `closed`, `offline` (map reliée dont le relais
+/// ne répond pas) ou `unlinked` (aucun relais ni projet UEFN n'a jamais été relié à cette map).
+pub async fn statut(st: &AppState, mid: i64) -> Result<&'static str, AppError> {
+    let s = st.relays.status(mid);
+    if s != "offline" {
+        return Ok(s);
+    }
+    let relie: i64 = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM relay_devices WHERE map_id = ?1 AND pair_code_hash IS NULL)
+              OR EXISTS (SELECT 1 FROM uefn_state WHERE map_id = ?1 AND project <> '')",
+    )
+    .bind(mid)
+    .fetch_one(&st.db)
+    .await?;
+    Ok(if relie == 1 { "offline" } else { "unlinked" })
+}
+
+/// Un relais est-il connecté pour une autre map du même studio (le relais du créateur marche, #152) ?
+pub async fn relais_ailleurs(st: &AppState, mid: i64) -> Result<bool, AppError> {
+    let autres: Vec<i64> = sqlx::query_scalar(
+        "SELECT id FROM maps WHERE studio_id = (SELECT studio_id FROM maps WHERE id = ?) AND id <> ?",
+    )
+    .bind(mid)
+    .bind(mid)
+    .fetch_all(&st.db)
+    .await?;
+    Ok(autres.iter().any(|m| st.relays.status(*m) != "offline"))
+}
+
 pub async fn state(
     State(st): State<AppState>,
     u: AuthUser,
@@ -699,8 +730,12 @@ pub async fn state(
     let approvals: Vec<(i64, String, Option<String>, String)> = sqlx::query_as(
         "SELECT a.id, a.summary, u.name, a.at FROM approvals a LEFT JOIN users u ON u.id = a.user_id WHERE a.map_id = ? AND a.status = 'pending' ORDER BY a.id",
     ).bind(mid).fetch_all(&st.db).await?;
+    let status = statut(&st, mid).await?;
     Ok(Json(json!({
-        "status": st.relays.status(mid), "stale": st.relays.stale(mid), "project": project, "updated_at": updated, "tools": st.relays.tools(mid),
+        // Jamais reliée : pas de « dernier état connu » (sa date serait celle de la création de la map).
+        "status": status, "stale": st.relays.stale(mid), "project": project,
+        "updated_at": if status == "unlinked" { Value::Null } else { json!(updated) }, "tools": st.relays.tools(mid),
+        "relay_elsewhere": status == "unlinked" && relais_ailleurs(&st, mid).await?,
         "actors": actors, "tags": serde_json::from_str::<Value>(&tags).unwrap_or(json!([])),
         "pending": pending, "unsaved_actors": unsaved, "has_topview": has_top == 1,
         "topview_bounds": bounds.and_then(|b| serde_json::from_str::<Value>(&b).ok()),
@@ -1972,5 +2007,99 @@ mod tests_rangement {
         assert_eq!(undo["action"], "actor_update_raw");
         assert_eq!(undo["args"]["patches"][0]["changes"]["name"], "Button2");
         assert_eq!(undo["args"]["patches"][0]["changes"]["folder"], "");
+    }
+}
+
+#[cfg(test)]
+mod tests_statut {
+    use super::*;
+
+    /// Relais connecté (comme après `relay_ws`) pour la map `mid`, avec l'état d'UEFN donné.
+    fn connecter(st: &AppState, mid: i64, uefn: &str) {
+        let (tx, _rx) = mpsc::unbounded_channel();
+        st.relays.conns.lock().unwrap().insert(
+            mid,
+            RelayConn {
+                tx,
+                pending: Default::default(),
+                uefn: uefn.into(),
+                project: "P".into(),
+                conn_id: 1,
+                tools: Value::Null,
+                proto: RELAY_PROTO,
+            },
+        );
+    }
+
+    /// #152 : jamais reliée → « unlinked » ; reliée hors ligne → « offline » ; reliée connectée → « connected ».
+    #[tokio::test]
+    async fn trois_cas() {
+        let st = crate::test_state().await;
+        let sid: i64 = sqlx::query_scalar("INSERT INTO studios (name) VALUES ('S') RETURNING id")
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        let map = |n: &'static str| {
+            let st = st.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO maps (studio_id, name) VALUES (?, ?) RETURNING id",
+                )
+                .bind(sid)
+                .bind(n)
+                .fetch_one(&st.db)
+                .await
+                .unwrap()
+            }
+        };
+        let (neuve, reliee, autre) = (
+            map("GrassCutter").await,
+            map("VaultRush").await,
+            map("AuraDuels").await,
+        );
+        let uid: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash) VALUES ('a@a.fr', 'Ben', 'x') RETURNING id").fetch_one(&st.db).await.unwrap();
+        sqlx::query("INSERT INTO memberships (studio_id, user_id, role) VALUES (?, ?, 'owner')")
+            .bind(sid)
+            .bind(uid)
+            .execute(&st.db)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO relay_devices (map_id, user_id, token_hash) VALUES (?, ?, 'h')")
+            .bind(reliee)
+            .bind(uid)
+            .execute(&st.db)
+            .await
+            .unwrap();
+        let u = AuthUser {
+            id: uid,
+            email: "a@a.fr".into(),
+            name: "Ben".into(),
+            sid: String::new(),
+        };
+        let etat = |mid: i64| {
+            let (st, u) = (st.clone(), u.clone());
+            async move { state(State(st), u, Path(mid)).await.unwrap().0 }
+        };
+        // Jamais reliée : pas de date de « dernier état connu ».
+        assert_eq!(statut(&st, neuve).await.unwrap(), "unlinked");
+        let v = etat(neuve).await;
+        assert_eq!(
+            (
+                v["status"].as_str(),
+                v["updated_at"].is_null(),
+                v["relay_elsewhere"].as_bool()
+            ),
+            (Some("unlinked"), true, Some(false))
+        );
+        // Reliée, relais arrêté : toujours « hors ligne », avec sa date.
+        assert_eq!(statut(&st, reliee).await.unwrap(), "offline");
+        assert!(etat(reliee).await["updated_at"].is_string());
+        // Relais connecté pour une autre map du studio : on le dit sur la map non reliée.
+        connecter(&st, autre, "closed");
+        assert_eq!(etat(neuve).await["relay_elsewhere"], true);
+        // Reliée et connectée.
+        connecter(&st, reliee, "connected");
+        assert_eq!(statut(&st, reliee).await.unwrap(), "connected");
+        assert_eq!(statut(&st, autre).await.unwrap(), "closed");
     }
 }

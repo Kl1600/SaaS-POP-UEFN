@@ -984,7 +984,7 @@ pub async fn ask(
         "status",
         "is",
     ]) {
-        let s = st.relays.status(mid);
+        let s = crate::uefn::statut(&st, mid).await?;
         let text = match s {
             "online" => ls(
                 en,
@@ -995,6 +995,11 @@ pub async fn ask(
                 en,
                 "Le relais UEFN est hors ligne : lancez pop-link.exe sur le PC où UEFN est ouvert.",
                 "The UEFN relay is offline: run pop-link.exe on the PC where UEFN is open.",
+            ),
+            "unlinked" => ls(
+                en,
+                "Aucun projet UEFN n’est relié à cette map : reliez-le avec un code d’appairage (Organiseur → UEFN Link).",
+                "No UEFN project is linked to this map: link it with a pairing code (Organizer → UEFN Link).",
             ),
             other => tf!(en, "Relais UEFN : {other}.", "UEFN relay: {other}."),
         };
