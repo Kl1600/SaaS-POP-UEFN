@@ -247,10 +247,89 @@ Pour les traiter :
     Ok(n)
 }
 
-/// Toutes les minutes : envoie le résumé des demandes d'accès quand il est dû.
+/// Photo du jour (#68) : comptes actifs aujourd'hui et comptes par abonnement, gardés pour les courbes.
+pub async fn photo_du_jour(st: &AppState) -> Result<(), AppError> {
+    sqlx::query(
+        "INSERT INTO admin_stats_day (day, active, starter, pro, trials)
+         SELECT date('now'),
+                (SELECT COUNT(*) FROM users WHERE date(last_seen) = date('now')),
+                (SELECT COUNT(*) FROM users WHERE plan = 'starter'),
+                (SELECT COUNT(*) FROM users WHERE plan = 'pro'),
+                (SELECT COUNT(*) FROM users WHERE trial_until > datetime('now'))
+         ON CONFLICT(day) DO UPDATE SET active = MAX(active, excluded.active), starter = excluded.starter,
+                pro = excluded.pro, trials = excluded.trials",
+    )
+    .execute(&st.db)
+    .await?;
+    Ok(())
+}
+
+/// Courbes de la vue générale (#68), sur `jours` jours : inscriptions, comptes actifs, demandes d'accès, et
+/// abonnements. Un compte est actif un jour s'il s'est connecté ou a agi (tâche, page, UEFN) ce jour-là ; la photo
+/// quotidienne complète ce qu'on sait de lui.
+async fn courbes(st: &AppState, jours: i64) -> Result<Value, AppError> {
+    let depuis = format!("-{} days", jours - 1);
+    let parjour = |sql: String| {
+        let (st, depuis) = (st.clone(), depuis.clone());
+        async move {
+            sqlx::query_as::<_, (String, i64)>(&sql)
+                .bind(depuis)
+                .fetch_all(&st.db)
+                .await
+                .map(|v| v.into_iter().collect::<std::collections::HashMap<_, _>>())
+        }
+    };
+    let inscriptions = parjour("SELECT date(created_at), COUNT(*) FROM users WHERE date(created_at) >= date('now', ?) GROUP BY 1".into()).await?;
+    let demandes = parjour("SELECT date(created_at), COUNT(*) FROM waitlist WHERE date(created_at) >= date('now', ?) GROUP BY 1".into()).await?;
+    let actifs = parjour(
+        "SELECT d, COUNT(DISTINCT u) FROM (
+            SELECT date(created_at) d, user_id u FROM sessions
+            UNION SELECT date(last_seen), user_id FROM sessions WHERE last_seen IS NOT NULL
+            UNION SELECT date(at), user_id FROM task_events WHERE user_id IS NOT NULL
+            UNION SELECT date(at), user_id FROM page_versions WHERE user_id IS NOT NULL
+            UNION SELECT date(at), user_id FROM uefn_actions WHERE user_id IS NOT NULL
+        ) WHERE d >= date('now', ?) GROUP BY d"
+            .into(),
+    )
+    .await?;
+    let photos: Vec<(String, i64, i64, i64, i64)> = sqlx::query_as(
+        "SELECT day, active, starter, pro, trials FROM admin_stats_day WHERE day >= date('now', ?) ORDER BY day",
+    )
+    .bind(&depuis)
+    .fetch_all(&st.db)
+    .await?;
+    let jours_liste: Vec<String> = sqlx::query_scalar(
+        "WITH RECURSIVE j(d) AS (SELECT date('now', ?) UNION ALL SELECT date(d, '+1 day') FROM j WHERE d < date('now')) SELECT d FROM j",
+    )
+    .bind(&depuis)
+    .fetch_all(&st.db)
+    .await?;
+    let photo = |d: &str| photos.iter().find(|p| p.0 == d);
+    let un = |m: &std::collections::HashMap<String, i64>, d: &str| m.get(d).copied().unwrap_or(0);
+    let plans: (i64, i64, i64) = sqlx::query_as(
+        "SELECT (SELECT COUNT(*) FROM users WHERE plan = 'starter'), (SELECT COUNT(*) FROM users WHERE plan = 'pro'),
+                (SELECT COUNT(*) FROM users WHERE trial_until > datetime('now'))",
+    )
+    .fetch_one(&st.db)
+    .await?;
+    Ok(json!({
+        "days": jours,
+        "daily": jours_liste.iter().map(|d| json!({
+            "day": d, "signups": un(&inscriptions, d), "requests": un(&demandes, d),
+            "active": un(&actifs, d).max(photo(d).map(|p| p.1).unwrap_or(0)),
+        })).collect::<Vec<_>>(),
+        "plans": { "starter": plans.0, "pro": plans.1, "trials": plans.2 },
+        "plans_history": photos.iter().map(|p| json!({ "day": p.0, "starter": p.2, "pro": p.3, "trials": p.4 })).collect::<Vec<_>>(),
+    }))
+}
+
+/// Toutes les minutes : envoie le résumé des demandes d'accès quand il est dû, et met à jour la photo du jour (#68).
 pub async fn digest_loop(st: AppState) {
     loop {
         tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+        if let Err(e) = photo_du_jour(&st).await {
+            tracing::warn!("statistiques du jour : {e:?}")
+        }
         if let Err(e) = send_digest(&st).await {
             tracing::warn!("résumé de la liste d’attente : {e:?}")
         }
@@ -327,8 +406,20 @@ pub async fn mark_registered(st: &AppState, wid: i64, uid: i64) {
 
 // ---------- Administration ----------
 
-pub async fn overview(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
+#[derive(Deserialize, Default)]
+pub struct OverviewQ {
+    days: Option<i64>,
+}
+
+pub async fn overview(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Query(q): Query<OverviewQ>,
+) -> ApiResult<Value> {
     require(&st, &u).await?;
+    let jours = if q.days == Some(90) { 90 } else { 30 };
+    photo_du_jour(&st).await?;
+    let stats = courbes(&st, jours).await?;
     let one = |q: &'static str| {
         let st = st.clone();
         async move {
@@ -367,6 +458,7 @@ pub async fn overview(State(st): State<AppState>, u: AuthUser) -> ApiResult<Valu
         "waitlist": { "pending": pending, "approved": approved, "registered": registered }, "ai_tokens_active": tokens, "relays_online": relays,
         "mail": crate::mail::configured(), "open_signup": std::env::var("POP_OPEN_SIGNUP").map(|v| v == "1").unwrap_or(false),
         "requests_per_day": signups.into_iter().map(|(d, n)| json!({ "day": d, "count": n })).collect::<Vec<_>>(),
+        "stats": stats,
     })))
 }
 
@@ -1552,7 +1644,9 @@ mod depannage_tests {
             "supprimer une demande",
         );
         forbidden(
-            overview(s(), moder.clone()).await.map(|_| ()),
+            overview(s(), moder.clone(), Query(Default::default()))
+                .await
+                .map(|_| ()),
             "vue générale",
         );
         forbidden(
@@ -1716,5 +1810,60 @@ mod journal_tests {
             journal_de(&st, &simple, json!({})).await,
             Err(AppError::Forbidden)
         ));
+    }
+}
+
+#[cfg(test)]
+mod stats_tests {
+    use super::*;
+    use axum::extract::{Query, State};
+
+    /// #68 : courbes sur 30 ou 90 jours, inscription du jour comptée, totaux par plan conformes aux comptes.
+    #[tokio::test]
+    async fn statistiques_par_jour() {
+        let st = crate::test_state().await;
+        let kl: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash, is_admin, email_verified_at, plan) VALUES ('kl@pop.fr', 'KL', 'x', 1, datetime('now'), 'pro') RETURNING id").fetch_one(&st.db).await.unwrap();
+        sqlx::query("INSERT INTO sessions (token_hash, user_id, expires_at, sudo_until, created_at) VALUES ('s', ?, datetime('now', '+1 day'), datetime('now', '+10 minutes'), datetime('now'))").bind(kl).execute(&st.db).await.unwrap();
+        let u = AuthUser {
+            id: kl,
+            email: "kl@pop.fr".into(),
+            name: "KL".into(),
+            sid: "s".into(),
+        };
+        let vue = |jours: i64| {
+            let (st, u) = (st.clone(), u.clone());
+            async move {
+                overview(State(st), u, Query(OverviewQ { days: Some(jours) }))
+                    .await
+                    .unwrap()
+                    .0
+            }
+        };
+        let v = vue(30).await;
+        assert_eq!(v["stats"]["daily"].as_array().unwrap().len(), 30);
+        assert_eq!(
+            vue(90).await["stats"]["daily"].as_array().unwrap().len(),
+            90
+        );
+        let aujourdhui = |v: &Value, k: &str| {
+            v["stats"]["daily"].as_array().unwrap().last().unwrap()[k]
+                .as_i64()
+                .unwrap()
+        };
+        let avant = aujourdhui(&v, "signups");
+        // Un compte de test créé : +1 inscription aujourd'hui ; plans comptés comme dans Utilisateurs.
+        sqlx::query("INSERT INTO users (email, name, password_hash, plan, trial_until) VALUES ('t@a.fr', 'Test', 'x', 'starter', datetime('now', '+7 days'))").execute(&st.db).await.unwrap();
+        let v = vue(30).await;
+        assert_eq!(aujourdhui(&v, "signups"), avant + 1);
+        assert!(
+            aujourdhui(&v, "active") >= 1,
+            "KL a une session aujourd'hui"
+        );
+        assert_eq!(
+            v["stats"]["plans"],
+            json!({ "starter": 1, "pro": 1, "trials": 1 })
+        );
+        let h = v["stats"]["plans_history"].as_array().unwrap();
+        assert_eq!(h.last().unwrap()["starter"], 1, "photo du jour à jour");
     }
 }

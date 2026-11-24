@@ -2864,5 +2864,18 @@ const EN: Record<string, string> = {
  "Administrateur retiré": "Admin removed",
  "Crédits IA donnés": "AI credits granted",
  "Accès accordé": "Access granted",
+ "Total sur la période : {0}": "Total for the period: {0}",
+ "{0} sur la période": "{0} over the period",
+ "Activité par jour": "Daily activity",
+ "{0} jours": "{0} days",
+ "Inscriptions": "Sign-ups",
+ "Comptes créés par jour": "Accounts created per day",
+ "Comptes actifs": "Active accounts",
+ "Connectés ou actifs (tâches, pages, UEFN) ce jour-là": "Signed in or active (tasks, pages, UEFN) that day",
+ "Liste d’attente, par jour": "Waitlist, per day",
+ "Abonnements": "Subscriptions",
+ "Comptes par plan aujourd’hui, avec l’évolution depuis le début de la période suivie": "Accounts per plan today, with the change since the start of the tracked period",
+ "Essais Pro en cours": "Pro trials in progress",
+ "L’évolution apparaît à partir du deuxième jour de suivi.": "The change shows from the second tracked day.",
 }
 export default EN
