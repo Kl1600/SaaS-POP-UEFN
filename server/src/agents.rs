@@ -328,15 +328,15 @@ pub async fn pour_next_task(st: &AppState, agent: i64, mid: i64) -> Result<Value
         a_reprendre.push(json!({ "number": n, "title": titre, "reprise": reprise(st, id).await? }));
     }
     // #112 : tâches que l'Orchestrateur a attribuées à cet agent, pas encore faites, avec ce qu'elles attendent.
-    let a_moi: Vec<(i64, i64, String, String)> = sqlx::query_as(
-        "SELECT t.id, t.number, t.title, t.status FROM tasks t WHERE t.map_id = ? AND t.agent_id = ? AND t.status <> 'done' ORDER BY t.number LIMIT 20",
+    let a_moi: Vec<(i64, i64, String, String, Option<String>)> = sqlx::query_as(
+        "SELECT t.id, t.number, t.title, t.status, t.description FROM tasks t WHERE t.map_id = ? AND t.agent_id = ? AND t.status <> 'done' ORDER BY t.number LIMIT 20",
     )
     .bind(mid)
     .bind(agent)
     .fetch_all(&st.db)
     .await?;
     let mut attribuees = vec![];
-    for (id, n, titre, statut) in a_moi {
+    for (id, n, titre, statut, consigne) in a_moi {
         let attend: Vec<i64> = sqlx::query_scalar(
             "SELECT o.number FROM task_deps d JOIN tasks o ON o.id = d.depends_on WHERE d.task_id = ? AND o.status <> 'done' ORDER BY o.number",
         )
@@ -344,7 +344,7 @@ pub async fn pour_next_task(st: &AppState, agent: i64, mid: i64) -> Result<Value
         .fetch_all(&st.db)
         .await?;
         attribuees
-            .push(json!({ "number": n, "title": titre, "status": statut, "waiting_on": attend }));
+            .push(json!({ "number": n, "title": titre, "status": statut, "waiting_on": attend, "description": consigne }));
     }
     Ok(json!({ "ta_tache": mienne, "a_reprendre": a_reprendre, "attribuees": attribuees }))
 }

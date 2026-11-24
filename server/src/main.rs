@@ -41,6 +41,7 @@ mod security;
 mod skills;
 mod stripe;
 mod studio;
+mod suggestions;
 mod tasks;
 mod uefn;
 mod verify;
@@ -588,6 +589,11 @@ fn api() -> Router<AppState> {
         .route("/api/maps/{mid}/agents/activity", get(agents::activite))
         .route("/api/maps/{mid}/fil", get(fil::route))
         .route("/api/maps/{mid}/questions", get(questions::route_liste))
+        .route("/api/maps/{mid}/suggestions", get(suggestions::liste))
+        .route(
+            "/api/maps/{mid}/suggestions/{cle}",
+            post(suggestions::route_demarrer),
+        )
         .route(
             "/api/maps/{mid}/lancement",
             get(lancement::route_apercu).post(lancement::route_lancer),
