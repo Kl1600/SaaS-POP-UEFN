@@ -8,6 +8,7 @@ const COMMUNS: &[&str] = &[
     "use_map",
     "ask_user",
     "get_answer",
+    "get_feasibility",
     "uefn_status",
     "check_level",
     "list_actors",

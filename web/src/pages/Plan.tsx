@@ -8,6 +8,7 @@ import { tr } from '../i18n/t'
 import { useNav } from '../routes'
 import { useSearchParams } from 'react-router-dom'
 import PlanCalendar from './PlanCalendar'
+import { AvisFaisabilite, EquipeMap } from '../components/Faisabilite'
 
 const GENRES: [string, string, string][] = [
   ['cr', tr("Gendarmes et voleurs"), tr("Équipes, braquages, boutique")], ['tycoon', tr("Tycoon"), tr("Production, améliorations")], ['boxfight', tr("Box fight / Zone wars"), tr("Manches courtes")],
@@ -17,6 +18,7 @@ const GENRES: [string, string, string][] = [
 export default function Plan() {
   // Le Générateur de projet s'ouvre depuis le sélecteur de map (#194) : /planifier?vue=generateur.
   const [sp, setSp] = useSearchParams()
+  const { map } = useApp()
   const wizard = sp.get('vue') === 'generateur'
   if (wizard) return (
     <main className="content">
@@ -26,10 +28,14 @@ export default function Plan() {
       <Wizard done={() => setSp({})} />
     </main>
   )
+  const equipe = sp.get('vue') === 'equipe'
   return (
     <main className="content">
-      <PageHead title={tr("Planifier")} help={tr("Objectifs, tâches et dates Fortnite sur un même calendrier. Glissez une tâche sur un jour pour la planifier.")} />
-      <PlanCalendar />
+      <PageHead title={tr("Planifier")} help={tr("Objectifs, tâches et dates Fortnite sur un même calendrier. Glissez une tâche sur un jour pour la planifier.")}>
+        <button className="btn" onClick={() => setSp(equipe ? {} : { vue: 'equipe' })}>{equipe ? tr("Retour au planning") : tr("Équipe et faisabilité")}</button>
+      </PageHead>
+      {map && <AvisFaisabilite mapId={map.id} onEdit={equipe ? undefined : () => setSp({ vue: 'equipe' })} />}
+      {equipe && map ? <EquipeMap mapId={map.id} /> : <PlanCalendar />}
     </main>
   )
 }

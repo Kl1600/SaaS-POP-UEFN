@@ -348,6 +348,11 @@ fn skeleton(genre: &str) -> Vec<(&'static str, Vec<T>)> {
     ]
 }
 
+/// Nombre de tâches du gabarit d'un genre (travail estimé d'une map qui n'a pas encore de tâches, #149).
+pub fn taille_du_gabarit(genre: &str) -> usize {
+    skeleton(genre).iter().map(|(_, l)| l.len()).sum()
+}
+
 pub async fn preview(
     State(st): State<AppState>,
     u: AuthUser,
@@ -426,10 +431,24 @@ pub async fn preview(
     // Placement jour par jour selon la capacité de l'équipe. Les spécialités servent à répartir la charge,
     // mais personne n'est assigné d'office : chaque membre prend ses tâches lui-même (#157).
     let deadline = release - Duration::days(4);
+    // Heures par semaine : celles de l'équipe de la map quand elle est remplie (#149), sinon celles données.
+    let staff: HashMap<i64, i64> = sqlx::query_as::<_, (i64, i64)>(
+        "SELECT user_id, hours_per_week FROM map_staff WHERE map_id = ?",
+    )
+    .bind(mid)
+    .fetch_all(&st.db)
+    .await?
+    .into_iter()
+    .collect();
     let mut cap: HashMap<i64, f64> = HashMap::new();
     for m in &b.members {
-        cap.insert(m.user_id, (m.hours.max(1) as f64) / 5.0);
+        cap.insert(
+            m.user_id,
+            staff.get(&m.user_id).copied().unwrap_or(m.hours).max(1) as f64,
+        );
     }
+    // Charge par personne et par semaine (lundi) : jamais plus que ses heures de la semaine (1 h par tâche).
+    let lundi = |d: Date| d - Duration::days(d.weekday().number_days_from_monday() as i64);
     let mut used: HashMap<(i64, Date), f64> = HashMap::new();
     let mut rr = 0usize;
     for i in 0..tasks.len() {
@@ -451,11 +470,16 @@ pub async fn preview(
                 }
             }
         }
-        let c = *cap.get(&who).unwrap_or(&2.0);
+        let c = *cap.get(&who).unwrap_or(&10.0);
         if !tasks[i].ai {
-            while used.get(&(who, day)).copied().unwrap_or(0.0) + 1.0 > c.max(1.0) {
+            // Au plus un cinquième des heures de la semaine par jour (au moins une tâche), et la semaine pas dépassée.
+            let par_jour = (c / 5.0).ceil().max(1.0);
+            while used.get(&(who, lundi(day))).copied().unwrap_or(0.0) + 1.0 > c
+                || used.get(&(who, day)).copied().unwrap_or(0.0) + 1.0 > par_jour
+            {
                 day = next_workday(day + Duration::days(1));
             }
+            *used.entry((who, lundi(day))).or_default() += 1.0;
             *used.entry((who, day)).or_default() += 1.0;
         }
         tasks[i].planned_day = Some(fmt(day));
