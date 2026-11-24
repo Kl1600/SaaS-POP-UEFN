@@ -24,6 +24,8 @@ pub struct TokenIn {
     name: String,
     kind: Option<String>,
     scope: Option<String>,
+    /// Rôle de l'agent (#111), facultatif.
+    role: Option<String>,
 }
 
 const KINDS: &[&str] = &[
@@ -54,18 +56,19 @@ pub async fn create_token(
     } else {
         "write"
     };
-    let id: i64 = sqlx::query_scalar("INSERT INTO api_tokens (user_id, name, token_hash, kind, scope) VALUES (?, ?, ?, ?, ?) RETURNING id").bind(u.id).bind(b.name.trim()).bind(sha256_hex(&token)).bind(&kind).bind(scope).fetch_one(&st.db).await?;
+    let role = role_valide(b.role.as_deref())?;
+    let id: i64 = sqlx::query_scalar("INSERT INTO api_tokens (user_id, name, token_hash, kind, scope, role) VALUES (?, ?, ?, ?, ?, ?) RETURNING id").bind(u.id).bind(b.name.trim()).bind(sha256_hex(&token)).bind(&kind).bind(scope).bind(role).fetch_one(&st.db).await?;
     Ok(Json(json!({ "token": token, "id": id })))
 }
 
 /// Jetons du compte, avec leur map de travail (seulement si le compte y a encore accès).
 pub async fn tokens(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
-    let rows: Vec<(i64, String, String, String, String, Option<String>, i64, Option<i64>, Option<String>, bool)> = sqlx::query_as(
-        "SELECT t.id, t.name, t.created_at, t.kind, t.scope, t.last_used, t.calls, m.id, m.name, t.oauth_client IS NOT NULL FROM api_tokens t
+    let rows: Vec<(i64, String, String, String, String, Option<String>, i64, Option<i64>, Option<String>, bool, Option<String>)> = sqlx::query_as(
+        "SELECT t.id, t.name, t.created_at, t.kind, t.scope, t.last_used, t.calls, m.id, m.name, t.oauth_client IS NOT NULL, t.role FROM api_tokens t
          LEFT JOIN maps m ON m.id = t.map_id AND EXISTS (SELECT 1 FROM memberships ms WHERE ms.studio_id = m.studio_id AND ms.user_id = t.user_id)
          WHERE t.user_id = ? ORDER BY t.id DESC",
     ).bind(u.id).fetch_all(&st.db).await?;
-    Ok(Json(json!(rows.into_iter().map(|(id, n, at, kind, scope, last, calls, mid, mname, oauth)| json!({"id": id, "name": n, "created_at": at, "kind": kind, "scope": scope, "last_used": last, "calls": calls, "oauth": oauth, "map": mid.map(|i| json!({ "id": i, "name": mname }))})).collect::<Vec<_>>())))
+    Ok(Json(json!(rows.into_iter().map(|(id, n, at, kind, scope, last, calls, mid, mname, oauth, role)| json!({"id": id, "name": n, "created_at": at, "kind": kind, "scope": scope, "role": role, "last_used": last, "calls": calls, "oauth": oauth, "map": mid.map(|i| json!({ "id": i, "name": mname }))})).collect::<Vec<_>>())))
 }
 
 #[derive(Deserialize)]
@@ -87,6 +90,48 @@ pub async fn set_scope(
         .execute(&st.db)
         .await?;
     Ok(Json(json!({ "ok": true })))
+}
+
+fn role_valide(r: Option<&str>) -> Result<Option<&'static str>, AppError> {
+    match r.map(str::trim).filter(|r| !r.is_empty()) {
+        None => Ok(None),
+        Some(r) => crate::roles::get(r)
+            .map(|x| Some(x.id))
+            .ok_or_else(|| bad("Rôle inconnu.")),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct RoleIn {
+    role: Option<String>,
+}
+
+/// Change le rôle d'un agent du compte (#111) ; null le retire. Pris en compte au prochain appel de l'IA.
+pub async fn set_role(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(id): Path<i64>,
+    Json(b): Json<RoleIn>,
+) -> ApiResult<Value> {
+    let role = role_valide(b.role.as_deref())?;
+    let r = sqlx::query("UPDATE api_tokens SET role = ? WHERE id = ? AND user_id = ?")
+        .bind(role)
+        .bind(id)
+        .bind(u.id)
+        .execute(&st.db)
+        .await?;
+    if r.rows_affected() == 0 {
+        return Err(AppError::NotFound);
+    }
+    Ok(Json(json!({ "ok": true })))
+}
+
+/// Les rôles proposés par POP, pour l'interface.
+pub async fn roles() -> Json<Value> {
+    Json(json!(crate::roles::ROLES
+        .iter()
+        .map(|r| json!({ "id": r.id, "name": r.nom, "instructions": r.consignes }))
+        .collect::<Vec<_>>()))
 }
 
 pub async fn delete_token(
@@ -154,6 +199,18 @@ fn tools() -> Value {
     ])
 }
 
+/// Noms de tous les outils du serveur MCP.
+pub(crate) fn tool_names() -> Vec<String> {
+    tools()
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .filter_map(|t| t["name"].as_str().map(String::from))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 const READ_TOOLS: &[&str] = &[
     "list_maps",
     "use_map",
@@ -205,13 +262,13 @@ pub async fn mcp(
         .or(q.token)
         .unwrap_or_default();
     let token = token.as_str();
-    let row: Option<(i64, Option<i64>, String, String, String, i64)> = match sqlx::query_as(
-        "SELECT t.user_id, t.map_id, u.email, u.name, t.scope, t.id FROM api_tokens t JOIN users u ON u.id = t.user_id WHERE t.token_hash = ? AND u.disabled = 0 AND (t.expires_at IS NULL OR t.expires_at > datetime('now'))",
+    let row: Option<(i64, Option<i64>, String, String, String, i64, Option<String>)> = match sqlx::query_as(
+        "SELECT t.user_id, t.map_id, u.email, u.name, t.scope, t.id, t.role FROM api_tokens t JOIN users u ON u.id = t.user_id WHERE t.token_hash = ? AND u.disabled = 0 AND (t.expires_at IS NULL OR t.expires_at > datetime('now'))",
     ).bind(sha256_hex(token)).fetch_optional(&st.db).await {
         Ok(r) => r,
         Err(_) => return rpc_err(id, -32603, "Erreur interne"),
     };
-    let Some((uid, mid, email, name, scope, agent)) = row else {
+    let Some((uid, mid, email, name, scope, agent, role)) = row else {
         // L'en-tête dit à l'IA où trouver la connexion OAuth de POP (#285).
         return (
             StatusCode::UNAUTHORIZED,
@@ -246,19 +303,28 @@ pub async fn mcp(
                 "protocolVersion": req["params"]["protocolVersion"].as_str().unwrap_or("2025-06-18"),
                 "capabilities": { "tools": {} },
                 "serverInfo": { "name": "pop", "version": "0.1.0" },
-                "instructions": "Commencez par list_maps puis use_map pour choisir la map de travail (gardée par POP). Outils POP : gérer les tâches de la map (list_tasks, next_task, create_task, set_task_status, comment_task) et piloter UEFN via le relais du créateur. Avant de travailler, lisez les compétences utiles (list_skills, get_skill : la méthode de POP et les règles du studio), prenez une tâche avec next_task et passez-la en cours ; quand elle est finie, passez-la en done avec une note. Toute action UEFN est journalisée et annulable ; les suppressions attendent une validation humaine."
+                "instructions": consignes(role.as_deref(), "Commencez par list_maps puis use_map pour choisir la map de travail (gardée par POP). Outils POP : gérer les tâches de la map (list_tasks, next_task, create_task, set_task_status, comment_task) et piloter UEFN via le relais du créateur. Avant de travailler, lisez les compétences utiles (list_skills, get_skill : la méthode de POP et les règles du studio), prenez une tâche avec next_task et passez-la en cours ; quand elle est finie, passez-la en done avec une note. Toute action UEFN est journalisée et annulable ; les suppressions attendent une validation humaine.")
             }),
         ),
         m if m.starts_with("notifications/") => StatusCode::ACCEPTED.into_response(),
         "ping" => rpc_ok(id, json!({})),
         "tools/list" => rpc_ok(
             id,
-            json!({ "tools": tools().as_array().cloned().unwrap_or_default().into_iter().filter(|t| scope != "read" || READ_TOOLS.contains(&t["name"].as_str().unwrap_or(""))).collect::<Vec<_>>() }),
+            json!({ "tools": tools().as_array().cloned().unwrap_or_default().into_iter().filter(|t| { let n = t["name"].as_str().unwrap_or(""); (scope != "read" || READ_TOOLS.contains(&n)) && crate::roles::allows(role.as_deref(), n) }).collect::<Vec<_>>() }),
         ),
         "tools/call" => {
             let name = req["params"]["name"].as_str().unwrap_or("");
             if scope == "read" && !READ_TOOLS.contains(&name) {
                 return rpc_ok(id, text("Cette IA est en lecture seule dans POP (IA connectées → autoriser les modifications).", true));
+            }
+            if !crate::roles::allows(role.as_deref(), name) {
+                return rpc_ok(
+                    id,
+                    text(
+                        crate::roles::refus(role.as_deref().unwrap_or(""), name),
+                        true,
+                    ),
+                );
             }
             let args = req["params"]["arguments"].clone();
             match token_call(&st, &user, mid, agent, name, args).await {
@@ -281,6 +347,17 @@ pub async fn mcp(
             }
         }
         _ => rpc_err(id, -32601, "Méthode inconnue"),
+    }
+}
+
+/// Consignes d'initialisation : celles de POP, précédées de celles du rôle de l'agent (#111).
+fn consignes(role: Option<&str>, base: &str) -> String {
+    match role.and_then(crate::roles::get) {
+        Some(r) => format!(
+            "Votre rôle dans l'équipe : {}. {}\n\n{base}",
+            r.nom, r.consignes
+        ),
+        None => base.to_string(),
     }
 }
 
@@ -1542,6 +1619,7 @@ mod tests_compte {
                 name: "Claude Code".into(),
                 kind: Some("claude_code".into()),
                 scope: None,
+                role: Some("testeur".into()),
             }),
         )
         .await
@@ -1555,6 +1633,10 @@ mod tests_compte {
         assert_eq!(map, None, "un jeton de compte n'est lié à aucune map");
         let Json(l) = tokens(State(m.st.clone()), u).await.unwrap();
         assert_eq!(l.as_array().unwrap().len(), 1);
+        assert_eq!(
+            l[0]["role"], "testeur",
+            "le rôle choisi à la création est gardé (#111)"
+        );
         // Sans map de travail : l'erreur explique list_maps / use_map, et rien n'est lu.
         let (err, msg) = mcp_call(&m.st, &t, "list_tasks", json!({})).await;
         assert!(
@@ -1649,6 +1731,119 @@ mod tests_compte {
         )
         .await;
         assert!(!err, "{txt}");
+    }
+
+    /// Appel JSON-RPC d'une méthode (initialize, tools/list) : le résultat brut.
+    async fn rpc(st: &AppState, token: &str, method: &str) -> Value {
+        let mut h = HeaderMap::new();
+        h.insert("authorization", format!("Bearer {token}").parse().unwrap());
+        let r = mcp(
+            State(st.clone()),
+            h,
+            axum::extract::Query(McpQ { token: None }),
+            Json(json!({ "jsonrpc": "2.0", "id": 1, "method": method, "params": {} })),
+        )
+        .await;
+        let b = axum::body::to_bytes(r.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        serde_json::from_slice::<Value>(&b).unwrap()["result"].clone()
+    }
+
+    /// #111 : rôle d'un agent : consignes à l'initialisation, outils filtrés, refus clair, changement au prochain appel.
+    #[tokio::test]
+    async fn roles_des_agents() {
+        let m = monde().await;
+        let t = jeton(&m, None, "write").await;
+        let id: i64 = sqlx::query_scalar("SELECT id FROM api_tokens WHERE token_hash = ?")
+            .bind(sha256_hex(&t))
+            .fetch_one(&m.st.db)
+            .await
+            .unwrap();
+        let user = AuthUser {
+            id: m.uid,
+            email: "a@b.c".into(),
+            name: "A".into(),
+            sid: String::new(),
+        };
+        let role = |r: Option<&str>| {
+            Json(RoleIn {
+                role: r.map(String::from),
+            })
+        };
+        mcp_call(&m.st, &t, "use_map", json!({ "map": m.equipe })).await;
+
+        // Codeur Verse : ses consignes, ses outils, pas ceux du Level designer.
+        set_role(
+            State(m.st.clone()),
+            user.clone(),
+            Path(id),
+            role(Some("codeur_verse")),
+        )
+        .await
+        .unwrap();
+        let init = rpc(&m.st, &t, "initialize").await;
+        assert!(
+            init["instructions"]
+                .as_str()
+                .unwrap()
+                .contains("Codeur Verse"),
+            "{init}"
+        );
+        let noms: Vec<String> = rpc(&m.st, &t, "tools/list").await["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x["name"].as_str().unwrap().to_string())
+            .collect();
+        assert!(
+            noms.contains(&"write_verse_file".into()) && !noms.contains(&"place_device".into())
+        );
+        let (err, msg) = mcp_call(&m.st, &t, "place_device", json!({})).await;
+        assert!(err && msg.contains("« Codeur Verse »"), "{msg}");
+
+        // Relecteur : aucune modification, au prochain appel.
+        set_role(
+            State(m.st.clone()),
+            user.clone(),
+            Path(id),
+            role(Some("relecteur")),
+        )
+        .await
+        .unwrap();
+        let (err, msg) = mcp_call(&m.st, &t, "create_task", json!({ "title": "Non" })).await;
+        assert!(err && msg.contains("« Relecteur »"), "{msg}");
+        let (err, txt) = mcp_call(&m.st, &t, "list_tasks", json!({})).await;
+        assert!(!err, "{txt}");
+
+        // Sans rôle : tout revient ; un rôle inconnu est refusé ; le jeton d'un autre compte n'est pas touché.
+        set_role(State(m.st.clone()), user.clone(), Path(id), role(None))
+            .await
+            .unwrap();
+        let (err, txt) = mcp_call(&m.st, &t, "create_task", json!({ "title": "Oui" })).await;
+        assert!(!err, "{txt}");
+        assert!(set_role(
+            State(m.st.clone()),
+            user.clone(),
+            Path(id),
+            role(Some("pirate"))
+        )
+        .await
+        .is_err());
+        let autre = AuthUser {
+            id: m.uid + 999,
+            ..user
+        };
+        assert!(matches!(
+            set_role(
+                State(m.st.clone()),
+                autre,
+                Path(id),
+                role(Some("relecteur"))
+            )
+            .await,
+            Err(AppError::NotFound)
+        ));
     }
 
     #[tokio::test]

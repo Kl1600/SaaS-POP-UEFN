@@ -31,6 +31,7 @@ mod oauth;
 mod pages;
 mod plan;
 mod privstats;
+mod roles;
 mod s3;
 mod security;
 mod skills;
@@ -611,6 +612,8 @@ fn api() -> Router<AppState> {
         .route("/api/skills/{id}", delete(skills::delete))
         .route("/api/me/tokens", get(mcp::tokens).post(mcp::create_token))
         .route("/api/tokens/{id}/scope", post(mcp::set_scope))
+        .route("/api/tokens/{id}/role", post(mcp::set_role))
+        .route("/api/agent-roles", get(mcp::roles))
         .route("/api/tokens/{id}", delete(mcp::delete_token))
         .route("/mcp", post(mcp::mcp))
         .route(

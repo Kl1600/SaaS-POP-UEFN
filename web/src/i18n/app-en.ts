@@ -1,6 +1,15 @@
 // Traduction anglaise de l'application. Clé = texte français de l'interface (ou du serveur), valeur = anglais.
 // Généré à partir des textes enveloppés dans tr(...) ; à compléter quand on ajoute des textes.
 const EN: Record<string, string> = {
+ "Sans rôle : tous les outils de POP.": "No role: every POP tool.",
+ "Sans rôle": "No role",
+ "Orchestrateur": "Orchestrator",
+ "Codeur Verse": "Verse coder",
+ "Level designer": "Level designer",
+ "UI": "UI",
+ "Testeur": "Tester",
+ "Relecteur": "Reviewer",
+ "Analyste": "Analyst",
  "UEFN": "UEFN",
  "Check-in Lore requis pour la fermer": "Lore check-in required to close it",
  "Tâche UEFN : check-in Lore requis pour la fermer": "UEFN task: Lore check-in required to close it",
