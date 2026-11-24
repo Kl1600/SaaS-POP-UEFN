@@ -314,7 +314,12 @@ pub async fn discord_hook(
 
 // ---------- GitHub ----------
 
-fn gh(st: &AppState, method: reqwest::Method, url: String, token: &str) -> reqwest::RequestBuilder {
+pub(crate) fn gh(
+    st: &AppState,
+    method: reqwest::Method,
+    url: String,
+    token: &str,
+) -> reqwest::RequestBuilder {
     st.http
         .request(method, url)
         .header("authorization", format!("Bearer {token}"))
@@ -331,6 +336,27 @@ fn repo_ok(r: &str) -> bool {
                 && x.chars()
                     .all(|c| c.is_ascii_alphanumeric() || "-_.".contains(c))
         })
+}
+
+/// Dépôt (`propriétaire/nom`) et jeton de l'intégration GitHub du studio (#128).
+pub(crate) async fn github_repo_token(
+    st: &AppState,
+    sid: i64,
+) -> Result<(String, String), AppError> {
+    let cfg = config(st, sid, "github")
+        .await?
+        .ok_or_else(|| bad("Activez GitHub d’abord (Équipe et intégrations → GitHub)."))?;
+    let repo = cfg["repo"]
+        .as_str()
+        .filter(|r| repo_ok(r))
+        .ok_or_else(|| bad("Dépôt GitHub invalide (format : propriétaire/nom)."))?
+        .to_string();
+    let token = cfg["token"]
+        .as_str()
+        .filter(|t| !t.is_empty())
+        .ok_or_else(|| bad("Jeton GitHub manquant."))?
+        .to_string();
+    Ok((repo, token))
 }
 
 #[derive(Deserialize)]
