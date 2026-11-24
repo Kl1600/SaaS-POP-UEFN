@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-24 · #280 · IA connectées : seulement les IA vraiment connectées
+- Fait : « Vos IA » et le compteur des cartes ne gardent que les jetons déjà utilisés (last_used) ; les jetons jamais utilisés sont « en attente » (ligne discrète avec Annuler) ; recliquer « Connecter » remplace le jeton en attente de la même IA ; la fenêtre de connexion recharge toutes les 3 s et passe de « En attente de connexion… » à « Connectée ».
+- Vérifié : navigateur (2 clics + fermeture → 1 seul jeton en base, rien dans Vos IA ; appel simulé → Connectée, la ligne apparaît).
+
 ### 2026-11-24 · #277 · logo de la barre latérale plus grand
 - Fait : logo 34 → 56 px de haut en barre normale (halo agrandi), barre repliée inchangée.
 - Vérifié : navigateur 1440 px, barre normale et repliée.

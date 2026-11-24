@@ -1124,3 +1124,10 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 /* Logo de la barre latérale plus grand (#277). */
 .app:not(.collapsed) .brand img{height:56px}
 .app:not(.collapsed) .brand::before{width:220px;height:120px}
+/* Fenêtre « Connecter une IA » : attente puis connexion confirmée (#280). */
+.aiwait{display:flex;align-items:center;gap:8px;margin:14px 0 4px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;font-size:13px;color:var(--muted)}
+.aiwait.ok{color:var(--text);border-color:rgba(34,160,90,.45);background:rgba(34,160,90,.07)}
+.aiwait.ok svg{color:rgb(34,160,90)}
+.aiwait-dot{width:8px;height:8px;border-radius:50%;background:var(--accent,#ED753E);flex:none;animation:aiwait 1.2s ease-in-out infinite}
+@keyframes aiwait{0%,100%{opacity:.25}50%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.aiwait-dot{animation:none}}
