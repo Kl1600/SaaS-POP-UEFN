@@ -25,6 +25,7 @@ mod engine;
 mod error;
 mod faisabilite;
 mod fil;
+mod github_import;
 mod guide;
 mod ideas;
 mod integrations;
@@ -406,6 +407,14 @@ fn api() -> Router<AppState> {
         .route(
             "/api/studios/{sid}/discord/register",
             post(integrations::discord_register),
+        )
+        .route(
+            "/api/studios/{sid}/github/import/preview",
+            post(github_import::apercu),
+        )
+        .route(
+            "/api/studios/{sid}/github/import",
+            post(github_import::route_importer),
         )
         .route(
             "/api/studios/{sid}/github/sync",

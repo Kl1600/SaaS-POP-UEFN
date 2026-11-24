@@ -3111,5 +3111,16 @@ const EN: Record<string, string> = {
  "Derniers événements": "Latest events",
  "Aucun événement.": "No events.",
  "Admin : déconnecté partout": "Admin: signed out everywhere",
+ "Importer tout le dépôt": "Import the whole repository",
+ "En une fois : toutes les issues (ouvertes et fermées), étiquettes, personnes, jalons, liens « Blocked by » et commentaires. Relancer l'import ne crée pas de doublon.": "All at once: every issue (open and closed), labels, people, milestones, “Blocked by” links and comments. Running the import again creates no duplicates.",
+ "Lecture du dépôt…": "Reading the repository…",
+ "Préparer l'import": "Prepare the import",
+ "{0} : {1} issues, dont {2} fermées.": "{0}: {1} issues, {2} of them closed.",
+ "Associez chaque compte GitHub à un membre du studio (sinon son nom est noté dans la tâche) :": "Match each GitHub account to a studio member (otherwise their name is noted in the task):",
+ "Import en cours…": "Importing…",
+ "Import terminé": "Import finished",
+ "{0} tâches ({1} ouvertes, {2} faites), {3} dépendances, {4} jalons, {5} commentaires.": "{0} tasks ({1} open, {2} done), {3} dependencies, {4} milestones, {5} comments.",
+ "Numéros déjà pris, tâches renumérotées : {0}": "Numbers already taken, tasks renumbered: {0}",
+ "Non repris :": "Not imported:",
 }
 export default EN
