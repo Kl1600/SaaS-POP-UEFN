@@ -461,6 +461,11 @@ fn api() -> Router<AppState> {
         .route("/api/admin/users/{id}/activation", post(activation::resend))
         .route("/api/admin/users/{id}/unlock", post(admin::unlock_user))
         .route(
+            "/api/admin/users/{id}/logout",
+            post(admin::logout_everywhere),
+        )
+        .route("/api/admin/users/{id}/card", get(admin::user_card))
+        .route(
             "/api/admin/users/{id}/deletion",
             get(admin::deletion_preview),
         )
