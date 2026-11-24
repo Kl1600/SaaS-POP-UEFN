@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-24 · #276 · bêta : message de confirmation
+- Fait : okText/approvedText de la liste d'attente, dans les 16 langues : annoncent l'e-mail d'activation (lien pour choisir son mot de passe) et rappellent les spams, au lieu de « identifiant et mot de passe provisoire ».
+- Vérifié : tsc -b, vite build.
+
 ### 2026-11-23 · #271 · menu du compte
 - Fait : adresse e-mail coupée par « … » avec l'adresse complète au survol (.acct-mail) ; menu borné à l'écran ; barre latérale repliée : le menu sort à droite de la barre (position fixe, 260 px) au lieu de faire 39 px de large.
 - Vérifié : navigateur (1440 px normal et replié, 1100 px, 390 px).

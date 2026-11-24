@@ -68,8 +68,8 @@ const tr: Dict = {
     teams: ['Tek başıma', '2–3', '4–10', '10’dan fazla'], exp: 'Deneyim', exps: ['UEFN’de yeni', 'Birkaç yayımlanmış harita', 'Deneyimli üretici', 'Profesyonel stüdyo'],
     links: 'Haritalarınız veya sosyal medyanız', linksPh: 'Ada kodları, TikTok, YouTube…', msg: 'POP ile ne yapmak istiyorsunuz', msgPh: 'Örn. bir tycoon haritasında 4 kişiyiz ve Discord ile Google Docs arasında kayboluyoruz.',
     send: 'Erişim iste', sending: 'Gönderiliyor…', nospam: 'Spam yok: yalnızca erişim vermek için yazarız.', privacy: 'Gizlilik politikası',
-    okTitle: 'Kaydedildi, teşekkürler!', okText: 'Talebiniz POP ekibine ulaştı. Bir yer açılır açılmaz kullanıcı adınızı ve geçici bir şifre göndereceğiz.',
-    alreadyTitle: 'Zaten listedesiniz.', approvedTitle: 'Erişiminiz zaten onaylandı.', approvedText: 'Hesabınız hazır: POP ekibi kullanıcı adınızı ve geçici şifrenizi gönderiyor. Gelmediyse bize yazın.', close: 'Kapat',
+    okTitle: 'Kaydedildi, teşekkürler!', okText: 'Erişimin hazır olduğunda belirttiğin adrese, hesabını etkinleştirmen için bir bağlantı içeren bir e-posta alacaksın. Spam klasörünü de kontrol etmeyi unutma.',
+    alreadyTitle: 'Zaten listedesiniz.', approvedTitle: 'Erişiminiz zaten onaylandı.', approvedText: 'Hesabın hazır: etkinleştirmek ve şifreni seçmek için bağlantı içeren bir e-posta aldın. Spam klasörünü de kontrol etmeyi unutma.', close: 'Kapat',
   },
 }
 export default tr

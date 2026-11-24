@@ -68,8 +68,8 @@ const nl: Dict = {
     teams: ['Alleen', '2 tot 3', '4 tot 10', 'Meer dan 10'], exp: 'Ervaring', exps: ['Nieuw in UEFN', 'Een paar maps gepubliceerd', 'Ervaren creator', 'Professionele studio'],
     links: 'Je maps of socials', linksPh: 'Eilandcodes, TikTok, YouTube…', msg: 'Wat je met POP wilt doen', msgPh: 'Bijv.: we zijn met z’n vieren aan een tycoon-map en raken verdwaald tussen Discord en Google Docs.',
     send: 'Toegang aanvragen', sending: 'Verzenden…', nospam: 'Geen spam: we schrijven je alleen om je toegang te geven.', privacy: 'Privacybeleid',
-    okTitle: 'Genoteerd, bedankt!', okText: 'Je aanvraag is bij het POP-team aangekomen. Zodra er een plek vrijkomt, sturen we je je gebruikersnaam en een tijdelijk wachtwoord.',
-    alreadyTitle: 'Je staat al op de lijst.', approvedTitle: 'Je toegang is al goedgekeurd.', approvedText: 'Je account is klaar: het POP-team stuurt je je gebruikersnaam en tijdelijke wachtwoord. Anders kun je ons mailen.', close: 'Sluiten',
+    okTitle: 'Genoteerd, bedankt!', okText: 'Zodra je toegang klaar is, ontvang je een e-mail op het opgegeven adres met een link om je account te activeren. Kijk ook in je spammap.',
+    alreadyTitle: 'Je staat al op de lijst.', approvedTitle: 'Je toegang is al goedgekeurd.', approvedText: 'Je account is klaar: je hebt een e-mail ontvangen met een link om het te activeren en je wachtwoord te kiezen. Kijk ook in je spammap.', close: 'Sluiten',
   },
 }
 export default nl

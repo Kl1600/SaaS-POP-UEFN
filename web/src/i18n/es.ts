@@ -68,8 +68,8 @@ const es: Dict = {
     teams: ['Solo', '2 a 3', '4 a 10', 'Más de 10'], exp: 'Experiencia', exps: ['Principiante en UEFN', 'Algunos mapas publicados', 'Creador experimentado', 'Estudio profesional'],
     links: 'Tus mapas o redes', linksPh: 'Códigos de isla, TikTok, YouTube…', msg: 'Qué quieres hacer con POP', msgPh: 'Ej.: somos 4 en un mapa tycoon y nos perdemos entre Discord y Google Docs.',
     send: 'Solicitar acceso', sending: 'Enviando…', nospam: 'Sin spam: solo te escribimos para darte acceso.', privacy: 'Política de privacidad',
-    okTitle: '¡Anotado, gracias!', okText: 'Tu solicitud ha llegado al equipo de POP. En cuanto haya una plaza, te enviaremos tu usuario y una contraseña provisional.',
-    alreadyTitle: 'Ya estás en la lista.', approvedTitle: 'Tu acceso ya está aprobado.', approvedText: 'Tu cuenta está lista: el equipo de POP te envía tu usuario y tu contraseña provisional. Si no, escríbenos.', close: 'Cerrar',
+    okTitle: '¡Anotado, gracias!', okText: 'Recibirás un correo en la dirección indicada en cuanto tu acceso esté listo, con un enlace para activar tu cuenta. Revisa también la carpeta de spam.',
+    alreadyTitle: 'Ya estás en la lista.', approvedTitle: 'Tu acceso ya está aprobado.', approvedText: 'Tu cuenta está lista: has recibido un correo con un enlace para activarla y elegir tu contraseña. Revisa también la carpeta de spam.', close: 'Cerrar',
   },
 }
 export default es

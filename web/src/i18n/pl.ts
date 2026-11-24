@@ -68,8 +68,8 @@ const pl: Dict = {
     teams: ['Sam', '2–3', '4–10', 'Ponad 10'], exp: 'Doświadczenie', exps: ['Nowy w UEFN', 'Kilka opublikowanych map', 'Doświadczony twórca', 'Profesjonalne studio'],
     links: 'Twoje mapy lub social media', linksPh: 'Kody wysp, TikTok, YouTube…', msg: 'Co chcesz robić z POP', msgPh: 'Np. jesteśmy w 4 osoby przy mapie tycoon i gubimy się między Discordem a Google Docs.',
     send: 'Poproś o dostęp', sending: 'Wysyłanie…', nospam: 'Bez spamu: piszemy tylko po to, by dać ci dostęp.', privacy: 'Polityka prywatności',
-    okTitle: 'Zapisane, dziękujemy!', okText: 'Twoja prośba dotarła do zespołu POP. Gdy tylko zwolni się miejsce, wyślemy ci login i tymczasowe hasło.',
-    alreadyTitle: 'Jesteś już na liście.', approvedTitle: 'Twój dostęp jest już zatwierdzony.', approvedText: 'Twoje konto jest gotowe: zespół POP wyśle ci login i tymczasowe hasło. Jeśli nie dotarły, napisz do nas.', close: 'Zamknij',
+    okTitle: 'Zapisane, dziękujemy!', okText: 'Gdy dostęp będzie gotowy, otrzymasz e-mail na podany adres z linkiem do aktywacji konta. Sprawdź też folder spam.',
+    alreadyTitle: 'Jesteś już na liście.', approvedTitle: 'Twój dostęp jest już zatwierdzony.', approvedText: 'Twoje konto jest gotowe: otrzymałeś e-mail z linkiem do jego aktywacji i wyboru hasła. Sprawdź też folder spam.', close: 'Zamknij',
   },
 }
 export default pl

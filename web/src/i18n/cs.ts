@@ -68,8 +68,8 @@ const cs: Dict = {
     teams: ['Sám', '2–3', '4–10', 'Víc než 10'], exp: 'Zkušenosti', exps: ['Nováček v UEFN', 'Pár vydaných map', 'Zkušený tvůrce', 'Profesionální studio'],
     links: 'Vaše mapy nebo sítě', linksPh: 'Kódy ostrovů, TikTok, YouTube…', msg: 'Co chcete s POP dělat', msgPh: 'Např. jsme 4 na tycoon mapě a ztrácíme se mezi Discordem a Google Docs.',
     send: 'Požádat o přístup', sending: 'Odesílání…', nospam: 'Žádný spam: píšeme jen kvůli přístupu.', privacy: 'Zásady ochrany soukromí',
-    okTitle: 'Zapsáno, díky!', okText: 'Vaše žádost dorazila týmu POP. Jakmile se uvolní místo, pošleme vám uživatelské jméno a dočasné heslo.',
-    alreadyTitle: 'Už jste na seznamu.', approvedTitle: 'Váš přístup je už schválený.', approvedText: 'Váš účet je připraven: tým POP vám pošle uživatelské jméno a dočasné heslo. Pokud nedorazily, napište nám.', close: 'Zavřít',
+    okTitle: 'Zapsáno, díky!', okText: 'Jakmile bude váš přístup připraven, obdržíte e-mail na zadanou adresu s odkazem pro aktivaci účtu. Zkontrolujte i složku se spamem.',
+    alreadyTitle: 'Už jste na seznamu.', approvedTitle: 'Váš přístup je už schválený.', approvedText: 'Váš účet je připraven: obdrželi jste e-mail s odkazem pro jeho aktivaci a volbu hesla. Zkontrolujte i složku se spamem.', close: 'Zavřít',
   },
 }
 export default cs
