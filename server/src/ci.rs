@@ -292,26 +292,38 @@ pub async fn synchroniser(
     Ok(Json(json!({ "runs": runs.len(), "jobs": jobs })))
 }
 
-fn ligne_run(
-    r: &(
-        i64,
-        i64,
-        String,
-        String,
-        String,
-        Option<i64>,
-        String,
-        String,
-        Option<String>,
-        Option<String>,
-        String,
-        String,
-        Option<i64>,
-    ),
-) -> Value {
+fn ligne_run(r: &LigneRun) -> Value {
     json!({ "id": r.0, "github_id": r.1, "workflow": r.2, "branch": r.3, "sha": r.4, "pr": r.5, "event": r.6, "status": r.7,
         "conclusion": r.8, "started_at": r.9, "updated_at": r.10, "url": r.11, "task": r.12 })
 }
+
+/// Une ligne de `ci_jobs` : id GitHub, nom, statut, conclusion, début, fin, étapes (JSON), lien.
+type LigneJob = (
+    i64,
+    String,
+    String,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    String,
+    String,
+);
+/// Une ligne de `ci_runs` lue avec `COLONNES`.
+type LigneRun = (
+    i64,
+    i64,
+    String,
+    String,
+    String,
+    Option<i64>,
+    String,
+    String,
+    Option<String>,
+    Option<String>,
+    String,
+    String,
+    Option<i64>,
+);
 
 const COLONNES: &str = "r.id, r.github_id, r.workflow, r.branch, r.sha, r.pr, r.event, r.status, r.conclusion, r.started_at, r.updated_at, r.url, t.number";
 
@@ -332,21 +344,7 @@ pub async fn liste(
 ) -> ApiResult<Value> {
     map_ctx(&st, &u, mid).await?;
     let page = q.page.unwrap_or(1).max(1);
-    let rows: Vec<(
-        i64,
-        i64,
-        String,
-        String,
-        String,
-        Option<i64>,
-        String,
-        String,
-        Option<String>,
-        Option<String>,
-        String,
-        String,
-        Option<i64>,
-    )> = sqlx::query_as(&format!(
+    let rows: Vec<LigneRun> = sqlx::query_as(&format!(
         "SELECT {COLONNES} FROM ci_runs r LEFT JOIN tasks t ON t.id = r.task_id WHERE r.map_id = ?
            AND (? IS NULL OR r.branch = ?) AND (? IS NULL OR r.status = ? OR r.conclusion = ?)
          ORDER BY r.github_id DESC LIMIT 50 OFFSET ?"
@@ -372,14 +370,14 @@ pub async fn detail(
     Path((mid, id)): Path<(i64, i64)>,
 ) -> ApiResult<Value> {
     map_ctx(&st, &u, mid).await?;
-    let r: Option<(i64, i64, String, String, String, Option<i64>, String, String, Option<String>, Option<String>, String, String, Option<i64>)> =
+    let r: Option<LigneRun> =
         sqlx::query_as(&format!("SELECT {COLONNES} FROM ci_runs r LEFT JOIN tasks t ON t.id = r.task_id WHERE r.id = ? AND r.map_id = ?"))
             .bind(id)
             .bind(mid)
             .fetch_optional(&st.db)
             .await?;
     let r = r.ok_or(AppError::NotFound)?;
-    let jobs: Vec<(i64, String, String, Option<String>, Option<String>, Option<String>, String, String)> = sqlx::query_as(
+    let jobs: Vec<LigneJob> = sqlx::query_as(
         "SELECT github_id, name, status, conclusion, started_at, completed_at, steps, url FROM ci_jobs WHERE run_id = ? ORDER BY github_id",
     )
     .bind(id)
@@ -398,7 +396,7 @@ pub async fn de_la_tache(
     Path((mid, n)): Path<(i64, i64)>,
 ) -> ApiResult<Value> {
     map_ctx(&st, &u, mid).await?;
-    let r: Option<(i64, i64, String, String, String, Option<i64>, String, String, Option<String>, Option<String>, String, String, Option<i64>)> = sqlx::query_as(&format!(
+    let r: Option<LigneRun> = sqlx::query_as(&format!(
         "SELECT {COLONNES} FROM ci_runs r JOIN tasks t ON t.id = r.task_id WHERE r.map_id = ? AND t.number = ? ORDER BY r.github_id DESC LIMIT 1"
     ))
     .bind(mid)
