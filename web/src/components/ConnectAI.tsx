@@ -143,7 +143,7 @@ function ConnectPanel({ ai, onClose }: { ai: AccountAI; onClose?: () => void }) 
   return <div className="connectai">
     {head(tr("Connecter un agent"))}
     <p className="muted connectai-sub">{tr("POP se pilote avec votre IA (Claude, Cursor, Codex…) : elle voit vos maps, prend les tâches et agit dans UEFN. Connectez-la une fois pour tout votre compte.")}</p>
-    <OneClick url={`${location.origin}/mcp`} />
+    <PromptBlock ai={ai} />
     <div className="aiwait" role="status">
       <span className="aiwait-dot" />
       {waiting ? tr("{0} est enregistrée, en attente de connexion… Envoyez-lui un message pour qu’elle appelle POP.", [waiting.name]) : tr("En attente de votre IA…")}
@@ -153,11 +153,68 @@ function ConnectPanel({ ai, onClose }: { ai: AccountAI; onClose?: () => void }) 
       <code className="aiurl-v">{ask}</code>
       <button className="btn" onClick={copyAsk}>{copied ? <><Check size={15} />{tr("Copié")}</> : <><Copy size={15} />{tr("Copier")}</>}</button>
     </div>
-    <p className="small muted" style={{ margin: '18px 0 8px' }}>{tr("Votre IA ne propose pas de se connecter ? Copiez sa configuration avec une clé API :")}</p>
-    <div className="aigrid">
-      {CLIENTS.filter(c => KEY_KINDS.includes(c.kind)).map(c => <button key={c.kind} className="aicard" onClick={() => createKey(c)}>
-        <ClientLogo kind={c.kind} size={20} /><b style={{ fontWeight: 500, flex: 1 }}>{c.name}</b><span className="small">{tr("Clé API")}</span>
-      </button>)}
-    </div>
+    <details className="connectai-more">
+      <summary className="small">{tr("Autres façons de connecter : en un clic depuis l’IA, ou configuration à copier")}</summary>
+      <OneClick url={`${location.origin}/mcp`} />
+      <p className="small muted" style={{ margin: '14px 0 8px' }}>{tr("Votre IA ne propose pas de se connecter ? Copiez sa configuration avec une clé API :")}</p>
+      <div className="aigrid">
+        {CLIENTS.filter(c => KEY_KINDS.includes(c.kind)).map(c => <button key={c.kind} className="aicard" onClick={() => createKey(c)}>
+          <ClientLogo kind={c.kind} size={20} /><b style={{ fontWeight: 500, flex: 1 }}>{c.name}</b><span className="small">{tr("Clé API")}</span>
+        </button>)}
+      </div>
+    </details>
+  </div>
+}
+
+/** IA qui savent modifier leur propre configuration (agents de code) : on leur donne un prompt, elles font le reste. */
+const PROMPT_KINDS = ['claude_code', 'codex', 'cursor', 'autre']
+
+/** Le prompt à coller dans l'IA : adresse, clé du compte et commandes par outil. La clé n'est montrée qu'ici, une fois. */
+function promptText(url: string, token: string) {
+  const name = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? 'pop-local' : 'pop'
+  return tr(`Connecte-toi à POP (mon outil de production de maps Fortnite / UEFN) par son serveur MCP, puis montre-moi mes maps.
+
+Adresse du serveur MCP (Streamable HTTP) : {0}
+Clé : {1} (en-tête HTTP « Authorization: Bearer {1} »)
+
+1. Ajoute ce serveur MCP sous le nom « {2} » dans ta configuration utilisateur (pas dans un fichier du dépôt git : la clé est personnelle) :
+   - Claude Code : claude mcp add --scope user --transport http {2} {0} --header "Authorization: Bearer {1}"
+   - Codex : dans ~/.codex/config.toml, [mcp_servers.{2}] avec url = "{0}" et http_headers = { "Authorization" = "Bearer {1}" }
+   - Cursor : dans ~/.cursor/mcp.json, "mcpServers": { "{2}": { "url": "{0}", "headers": { "Authorization": "Bearer {1}" } } }
+   - Autre outil : un serveur MCP HTTP avec cette adresse et cet en-tête.
+   Si un serveur « {2} » existe déjà, remplace-le.
+2. Si les outils de POP n'apparaissent qu'après un redémarrage, dis-moi exactement quoi faire (par exemple ouvrir une nouvelle session).
+3. Une fois connecté, appelle l'outil list_maps de POP et donne-moi la liste de mes maps.`, [url, token, name])
+}
+
+function PromptBlock({ ai }: { ai: AccountAI }) {
+  const { toast } = useApp()
+  const [kind, setKind] = useState('claude_code')
+  const [text, setText] = useState('')
+  const [copied, setCopied] = useState(false)
+  const copy = async (t: string) => { try { await navigator.clipboard.writeText(t); setCopied(true) } catch { setCopied(false); toast(tr("Copie impossible : sélectionnez le texte."), true) } }
+  const make = async () => {
+    try {
+      const c = CLIENTS.find(c => c.kind === kind)!
+      // Un seul jeton en attente par IA : l'ancien, jamais utilisé, est remplacé.
+      for (const t of ai.pending.filter(t => t.kind === kind && !t.oauth)) await api.del(`/api/tokens/${t.id}`)
+      const r = await api.post('/api/me/tokens', { name: c.name, kind, scope: 'write' })
+      const p = promptText(`${location.origin}/mcp`, r.token)
+      setText(p); ai.reload(); await copy(p)
+    } catch (e: any) { toast(e.message, true) }
+  }
+  return <div className="aiurl connectai-prompt">
+    <b style={{ fontWeight: 500 }}>{tr("Le plus simple : donnez ce prompt à votre IA")}</b>
+    <p className="small muted" style={{ margin: '2px 0 10px' }}>{tr("Il contient l’adresse de POP et une clé pour votre compte : votre IA s’ajoute POP toute seule. Pour les IA qui travaillent sur votre ordinateur (Claude Code, Codex, Cursor…).")}</p>
+    <div className="aiquick" role="tablist">{PROMPT_KINDS.map(k => <button key={k} role="tab" aria-selected={k === kind} className={k === kind ? 'on' : ''} onClick={() => { setKind(k); setText(''); setCopied(false) }}><ClientLogo kind={k} size={16} />{CLIENTS.find(c => c.kind === k)!.name}</button>)}</div>
+    {!text
+      ? <button className="btn pri" onClick={make}><Copy size={15} />{tr("Créer la clé et copier le prompt")}</button>
+      : <>
+        <pre className="report mono connectai-ptext">{text}</pre>
+        <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+          <button className="btn pri" onClick={() => copy(text)}>{copied ? <><Check size={15} />{tr("Prompt copié")}</> : <><Copy size={15} />{tr("Copier le prompt")}</>}</button>
+          <span className="small muted">{tr("Collez-le dans votre IA. La clé ne sera plus affichée.")}</span>
+        </div>
+      </>}
   </div>
 }

@@ -1,6 +1,13 @@
 // Traduction anglaise de l'application. Clé = texte français de l'interface (ou du serveur), valeur = anglais.
 // Généré à partir des textes enveloppés dans tr(...) ; à compléter quand on ajoute des textes.
 const EN: Record<string, string> = {
+ "Autres façons de connecter : en un clic depuis l’IA, ou configuration à copier": "Other ways to connect: one click from the AI, or a configuration to copy",
+ "Le plus simple : donnez ce prompt à votre IA": "Easiest: give this prompt to your AI",
+ "Il contient l’adresse de POP et une clé pour votre compte : votre IA s’ajoute POP toute seule. Pour les IA qui travaillent sur votre ordinateur (Claude Code, Codex, Cursor…).": "It contains POP’s address and a key for your account: your AI adds POP by itself. For AIs that work on your computer (Claude Code, Codex, Cursor…).",
+ "Créer la clé et copier le prompt": "Create the key and copy the prompt",
+ "Prompt copié": "Prompt copied",
+ "Copier le prompt": "Copy the prompt",
+ "Collez-le dans votre IA. La clé ne sera plus affichée.": "Paste it into your AI. The key won’t be shown again.",
  "Mes agents": "My agents",
  "Les IA connectées à votre compte : elles voient vos maps et choisissent celle sur laquelle travailler.": "The AIs connected to your account: they see your maps and choose which one to work on.",
  "Gérer": "Manage",

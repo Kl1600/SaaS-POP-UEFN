@@ -1210,3 +1210,6 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 .connectai-ask .aiurl-v{flex:1;min-width:200px}
 .connectai-ok{font-size:15px;padding:14px 16px;margin:0 0 12px}
 .upill .aiwait-dot{width:8px;height:8px}
+.connectai-ptext{font-size:12px;max-height:220px;overflow:auto;white-space:pre-wrap;margin:0 0 10px}
+.connectai-more{margin-top:16px}.connectai-more>summary{cursor:pointer;color:var(--muted)}
+.connectai-more[open]>summary{margin-bottom:12px}
