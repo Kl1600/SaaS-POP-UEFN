@@ -101,10 +101,26 @@ function AccountForm({ init, waitlistId, onCreated, onCancel }: { init?: { name:
   </form>
 }
 
+/** Barres par jour (#68) : une barre par jour, le dernier jour en couleur ; une date sur quelques barres seulement. */
+function Barres({ points, cle, titre, sous }: { points: any[]; cle: string; titre: string; sous: string }) {
+  const max = Math.max(1, ...points.map(p => p[cle]))
+  const total = points.reduce((s, p) => s + p[cle], 0)
+  const pas = Math.ceil(points.length / 8)
+  return <section className="card"><CardHead title={titre} sub={sous} />
+    <div className="small muted" style={{ marginTop: -4 }}>{tr("Total sur la période : {0}", [n(total)])}</div>
+    <div className="minibars" style={{ gap: points.length > 40 ? 1 : 4 }}>{points.map((d, i) => <div key={d.day} title={`${frDate(d.day)} : ${d[cle]}`}>
+      <span style={{ height: `${(d[cle] / max) * 100}%` }} /><em style={{ visibility: (i % pas === 0 && points.length - 1 - i >= pas / 2) || i === points.length - 1 ? 'visible' : 'hidden' }}>{frDate(d.day).replace('.', '')}</em></div>)}</div>
+  </section>
+}
+
 function Overview() {
-  const { data } = useLoad<any>('/api/admin/overview')
+  const [jours, setJours] = useState<30 | 90>(30)
+  const { data } = useLoad<any>(`/api/admin/overview?days=${jours}`, [jours])
   if (!data) return null
-  const max = Math.max(1, ...data.requests_per_day.map((d: any) => d.count))
+  const s = data.stats
+  const hist = s.plans_history as any[]
+  const evol = (k: string) => hist.length > 1 ? hist[hist.length - 1][k] - hist[0][k] : null
+  const signe = (v: number | null) => v === null ? '' : ' · ' + tr("{0} sur la période", [(v > 0 ? '+' : '') + v])
   return <>
     <div className="tiles">
       <div className="card"><div className="lab">{tr("Demandes en attente")}</div><div className="num">{n(data.waitlist.pending)}</div><div className="muted">{tr("{0} comptes créés", [n(data.waitlist.registered)])}</div></div>
@@ -112,11 +128,24 @@ function Overview() {
       <div className="card"><div className="lab">{tr("Studios et maps")}</div><div className="num">{n(data.studios)}</div><div className="muted">{n(data.maps)} maps</div></div>
       <div className="card"><div className="lab">{tr("Tâches")}</div><div className="num">{n(data.tasks)}</div><div className="muted">{tr("{0} finies sur 7 j", [n(data.tasks_done_7d)])}</div></div>
     </div>
+    <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+      <b style={{ fontWeight: 500 }}>{tr("Activité par jour")}</b>
+      <div className="tabs" role="tablist">{([30, 90] as const).map(j => <button key={j} role="tab" aria-selected={jours === j} className={jours === j ? 'on' : ''} onClick={() => setJours(j)}>{tr("{0} jours", [j])}</button>)}</div>
+    </div>
     <div className="grid2">
-      <section className="card"><CardHead title={tr("Demandes d’accès")} sub={tr("30 derniers jours")} />
-        {data.requests_per_day.length === 0 ? <p className="small muted">{tr("Aucune demande pour l’instant.")}</p> :
-          <div className="minibars">{data.requests_per_day.map((d: any) => <div key={d.day} title={`${frDate(d.day)} : ${d.count}`}><span style={{ height: `${(d.count / max) * 100}%` }} /><em>{frDate(d.day).replace('.', '')}</em></div>)}</div>}
+      <Barres points={s.daily} cle="signups" titre={tr("Inscriptions")} sous={tr("Comptes créés par jour")} />
+      <Barres points={s.daily} cle="active" titre={tr("Comptes actifs")} sous={tr("Connectés ou actifs (tâches, pages, UEFN) ce jour-là")} />
+      <Barres points={s.daily} cle="requests" titre={tr("Demandes d’accès")} sous={tr("Liste d’attente, par jour")} />
+      <section className="card"><CardHead title={tr("Abonnements")} sub={tr("Comptes par plan aujourd’hui, avec l’évolution depuis le début de la période suivie")} />
+        <div className="list">
+          <div className="li"><span style={{ flex: 1 }}>Starter</span><b style={{ fontWeight: 500 }}>{n(s.plans.starter)}</b><span className="small muted">{signe(evol('starter'))}</span></div>
+          <div className="li"><span style={{ flex: 1 }}>Pro</span><b style={{ fontWeight: 500 }}>{n(s.plans.pro)}</b><span className="small muted">{signe(evol('pro'))}</span></div>
+          <div className="li"><span style={{ flex: 1 }}>{tr("Essais Pro en cours")}</span><b style={{ fontWeight: 500 }}>{n(s.plans.trials)}</b><span className="small muted">{signe(evol('trials'))}</span></div>
+        </div>
+        {hist.length <= 1 && <p className="small muted" style={{ marginBottom: 0 }}>{tr("L’évolution apparaît à partir du deuxième jour de suivi.")}</p>}
       </section>
+    </div>
+    <div className="grid2">
       <section className="card"><CardHead title={tr("Plateforme")} />
         <div className="list">
           <div className="li"><span style={{ flex: 1 }}>{tr("Relais UEFN en ligne")}</span><b style={{ fontWeight: 500 }}>{n(data.relays_online)}</b></div>
