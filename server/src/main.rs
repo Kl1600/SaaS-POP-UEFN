@@ -421,6 +421,7 @@ fn api() -> Router<AppState> {
         .route("/api/admin/unlock", post(security::unlock_admin))
         .route("/api/admin/lock", post(security::lock_admin))
         .route("/api/admin/audit", get(security::admin_audit))
+        .route("/api/admin/journal", get(admin::journal))
         .route("/api/admin/overview", get(admin::overview))
         .route(
             "/api/admin/announcement",

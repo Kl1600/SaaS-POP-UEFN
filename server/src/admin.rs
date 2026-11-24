@@ -69,6 +69,17 @@ async fn log(st: &AppState, u: &AuthUser, action: &str, detail: &str) {
     crate::security::audit(st, Some(u.id), action, detail, "").await;
 }
 
+/// Adresse d'une demande de la liste d'attente, pour le journal (#66) : on y lit qui est visé, pas un numéro.
+async fn demande(st: &AppState, id: i64) -> String {
+    sqlx::query_scalar::<_, String>("SELECT email FROM waitlist WHERE id = ?")
+        .bind(id)
+        .fetch_optional(&st.db)
+        .await
+        .ok()
+        .flatten()
+        .unwrap_or_else(|| format!("demande n° {id}"))
+}
+
 // ---------- Public : demande d'accès ----------
 
 #[derive(Deserialize)]
@@ -419,7 +430,7 @@ pub async fn refuse(
     Path(id): Path<i64>,
 ) -> ApiResult<Value> {
     require_mod(&st, &u).await?;
-    log(&st, &u, "admin_demande_refusée", &id.to_string()).await;
+    log(&st, &u, "admin_demande_refusée", &demande(&st, id).await).await;
     sqlx::query("UPDATE waitlist SET status = 'refused', token_hash = NULL, decided_at = datetime('now'), decided_by = ? WHERE id = ? AND status != 'registered'").bind(u.id).bind(id).execute(&st.db).await?;
     Ok(Json(json!({ "ok": true })))
 }
@@ -430,6 +441,13 @@ pub async fn reopen(
     Path(id): Path<i64>,
 ) -> ApiResult<Value> {
     require_mod(&st, &u).await?;
+    log(
+        &st,
+        &u,
+        "admin_demande_remise_en_attente",
+        &demande(&st, id).await,
+    )
+    .await;
     sqlx::query("UPDATE waitlist SET status = 'pending', token_hash = NULL, decided_at = NULL, decided_by = NULL WHERE id = ? AND status != 'registered'").bind(id).execute(&st.db).await?;
     Ok(Json(json!({ "ok": true })))
 }
@@ -440,7 +458,7 @@ pub async fn remove(
     Path(id): Path<i64>,
 ) -> ApiResult<Value> {
     require(&st, &u).await?;
-    log(&st, &u, "admin_demande_supprimée", &id.to_string()).await;
+    log(&st, &u, "admin_demande_supprimée", &demande(&st, id).await).await;
     sqlx::query("DELETE FROM waitlist WHERE id = ?")
         .bind(id)
         .execute(&st.db)
@@ -459,6 +477,7 @@ pub async fn note(
     Json(b): Json<NoteIn>,
 ) -> ApiResult<Value> {
     require_mod(&st, &u).await?;
+    log(&st, &u, "admin_demande_note", &demande(&st, id).await).await;
     sqlx::query("UPDATE waitlist SET note = ? WHERE id = ?")
         .bind(b.note.chars().take(1000).collect::<String>())
         .bind(id)
@@ -500,6 +519,135 @@ pub async fn invite(
     let id: i64 = sqlx::query_scalar("INSERT INTO waitlist (email, name, message) VALUES (?, ?, 'Invité par un administrateur') ON CONFLICT(email) DO UPDATE SET name = excluded.name RETURNING id")
         .bind(&email).bind(&name).fetch_one(&st.db).await?;
     Ok(Json(grant(&st, &u, id).await?))
+}
+
+#[derive(Deserialize)]
+pub struct JournalQ {
+    who: Option<i64>,
+    #[serde(rename = "type")]
+    kind: Option<String>,
+    page: Option<i64>,
+}
+
+/// Types d'actions du journal (#66) : préfixes des actions enregistrées par `security::audit`.
+const JOURNAL_TYPES: &[(&str, &str, &[&str])] = &[
+    (
+        "attente",
+        "Liste d’attente",
+        &["admin\\_demande\\_%", "admin\\_accès\\_%"],
+    ),
+    (
+        "comptes",
+        "Comptes",
+        &[
+            "admin\\_compte\\_%",
+            "admin\\_lien\\_%",
+            "admin\\_mot\\_de\\_passe\\_%",
+            "admin\\_plan\\_%",
+            "admin\\_crédits\\_%",
+            "admin\\_nommé",
+            "admin\\_retiré",
+        ],
+    ),
+    ("annonces", "Annonces", &["annonce\\_%"]),
+    (
+        "securite",
+        "Accès admin",
+        &["admin\\_déverrouillé", "admin\\_confirmation\\_%"],
+    ),
+];
+
+/// Journal des actions des admins et modérateurs (#66) : le plus récent en haut, 50 par page, filtres par auteur et par
+/// type. Réservé aux administrateurs.
+pub async fn journal(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Query(q): Query<JournalQ>,
+) -> ApiResult<Value> {
+    require(&st, &u).await?;
+    let motifs: Vec<&str> = match q.kind.as_deref().filter(|k| !k.is_empty()) {
+        Some(k) => JOURNAL_TYPES
+            .iter()
+            .find(|t| t.0 == k)
+            .map(|t| t.2.to_vec())
+            .ok_or_else(|| bad("Type d’action inconnu."))?,
+        None => JOURNAL_TYPES
+            .iter()
+            .flat_map(|t| t.2.iter().copied())
+            .collect(),
+    };
+    let cond = (0..motifs.len())
+        .map(|i| format!("a.action LIKE ?{} ESCAPE '\\'", i + 3))
+        .collect::<Vec<_>>()
+        .join(" OR ");
+    let page = q.page.unwrap_or(1).max(1);
+    let sql = format!(
+        "SELECT a.id, a.action, a.detail, a.at, a.user_id, u.name, u.email FROM audit_log a LEFT JOIN users u ON u.id = a.user_id
+         WHERE ({cond}) AND (?1 IS NULL OR a.user_id = ?1) ORDER BY a.id DESC LIMIT 51 OFFSET ?2"
+    );
+    let mut req = sqlx::query_as::<
+        _,
+        (
+            i64,
+            String,
+            String,
+            String,
+            Option<i64>,
+            Option<String>,
+            Option<String>,
+        ),
+    >(&sql)
+    .bind(q.who)
+    .bind((page - 1) * 50);
+    for m in &motifs {
+        req = req.bind(*m);
+    }
+    let mut rows = req.fetch_all(&st.db).await?;
+    let suite = rows.len() > 50;
+    rows.truncate(50);
+    let libelle = |a: &str| {
+        match a {
+            "admin_déverrouillé" => return "Administration déverrouillée".to_string(),
+            "admin_confirmation_échouée" => {
+                return "Mot de passe d’administration refusé".to_string()
+            }
+            "admin_nommé" => return "Administrateur nommé".to_string(),
+            "admin_retiré" => return "Administrateur retiré".to_string(),
+            "admin_crédits_ia" => return "Crédits IA donnés".to_string(),
+            _ => {}
+        }
+        let s = a.trim_start_matches("admin_").replace('_', " ");
+        let mut c = s.chars();
+        c.next()
+            .map(|f| f.to_uppercase().collect::<String>() + c.as_str())
+            .unwrap_or_default()
+    };
+    let type_de = |a: &str| {
+        JOURNAL_TYPES
+            .iter()
+            .find(|t| {
+                t.2.iter().any(|m| {
+                    let m = m.replace('\\', "");
+                    match m.strip_suffix('%') {
+                        Some(p) => a.starts_with(&p),
+                        None => a == m,
+                    }
+                })
+            })
+            .map(|t| t.0)
+            .unwrap_or("")
+    };
+    let auteurs: Vec<(i64, String)> = sqlx::query_as(
+        "SELECT DISTINCT u.id, u.name FROM audit_log a JOIN users u ON u.id = a.user_id WHERE a.action LIKE 'admin\\_%' ESCAPE '\\' OR a.action LIKE 'annonce\\_%' ESCAPE '\\' ORDER BY u.name",
+    )
+    .fetch_all(&st.db)
+    .await?;
+    Ok(Json(json!({
+        "rows": rows.into_iter().map(|r| json!({ "id": r.0, "action": r.1, "label": libelle(&r.1), "type": type_de(&r.1), "target": r.2, "at": r.3, "who_id": r.4, "who": r.5, "who_email": r.6 })).collect::<Vec<_>>(),
+        "page": page, "more": suite,
+        "authors": auteurs.into_iter().map(|(id, n)| json!({ "id": id, "name": n })).collect::<Vec<_>>(),
+        "types": JOURNAL_TYPES.iter().map(|t| json!({ "key": t.0, "label": t.1 })).collect::<Vec<_>>(),
+    })))
 }
 
 pub async fn users(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
@@ -1427,6 +1575,145 @@ mod depannage_tests {
             .unwrap();
         assert!(matches!(
             users(s(), moder.clone()).await,
+            Err(AppError::Forbidden)
+        ));
+    }
+}
+
+#[cfg(test)]
+mod journal_tests {
+    use super::*;
+    use axum::extract::{Path, Query, State};
+
+    async fn user(st: &AppState, email: &str, admin: bool) -> AuthUser {
+        let id: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash, is_admin, email_verified_at) VALUES (?, ?, 'x', ?, datetime('now')) RETURNING id")
+            .bind(email).bind(email.split('@').next().unwrap()).bind(admin as i64)
+            .fetch_one(&st.db).await.unwrap();
+        let sid = format!("session-{id}");
+        sqlx::query("INSERT INTO sessions (token_hash, user_id, expires_at, sudo_until) VALUES (?, ?, datetime('now', '+1 day'), datetime('now', '+10 minutes'))")
+            .bind(&sid).bind(id).execute(&st.db).await.unwrap();
+        AuthUser {
+            id,
+            email: email.into(),
+            name: email.split('@').next().unwrap().into(),
+            sid,
+        }
+    }
+
+    async fn journal_de(st: &AppState, u: &AuthUser, q: Value) -> Result<Value, AppError> {
+        journal(
+            State(st.clone()),
+            u.clone(),
+            Query(serde_json::from_value(q).unwrap()),
+        )
+        .await
+        .map(|Json(v)| v)
+    }
+
+    /// #66 : une action d'admin apparaît avec auteur, action, compte visé et date ; filtres ; 403 pour un non-admin.
+    #[tokio::test]
+    async fn journal_des_admins() {
+        let st = crate::test_state().await;
+        let (kl, ben, simple) = (
+            user(&st, "kl@pop.fr", true).await,
+            user(&st, "ben@pop.fr", true).await,
+            user(&st, "yanis@a.fr", false).await,
+        );
+        sqlx::query("UPDATE users SET locked_until = datetime('now', '+1 hour') WHERE id = ?")
+            .bind(simple.id)
+            .execute(&st.db)
+            .await
+            .unwrap();
+        unlock_user(State(st.clone()), kl.clone(), Path(simple.id))
+            .await
+            .unwrap();
+        let wid: i64 = sqlx::query_scalar(
+            "INSERT INTO waitlist (email, name) VALUES ('nouveau@a.fr', 'Nouveau') RETURNING id",
+        )
+        .fetch_one(&st.db)
+        .await
+        .unwrap();
+        refuse(State(st.clone()), ben.clone(), Path(wid))
+            .await
+            .unwrap();
+        // Une connexion ratée (journal de sécurité) n'est pas une action d'admin.
+        crate::security::audit(&st, Some(simple.id), "connexion_échouée", "", "1.2.3.4").await;
+
+        let v = journal_de(&st, &kl, json!({})).await.unwrap();
+        let rows = v["rows"].as_array().unwrap();
+        assert_eq!(rows.len(), 2, "{v}");
+        assert_eq!(
+            (
+                rows[0]["who"].as_str(),
+                rows[0]["label"].as_str(),
+                rows[0]["target"].as_str(),
+                rows[0]["type"].as_str()
+            ),
+            (
+                Some("ben"),
+                Some("Demande refusée"),
+                Some("nouveau@a.fr"),
+                Some("attente")
+            )
+        );
+        assert_eq!(
+            (
+                rows[1]["who"].as_str(),
+                rows[1]["label"].as_str(),
+                rows[1]["target"].as_str()
+            ),
+            (Some("kl"), Some("Compte débloqué"), Some("yanis@a.fr"))
+        );
+        assert!(rows[1]["at"].as_str().unwrap().len() >= 19, "date et heure");
+        // Filtres.
+        let v = journal_de(&st, &kl, json!({ "who": kl.id })).await.unwrap();
+        assert!(
+            v["rows"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|r| r["who"] == "kl")
+                && v["rows"].as_array().unwrap().len() == 1
+        );
+        let v = journal_de(&st, &kl, json!({ "type": "attente" }))
+            .await
+            .unwrap();
+        assert!(
+            v["rows"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|r| r["type"] == "attente")
+                && v["rows"].as_array().unwrap().len() == 1
+        );
+        let v = journal_de(&st, &kl, json!({ "type": "comptes", "who": ben.id }))
+            .await
+            .unwrap();
+        assert_eq!(v["rows"].as_array().unwrap().len(), 0);
+        // 50 par page.
+        for k in 0..60 {
+            crate::security::audit(
+                &st,
+                Some(kl.id),
+                "annonce_publiée",
+                &format!("annonce {k}"),
+                "",
+            )
+            .await;
+        }
+        let v = journal_de(&st, &kl, json!({})).await.unwrap();
+        assert_eq!(
+            (v["rows"].as_array().unwrap().len(), v["more"].as_bool()),
+            (50, Some(true))
+        );
+        let v = journal_de(&st, &kl, json!({ "page": 2 })).await.unwrap();
+        assert_eq!(
+            (v["rows"].as_array().unwrap().len(), v["more"].as_bool()),
+            (12, Some(false))
+        );
+        // Un compte non admin : 403.
+        assert!(matches!(
+            journal_de(&st, &simple, json!({})).await,
             Err(AppError::Forbidden)
         ));
     }
