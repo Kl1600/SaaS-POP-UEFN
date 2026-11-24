@@ -1,22 +1,26 @@
-// « Connecte ton IA » au niveau du compte (#134) : depuis #145, une IA se connecte au compte et choisit sa map elle-même.
-// - Pastille dans la barre du haut : aucune IA → « Connecter une IA » ; IA enregistrée (clé ou autorisation OAuth créée,
-//   aucun appel encore) → « en attente de connexion » ; premier appel MCP reçu (last_used) → « connectée ».
-// - Fenêtre ouverte à l'arrivée tant qu'aucune IA n'a appelé POP, sauf après « Passer » (gardé pour le compte).
-// Reprend la connexion en un clic (#290) et les clés API (#280) de Paramètres → IA connectées.
+// « Mes agents » (#134) : les IA du compte (depuis #145, une IA se connecte au compte et choisit sa map elle-même).
+// - Section de l'accueil : une carte par IA (connectée, ou enregistrée et en attente de son premier appel MCP) et
+//   « Connecter un agent », qui déplie la connexion dans la section (en un clic #290, ou clé API #280).
+// - Pastille dans la barre du haut : aucune IA → « Connecter une IA » ; en attente ; connectée.
+// État lu dans /api/me/tokens : last_used vide = en attente de connexion, rempli = premier appel MCP reçu.
 import { useEffect, useRef, useState } from 'react'
-import { Check, Copy, ArrowLeft, X } from 'lucide-react'
-import { api } from '../api'
+import { Check, Copy, ArrowLeft, X, Plus, Bot, Settings2 } from 'lucide-react'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { ago, api } from '../api'
 import { useApp } from '../state'
 import { tr } from '../i18n/t'
-import { CLIENTS, ClientLogo, KeyPanel, OneClick, type Client } from './AiTokens'
-import { Modal } from './ui'
+import { CLIENTS, ClientLogo, KeyPanel, OneClick, clientName, type Client } from './AiTokens'
 
 export type AccountAI = { tokens: any[] | null; live: any[]; pending: any[]; reload: () => void }
 
 /** IA du compte, relues toutes les 3 s tant qu'on attend une connexion, toutes les 30 s sinon, et au retour sur l'onglet. */
+// La pastille et la section « Mes agents » partagent la dernière lecture : elles changent ensemble.
+let last: any[] | null = null
+const subs = new Set<(t: any[]) => void>()
 export function useAccountAI(waiting: boolean): AccountAI {
-  const [tokens, setTokens] = useState<any[] | null>(null)
-  const reload = async () => { try { setTokens(await api.get<any[]>('/api/me/tokens')) } catch {} }
+  const [tokens, setTokens] = useState<any[] | null>(last)
+  useEffect(() => { subs.add(setTokens); return () => { subs.delete(setTokens) } }, [])
+  const reload = async () => { try { last = await api.get<any[]>('/api/me/tokens'); subs.forEach(f => f(last!)) } catch {} }
   const live = (tokens ?? []).filter(t => t.last_used)
   const pending = (tokens ?? []).filter(t => !t.last_used)
   const fast = waiting || pending.length > 0
@@ -34,41 +38,82 @@ export function useAccountAI(waiting: boolean): AccountAI {
   return { tokens, live, pending, reload }
 }
 
-/** Pastille d'état de l'IA, à côté de celle d'UEFN Link. */
-export function AiPill({ ai, onOpen, onSettings }: { ai: AccountAI; onOpen: () => void; onSettings: () => void }) {
+/** Pastille d'état de l'IA, à côté de celle d'UEFN Link. Sans IA connectée, elle mène à « Mes agents » sur l'accueil. */
+export function AiPill() {
+  const nav = useNavigate()
+  const ai = useAccountAI(false)
   if (!ai.tokens) return null
+  const toAgents = () => nav('/#agents')
   if (ai.live.length) {
     const kinds = [...new Set(ai.live.map(t => t.kind))].slice(0, 3)
-    return <button className="upill connected" onClick={onSettings} title={ai.live.map(t => t.name).join(', ')}>
+    return <button className="upill connected" onClick={toAgents} title={ai.live.map(t => t.name).join(', ')}>
       <span className="udot" />{kinds.map(k => <ClientLogo key={k} kind={k} size={16} />)}
       {ai.live.length === 1 ? tr("{0} connectée", [ai.live[0].name]) : tr("{0} IA connectées", [ai.live.length])}
     </button>
   }
   if (ai.pending.length) {
     const t = ai.pending[ai.pending.length - 1]
-    return <button className="upill closed" onClick={onOpen} title={tr("Enregistrée dans POP : elle sera connectée à son premier appel.")}>
+    return <button className="upill closed" onClick={toAgents} title={tr("Enregistrée dans POP : elle sera connectée à son premier appel.")}>
       <span className="aiwait-dot" /><ClientLogo kind={t.kind} size={16} />{tr("{0} · en attente de connexion", [t.name])}
     </button>
   }
-  return <button className="upill unlinked" onClick={onOpen}><span className="udot" />{tr("Connecter une IA")}</button>
+  return <button className="upill unlinked" onClick={toAgents}><span className="udot" />{tr("Connecter une IA")}</button>
+}
+
+/** Section « Mes agents » de l'accueil. */
+export function AgentsSection() {
+  const nav = useNavigate()
+  const loc = useLocation()
+  const ref = useRef<HTMLElement>(null)
+  const [open, setOpen] = useState(false)
+  const ai = useAccountAI(open)
+  const none = !!ai.tokens && ai.tokens.length === 0
+  // /#agents (pastille de la barre du haut) : on descend jusqu'à la section et on ouvre la connexion s'il n'y a pas d'IA.
+  useEffect(() => {
+    if (loc.hash !== '#agents' || !ai.tokens) return
+    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    if (!ai.live.length) setOpen(true)
+  }, [loc.key, !!ai.tokens])
+  // Aucune IA : la connexion est dépliée d'office, et le reste quand la clé est créée (elle ne s'affiche qu'une fois).
+  useEffect(() => { if (none) setOpen(true) }, [none])
+  if (!ai.tokens) return null
+  const settings = () => nav('/parametres?onglet=ia')
+  return <section className="home-block" id="agents" ref={ref}>
+    <div className="home-head">
+      <span className="home-ic"><Bot size={18} /></span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <h2>{tr("Mes agents")}</h2>
+        <span className="small muted">{tr("Les IA connectées à votre compte : elles voient vos maps et choisissent celle sur laquelle travailler.")}</span>
+      </div>
+      {!none && <button className="btn" onClick={settings}><Settings2 size={16} />{tr("Gérer")}</button>}
+    </div>
+    <div className="home-grid">
+      {ai.tokens.map(t => {
+        const live = !!t.last_used
+        return <div key={t.id} role="button" tabIndex={0} className="home-map agent-card" onClick={settings} onKeyDown={e => { if (e.key === 'Enter') settings() }}>
+          <span className="home-map-top"><span className="agent-name"><ClientLogo kind={t.kind} size={20} /><b>{t.name}</b></span></span>
+          <span className="small muted">{t.oauth ? tr("Autorisée depuis l’IA") : clientName(t.kind)}{t.scope === 'read' ? ` · ${tr("Lecture seule")}` : ''}</span>
+          <span className={'agent-state' + (live ? ' on' : '')}>{live ? <span className="udot" /> : <span className="aiwait-dot" />}{live ? tr("Connectée · {0}", [ago(t.last_used)]) : tr("En attente de connexion…")}</span>
+          <span className="small muted">{t.map ? tr("Travaille sur « {0} »", [t.map.name]) : live ? tr("Aucune map choisie") : tr("Sera connectée à son premier appel")}</span>
+        </div>
+      })}
+      {!open && !none && <button className="home-map add" onClick={() => setOpen(true)}><Plus size={20} /><b>{tr("Connecter un agent")}</b></button>}
+    </div>
+    {(open || none) && <div className="card agents-connect"><ConnectPanel ai={ai} onClose={none ? undefined : () => setOpen(false)} /></div>}
+  </section>
 }
 
 const KEY_KINDS = ['claude_desktop', 'claude_code', 'cursor', 'codex', 'autre']
 
-/** Fenêtre « Connecte ton IA ». Passe seule à « IA connectée » dès le premier appel MCP d'une nouvelle IA. */
-export function ConnectAIModal({ ai, onClose, onSkip }: { ai: AccountAI; onClose: () => void; onSkip?: () => void }) {
+/** Connexion d'un agent, dépliée dans la section. Passe seule à « connectée » dès le premier appel MCP d'une nouvelle IA. */
+function ConnectPanel({ ai, onClose }: { ai: AccountAI; onClose?: () => void }) {
   const { map, toast } = useApp()
   const [key, setKey] = useState<{ c: Client; token: string; id: number } | null>(null)
   const [copied, setCopied] = useState(false)
-  // IA déjà connectées à l'ouverture : seule une nouvelle connexion fait passer à la suite.
+  // IA déjà connectées à l'ouverture : seule une nouvelle connexion fait passer à « connectée ».
   const before = useRef<Set<number> | null>(null)
   if (before.current === null && ai.tokens) before.current = new Set(ai.live.map(t => t.id))
   const fresh = before.current ? ai.live.find(t => !before.current!.has(t.id)) : undefined
-  useEffect(() => {
-    if (!fresh) return
-    const h = setTimeout(onClose, 4000)
-    return () => clearTimeout(h)
-  }, [fresh?.id])
   const ask = map ? tr("Travaille sur ma map POP « {0} »", [map.name]) : tr("Liste mes maps POP")
   const copyAsk = async () => { try { await navigator.clipboard.writeText(ask); setCopied(true) } catch { toast(tr("Copie impossible : sélectionnez le texte."), true) } }
   const createKey = async (c: Client) => {
@@ -81,42 +126,38 @@ export function ConnectAIModal({ ai, onClose, onSkip }: { ai: AccountAI; onClose
   }
   const waiting = ai.pending[ai.pending.length - 1]
   const head = (title: string) => <div className="row" style={{ justifyContent: 'space-between' }}>
-    <h2 className="connectai-t">{title}</h2>
-    <button className="iconbtn" aria-label={tr("Fermer")} onClick={onClose}><X size={18} /></button>
+    <h3 className="connectai-t">{title}</h3>
+    {onClose && <button className="iconbtn" aria-label={tr("Fermer")} onClick={onClose}><X size={18} /></button>}
   </div>
 
-  return <Modal onClose={onClose} label={tr("Connecte ton IA")}>
-    <div className="connectai">
-      {fresh ? <>
-        {head(tr("IA connectée"))}
-        <div className="aiwait ok connectai-ok" role="status"><ClientLogo kind={fresh.kind} size={18} />{tr("{0} est connectée à POP.", [fresh.name])}</div>
-        <p className="small">{tr("Demandez-lui maintenant :")} <b style={{ fontWeight: 500 }}>{ask}</b></p>
-        <div className="row"><button className="btn pri" onClick={onClose}>{tr("Continuer")}</button></div>
-      </> : key ? <>
-        {head(tr("Connecter {0}", [key.c.name]))}
-        <KeyPanel c={key.c} token={key.token} linked={false} />
-        <button className="linkbtn" onClick={() => setKey(null)}><ArrowLeft size={14} /> {tr("Choisir une autre IA")}</button>
-      </> : <>
-        {head(tr("Connecte ton IA"))}
-        <p className="muted connectai-sub">{tr("POP se pilote avec votre IA (Claude, Cursor, Codex…) : elle voit vos maps, prend les tâches et agit dans UEFN. Connectez-la une fois pour tout votre compte.")}</p>
-        <OneClick url={`${location.origin}/mcp`} />
-        <div className={'aiwait' + (waiting ? ' wait' : '')} role="status">
-          <span className="aiwait-dot" />
-          {waiting ? tr("{0} est enregistrée, en attente de connexion… Envoyez-lui un message pour qu’elle appelle POP.", [waiting.name]) : tr("En attente de votre IA…")}
-        </div>
-        <div className="connectai-ask">
-          <span className="small">{tr("Une fois connectée, demandez-lui :")}</span>
-          <code className="aiurl-v">{ask}</code>
-          <button className="btn" onClick={copyAsk}>{copied ? <><Check size={15} />{tr("Copié")}</> : <><Copy size={15} />{tr("Copier")}</>}</button>
-        </div>
-        <p className="small muted" style={{ margin: '18px 0 8px' }}>{tr("Votre IA ne propose pas de se connecter ? Copiez sa configuration avec une clé API :")}</p>
-        <div className="aigrid">
-          {CLIENTS.filter(c => KEY_KINDS.includes(c.kind)).map(c => <button key={c.kind} className="aicard" onClick={() => createKey(c)}>
-            <ClientLogo kind={c.kind} size={20} /><b style={{ fontWeight: 500, flex: 1 }}>{c.name}</b><span className="small">{tr("Clé API")}</span>
-          </button>)}
-        </div>
-        {onSkip && <p style={{ margin: '18px 0 0' }}><button className="linkbtn" onClick={onSkip}>{tr("Passer, je connecterai mon IA plus tard")}</button></p>}
-      </>}
+  if (fresh) return <div className="connectai">
+    <div className="aiwait ok connectai-ok" role="status"><ClientLogo kind={fresh.kind} size={18} />{tr("{0} est connectée à POP.", [fresh.name])}</div>
+    <p className="small" style={{ margin: '0 0 12px' }}>{tr("Demandez-lui maintenant :")} <b style={{ fontWeight: 500 }}>{ask}</b></p>
+    {onClose && <button className="btn pri" onClick={onClose}><Check size={16} />{tr("Terminé")}</button>}
+  </div>
+  if (key) return <div className="connectai">
+    {head(tr("Connecter {0}", [key.c.name]))}
+    <KeyPanel c={key.c} token={key.token} linked={false} />
+    <button className="linkbtn" onClick={() => setKey(null)}><ArrowLeft size={14} /> {tr("Choisir une autre IA")}</button>
+  </div>
+  return <div className="connectai">
+    {head(tr("Connecter un agent"))}
+    <p className="muted connectai-sub">{tr("POP se pilote avec votre IA (Claude, Cursor, Codex…) : elle voit vos maps, prend les tâches et agit dans UEFN. Connectez-la une fois pour tout votre compte.")}</p>
+    <OneClick url={`${location.origin}/mcp`} />
+    <div className="aiwait" role="status">
+      <span className="aiwait-dot" />
+      {waiting ? tr("{0} est enregistrée, en attente de connexion… Envoyez-lui un message pour qu’elle appelle POP.", [waiting.name]) : tr("En attente de votre IA…")}
     </div>
-  </Modal>
+    <div className="connectai-ask">
+      <span className="small">{tr("Une fois connectée, demandez-lui :")}</span>
+      <code className="aiurl-v">{ask}</code>
+      <button className="btn" onClick={copyAsk}>{copied ? <><Check size={15} />{tr("Copié")}</> : <><Copy size={15} />{tr("Copier")}</>}</button>
+    </div>
+    <p className="small muted" style={{ margin: '18px 0 8px' }}>{tr("Votre IA ne propose pas de se connecter ? Copiez sa configuration avec une clé API :")}</p>
+    <div className="aigrid">
+      {CLIENTS.filter(c => KEY_KINDS.includes(c.kind)).map(c => <button key={c.kind} className="aicard" onClick={() => createKey(c)}>
+        <ClientLogo kind={c.kind} size={20} /><b style={{ fontWeight: 500, flex: 1 }}>{c.name}</b><span className="small">{tr("Clé API")}</span>
+      </button>)}
+    </div>
+  </div>
 }

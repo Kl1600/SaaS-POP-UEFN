@@ -327,8 +327,8 @@ pub async fn logout(
 pub async fn me(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
     // Chaque compte a d'office son espace perso (maps faites seul) : pas de formulaire à l'arrivée.
     crate::studio::ensure_personal(&st, u.id).await?;
-    let (credits, username, must_change, ai_skip): (i64, Option<String>, i64, bool) =
-        sqlx::query_as("SELECT credits, username, must_change_password, ai_intro_skipped != 0 FROM users WHERE id = ?")
+    let (credits, username, must_change): (i64, Option<String>, i64) =
+        sqlx::query_as("SELECT credits, username, must_change_password FROM users WHERE id = ?")
             .bind(u.id)
             .fetch_one(&st.db)
             .await?;
@@ -367,7 +367,7 @@ pub async fn me(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
     }
     let email_verified = crate::verify::is_verified(&st, u.id).await?;
     Ok(Json(
-        json!({ "user": u, "credits": credits, "studios": out, "admin": admin, "moderator": moderator, "admin_pending": pending, "username": username, "must_change_password": must_change == 1, "ai_intro_skipped": ai_skip, "email_verified": email_verified, "announcement": crate::announce::for_user(&st, u.id).await?,
+        json!({ "user": u, "credits": credits, "studios": out, "admin": admin, "moderator": moderator, "admin_pending": pending, "username": username, "must_change_password": must_change == 1, "email_verified": email_verified, "announcement": crate::announce::for_user(&st, u.id).await?,
         "plan": crate::billing::user_plan(&st, u.id).await?, "trial_until": crate::billing::trial_until(&st, u.id).await?, "billing_state": crate::stripe::access_state(&st, u.id).await?, "ai_credits": sqlx::query_scalar::<_, i64>("SELECT ai_credits FROM users WHERE id = ?").bind(u.id).fetch_one(&st.db).await?, "analyse": crate::billing::user_analyse(&st, u.id).await? }),
     ))
 }

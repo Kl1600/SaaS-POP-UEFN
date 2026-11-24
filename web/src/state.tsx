@@ -6,7 +6,7 @@ export type MapInfo = { id: number; name: string; genre: string; release_date: s
 export type Studio = { id: number; name: string; role: string; personal?: boolean; analyse?: boolean; maps: MapInfo[] }
 /** Nom affiché d’un studio : « Mes maps » pour l’espace perso. */
 export const studioName = (s?: { name: string; personal?: boolean } | null) => s ? (s.personal ? tr("Mes maps (seul)") : s.name) : ""
-export type Me = { user: { id: number; name: string; email: string }; credits: number; studios: Studio[]; admin?: boolean; moderator?: boolean; admin_pending?: number; username?: string | null; must_change_password?: boolean; ai_intro_skipped?: boolean; plan?: string; trial_until?: string | null; analyse?: boolean; billing_state?: string; ai_credits?: number; email_verified?: boolean; announcement?: { id: number; text: string; level: string } | null }
+export type Me = { user: { id: number; name: string; email: string }; credits: number; studios: Studio[]; admin?: boolean; moderator?: boolean; admin_pending?: number; username?: string | null; must_change_password?: boolean; plan?: string; trial_until?: string | null; analyse?: boolean; billing_state?: string; ai_credits?: number; email_verified?: boolean; announcement?: { id: number; text: string; level: string } | null }
 export type Presence = { uid: number; name: string; place: string }
 
 type Ctx = {

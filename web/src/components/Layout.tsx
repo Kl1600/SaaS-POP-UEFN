@@ -15,7 +15,7 @@ import { MapSwitcher, CreateHost, openCreate } from './MapSwitcher'
 import { Tooltips } from './Tooltip'
 import { useNav } from '../routes'
 import { IdeaPop } from '../pages/Ideas'
-import { AiPill, ConnectAIModal, useAccountAI } from './ConnectAI'
+import { AiPill } from './ConnectAI'
 
 type Item = [string, string, any]
 /** Onglets de la map (changent quand on change de map). Le premier groupe n'a pas de titre. */
@@ -39,16 +39,6 @@ export default function Layout() {
   const [acct, setAcct] = useState(false)
   const acctBox = useOutside(acct, () => setAcct(false))
   const [newTask, setNewTask] = useState(false)
-  // « Connecte ton IA » (#134) : ouverte d'office tant qu'aucune IA du compte n'a appelé POP, sauf après « Passer ».
-  const [aiOpen, setAiOpen] = useState<'' | 'auto' | 'manual'>('')
-  const ai = useAccountAI(!!aiOpen)
-  useEffect(() => {
-    if (!app.me || !ai.tokens || ai.live.length || app.me.ai_intro_skipped) return
-    let closed = false
-    try { closed = sessionStorage.getItem('pop-ai-intro') === 'closed' } catch {}
-    if (!closed) setAiOpen(o => o || 'auto')
-  }, [app.me?.user.id, !!ai.tokens])
-  const closeAi = () => { if (aiOpen === 'auto') { try { sessionStorage.setItem('pop-ai-intro', 'closed') } catch {} } setAiOpen('') }
   const [guide, setGuide] = useState<false | { ask?: string }>(false)
   useEffect(() => { const h = (e: Event) => setGuide({ ask: (e as CustomEvent).detail ?? '' }); window.addEventListener('boussole', h); return () => window.removeEventListener('boussole', h) }, [])
   // Pas d'onglets de map quand le studio ouvert n'a pas cette map (ex. espace perso encore vide).
@@ -134,7 +124,7 @@ export default function Layout() {
           <button className="iconbtn" aria-label={tr("Replier la barre latérale")} onClick={() => setCollapsed(c => !c)}><PanelLeft size={20} strokeWidth={1.5} /></button>
           <nav className="crumb" aria-label={tr("Fil d'Ariane")}><span>{group}</span><span>/</span>{title}</nav>
           <button className={'upill ' + uefn.status} onClick={() => nav('/parametres?onglet=uefn')} title={uefn.project ? tr("Projet {0}", [uefn.project]) : 'UEFN Link'}><span className="udot" />{STATUS_LABEL[uefn.status]}{uefn.stale ? ` · ${tr("périmé")}` : ''}{uefn.pending ? ` · ${uefn.pending}` : ''}</button>
-          <AiPill ai={ai} onOpen={() => setAiOpen('manual')} onSettings={() => nav('/parametres?onglet=ia')} />
+          <AiPill />
           <span className="top-spacer" />
           <GlobalSearch />
           <Notifications />
@@ -146,9 +136,6 @@ export default function Layout() {
       {app.map && <button className="popy-fab" aria-label={tr("Popy, assistant intégré")} data-tip={tr("Popy, votre assistant")} onClick={() => setGuide({})}><Sparkles size={24} strokeWidth={1.75} /></button>}
       {guide && <GuideDrawer key={guide.ask ?? 'day'} ask={guide.ask} onClose={() => setGuide(false)} />}
       {newTask && <NewTaskModal onClose={() => setNewTask(false)} />}
-      {aiOpen && <ConnectAIModal ai={ai} onClose={closeAi} onSkip={aiOpen === 'auto' ? async () => {
-        try { await api.post('/api/me/ai-intro/skip'); setAiOpen(''); app.reload() } catch (e: any) { app.toast(e.message, true) }
-      } : undefined} />}
       <CreateHost />
       <Tooltips />
       <IdeaPop />

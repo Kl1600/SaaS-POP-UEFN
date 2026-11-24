@@ -1197,12 +1197,16 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 .afaire-pill.err{background:var(--tr-bg);color:var(--tr)}
 .afaire-more{margin-top:-8px;margin-bottom:0}
 .afaire-more .linkbtn{padding:0}
-/* Fenêtre « Connecte ton IA » et pastille d'état de l'IA (#134) */
-.modal:has(.connectai){width:min(720px,calc(100vw - 32px))}
-.connectai-t{font-size:22px;font-weight:500;margin:0}
-.connectai-sub{margin:8px 0 16px}
+/* « Mes agents » sur l'accueil et pastille d'état de l'IA (#134) */
+.agent-name{display:inline-flex;align-items:center;gap:8px;min-width:0}
+.agent-name b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.agent-state{display:flex;align-items:center;gap:8px;margin:12px 0 4px;font-size:13px;color:var(--muted)}
+.agent-state.on{color:var(--text)}.agent-state.on .udot{background:var(--tg)}
+.agents-connect{margin-top:14px}
+.connectai-t{font-size:17px;font-weight:500;margin:0}
+.connectai-sub{margin:6px 0 14px}
 .connectai .aiwait{margin:12px 0 0}
 .connectai-ask{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}
 .connectai-ask .aiurl-v{flex:1;min-width:200px}
-.connectai-ok{font-size:15px;padding:14px 16px;margin:16px 0 12px}
+.connectai-ok{font-size:15px;padding:14px 16px;margin:0 0 12px}
 .upill .aiwait-dot{width:8px;height:8px}

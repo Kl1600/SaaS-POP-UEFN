@@ -615,7 +615,6 @@ fn api() -> Router<AppState> {
         .route("/api/studios/{sid}/skills/{name}", get(skills::get))
         .route("/api/skills/{id}", delete(skills::delete))
         .route("/api/me/tokens", get(mcp::tokens).post(mcp::create_token))
-        .route("/api/me/ai-intro/skip", post(mcp::ai_intro_skip))
         .route("/api/tokens/{id}/scope", post(mcp::set_scope))
         .route("/api/tokens/{id}/role", post(mcp::set_role))
         .route("/api/agent-roles", get(mcp::roles))
