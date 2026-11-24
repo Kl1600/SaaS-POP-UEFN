@@ -254,6 +254,7 @@ function GitHub({ data, set }: { data: any; set: (k: string, e: boolean, c: any)
       <p className="small muted" style={{ margin: '8px 0 0' }}>{tr("Jeton : GitHub → Settings → Developer settings → Fine-grained tokens, accès à ce dépôt, permission Issues en lecture et écriture.")}</p>
       <F label={tr("Jeton GitHub")} k="token" cfg={cfg} onSave={save} disabled={!isAdmin} mono type="password" />
       <button className="btn pri" style={{ marginTop: 10 }} disabled={busy} onClick={async () => { setBusy(true); try { const r = await api.post(`/api/studios/${studio!.id}/github/sync?map=${map!.id}`); toast(tr("GitHub : {0} issue(s) créée(s), {1} importée(s), {2} fermée(s), {3} tâche(s) faite(s)", [r.created, r.imported, r.closed, r.done])) } catch (e: any) { toast(e.message, true) } finally { setBusy(false) } }}>{busy ? tr("Synchronisation…") : tr("Synchroniser maintenant")}</button>
+      <ImportGitHub />
       <div className="dsec">{tr("Mise à jour instantanée (POP en ligne)")}</div>
       <p className="small muted" style={{ margin: 0 }}>{tr("Dépôt → Settings → Webhooks → Add webhook : Payload URL ci-dessous, Content type application/json, Secret ci-dessous, événement « Issues ».")}</p>
       <pre className="report mono" style={{ fontSize: 12 }}>{`${location.origin}/api/hooks/github/${studio!.id}\nSecret : ${cfg.secret ?? tr("(activez puis rechargez)")}`}</pre>
@@ -287,4 +288,54 @@ function StudioSettings() {
       {delS && <DeleteDialog t={{ kind: 'studio', id: studio.id, name: studio.name, studioId: studio.id, maps: studio.maps?.length }} onClose={() => setDelS(false)} />}
     </div>
   </section>
+}
+
+/** Import complet du dépôt dans une map (#128) : choisir la map, associer les comptes GitHub aux membres, importer. */
+function ImportGitHub() {
+  const { studio, map, toast } = useApp()
+  const maps = studio?.maps ?? []
+  const [mid, setMid] = useState<number>(map?.id ?? maps[0]?.id ?? 0)
+  const [apercu, setApercu] = useState<any>(null)
+  const [gens, setGens] = useState<Record<string, string>>({})
+  const [busy, setBusy] = useState(false)
+  const [fin, setFin] = useState<any>(null)
+  const voir = async () => {
+    setBusy(true); setFin(null)
+    try {
+      const r = await api.post<any>(`/api/studios/${studio!.id}/github/import/preview`, { map: mid })
+      // Association proposée d'office : même nom (sans casse) que le compte GitHub.
+      const g: Record<string, string> = {}
+      for (const l of r.logins) { const m = r.members.find((x: any) => x.name.toLowerCase() === l.toLowerCase()); g[l] = m ? String(m.id) : '' }
+      setGens(g); setApercu(r)
+    } catch (e: any) { toast(e.message, true) } finally { setBusy(false) }
+  }
+  const importer = async () => {
+    setBusy(true)
+    try {
+      const people: Record<string, number | null> = {}
+      for (const [l, v] of Object.entries(gens)) people[l] = v ? Number(v) : null
+      setFin(await api.post(`/api/studios/${studio!.id}/github/import`, { map: mid, people })); setApercu(null)
+    } catch (e: any) { toast(e.message, true) } finally { setBusy(false) }
+  }
+  return <>
+    <div className="dsec">{tr("Importer tout le dépôt")}</div>
+    <p className="small muted" style={{ margin: 0 }}>{tr("En une fois : toutes les issues (ouvertes et fermées), étiquettes, personnes, jalons, liens « Blocked by » et commentaires. Relancer l'import ne crée pas de doublon.")}</p>
+    <div className="row" style={{ gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+      <select className="field" style={{ width: 'auto' }} aria-label={tr("Map")} value={mid} onChange={e => { setMid(Number(e.target.value)); setApercu(null) }}>{maps.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
+      <button className="btn" disabled={busy || !mid} onClick={voir}>{busy && !apercu ? tr("Lecture du dépôt…") : tr("Préparer l'import")}</button>
+    </div>
+    {apercu && <div className="stack" style={{ gap: 8, marginTop: 10 }}>
+      <span className="small">{tr("{0} : {1} issues, dont {2} fermées.", [apercu.repo, apercu.issues, apercu.closed])}</span>
+      {apercu.logins.length > 0 && <span className="small muted">{tr("Associez chaque compte GitHub à un membre du studio (sinon son nom est noté dans la tâche) :")}</span>}
+      {apercu.logins.map((l: string) => <label key={l} className="row small" style={{ gap: 8, alignItems: 'center' }}><span className="mono" style={{ minWidth: 140 }}>{l}</span>
+        <select className="field" style={{ width: 'auto' }} value={gens[l] ?? ''} onChange={e => setGens({ ...gens, [l]: e.target.value })}><option value="">{tr("Personne")}</option>{apercu.members.map((m: any) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></label>)}
+      <div className="row" style={{ gap: 8 }}><button className="btn pri" disabled={busy} onClick={importer}>{busy ? tr("Import en cours…") : tr("Importer")}</button><button className="btn" onClick={() => setApercu(null)}>{tr("Annuler")}</button></div>
+    </div>}
+    {fin && <div className="stack" style={{ gap: 4, marginTop: 10 }}>
+      <b style={{ fontWeight: 500 }}>{tr("Import terminé")}</b>
+      <span className="small">{tr("{0} tâches ({1} ouvertes, {2} faites), {3} dépendances, {4} jalons, {5} commentaires.", [fin.tasks, fin.open, fin.closed, fin.dependencies, fin.milestones, fin.comments])}</span>
+      {fin.renumbered.length > 0 && <span className="small muted">{tr("Numéros déjà pris, tâches renumérotées : {0}", [fin.renumbered.map((x: any) => `#${x.issue} → #${x.task}`).join(', ')])}</span>}
+      {fin.not_imported.length > 0 && <><span className="small muted">{tr("Non repris :")}</span><ul style={{ margin: 0, paddingLeft: 20 }}>{fin.not_imported.map((x: any, i: number) => <li key={i} className="small">{x.what} × {x.count}</li>)}</ul></>}
+    </div>}
+  </>
 }
