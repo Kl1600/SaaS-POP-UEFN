@@ -1131,3 +1131,5 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 .aiwait-dot{width:8px;height:8px;border-radius:50%;background:var(--accent,#ED753E);flex:none;animation:aiwait 1.2s ease-in-out infinite}
 @keyframes aiwait{0%,100%{opacity:.25}50%{opacity:1}}
 @media (prefers-reduced-motion:reduce){.aiwait-dot{animation:none}}
+/* Bêta : une fois la demande envoyée, on ne garde que le message de confirmation (#282). */
+.lwbox:has(.lwdone) > .leyebrow,.lwbox:has(.lwdone) > h2,.lwbox:has(.lwdone) > .lwintro,.lwbox:has(.lwdone) > .lwerr{display:none}
