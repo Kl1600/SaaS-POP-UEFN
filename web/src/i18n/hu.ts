@@ -68,8 +68,8 @@ const hu: Dict = {
     teams: ['Egyedül', '2–3', '4–10', 'Több mint 10'], exp: 'Tapasztalat', exps: ['Új az UEFN-ben', 'Néhány kiadott pálya', 'Tapasztalt alkotó', 'Profi stúdió'],
     links: 'A pályáid vagy közösségi oldalaid', linksPh: 'Szigetkódok, TikTok, YouTube…', msg: 'Mit szeretnél csinálni a POP-pal', msgPh: 'Pl. négyen dolgozunk egy tycoon pályán, és elveszünk a Discord és a Google Docs között.',
     send: 'Hozzáférés kérése', sending: 'Küldés…', nospam: 'Nincs spam: csak a hozzáférés miatt írunk.', privacy: 'Adatvédelmi irányelvek',
-    okTitle: 'Megkaptuk, köszönjük!', okText: 'A kérésed megérkezett a POP csapatához. Amint felszabadul egy hely, elküldjük a felhasználóneved és egy ideiglenes jelszót.',
-    alreadyTitle: 'Már rajta vagy a listán.', approvedTitle: 'A hozzáférésed már jóvá van hagyva.', approvedText: 'A fiókod kész: a POP csapata elküldi a felhasználóneved és az ideiglenes jelszavad. Ha nem érkezett meg, írj nekünk.', close: 'Bezárás',
+    okTitle: 'Megkaptuk, köszönjük!', okText: 'Amint elkészül a hozzáférésed, e-mailt küldünk a megadott címre egy fiókaktiváló linkkel. Nézd meg a spam mappát is.',
+    alreadyTitle: 'Már rajta vagy a listán.', approvedTitle: 'A hozzáférésed már jóvá van hagyva.', approvedText: 'A fiókod kész: kaptál egy e-mailt egy linkkel, amellyel aktiválhatod és megadhatod a jelszavad. Nézd meg a spam mappát is.', close: 'Bezárás',
   },
 }
 export default hu

@@ -69,8 +69,8 @@ const fr = {
     teams: ['Seul', '2 à 3', '4 à 10', 'Plus de 10'], exp: 'Expérience', exps: ['Débutant UEFN', 'Quelques maps publiées', 'Créateur confirmé', 'Studio professionnel'],
     links: 'Vos maps ou réseaux', linksPh: 'Codes d’îles, TikTok, YouTube…', msg: 'Ce que vous voulez faire avec POP', msgPh: 'Ex. : on est 4 sur une map tycoon et on se perd entre Discord et les Google Docs.',
     send: 'Demander mon accès', sending: 'Envoi…', nospam: 'Pas de spam : on vous écrit seulement pour vous donner votre accès.', privacy: 'Politique de confidentialité',
-    okTitle: 'C’est noté, merci !', okText: 'Votre demande est arrivée chez l’équipe POP. Dès qu’une place se libère, on vous envoie votre identifiant et un mot de passe provisoire.',
-    alreadyTitle: 'Vous êtes déjà sur la liste.', approvedTitle: 'Votre accès est déjà validé.', approvedText: 'Votre compte est prêt : l’équipe POP vous envoie votre identifiant et votre mot de passe provisoire. Sinon, écrivez-nous.', close: 'Fermer',
+    okTitle: 'C’est noté, merci !', okText: 'Vous recevrez un e-mail à l’adresse indiquée dès que votre accès sera prêt, avec un lien pour activer votre compte. Pensez à vérifier vos spams.',
+    alreadyTitle: 'Vous êtes déjà sur la liste.', approvedTitle: 'Votre accès est déjà validé.', approvedText: 'Votre compte est prêt : vous avez reçu un e-mail avec un lien pour l’activer et choisir votre mot de passe. Pensez à vérifier vos spams.', close: 'Fermer',
   },
 }
 export type Dict = typeof fr

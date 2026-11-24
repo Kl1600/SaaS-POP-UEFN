@@ -68,8 +68,8 @@ const ro: Dict = {
     teams: ['Singur', '2–3', '4–10', 'Peste 10'], exp: 'Experiență', exps: ['Începător în UEFN', 'Câteva hărți publicate', 'Creator experimentat', 'Studio profesionist'],
     links: 'Hărțile sau rețelele tale', linksPh: 'Coduri de insulă, TikTok, YouTube…', msg: 'Ce vrei să faci cu POP', msgPh: 'Ex.: suntem 4 pe o hartă tycoon și ne pierdem între Discord și Google Docs.',
     send: 'Cere acces', sending: 'Se trimite…', nospam: 'Fără spam: îți scriem doar ca să-ți dăm accesul.', privacy: 'Politica de confidențialitate',
-    okTitle: 'Am notat, mulțumim!', okText: 'Cererea ta a ajuns la echipa POP. Imediat ce se eliberează un loc, îți trimitem numele de utilizator și o parolă provizorie.',
-    alreadyTitle: 'Ești deja pe listă.', approvedTitle: 'Accesul tău e deja aprobat.', approvedText: 'Contul tău e gata: echipa POP îți trimite numele de utilizator și parola provizorie. Dacă nu, scrie-ne.', close: 'Închide',
+    okTitle: 'Am notat, mulțumim!', okText: 'Vei primi un e-mail la adresa indicată imediat ce accesul tău este gata, cu un link pentru activarea contului. Verifică și dosarul de spam.',
+    alreadyTitle: 'Ești deja pe listă.', approvedTitle: 'Accesul tău e deja aprobat.', approvedText: 'Contul tău este gata: ai primit un e-mail cu un link pentru a-l activa și a-ți alege parola. Verifică și dosarul de spam.', close: 'Închide',
   },
 }
 export default ro

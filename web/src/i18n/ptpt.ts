@@ -69,8 +69,8 @@ const ptPT: Dict = {
     teams: ['Sozinho', '2 a 3', '4 a 10', 'Mais de 10'], exp: 'Experiência', exps: ['Iniciante no UEFN', 'Alguns mapas publicados', 'Criador experiente', 'Estúdio profissional'],
     links: 'Os seus mapas ou redes', linksPh: 'Códigos de ilha, TikTok, YouTube…', msg: 'O que quer fazer com o POP', msgPh: 'Ex.: somos 4 num mapa tycoon e perdemo-nos entre o Discord e os Google Docs.',
     send: 'Pedir acesso', sending: 'A enviar…', nospam: 'Sem spam: só escrevemos para liberar o seu acesso.', privacy: 'Política de privacidade',
-    okTitle: 'Anotado, obrigado!', okText: 'O seu pedido chegou à equipa do POP. Assim que houver uma vaga, enviamos o seu utilizador e uma palavra-passe provisória.',
-    alreadyTitle: 'Já está na lista.', approvedTitle: 'O o seu acesso já foi aprovado.', approvedText: 'A sua conta está pronta: a equipa do POP vai enviar-lhe o utilizador e a palavra-passe provisória. Se não chegar, escreva-nos.', close: 'Fechar',
+    okTitle: 'Anotado, obrigado!', okText: 'Vai receber um e-mail no endereço indicado assim que o seu acesso estiver pronto, com uma ligação para ativar a conta. Verifique também a pasta de spam.',
+    alreadyTitle: 'Já está na lista.', approvedTitle: 'O o seu acesso já foi aprovado.', approvedText: 'A sua conta está pronta: recebeu um e-mail com uma ligação para a ativar e escolher a palavra-passe. Verifique também a pasta de spam.', close: 'Fechar',
   },
 }
 export default ptPT
