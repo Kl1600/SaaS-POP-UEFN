@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-24 · #277 · logo de la barre latérale plus grand
+- Fait : logo 34 → 56 px de haut en barre normale (halo agrandi), barre repliée inchangée.
+- Vérifié : navigateur 1440 px, barre normale et repliée.
+
 ### 2026-11-24 · #276 · bêta : message de confirmation
 - Fait : okText/approvedText de la liste d'attente, dans les 16 langues : annoncent l'e-mail d'activation (lien pour choisir son mot de passe) et rappellent les spams, au lieu de « identifiant et mot de passe provisoire ».
 - Vérifié : tsc -b, vite build.

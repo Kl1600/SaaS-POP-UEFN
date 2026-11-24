@@ -1121,3 +1121,6 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 .acct-menu{box-sizing:border-box;max-width:calc(100vw - 16px);overflow:hidden}
 .acct-mail{padding:6px 10px;min-width:0;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .app.collapsed .acct-menu{position:fixed;left:76px;right:auto;bottom:14px;width:260px}
+/* Logo de la barre latérale plus grand (#277). */
+.app:not(.collapsed) .brand img{height:56px}
+.app:not(.collapsed) .brand::before{width:220px;height:120px}
