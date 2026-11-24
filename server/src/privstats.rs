@@ -116,7 +116,7 @@ fn parse_date(s: &str) -> Option<String> {
         return Some(d.to_string());
     }
     let parts: Vec<&str> = s
-        .split(|c| c == '/' || c == '.' || c == '-' || c == ' ')
+        .split(['/', '.', '-', ' '])
         .filter(|p| !p.is_empty())
         .collect();
     if parts.len() >= 3 {
@@ -132,13 +132,7 @@ fn parse_date(s: &str) -> Option<String> {
         );
         let y = if c < 100 { 2000 + c } else { c };
         // JJ/MM/AAAA si le premier nombre dépasse 12, sinon MM/JJ/AAAA (format américain du portail).
-        let (d, m) = if a > 12 {
-            (a, b)
-        } else if b > 12 {
-            (b, a)
-        } else {
-            (b, a)
-        };
+        let (d, m) = if a > 12 { (a, b) } else { (b, a) };
         return chrono::NaiveDate::from_ymd_opt(y, m, d).map(|x| x.to_string());
     }
     for f in ["%b %d, %Y", "%B %d, %Y", "%d %b %Y", "%d %B %Y"] {

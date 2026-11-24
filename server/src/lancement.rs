@@ -222,7 +222,7 @@ pub async fn lancer(st: &AppState, ctx: &MapCtx, mode: &str) -> Result<Value, Ap
     let b: crate::plan::ApplyIn =
         serde_json::from_value(json!({ "tasks": taches, "milestones": milestones }))
             .map_err(|e| bad(format!("Plan illisible : {e}")))?;
-    crate::plan::apply(
+    let _ = crate::plan::apply(
         State(st.clone()),
         ctx.user.clone(),
         Path(ctx.map_id),

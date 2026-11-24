@@ -368,7 +368,7 @@ async fn track(
             Option<i64>,
             Option<i64>,
         ),
-    ) -> Option<f64>| series.iter().rev().find_map(|s| f(s));
+    ) -> Option<f64>| series.iter().rev().find_map(f);
     let minutes = last(&|s| s.2);
     let d1 = last(&|s| s.3);
     let d7 = last(&|s| s.4);

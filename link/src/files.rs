@@ -16,7 +16,7 @@ const SKIP: [&str; 7] = [
     "node_modules",
 ];
 
-fn walk(root: &Path, dir: &Path, out: &mut Vec<PathBuf>, digests: bool) {
+fn walk(dir: &Path, out: &mut Vec<PathBuf>, digests: bool) {
     let Ok(rd) = std::fs::read_dir(dir) else {
         return;
     };
@@ -30,7 +30,7 @@ fn walk(root: &Path, dir: &Path, out: &mut Vec<PathBuf>, digests: bool) {
         if ft.is_dir() {
             if !SKIP.contains(&name.as_str()) && !name.starts_with("__External") && out.len() < 5000
             {
-                walk(root, &p, out, digests);
+                walk(&p, out, digests);
             }
         } else if name.ends_with(".verse") && (name.ends_with(".digest.verse") == digests) {
             out.push(p);
@@ -98,7 +98,7 @@ impl Scanner {
     /// Fichiers .verse modifiés depuis le dernier passage (ou tous si `full`).
     pub fn changed(&mut self, full: bool) -> Vec<(String, String)> {
         let mut list = vec![];
-        walk(&self.root, &self.root, &mut list, false);
+        walk(&self.root, &mut list, false);
         let mut out = vec![];
         let mut now = HashMap::new();
         for p in list {
@@ -133,9 +133,9 @@ impl Scanner {
     /// Contenu des digests s'ils ont changé.
     pub fn digests(&mut self, extra: Option<&Path>) -> Option<Vec<(String, String)>> {
         let mut list = vec![];
-        walk(&self.root, &self.root, &mut list, true);
+        walk(&self.root, &mut list, true);
         if let Some(d) = extra {
-            walk(d, d, &mut list, true);
+            walk(d, &mut list, true);
         }
         let mut now = HashMap::new();
         for p in &list {
@@ -200,7 +200,7 @@ impl Scanner {
 
     pub fn read_all(&self) -> Vec<(String, String)> {
         let mut list = vec![];
-        walk(&self.root, &self.root, &mut list, false);
+        walk(&self.root, &mut list, false);
         list.iter()
             .filter_map(|p| {
                 std::fs::read_to_string(p)

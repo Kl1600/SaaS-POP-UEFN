@@ -417,17 +417,17 @@ pub async fn guide(
             "planned_day": t.planned_day, "why": why, "action": if t.status == "doing" { "continue" } else { "take" },
         })));
     }
-    cands.sort_by(|a, b| b.0.cmp(&a.0));
+    cands.sort_by_key(|a| std::cmp::Reverse(a.0));
     let suggestions: Vec<Value> = cands.into_iter().take(5).map(|c| c.1).collect();
 
     let hour = now.hour();
     let hello = if en {
-        if hour < 5 || hour >= 18 {
+        if !(5..18).contains(&hour) {
             "Good evening"
         } else {
             "Hi"
         }
-    } else if hour < 5 || hour >= 18 {
+    } else if !(5..18).contains(&hour) {
         "Bonsoir"
     } else {
         "Bonjour"

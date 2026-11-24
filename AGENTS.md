@@ -163,8 +163,8 @@ Une branche longue qui mélange plusieurs sujets ne se relit pas, ne se teste pa
 
 ### Vérifier avant `review`
 ```
-cd server && cargo build && cargo test
-cd link && cargo test
+cd server && cargo build && cargo test && cargo clippy -- -D warnings
+cd link && cargo test && cargo clippy -- -D warnings
 cd web && npx tsc -b && npx vite build
 ```
 Avec le vrai UEFN : `pop-link.exe diagnostic` (voir `KB/UEFN.md`). Jamais d'archivage Lore ni d'action

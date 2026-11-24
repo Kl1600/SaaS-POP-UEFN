@@ -663,11 +663,7 @@ async fn session(link: &mut Link) -> Result<()> {
     let (tx, mut rx) = mpsc::unbounded_channel::<Value>();
     let writer = tokio::spawn(async move {
         while let Some(v) = rx.recv().await {
-            if sink
-                .send(Message::Text(v.to_string().into()))
-                .await
-                .is_err()
-            {
+            if sink.send(Message::Text(v.to_string())).await.is_err() {
                 break;
             }
         }
@@ -717,7 +713,7 @@ async fn session(link: &mut Link) -> Result<()> {
             }
             _ = tick.tick() => {
                 n += 1;
-                if n % 2 == 0 {
+                if n.is_multiple_of(2) {
                     let alive = link.uefn_here().await;
                     if alive != link.uefn {
                         link.uefn = alive;
@@ -732,7 +728,7 @@ async fn session(link: &mut Link) -> Result<()> {
                     }
                 }
                 sync(link, &tx, false).await;
-                if link.uefn && (n % 10 == 0 || link.last_actors.is_empty()) {
+                if link.uefn && (n.is_multiple_of(10) || link.last_actors.is_empty()) {
                     match link.mcp.list_actors().await {
                         Ok(a) => {
                         let s = json!(a).to_string();

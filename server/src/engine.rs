@@ -28,8 +28,12 @@ re!(
     RE_SUB,
     r"([A-Za-z_][\w.]*?)\.([A-Za-z_]\w*Event)\.Subscribe\(\s*([A-Za-z_]\w*)\s*\)"
 );
-re!(RE_CALL, r"([A-Za-z_][\w]*(?:\.[A-Za-z_]\w*)*)\s*(\(|\[)");
+// Seulement pour l'assistant Verse local (explain_line), gardé pour Forge (#86).
+#[allow(dead_code)]
+static RE_CALL: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"([A-Za-z_][\w]*(?:\.[A-Za-z_]\w*)*)\s*(\(|\[)").unwrap());
 re!(RE_EFFECT, r"<([a-z_]+)>");
+re!(RE_INT_DECIMAL, r":\s*int\s*=\s*(\d+\.\d+)");
 re!(RE_IDENT, r"[A-Za-z_]\w*");
 re!(RE_INT_ARG, r"(Sleep|Seconds|Delay)\s*\(\s*(\d+)\s*\)");
 re!(
@@ -47,6 +51,8 @@ pub struct Field {
     pub var: bool,
     pub line: usize,
 }
+#[allow(dead_code)]
+// Assistant Verse local (expliquer, écrire, relire) : plus appelé depuis le retrait de l'éditeur Verse du site, gardé pour Forge (#86).
 #[derive(Debug, Clone)]
 pub struct Func {
     pub name: String,
@@ -57,6 +63,8 @@ pub struct Func {
     pub end: usize,
     pub indent: usize,
 }
+#[allow(dead_code)]
+// Assistant Verse local (expliquer, écrire, relire) : plus appelé depuis le retrait de l'éditeur Verse du site, gardé pour Forge (#86).
 #[derive(Debug, Clone)]
 pub struct Class {
     pub name: String,
@@ -67,6 +75,8 @@ pub struct Class {
     pub funcs: Vec<Func>,
     pub doc: String,
 }
+#[allow(dead_code)]
+// Assistant Verse local (expliquer, écrire, relire) : plus appelé depuis le retrait de l'éditeur Verse du site, gardé pour Forge (#86).
 #[derive(Debug, Default)]
 pub struct Analysis {
     pub usings: Vec<String>,
@@ -83,6 +93,7 @@ pub struct Issue {
 }
 
 /// Contexte du projet : symboles des digests (nom → module), tags, appareils du niveau.
+#[allow(dead_code)] // Assistant Verse local (expliquer, écrire, relire) : plus appelé depuis le retrait de l'éditeur Verse du site, gardé pour Forge (#86).
 pub struct Project {
     pub symbols: Vec<Value>,
     pub tags: Vec<String>,
@@ -272,7 +283,7 @@ pub fn analyze(src: &str) -> Analysis {
                 indent: ind,
             });
         } else if let Some(c) = RE_FIELD.captures(body) {
-            if !body.contains('(') || body.contains(":=") == false {
+            if !body.contains('(') || !body.contains(":=") {
                 a.classes[ci].fields.push(Field {
                     name: c[3].into(),
                     ty: c[4].trim().into(),
@@ -288,13 +299,14 @@ pub fn analyze(src: &str) -> Analysis {
     a
 }
 
-fn func_at<'a>(a: &'a Analysis, line: usize) -> Option<&'a Func> {
+fn func_at(a: &Analysis, line: usize) -> Option<&Func> {
     a.classes
         .iter()
         .flat_map(|c| c.funcs.iter())
         .find(|f| line >= f.line && line <= f.end)
 }
 
+#[allow(dead_code)] // Assistant Verse local (expliquer, écrire, relire) : plus appelé depuis le retrait de l'éditeur Verse du site, gardé pour Forge (#86).
 fn ty_fr(t: &str) -> String {
     match t {
         "int" => "nombre entier".into(),
@@ -314,6 +326,7 @@ fn ty_fr(t: &str) -> String {
     }
 }
 
+#[allow(dead_code)] // Assistant Verse local (expliquer, écrire, relire) : plus appelé depuis le retrait de l'éditeur Verse du site, gardé pour Forge (#86).
 fn effect_fr(e: &str) -> &'static str {
     match e {
         "suspends" => "peut attendre (asynchrone)",
@@ -328,6 +341,8 @@ fn effect_fr(e: &str) -> &'static str {
     }
 }
 
+#[allow(dead_code)]
+// Assistant Verse local (expliquer, écrire, relire) : plus appelé depuis le retrait de l'éditeur Verse du site, gardé pour Forge (#86).
 /// Phrase pour une ligne de code.
 fn explain_line(l: &str, a: &Analysis) -> Option<String> {
     let t = l.trim();
@@ -390,8 +405,8 @@ fn explain_line(l: &str, a: &Analysis) -> Option<String> {
             &c[1], &c[2], &c[3]
         ));
     }
-    if t.starts_with("set ") {
-        return Some(format!("Modifie la variable : {}.", &t[4..]));
+    if let Some(v) = t.strip_prefix("set ") {
+        return Some(format!("Modifie la variable : {v}."));
     }
     if t.starts_with("if ") || t.starts_with("if(") {
         return Some("Condition : le bloc s'exécute seulement si toutes les expressions entre parenthèses réussissent.".into());
@@ -641,6 +656,7 @@ pub fn lint(src: &str, a: &Analysis, p: &Project) -> Vec<Issue> {
     out
 }
 
+#[allow(dead_code)] // Assistant Verse local (expliquer, écrire, relire) : plus appelé depuis le retrait de l'éditeur Verse du site, gardé pour Forge (#86).
 pub fn explain(path: &str, src: &str, selection: Option<&str>, p: &Project) -> String {
     let a = analyze(src);
     if let Some(sel) = selection {
@@ -1010,10 +1026,7 @@ pub fn fix(src: &str, diags: &[Value], p: &Project) -> (String, Vec<String>) {
                 notes.push(format!(
                     "Ligne {n} : nombre entier converti en décimal (ex. 5 → 5.0)."
                 ))
-            } else if let Some(cap) = Regex::new(r":\s*int\s*=\s*(\d+\.\d+)")
-                .unwrap()
-                .captures(&lines[idx].clone())
-            {
+            } else if let Some(cap) = RE_INT_DECIMAL.captures(&lines[idx].clone()) {
                 lines[idx] = lines[idx].replacen(": int", ": float", 1);
                 let _ = cap;
                 notes.push(format!(
@@ -1068,7 +1081,7 @@ pub fn fix(src: &str, diags: &[Value], p: &Project) -> (String, Vec<String>) {
             }
         }
     }
-    inserts.sort_by(|x, y| y.0.cmp(&x.0));
+    inserts.sort_by_key(|x| std::cmp::Reverse(x.0));
     for (at, s) in inserts {
         let at = at.min(lines.len());
         lines.insert(at, s)
@@ -1149,6 +1162,7 @@ fn closest(id: &str, p: &Project, a: &Analysis) -> Option<String> {
         .map(|x| x.1)
 }
 
+#[allow(dead_code)] // Assistant Verse local (expliquer, écrire, relire) : plus appelé depuis le retrait de l'éditeur Verse du site, gardé pour Forge (#86).
 const TEMPLATES: &[(&str, &[&str], &str)] = &[
     ("Économie", &["économie", "economie", "argent", "monnaie", "gold", "pièces", "achat", "boutique", "shop", "acheter", "vendre", "prix"], "# Monnaie par joueur : gagner, dépenser, consulter.\n{NAME} := class(creative_device):\n\n    var Balances : [agent]int = map{}\n\n    Earn(Agent : agent, Amount : int) : void =\n        Current := Balances[Agent] or 0\n        if (set Balances[Agent] = Current + Amount) {}\n\n    Spend(Agent : agent, Amount : int)<decides><transacts> : void =\n        Current := Balances[Agent]\n        Current >= Amount\n        set Balances[Agent] = Current - Amount\n\n    GetBalance(Agent : agent) : int =\n        Balances[Agent] or 0\n"),
     ("Inventaire", &["inventaire", "objet", "item", "ramasser", "butin", "loot", "sac"], "# Objets possédés par joueur.\n{NAME} := class(creative_device):\n\n    var Items : [agent][]string = map{}\n\n    Add(Agent : agent, Item : string) : void =\n        Current := Items[Agent] or array{}\n        if (set Items[Agent] = Current + array{Item}) {}\n\n    Has(Agent : agent, Item : string)<decides><transacts> : void =\n        List := Items[Agent]\n        List.Find[Item]\n"),
@@ -1158,6 +1172,7 @@ const TEMPLATES: &[(&str, &[&str], &str)] = &[
     ("Minuteur", &["minuteur", "timer", "chrono", "compte à rebours", "manche", "round", "durée"], "# Compte à rebours de manche.\n{NAME} := class(creative_device):\n\n    @editable\n    Seconds : float = 480.0\n\n    OnBegin<override>()<suspends> : void =\n        Sleep(Seconds)\n        Print(\"Fin de la manche\")\n"),
 ];
 
+#[allow(dead_code)] // Assistant Verse local (expliquer, écrire, relire) : plus appelé depuis le retrait de l'éditeur Verse du site, gardé pour Forge (#86).
 fn snake(s: &str) -> String {
     let t: String = s
         .to_lowercase()
@@ -1190,6 +1205,8 @@ fn snake(s: &str) -> String {
     }
 }
 
+#[allow(dead_code)]
+// Assistant Verse local (expliquer, écrire, relire) : plus appelé depuis le retrait de l'éditeur Verse du site, gardé pour Forge (#86).
 /// Écrit un module pour une tâche : modèle choisi par mots-clés, appareils et tags du niveau cités dans la tâche.
 pub fn write(
     path: &str,
@@ -1413,6 +1430,8 @@ pub fn write(
     (out, expl)
 }
 
+#[allow(dead_code)]
+// Assistant Verse local (expliquer, écrire, relire) : plus appelé depuis le retrait de l'éditeur Verse du site, gardé pour Forge (#86).
 /// Relecture : points d'attention + documentation, et fichier avec commentaires ajoutés.
 pub fn review(path: &str, src: &str, p: &Project) -> (String, String) {
     let a = analyze(src);
@@ -1503,7 +1522,7 @@ pub fn review(path: &str, src: &str, p: &Project) -> (String, String) {
             }
         }
     }
-    inserts.sort_by(|x, y| y.0.cmp(&x.0));
+    inserts.sort_by_key(|x| std::cmp::Reverse(x.0));
     for (at, s) in inserts {
         lines.insert(at.min(lines.len()), s)
     }

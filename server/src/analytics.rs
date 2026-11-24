@@ -762,7 +762,7 @@ pub async fn market(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value>
         let d1 = if a.d1_n > 0 { Some(a.d1_sum / a.d1_n as f64) } else { None };
         let mins = if a.min_n > 0 { Some(a.min_sum / a.min_n as f64) } else { None };
         let trend = if a.first > 0 && first_day != last_day { Some(((a.same as f64 / a.first as f64) - 1.0) * 100.0) } else { None };
-        a.top.sort_by(|x, y| y.0.cmp(&x.0));
+        a.top.sort_by_key(|x| std::cmp::Reverse(x.0));
         let top_share = if a.players > 0 { a.top.iter().take(3).map(|x| x.0).sum::<i64>() as f64 / a.players as f64 } else { 0.0 };
         let crowded = a.islands as f64 > med_islands * 1.5 || a.new as f64 / a.islands as f64 > med_new * 1.5;
         let strong = typ >= med_typ;
@@ -1604,7 +1604,7 @@ pub async fn social_loop(st: AppState) {
                         .map(|c| c["auto"].as_bool().unwrap_or(false))
                         .unwrap_or(false)
             });
-            let _ = collect_all(&st, sid, tt_auto && tick % 4 == 0).await;
+            let _ = collect_all(&st, sid, tt_auto && tick.is_multiple_of(4)).await;
         }
         tick += 1;
         tokio::time::sleep(std::time::Duration::from_secs(6 * 3600)).await;

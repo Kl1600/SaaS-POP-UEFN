@@ -289,7 +289,7 @@ pub async fn churn(
         *reasons.entry(r.clone()).or_default() += 1;
     }
     let mut rs: Vec<(String, i64)> = reasons.into_iter().collect();
-    rs.sort_by(|a, b| b.1.cmp(&a.1));
+    rs.sort_by_key(|a| std::cmp::Reverse(a.1));
     Ok(Json(
         json!({ "testers": rows.len(), "per_minute": per, "reasons": rs.into_iter().map(|(r, n)| json!({"reason": r, "count": n})).collect::<Vec<_>>() }),
     ))
