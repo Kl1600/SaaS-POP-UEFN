@@ -204,6 +204,12 @@ fn tools() -> Value {
         tool("list_pages", "Pages de la documentation de la map (identifiant, titre, page parente).", json!({}), &[]),
         tool("read_page", "Lit une page de la documentation, en Markdown.", json!({ "page": { "type": "integer" } }), &["page"]),
         tool("write_page", "Écrit une page de la documentation en Markdown (titres #, listes -, cases - [ ], citations >, code ```, tableaux |, ---). Sans page : crée une page (title, parent facultatif). Avec page : remplace son contenu ; l'ancienne version reste dans l'historique de la page.", json!({ "page": { "type": "integer" }, "title": { "type": "string" }, "markdown": { "type": "string" }, "parent": { "type": "integer" } }), &["markdown"]),
+        tool("ask_user", "Pose une question au créateur dans POP, avec 2 à 5 réponses en boutons (plus « Autre » en texte libre, sauf allow_other: false). À utiliser quand une décision lui revient. Rend question_id : lisez la réponse plus tard avec get_answer.", json!({
+            "question": { "type": "string" },
+            "choices": { "type": "array", "items": { "type": "string" }, "description": "2 à 5 réponses courtes" },
+            "allow_other": { "type": "boolean", "description": "Autoriser une réponse libre (par défaut : oui)" }
+        }), &["question", "choices"]),
+        tool("get_answer", "Réponse du créateur à une question posée avec ask_user (null tant qu'il n'a pas répondu).", json!({ "question_id": { "type": "integer" } }), &["question_id"]),
         tool("list_milestones", "Jalons et objectifs du planning de la map (date, heure, type, détail).", json!({}), &[]),
         tool("add_milestone", "Ajoute un jalon au planning : title, date AAAA-MM-JJ ; facultatifs : time HH:MM, detail, kind (jalon par défaut).", json!({ "title": { "type": "string" }, "date": { "type": "string" }, "time": { "type": "string" }, "detail": { "type": "string" }, "kind": { "type": "string" } }), &["title", "date"]),
         tool("list_agents", "Agents IA de la map : identifiant, nom, rôle, tâche en cours, actif ou non, et lequel est l'Orchestrateur.", json!({}), &[]),
@@ -254,6 +260,7 @@ const READ_TOOLS: &[&str] = &[
     "list_pages",
     "read_page",
     "list_milestones",
+    "get_answer",
 ];
 
 fn rpc_ok(id: Value, result: Value) -> Response {
@@ -918,6 +925,8 @@ async fn call_as(
         "plan_tasks" => crate::orchestre::plan(st, &ctx, agent_requis()?, &a).await,
         "assign_task" => crate::orchestre::assign(st, &ctx, agent_requis()?, &a).await,
         "save_progress" => crate::agents::save_progress(st, agent_requis()?, &a).await,
+        "ask_user" => crate::questions::ask_user(st, mid, agent_requis()?, &a).await,
+        "get_answer" => crate::questions::get_answer(st, mid, &a).await,
         "list_skills" => Ok(json!(crate::skills::liste(st, ctx.studio_id).await?)),
         "get_skill" => {
             crate::skills::lire(st, ctx.studio_id, a["name"].as_str().unwrap_or("")).await

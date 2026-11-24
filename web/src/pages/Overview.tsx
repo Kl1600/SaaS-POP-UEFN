@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  Clock, Ban, CheckSquare, Flag, Coins, Users, Zap, Activity, ArrowRight, Upload, FileText, PenTool, AlertTriangle, MessageSquare, CheckCircle2, Rocket, Bot, User, Radio,
+  Clock, Ban, CheckSquare, Flag, Coins, Users, Zap, Activity, ArrowRight, Upload, FileText, PenTool, AlertTriangle, MessageSquare, CheckCircle2, Rocket, Bot, User, Radio, ArrowLeft, HelpCircle, Pencil,
 } from 'lucide-react'
 import { ago, api, euros, frDate } from '../api'
 import { useApp, useLive, useLoad } from '../state'
@@ -54,6 +54,8 @@ export default function Overview() {
       <PageHead title={tr("Dashboard")} help={tr("Où en est {0}, en un coup d'œil.", [map?.name])}>
         <button className="btn pri" onClick={() => nav('/taches')}>{tr("Ouvrir les tâches")}</button>
       </PageHead>
+
+      {map && <Parcours mapId={map.id} />}
 
       <section className="tiles six" aria-label={tr("Indicateurs")}>
         <div className="card"><div className="lab"><Clock size={18} strokeWidth={1.5} />{tr("Tâches en cours")}</div><div className="num">{t.doing}</div><div className="muted">{tr("{0} / {1} finies au total", [t.done, t.total])}</div></div>
@@ -180,6 +182,69 @@ function FilAvancement({ mapId }: { mapId: number }) {
         </div>
       )}
       {data.items.length > 8 && <button className="btn more" onClick={() => setTout(!tout)}>{tout ? tr("Voir moins") : tr("Voir plus ({0})", [data.items.length - 8])}<ArrowRight size={16} strokeWidth={1.5} /></button>}
+    </section>
+  )
+}
+
+/** Parcours de questions-boutons (#135) : une question à la fois, posée par POP (cadrage) ou par l'IA (ask_user),
+ * réponse en un clic ; retour en arrière ; une fois au bout, les réponses restent visibles et modifiables. */
+function Parcours({ mapId }: { mapId: number }) {
+  const { toast } = useApp()
+  const { data, reload } = useLoad<{ questions: any[]; can_answer: boolean }>(`/api/maps/${mapId}/questions`, [mapId])
+  useLive(['questions'], reload)
+  const [pos, setPos] = useState<number | null>(null)
+  const [autre, setAutre] = useState('')
+  const [voir, setVoir] = useState(false)
+  useEffect(() => { setPos(null); setAutre('') }, [mapId])
+  if (!data) return null
+  const qs = data.questions
+  const premiere = qs.findIndex(q => !q.answer)
+  const i = pos ?? premiere
+  const q = i >= 0 ? qs[i] : null
+  const repondre = async (rep: string) => {
+    if (!q) return
+    try {
+      await api.post(`/api/maps/${mapId}/questions/${q.id}`, { answer: rep })
+      setAutre(''); await reload()
+      // Après une réponse : la question suivante sans réponse (ou fin du parcours).
+      setPos(null)
+    } catch (e: any) { toast(e.message, true) }
+  }
+  const faites = qs.filter(x => x.answer).length
+  if (!q) {
+    return (
+      <section className="card">
+        <CardHead icon={<CheckCircle2 size={22} strokeWidth={1.5} />} title={tr("Cadrage de la map")} sub={tr("{0} réponses · modifiables à tout moment", [faites])} />
+        {voir ? <div className="list">
+          {qs.map((x, k) => <div key={x.id} className="li">
+            <span className="ico i-n">{x.author === 'ia' ? <Bot size={20} strokeWidth={1.5} /> : <HelpCircle size={20} strokeWidth={1.5} />}</span>
+            <div style={{ flex: 1, minWidth: 0 }}><div>{tx(x.question)}</div><div className="small muted">{tx(x.answer)}{x.answered_by ? ` · ${x.answered_by}` : ''}</div></div>
+            {data.can_answer && <button className="btn" onClick={() => setPos(k)}><Pencil size={15} strokeWidth={1.5} />{tr("Modifier")}</button>}
+          </div>)}
+        </div> : null}
+        <button className="btn more" onClick={() => setVoir(!voir)}>{voir ? tr("Masquer les réponses") : tr("Voir les réponses")}<ArrowRight size={16} strokeWidth={1.5} /></button>
+      </section>
+    )
+  }
+  const precedente = i > 0 ? i - 1 : null
+  return (
+    <section className="card" aria-live="polite">
+      <CardHead icon={q.author === 'ia' ? <Bot size={22} strokeWidth={1.5} /> : <HelpCircle size={22} strokeWidth={1.5} />}
+        title={tx(q.question)}
+        sub={q.author === 'ia' ? tr("Question de votre IA « {0} »", [q.agent ?? 'IA']) : tr("Cadrage de la map · question {0} sur {1}", [Math.min(i + 1, qs.length), qs.length])} />
+      {!data.can_answer && <p className="small muted" style={{ marginTop: 0 }}>{tr("Vous pouvez voir les questions, mais pas y répondre : il faut le droit de modifier cette map.")}</p>}
+      <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
+        {q.choices.map((c: string) => <button key={c} className={'btn' + (q.answer === c ? ' pri' : '')} disabled={!data.can_answer} onClick={() => repondre(c)}>{tx(c)}</button>)}
+      </div>
+      {q.other && data.can_answer && <form className="row" style={{ gap: 8, marginTop: 10 }} onSubmit={e => { e.preventDefault(); if (autre.trim()) repondre(autre) }}>
+        <input className="field" style={{ flex: 1, maxWidth: 360 }} placeholder={tr("Autre réponse (facultatif)")} value={autre} onChange={e => setAutre(e.target.value)} maxLength={200} />
+        <button className="btn" disabled={!autre.trim()}>{tr("Répondre")}</button>
+      </form>}
+      <div className="row" style={{ gap: 8, marginTop: 12 }}>
+        {precedente !== null && <button className="btn" onClick={() => setPos(precedente)}><ArrowLeft size={16} strokeWidth={1.5} />{tr("Retour")}</button>}
+        {pos !== null && <button className="btn" onClick={() => setPos(null)}>{tr("Revenir à la suite")}</button>}
+        {q.answer && <span className="small muted">{tr("Réponse actuelle : {0}", [q.answer])}</span>}
+      </div>
     </section>
   )
 }
