@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  Clock, Ban, CheckSquare, Flag, Coins, Users, Zap, Activity, ArrowRight, Upload, FileText, PenTool, AlertTriangle, MessageSquare, CheckCircle2, Rocket, Bot, User, Radio, ArrowLeft, HelpCircle, Pencil,
+  Clock, Ban, CheckSquare, Flag, Coins, Users, Zap, Activity, ArrowRight, Upload, FileText, PenTool, AlertTriangle, MessageSquare, CheckCircle2, Rocket, Bot, User, Radio, ArrowLeft, HelpCircle, Pencil, Lightbulb, Map as MapIcon, RefreshCcw, EyeOff,
 } from 'lucide-react'
 import { ago, api, euros, frDate } from '../api'
 import { useApp, useLive, useLoad } from '../state'
@@ -55,6 +55,7 @@ export default function Overview() {
         <button className="btn pri" onClick={() => nav('/taches')}>{tr("Ouvrir les tâches")}</button>
       </PageHead>
 
+      {map && <PremiersPas mapId={map.id} />}
       {map && <Parcours mapId={map.id} />}
 
       <section className="tiles six" aria-label={tr("Indicateurs")}>
@@ -297,3 +298,46 @@ function OnLance({ mapId }: { mapId: number }) {
   )
 }
 
+
+const PAS_ICONE: Record<string, any> = { design: FileText, layout: MapIcon, brainstorm: Lightbulb, boucle: RefreshCcw }
+
+/** Premiers pas d'une map neuve avec son IA (#146) : un clic crée le document (page ou tableau) et une tâche pour
+ * l'IA connectée, puis ouvre le document. Seulement quand une IA travaille sur la map ; masquable pour la map. */
+function PremiersPas({ mapId }: { mapId: number }) {
+  const { toast } = useApp()
+  const nav = useNav()
+  const { data, reload } = useLoad<any>(`/api/maps/${mapId}/suggestions`, [mapId])
+  useLive(['ai', 'tasks'], reload)
+  const cle = `pop.suggestions.masquees.${mapId}`
+  const [masque, setMasque] = useState(() => { try { return localStorage.getItem(cle) === '1' } catch { return false } })
+  useEffect(() => { try { setMasque(localStorage.getItem(cle) === '1') } catch { setMasque(false) } }, [cle])
+  const [occupe, setOccupe] = useState<string | null>(null)
+  if (!data || !data.ai || masque) return null
+  const restants = data.items.filter((x: any) => !x.done)
+  if (restants.length === 0) return null
+  const demarrer = async (k: string) => {
+    setOccupe(k)
+    try {
+      const r = await api.post<any>(`/api/maps/${mapId}/suggestions/${k}`)
+      if (r.created) toast(tr("Tâche #{0} donnée à {1}", [r.task, r.ai ?? 'IA']))
+      nav(r.kind === 'page' ? `/pages/${r.id}` : `/tableau/${r.id}`)
+    } catch (e: any) { toast(e.message, true) } finally { setOccupe(null) }
+  }
+  const masquer = () => { try { localStorage.setItem(cle, '1') } catch {}; setMasque(true) }
+  return (
+    <section className="card">
+      <CardHead icon={<Lightbulb size={22} strokeWidth={1.5} />} title={tr("Premiers pas avec {0}", [data.ai])} sub={tr("Un clic crée le document et donne à votre IA la tâche de le remplir avec vous")} />
+      {!data.can_start && <p className="small muted" style={{ marginTop: 0 }}>{tr("Il faut être membre du studio pour lancer ces premiers pas.")}</p>}
+      <div className="list">
+        {restants.map((x: any) => { const I = PAS_ICONE[x.key] ?? Lightbulb; return (
+          <div key={x.key} className="li">
+            <span className="ico i-n"><I size={20} strokeWidth={1.5} /></span>
+            <div style={{ flex: 1, minWidth: 0 }}>{tx(x.label)}</div>
+            <button className="btn" disabled={!data.can_start || occupe !== null} onClick={() => demarrer(x.key)}>{occupe === x.key ? tr("Création…") : tr("Démarrer")}</button>
+          </div>
+        ) })}
+      </div>
+      <button className="btn more" onClick={masquer}><EyeOff size={16} strokeWidth={1.5} />{tr("Masquer les suggestions")}</button>
+    </section>
+  )
+}

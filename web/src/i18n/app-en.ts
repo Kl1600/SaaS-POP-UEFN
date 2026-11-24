@@ -3028,5 +3028,14 @@ const EN: Record<string, string> = {
  "Lancer": "Start",
  "Ne rien créer": "Create nothing",
  "Rien à ajouter : tout existe déjà.": "Nothing to add: everything already exists.",
+ "Tâche #{0} donnée à {1}": "Task #{0} given to {1}",
+ "Premiers pas avec {0}": "First steps with {0}",
+ "Un clic crée le document et donne à votre IA la tâche de le remplir avec vous": "One click creates the document and gives your AI the task of filling it in with you",
+ "Il faut être membre du studio pour lancer ces premiers pas.": "You must be a studio member to start these first steps.",
+ "Masquer les suggestions": "Hide suggestions",
+ "Démarrer le document de design": "Start the design document",
+ "Démarrer le layout 2D": "Start the 2D layout",
+ "Démarrer le brainstorming": "Start the brainstorming",
+ "Définir la boucle de gameplay": "Define the gameplay loop",
 }
 export default EN
