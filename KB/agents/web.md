@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-24 · #288 · Popy épuré
+- Fait : récap = une phrase + 2 tâches max (Prendre/Continuer) ; objectif affiché seulement s'il est en retard ; plus de liste de points ni de bulle « Une question ? » ; 3 suggestions max ; barre de saisie mise en avant (.gask-main : bordure orange, ombre, 44 px).
+- Vérifié : navigateur.
+
 ### 2026-11-24 · #284 · Popy : un seul chat
 - Fait : plus d'onglets « Mon jour » / « Poser une question » ; le chat s'ouvre sur un message récap (phrase, 3 points max, objectif, 3 tâches max avec Prendre / Continuer), puis l'invitation à poser une question. « Voir ma journée » remet le récap. GuidePanel et AskBar supprimés (plus utilisés).
 - Vérifié : navigateur (récap, Prendre, question, 390 px).
