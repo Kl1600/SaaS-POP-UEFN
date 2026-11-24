@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-24 · #284 · Popy : un seul chat
+- Fait : plus d'onglets « Mon jour » / « Poser une question » ; le chat s'ouvre sur un message récap (phrase, 3 points max, objectif, 3 tâches max avec Prendre / Continuer), puis l'invitation à poser une question. « Voir ma journée » remet le récap. GuidePanel et AskBar supprimés (plus utilisés).
+- Vérifié : navigateur (récap, Prendre, question, 390 px).
+
 ### 2026-11-24 · #282 · bêta : seul le message de confirmation après l'envoi
 - Fait : CSS .lwbox:has(.lwdone) masque l'en-tête (Bêta privée, titre, introduction, erreur) une fois la demande envoyée, dans la fenêtre du site vitrine et sur /inscription.
 - Vérifié : navigateur (/inscription : en-tête visible avant, masqué après).
