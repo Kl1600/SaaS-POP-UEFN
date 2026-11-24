@@ -2,3 +2,6 @@
 *.sh text eol=lf
 deploy/** text eol=lf
 tools/hooks/* text eol=lf
+# Pages HTML de l'interface : toujours en LF, sinon un build sous Windows (autocrlf) rend web/dist/index.html en CRLF et le CI (Linux) le voit modifié (#319).
+web/index.html text eol=lf
+web/dist/index.html text eol=lf
