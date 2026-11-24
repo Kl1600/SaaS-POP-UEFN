@@ -33,6 +33,7 @@ mod orchestre;
 mod pages;
 mod plan;
 mod privstats;
+mod questions;
 mod roles;
 mod s3;
 mod security;
@@ -585,6 +586,11 @@ fn api() -> Router<AppState> {
         .route("/api/maps/{mid}/agents", get(agents::list))
         .route("/api/maps/{mid}/agents/activity", get(agents::activite))
         .route("/api/maps/{mid}/fil", get(fil::route))
+        .route("/api/maps/{mid}/questions", get(questions::route_liste))
+        .route(
+            "/api/maps/{mid}/questions/{qid}",
+            post(questions::route_repondre),
+        )
         .route("/api/uefn-actions/{id}/undo", post(uefn::undo))
         .route("/api/approvals/{id}/{verdict}", post(uefn::decide))
         .route(
