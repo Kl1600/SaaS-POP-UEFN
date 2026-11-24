@@ -155,3 +155,7 @@ Bloque : rien
 ### 2026-11-24 · #298 · fil d'activité des agents et temps réel avec le kanban
 - Fait : migration 0039 (`agent_calls`, sans arguments, gardés 7 jours) ; chaque appel MCP d'un agent sur sa map est noté et poussé sur le WebSocket de la map (`{"t":"agent"}`) ; `GET /api/maps/{mid}/agents/activity` ; étape de la tâche dans `/agents` (écrit, compilé, testé, relu) ; `claim_task`, `release_task`, `save_progress` écrivent dans l'historique (via « IA ») et rafraîchissent le kanban ; notifications : compilation qui passe en échec, tâche bloquée par un agent, validation demandée (texte et lien vers Paramètres → UEFN Link, plus l'Organiseur retiré).
 - Vérifié : `cargo test` (`agents::fil_d_activite`, `mcp::next_task_respecte_les_dependances`) ; `next_task` respectait déjà les dépendances (`guide.rs`).
+
+### 2026-11-24 · #301 N3 · garde-fou de compilation et versions du Verse
+- Fait : `server/src/builds.rs` + migration 0040 (`verse_builds`, 50 par map) ; l'envoi en session (`push_session` : MCP `push_to_session`, envoi du site) est refusé tant que la dernière compilation a une erreur ; chaque compilation sans erreur garde tous les fichiers Verse (sans doublon) ; `GET /api/maps/{mid}/verse/builds`, `POST /api/verse-builds/{id}/restore` (écritures et suppressions journalisées et annulables, puis recompilation).
+- Vérifié : `cargo test` (`builds::garde_fou_et_versions`). Pas vérifié : restauration avec le vrai UEFN (PC de benybens).

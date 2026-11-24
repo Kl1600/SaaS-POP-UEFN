@@ -1247,11 +1247,15 @@ async fn prepare(
         }
         "actor_restore" | "actor_update_raw" => Ok(("Annulation".into(), Value::Null, None)),
         "compile" => Ok(("Compilation Verse".into(), Value::Null, None)),
-        "push_session" => Ok((
-            "Envoi des changements en session de test".into(),
-            Value::Null,
-            None,
-        )),
+        "push_session" => {
+            // UEFN ne reçoit que du Verse qui compile (#301).
+            crate::builds::garde_envoi(st, o.ctx.map_id).await?;
+            Ok((
+                "Envoi des changements en session de test".into(),
+                Value::Null,
+                None,
+            ))
+        }
         "start_session" => Ok(("Démarrage de la session de test".into(), Value::Null, None)),
         "stop_session" => Ok(("Arrêt de la session de test".into(), Value::Null, None)),
         "session_output" => Ok((
@@ -1410,6 +1414,15 @@ async fn run_action(
                     o.remove("saved");
                 }
                 sqlx::query("UPDATE uefn_actions SET status = 'done', after = ?, undo = COALESCE(?, undo) WHERE id = ?").bind(short_data.to_string()).bind(extra_undo).bind(id).execute(&st.db).await?;
+                // Compilation sans erreur : on garde cette version du Verse (#301).
+                if action == "compile" && crate::builds::erreurs(data) == 0 {
+                    let (user, agent): (Option<i64>, Option<i64>) =
+                        sqlx::query_as("SELECT user_id, agent_id FROM uefn_actions WHERE id = ?")
+                            .bind(id)
+                            .fetch_one(&st.db)
+                            .await?;
+                    crate::builds::garder(st, mid, user, agent).await?;
+                }
             }
             // Check-in archivé : les tâches UEFN en cours qu'il cite (« #3 #5 … ») passent à « Faite » (#161).
             if action == "lore_checkin" {
