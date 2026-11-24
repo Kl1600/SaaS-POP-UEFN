@@ -24,6 +24,8 @@ struct Presence {
     uid: i64,
     name: String,
     place: String,
+    /// Écran ouvert (clé stable, sans traduction) pour la scène du studio (#176) : taches, planifier, tableau…
+    page: String,
 }
 
 #[derive(Default)]
@@ -55,7 +57,7 @@ impl Hub {
             for e in m.values() {
                 seen.insert(
                     e.uid,
-                    json!({ "uid": e.uid, "name": e.name, "place": e.place }),
+                    json!({ "uid": e.uid, "name": e.name, "place": e.place, "page": e.page }),
                 );
             }
         }
@@ -115,6 +117,7 @@ async fn run(st: AppState, user: AuthUser, map_id: i64, can_edit: bool, socket: 
             uid: user.id,
             name: user.name.clone(),
             place: String::new(),
+            page: String::new(),
         }),
     );
     st.hub.send(map_id, st.hub.presence_list(map_id));
@@ -145,6 +148,7 @@ async fn handle(st: &AppState, user: &AuthUser, map_id: i64, conn: u64, can_edit
     match v["t"].as_str().unwrap_or("") {
         "place" => {
             let place: String = v["place"].as_str().unwrap_or("").chars().take(80).collect();
+            let page: String = v["page"].as_str().unwrap_or("").chars().take(40).collect();
             st.hub.set_presence(
                 map_id,
                 conn,
@@ -152,6 +156,7 @@ async fn handle(st: &AppState, user: &AuthUser, map_id: i64, conn: u64, can_edit
                     uid: user.id,
                     name: user.name.clone(),
                     place,
+                    page,
                 }),
             );
             st.hub.send(map_id, st.hub.presence_list(map_id));

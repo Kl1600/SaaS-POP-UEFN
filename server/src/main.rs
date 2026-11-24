@@ -33,6 +33,7 @@ mod money;
 mod oauth;
 mod orchestre;
 mod pages;
+mod ping;
 mod plan;
 mod privstats;
 mod questions;
@@ -589,6 +590,7 @@ fn api() -> Router<AppState> {
         .route("/api/maps/{mid}/agents", get(agents::list))
         .route("/api/maps/{mid}/agents/activity", get(agents::activite))
         .route("/api/maps/{mid}/fil", get(fil::route))
+        .route("/api/maps/{mid}/ping", post(ping::ping))
         .route("/api/maps/{mid}/questions", get(questions::route_liste))
         .route(
             "/api/maps/{mid}/faisabilite",

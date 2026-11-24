@@ -7,7 +7,7 @@ export type Studio = { id: number; name: string; role: string; personal?: boolea
 /** Nom affiché d’un studio : « Mes maps » pour l’espace perso. */
 export const studioName = (s?: { name: string; personal?: boolean } | null) => s ? (s.personal ? tr("Mes maps (seul)") : s.name) : ""
 export type Me = { user: { id: number; name: string; email: string }; credits: number; studios: Studio[]; admin?: boolean; moderator?: boolean; admin_pending?: number; username?: string | null; must_change_password?: boolean; plan?: string; trial_until?: string | null; analyse?: boolean; billing_state?: string; ai_credits?: number; email_verified?: boolean; announcement?: { id: number; text: string; level: string } | null }
-export type Presence = { uid: number; name: string; place: string }
+export type Presence = { uid: number; name: string; place: string; page?: string }
 
 type Ctx = {
   me: Me | null
@@ -69,6 +69,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const connect = () => {
       const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/maps/${map.id}/ws`)
       sock.current = ws
+      // Présence (#176) : l'écran ouvert est renvoyé dès que la connexion s'ouvre (sinon il était perdu au chargement).
+      ws.onopen = () => { if (lastPlace.current) ws.send(JSON.stringify(lastPlace.current)) }
       ws.onmessage = e => {
         try {
           const m = JSON.parse(e.data)
@@ -83,7 +85,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [map?.id])
 
   const subscribe = useCallback((fn: (m: any) => void) => { subs.current.add(fn); return () => { subs.current.delete(fn) } }, [])
-  const send = useCallback((m: any) => { if (sock.current?.readyState === 1) sock.current.send(JSON.stringify(m)) }, [])
+  const lastPlace = useRef<any>(null)
+  const send = useCallback((m: any) => {
+    if (m?.t === 'place') lastPlace.current = m
+    if (sock.current?.readyState === 1) sock.current.send(JSON.stringify(m))
+  }, [])
 
   const value = useMemo<Ctx>(() => ({
     me, loading, reload, studio, map, setMapId, setStudioId, role,

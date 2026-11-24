@@ -8,6 +8,7 @@ import { CardHead, Drawer, Empty, PageHead, tagLabel } from '../components/ui'
 import { tr, tx } from '../i18n/t'
 import { useNav } from '../routes'
 import { AvisFaisabilite } from '../components/Faisabilite'
+import StudioScene from '../components/StudioScene'
 
 const ICON: Record<string, [any, string]> = {
   checkin: [Upload, 'i-g'], board: [PenTool, 'i-n'], page: [FileText, 'i-n'], blocked: [Ban, 'i-r'], done: [CheckCircle2, 'i-g'],
@@ -56,6 +57,7 @@ export default function Overview() {
         <button className="btn pri" onClick={() => nav('/taches')}>{tr("Ouvrir les tâches")}</button>
       </PageHead>
 
+      {map && <StudioScene mapId={map.id} />}
       {map && <PremiersPas mapId={map.id} />}
       {map && <Parcours mapId={map.id} />}
 

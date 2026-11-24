@@ -69,7 +69,14 @@ export default function Layout() {
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
   }, [])
-  useEffect(() => { app.send({ t: 'place', place: title }) }, [title, app.map?.id])
+  // Écran ouvert, en clé stable, pour la scène du studio (#176) : /map/12/taches → « taches », tableau de bord → « dashboard ».
+  const ecran = (() => {
+    const m = loc.pathname.match(/^\/map\/\d+\/?([^/]*)/)
+    if (m) return m[1] || 'dashboard'
+    if (loc.pathname.startsWith('/parametres') && loc.search.includes('onglet=uefn')) return 'uefn'
+    return loc.pathname.split('/')[1] || 'accueil'
+  })()
+  useEffect(() => { app.send({ t: 'place', place: title, page: ecran }) }, [title, ecran, app.map?.id])
 
   const uefn = useUefnStatus()
   const allMaps = app.me?.studios.flatMap(s => s.maps.map(m => ({ s, m }))) ?? []
