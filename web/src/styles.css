@@ -1154,3 +1154,13 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 .oauth-seg button{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px}
 .aiurl{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;padding:14px 16px;border:1px solid var(--border);border-radius:14px;background:var(--hover)}
 .aiurl-v{display:block;font-size:13px;padding:7px 10px;border-radius:8px;background:var(--surface);border:1px solid var(--border);word-break:break-all;user-select:all}
+/* Popy épuré (#288) : récap court, barre de saisie mise en avant. */
+.gsugs{padding:0 0 10px !important}
+.gsugs .chip{font-size:12.5px}
+.gask-main{padding:6px;border:1.5px solid var(--accent,#ED753E);border-radius:16px;background:var(--surface);box-shadow:0 6px 22px rgba(237,117,62,.18);align-items:center}
+.gask-main .field{border:0 !important;box-shadow:none !important;background:transparent !important;height:44px;font-size:15px;padding:0 8px}
+.gask-main .field:focus{outline:none}
+.gask-main .btn{height:40px;width:44px;border-radius:12px;padding:0;justify-content:center}
+.gask-main:focus-within{box-shadow:0 0 0 4px rgba(237,117,62,.16),0 6px 22px rgba(237,117,62,.2)}
+.grecap-goal{margin:4px 0 10px}
+.grecap-tasks{margin-top:2px}

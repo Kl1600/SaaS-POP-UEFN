@@ -161,6 +161,8 @@ const EN: Record<string, string> = {
  "Général": "General",
  "Vue d'ensemble": "Overview",
  "Dashboard": "Dashboard",
+  "Posez votre question à Popy…": "Ask Popy a question…",
+  "Rien à prendre pour l’instant.": "Nothing to pick up right now.",
   "Autoriser une IA": "Authorize an AI",
   "Connexion de l’IA impossible": "Couldn’t connect the AI",
   "Retour à POP": "Back to POP",

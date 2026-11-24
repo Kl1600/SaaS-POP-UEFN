@@ -1,17 +1,13 @@
 // Popy : assistant intégré (calculs côté serveur sur les données de la map + guide de POP, rien ne sort de POP).
 import { useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { Compass, AlertCircle, AlertTriangle, CheckCircle2, Info, Play, ArrowRight, X, Send } from 'lucide-react'
+import { Compass, Play, ArrowRight, X, Send } from 'lucide-react'
 import { ask, suggested, type Fiche } from '../guideKB'
 import { api } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { tr, LANG } from '../i18n/t'
 import { useNav } from '../routes'
 import { useDialog } from './ui'
-
-const TONE: Record<string, [any, string]> = {
-  bad: [AlertCircle, 'var(--tr)'], warn: [AlertTriangle, 'var(--to)'], good: [CheckCircle2, 'var(--tg)'], info: [Info, 'var(--text3)'],
-}
 
 /** /map/12/taches → /taches ; /studio/3/equipe → /equipe (pages des fiches d’aide). */
 const shortPath = (p: string) => p.replace(/^\/map\/\d+/, '').replace(/^\/studio\/\d+\/(integrations|maps)/, '/equipe').replace(/^\/studio\/\d+\/marche/, '/analyse/marche').replace(/^\/analyse\/videos/, '/analyse/tiktok').replace(/^\/studio\/\d+/, '') || '/'
@@ -34,12 +30,10 @@ function Recap({ onNavigate }: { onNavigate?: () => void }) {
   const open = (id: number) => { onNavigate?.(); nav(`/taches?t=${id}`) }
   return <div className="grecap">
     <p className="grecap-hl">{data.headline}</p>
-    {data.points.length > 0 && <ul className="grecap-pts">{data.points.slice(0, 3).map((p: any, i: number) => { const [I, c] = TONE[p.tone] ?? TONE.info; return <li key={i}><I size={15} style={{ color: c, flex: 'none', marginTop: 2 }} /><span>{p.text}</span></li> })}</ul>}
-    {data.pace && <div className="grecap-goal"><span>{tr("Objectif :")}{' '}<b style={{ fontWeight: 500 }}>{data.pace.title}</b></span><span className={'badge ' + (data.pace.on_track ? 'b-g' : 'b-r')}>{data.pace.on_track ? tr("Dans les temps") : tr("En retard")}</span></div>}
-    <div className="grecap-sec">{tr("À faire maintenant")}</div>
-    {data.suggestions.length === 0 ? <p className="small muted">{tr("Aucune tâche disponible pour vous. Créez-en une ou demandez à l’équipe.")}</p> :
-      <div className="grecap-tasks">{data.suggestions.slice(0, 3).map((s: any, i: number) => <div key={s.id} className="grecap-task">
-        <button className="grecap-t" onClick={() => open(s.id)}><span><span className="mono muted">#{s.number}</span> {s.title}</span>{s.why.length > 0 && <span className="small muted">{s.why[0]}</span>}</button>
+    {data.pace && !data.pace.on_track && <div className="grecap-goal"><span>{tr("Objectif :")}{' '}<b style={{ fontWeight: 500 }}>{data.pace.title}</b></span><span className={'badge ' + (data.pace.on_track ? 'b-g' : 'b-r')}>{data.pace.on_track ? tr("Dans les temps") : tr("En retard")}</span></div>}
+    {data.suggestions.length === 0 ? <p className="small muted" style={{ margin: 0 }}>{tr("Rien à prendre pour l’instant.")}</p> :
+      <div className="grecap-tasks">{data.suggestions.slice(0, 2).map((s: any, i: number) => <div key={s.id} className="grecap-task">
+        <button className="grecap-t" onClick={() => open(s.id)}><span><span className="mono muted">#{s.number}</span> {s.title}</span></button>
         {s.action === 'continue'
           ? <button className="btn" onClick={() => open(s.id)}><ArrowRight size={14} />{tr("Continuer")}</button>
           : <button className={'btn' + (i === 0 ? ' pri' : '')} onClick={() => take(s)}><Play size={13} />{s.mine ? tr("Commencer") : tr("Prendre")}</button>}
@@ -58,7 +52,6 @@ function GuideChat({ initial, onNavigate }: { initial?: string; onNavigate?: () 
   // Le chat s'ouvre sur le récap de la journée (si une map est ouverte), puis l'invitation à poser une question.
   const [msgs, setMsgs] = useState<Msg[]>([
     ...(map ? [{ who: 'bot' as const, recap: true }] : [{ who: 'bot' as const, text: first ? tr("Bonjour {0} !", [first]) : tr("Bonjour !") }]),
-    { who: 'bot', text: tr("Une question ? Sur votre map (« qu’est-ce qui est en retard ? », « où en est la tâche #12 ? ») ou sur POP (« comment relier UEFN ? »).") },
   ])
   const [q, setQ] = useState('')
   const end = useRef<HTMLDivElement>(null)
@@ -105,9 +98,9 @@ function GuideChat({ initial, onNavigate }: { initial?: string; onNavigate?: () 
       </div>)}
       <div ref={end} />
     </div>
-    {msgs.length <= 2 && <div className="gothers" style={{ padding: '0 0 8px' }}>{suggested(shortPath(loc.pathname)).map(f => <button key={f.id} className="chip" onClick={() => pick(f)}>{f.q}</button>)}</div>}
-    <form className="gask" onSubmit={e => { e.preventDefault(); send(q) }}>
-      <input className="field" value={q} onChange={e => setQ(e.target.value)} placeholder={tr("Comment je… ?")} aria-label={tr("Votre question")} />
+    {msgs.length <= 1 && <div className="gothers gsugs">{suggested(shortPath(loc.pathname)).slice(0, 3).map(f => <button key={f.id} className="chip" onClick={() => pick(f)}>{f.q}</button>)}</div>}
+    <form className="gask gask-main" onSubmit={e => { e.preventDefault(); send(q) }}>
+      <input className="field" value={q} onChange={e => setQ(e.target.value)} placeholder={tr("Posez votre question à Popy…")} aria-label={tr("Votre question")} />
       <button className="btn pri" aria-label={tr("Envoyer")}><Send size={16} /></button>
     </form>
   </div>
