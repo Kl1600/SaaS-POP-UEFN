@@ -1,6 +1,6 @@
-// « Mes agents » (#134) : les IA du compte (depuis #145, une IA se connecte au compte et choisit sa map elle-même).
+// « Mes IA » (#134) : les IA du compte (depuis #145, une IA se connecte au compte et choisit sa map elle-même).
 // - Section de l'accueil : une carte par IA (connectée, ou enregistrée et en attente de son premier appel MCP) et
-//   « Connecter un agent », qui déplie la connexion dans la section (en un clic #290, ou clé API #280).
+//   « Connecter une IA », qui déplie la connexion dans la section (en un clic #290, ou clé API #280).
 // - Pastille dans la barre du haut : aucune IA → « Connecter une IA » ; en attente ; connectée.
 // État lu dans /api/me/tokens : last_used vide = en attente de connexion, rempli = premier appel MCP reçu.
 import { useEffect, useRef, useState } from 'react'
@@ -14,7 +14,7 @@ import { CLIENTS, ClientLogo, KeyPanel, OneClick, clientName, type Client } from
 export type AccountAI = { tokens: any[] | null; live: any[]; pending: any[]; reload: () => void }
 
 /** IA du compte, relues toutes les 3 s tant qu'on attend une connexion, toutes les 30 s sinon, et au retour sur l'onglet. */
-// La pastille et la section « Mes agents » partagent la dernière lecture : elles changent ensemble.
+// La pastille et la section « Mes IA » partagent la dernière lecture : elles changent ensemble.
 let last: any[] | null = null
 const subs = new Set<(t: any[]) => void>()
 export function useAccountAI(waiting: boolean): AccountAI {
@@ -38,30 +38,30 @@ export function useAccountAI(waiting: boolean): AccountAI {
   return { tokens, live, pending, reload }
 }
 
-/** Pastille d'état de l'IA, à côté de celle d'UEFN Link. Sans IA connectée, elle mène à « Mes agents » sur l'accueil. */
+/** Pastille d'état de l'IA, à côté de celle d'UEFN Link. Sans IA connectée, elle mène à « Mes IA » sur l'accueil. */
 export function AiPill() {
   const nav = useNavigate()
   const ai = useAccountAI(false)
   if (!ai.tokens) return null
-  const toAgents = () => nav('/#agents')
+  const toAis = () => nav('/#ia')
   if (ai.live.length) {
     const kinds = [...new Set(ai.live.map(t => t.kind))].slice(0, 3)
-    return <button className="upill connected" onClick={toAgents} title={ai.live.map(t => t.name).join(', ')}>
+    return <button className="upill connected" onClick={toAis} title={ai.live.map(t => t.name).join(', ')}>
       <span className="udot" />{kinds.map(k => <ClientLogo key={k} kind={k} size={16} />)}
       {ai.live.length === 1 ? tr("{0} connectée", [ai.live[0].name]) : tr("{0} IA connectées", [ai.live.length])}
     </button>
   }
   if (ai.pending.length) {
     const t = ai.pending[ai.pending.length - 1]
-    return <button className="upill closed" onClick={toAgents} title={tr("Enregistrée dans POP : elle sera connectée à son premier appel.")}>
+    return <button className="upill closed" onClick={toAis} title={tr("Enregistrée dans POP : elle sera connectée à son premier appel.")}>
       <span className="aiwait-dot" /><ClientLogo kind={t.kind} size={16} />{tr("{0} · en attente de connexion", [t.name])}
     </button>
   }
-  return <button className="upill unlinked" onClick={toAgents}><span className="udot" />{tr("Connecter une IA")}</button>
+  return <button className="upill unlinked" onClick={toAis}><span className="udot" />{tr("Connecter une IA")}</button>
 }
 
-/** Section « Mes agents » de l'accueil. */
-export function AgentsSection() {
+/** Section « Mes IA » de l'accueil. */
+export function AiSection() {
   const nav = useNavigate()
   const { toast } = useApp()
   const loc = useLocation()
@@ -69,9 +69,9 @@ export function AgentsSection() {
   const [open, setOpen] = useState(false)
   const ai = useAccountAI(open)
   const none = !!ai.tokens && ai.tokens.length === 0
-  // /#agents (pastille de la barre du haut) : on descend jusqu'à la section et on ouvre la connexion s'il n'y a pas d'IA.
+  // /#ia (pastille de la barre du haut) : on descend jusqu'à la section et on ouvre la connexion s'il n'y a pas d'IA.
   useEffect(() => {
-    if (loc.hash !== '#agents' || !ai.tokens) return
+    if (loc.hash !== '#ia' || !ai.tokens) return
     ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     if (!ai.live.length) setOpen(true)
   }, [loc.key, !!ai.tokens])
@@ -79,11 +79,11 @@ export function AgentsSection() {
   useEffect(() => { if (none) setOpen(true) }, [none])
   if (!ai.tokens) return null
   const settings = () => nav('/parametres?onglet=ia')
-  return <section className="home-block" id="agents" ref={ref}>
+  return <section className="home-block" id="ia" ref={ref}>
     <div className="home-head">
       <span className="home-ic"><Bot size={18} /></span>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <h2>{tr("Mes agents")}</h2>
+        <h2>{tr("Mes IA")}</h2>
         <span className="small muted">{tr("Les IA connectées à votre compte : elles voient vos maps et choisissent celle sur laquelle travailler.")}</span>
       </div>
       {!none && <button className="btn" onClick={settings}><Settings2 size={16} />{tr("Gérer")}</button>}
@@ -91,39 +91,39 @@ export function AgentsSection() {
     <div className="home-grid">
       {ai.tokens.map(t => {
         const live = !!t.last_used
-        return <div key={t.id} role="button" tabIndex={0} className="home-map agent-card" onClick={settings} onKeyDown={e => { if (e.key === 'Enter') settings() }}>
-          <span className="home-map-top"><span className="agent-name"><ClientLogo kind={t.kind} size={20} /><b>{t.name}</b></span>
-            {!live && <button className="iconbtn agent-drop" aria-label={tr("Retirer {0}", [t.name])} data-tip={tr("Retirer cette tentative")} onClick={async e => {
+        return <div key={t.id} role="button" tabIndex={0} className="home-map myai-card" onClick={settings} onKeyDown={e => { if (e.key === 'Enter') settings() }}>
+          <span className="home-map-top"><span className="myai-name"><ClientLogo kind={t.kind} size={20} /><b>{t.name}</b></span>
+            {!live && <button className="iconbtn myai-drop" aria-label={tr("Retirer {0}", [t.name])} data-tip={tr("Retirer cette tentative")} onClick={async e => {
               // Tentative jamais aboutie : on retire sa clé (elle n'a jamais servi), sans passer par Paramètres.
               e.stopPropagation()
               try { await api.del(`/api/tokens/${t.id}`); ai.reload(); toast(tr("{0} retirée", [t.name])) } catch (er: any) { toast(er.message, true) }
             }}><X size={16} /></button>}
           </span>
           <span className="small muted">{t.oauth ? tr("Autorisée depuis l’IA") : clientName(t.kind)}{t.scope === 'read' ? ` · ${tr("Lecture seule")}` : ''}</span>
-          <span className={'agent-state' + (live ? ' on' : '')}>{live ? <span className="udot" /> : <span className="aiwait-dot" />}{live ? tr("Connectée · {0}", [ago(t.last_used)]) : tr("En attente de connexion…")}</span>
+          <span className={'myai-state' + (live ? ' on' : '')}>{live ? <span className="udot" /> : <span className="aiwait-dot" />}{live ? tr("Connectée · {0}", [ago(t.last_used)]) : tr("En attente de connexion…")}</span>
           <span className="small muted">{t.map ? tr("Travaille sur « {0} »", [t.map.name]) : live ? tr("Aucune map choisie") : tr("Sera connectée à son premier appel")}</span>
         </div>
       })}
-      {!open && !none && <button className="home-map add" onClick={() => setOpen(true)}><Plus size={20} /><b>{tr("Connecter un agent")}</b></button>}
+      {!open && !none && <button className="home-map add" onClick={() => setOpen(true)}><Plus size={20} /><b>{tr("Connecter une IA")}</b></button>}
     </div>
-    {(open || none) && <div className="card agents-connect"><ConnectPanel ai={ai} onClose={none ? undefined : () => setOpen(false)} /></div>}
+    {(open || none) && <div className="card myai-connect"><ConnectPanel ai={ai} onClose={none ? undefined : () => setOpen(false)} /></div>}
   </section>
 }
 
-/** « Connecter un agent » replié en bouton, déplié d'office tant que le compte n'a aucune IA (Paramètres → IA connectées). */
-export function ConnectAgent() {
+/** « Connecter une IA » replié en bouton, déplié d'office tant que le compte n'a aucune IA (Paramètres → IA connectées). */
+export function ConnectAiButton() {
   const [open, setOpen] = useState(false)
   const ai = useAccountAI(open)
   const none = !!ai.tokens && ai.tokens.length === 0
   useEffect(() => { if (none) setOpen(true) }, [none])
   if (!ai.tokens) return null
-  if (!open && !none) return <button className="btn" onClick={() => setOpen(true)}><Plus size={16} />{tr("Connecter un agent")}</button>
-  return <div className="card agents-connect"><ConnectPanel ai={ai} onClose={none ? undefined : () => setOpen(false)} /></div>
+  if (!open && !none) return <button className="btn" onClick={() => setOpen(true)}><Plus size={16} />{tr("Connecter une IA")}</button>
+  return <div className="card myai-connect"><ConnectPanel ai={ai} onClose={none ? undefined : () => setOpen(false)} /></div>
 }
 
 const KEY_KINDS = ['claude_desktop', 'claude_code', 'cursor', 'codex', 'autre']
 
-/** Connexion d'un agent, dépliée dans la section. Passe seule à « connectée » dès le premier appel MCP d'une nouvelle IA. */
+/** Connexion d'une IA, dépliée dans la section. Passe seule à « connectée » dès le premier appel MCP d'une nouvelle IA. */
 function ConnectPanel({ ai, onClose }: { ai: AccountAI; onClose?: () => void }) {
   const { map, toast } = useApp()
   const [key, setKey] = useState<{ c: Client; token: string; id: number } | null>(null)
@@ -159,7 +159,7 @@ function ConnectPanel({ ai, onClose }: { ai: AccountAI; onClose?: () => void }) 
     <button className="linkbtn" onClick={() => setKey(null)}><ArrowLeft size={14} /> {tr("Choisir une autre IA")}</button>
   </div>
   return <div className="connectai">
-    {head(tr("Connecter un agent"))}
+    {head(tr("Connecter une IA"))}
     <p className="muted connectai-sub">{tr("POP se pilote avec votre IA (Claude, Cursor, Codex…) : elle voit vos maps, prend les tâches et agit dans UEFN. Connectez-la une fois pour tout votre compte.")}</p>
     <PromptBlock ai={ai} />
     <div className="aiwait" role="status">

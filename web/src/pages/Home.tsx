@@ -1,6 +1,6 @@
 // Accueil : vos maps perso et vos studios, chacun avec ses maps. On choisit une map pour ouvrir sa dashboard.
 // Glisser une map d'un bloc à l'autre la déplace (solo ↔ studio), toujours après confirmation.
-// En dessous, « Mes agents » : les IA connectées au compte et la connexion d'un nouvel agent (#134).
+// En dessous, « Mes IA » : les IA connectées au compte et la connexion d'une nouvelle IA (#134).
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Building2, Plus, Settings2, User, Users, ArrowRight } from 'lucide-react'
@@ -10,7 +10,7 @@ import { PageHead } from '../components/ui'
 import { openCreate } from '../components/MapSwitcher'
 import { ConfirmMove, isAdmin, previewMove, type Drag, type Pending } from '../components/MoveMap'
 import { tr } from '../i18n/t'
-import { AgentsSection } from '../components/ConnectAI'
+import { AiSection } from '../components/ConnectAI'
 
 type DnD = { drag: Drag | null; setDrag: (d: Drag | null) => void; over: number | null; setOver: (id: number | null) => void; drop: (to: number) => void }
 
@@ -70,7 +70,7 @@ export default function Home() {
       <button className="btn pri" onClick={() => openCreate({ kind: 'map' })}><Plus size={16} />{tr("Nouvelle map")}</button>
     </PageHead>
     {me.studios.map(s => <StudioBlock key={s.id} s={s} dnd={dnd} />)}
-    <AgentsSection />
+    <AiSection />
     {pending && <ConfirmMove p={pending} studios={me.studios} onClose={() => setPending(null)} />}
   </main>
 }

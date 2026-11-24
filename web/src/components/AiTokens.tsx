@@ -8,7 +8,7 @@ import { useApp, useLoad } from '../state'
 import { CardHead } from './ui'
 import { tr } from '../i18n/t'
 import { AiLogo } from './AiLogo'
-import { ConnectAgent, useAccountAI } from './ConnectAI'
+import { ConnectAiButton, useAccountAI } from './ConnectAI'
 
 export const ClientLogo = ({ kind, size }: { kind: string; size?: number }) => <AiLogo kind={kind} size={size} />
 
@@ -28,8 +28,8 @@ export const CLIENTS: Client[] = [
 
 export const clientName = (kind: string) => CLIENTS.find(c => c.kind === kind)?.name ?? tr("Autre")
 
-/** Paramètres du compte → IA connectées : lister, rôle, lecture seule, déconnecter ; connecter un agent comme sur
- *  l'accueil (« Mes agents », #134 : prompt à coller d'abord, en un clic et clé API repliés). */
+/** Paramètres du compte → IA connectées : lister, rôle, lecture seule, déconnecter ; connecter une IA comme sur
+ *  l'accueil (« Mes IA », #134 : prompt à coller d'abord, en un clic et clé API repliés). */
 export function AccountAI() {
   const ai = useAccountAI(false)
   const data = ai.tokens, reload = ai.reload
@@ -61,7 +61,7 @@ export function AccountAI() {
         {tr("En attente de connexion : {0}.", [pending.map(t => clientName(t.kind)).join(', ')])}{' '}
         <button className="linkbtn" onClick={async () => { for (const t of pending) await api.del(`/api/tokens/${t.id}`); reload() }}>{tr("Annuler")}</button>
       </p>}
-      <div style={{ marginTop: 16 }}><ConnectAgent /></div>
+      <div style={{ marginTop: 16 }}><ConnectAiButton /></div>
     </section>
   </>)
 }
