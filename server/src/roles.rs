@@ -22,6 +22,11 @@ const COMMUNS: &[&str] = &[
     "get_skill",
     "comment_task",
     "list_agents",
+    "list_boards",
+    "get_board",
+    "list_pages",
+    "read_page",
+    "list_milestones",
 ];
 
 /// Ce qu'un agent fait de ses tâches : réserver, passer en cours ou fini, signaler un problème par une tâche.
@@ -31,6 +36,15 @@ const TACHES: &[&str] = &[
     "save_progress",
     "set_task_status",
     "create_task",
+];
+
+/// Conception de la map (#147) : tableau blanc, documentation, jalons.
+const CONCEPTION: &[&str] = &[
+    "create_board",
+    "upsert_board_objects",
+    "delete_board_objects",
+    "write_page",
+    "add_milestone",
 ];
 
 const SESSION: &[&str] = &[
@@ -53,7 +67,7 @@ pub const ROLES: &[Role] = &[
         id: "orchestrateur",
         nom: "Orchestrateur",
         consignes: "Vous êtes l'Orchestrateur de l'équipe. Vous ne codez pas et ne touchez pas au niveau : vous transformez la demande de l'humain en tâches POP d'environ une heure, liées par leurs dépendances (plan_tasks), vous les attribuez aux agents selon leur rôle (list_agents, assign_task), vous suivez l'avancement (list_tasks) et vous relisez ce que les autres agents ont fait (commentaires des tâches). Quand une tâche bloque, commentez-la et prévenez l'humain.",
-        outils: &[TACHES, &["set_task_lot"], crate::orchestre::OUTILS],
+        outils: &[TACHES, &["set_task_lot"], crate::orchestre::OUTILS, CONCEPTION],
     },
     Role {
         id: "codeur_verse",

@@ -661,6 +661,118 @@ fn to_markdown(title: &str, blocks: &Value) -> String {
     md
 }
 
+/// Markdown → blocs de page (#147) : titres, listes, cases à cocher, citations, code, séparateurs, tableaux et
+/// paragraphes. Le contraire de `to_markdown`, pour les IA qui écrivent la documentation.
+pub fn from_markdown(md: &str) -> Vec<Value> {
+    let mut out: Vec<Value> = vec![];
+    let mut lines = md.lines().peekable();
+    let mut para: Vec<String> = vec![];
+    let flush = |para: &mut Vec<String>, out: &mut Vec<Value>| {
+        if !para.is_empty() {
+            out.push(b("p", &para.join(" ")));
+            para.clear();
+        }
+    };
+    while let Some(l) = lines.next() {
+        let s = l.trim_end();
+        let t = s.trim_start();
+        if t.is_empty() {
+            flush(&mut para, &mut out);
+            continue;
+        }
+        if let Some(lang) = t.strip_prefix("```") {
+            flush(&mut para, &mut out);
+            let mut code = vec![];
+            for c in lines.by_ref() {
+                if c.trim_start().starts_with("```") {
+                    break;
+                }
+                code.push(c.to_string());
+            }
+            let mut bl = b("code", &code.join("\n"));
+            bl["lang"] = json!(if lang.trim().is_empty() {
+                "verse"
+            } else {
+                lang.trim()
+            });
+            out.push(bl);
+            continue;
+        }
+        if t.starts_with('|') {
+            flush(&mut para, &mut out);
+            let mut rows = vec![];
+            let mut cur = Some(t.to_string());
+            while let Some(r) = cur {
+                let cells: Vec<String> = r
+                    .trim()
+                    .trim_matches('|')
+                    .split('|')
+                    .map(|c| c.trim().replace("\\|", "|"))
+                    .collect();
+                if !cells
+                    .iter()
+                    .all(|c| !c.is_empty() && c.chars().all(|x| matches!(x, '-' | ':' | ' ')))
+                {
+                    rows.push(json!(cells));
+                }
+                cur = lines
+                    .next_if(|n| n.trim_start().starts_with('|'))
+                    .map(|n| n.trim().to_string());
+            }
+            out.push(
+                json!({ "id": random_token()[..10].to_string(), "type": "table", "rows": rows }),
+            );
+            continue;
+        }
+        let (ty, rest) = if let Some(r) = t.strip_prefix("### ") {
+            ("h3", r)
+        } else if let Some(r) = t.strip_prefix("## ") {
+            ("h2", r)
+        } else if let Some(r) = t.strip_prefix("# ") {
+            ("h1", r)
+        } else if let Some(r) = t.strip_prefix("- [ ] ").or(t.strip_prefix("* [ ] ")) {
+            ("todo", r)
+        } else if let Some(r) = t
+            .strip_prefix("- [x] ")
+            .or(t.strip_prefix("- [X] "))
+            .or(t.strip_prefix("* [x] "))
+        {
+            flush(&mut para, &mut out);
+            let mut bl = b("todo", r);
+            bl["checked"] = json!(true);
+            out.push(bl);
+            continue;
+        } else if let Some(r) = t.strip_prefix("- ").or(t.strip_prefix("* ")) {
+            ("bullet", r)
+        } else if let Some(r) = t
+            .split_once(". ")
+            .filter(|(n, _)| !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()))
+            .map(|(_, r)| r)
+        {
+            ("number", r)
+        } else if let Some(r) = t.strip_prefix("> ").or(t.strip_prefix(">")) {
+            ("quote", r)
+        } else if t == "---" || t == "***" {
+            ("divider", "")
+        } else {
+            para.push(t.to_string());
+            continue;
+        };
+        flush(&mut para, &mut out);
+        out.push(b(ty, rest));
+    }
+    flush(&mut para, &mut out);
+    if out.is_empty() {
+        out.push(b("p", ""));
+    }
+    out
+}
+
+/// Page en Markdown, pour les IA (#147).
+pub fn page_markdown(p: &Value) -> String {
+    to_markdown(p["title"].as_str().unwrap_or(""), &p["blocks"])
+}
+
 pub async fn export_md(
     State(st): State<AppState>,
     u: AuthUser,
