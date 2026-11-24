@@ -1,6 +1,6 @@
 // Panel administrateur de la plateforme POP : liste d'attente, création des comptes bêta, utilisateurs, vue générale.
 import { useEffect, useState } from 'react'
-import { Check, X, RotateCcw, Trash2, Copy, Mail, Ban, UserPlus, Lock, KeyRound, Link2, LockOpen } from 'lucide-react'
+import { Check, X, RotateCcw, Trash2, Copy, Mail, Ban, UserPlus, Lock, KeyRound, Link2, LockOpen, LogOut } from 'lucide-react'
 import { actionLabel } from '../components/Security'
 import { ago, api, frDate } from '../api'
 import { useApp, useLoad } from '../state'
@@ -239,6 +239,30 @@ function DeleteUser({ u, onClose, onDone }: { u: any; onClose: () => void; onDon
   </Modal>
 }
 
+/** Fiche d'un compte (#39) : studios et rôles, état, derniers événements du journal de sécurité. */
+function FicheCompte({ id, onClose }: { id: number; onClose: () => void }) {
+  const { data } = useLoad<any>(`/api/admin/users/${id}/card`, [id])
+  return <Modal onClose={onClose} label={tr("Fiche du compte")}>
+    {!data ? <p className="muted">{tr("Chargement…")}</p> : <div className="stack" style={{ gap: 12 }}>
+      <div><h2 style={{ margin: 0, fontWeight: 400 }}>{data.name}</h2><span className="small muted">{data.email} · {tr("inscrit le {0}", [frDate(data.created_at)])} · {data.last_seen ? tr("vu {0}", [ago(data.last_seen)]) : tr("jamais vu")}</span></div>
+      <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+        {data.is_admin && <span className="badge b-v">{data.env_admin ? tr("Admin du serveur") : tr("Admin")}</span>}
+        {data.is_moderator && <span className="badge b-g">{tr("Modérateur")}</span>}
+        <span className="badge">{data.two_factor ? tr("Double authentification : oui") : tr("Double authentification : non")}</span>
+        {data.locked_until && <span className="badge b-o">{tr("Bloqué jusqu’à {0}", [hhmm(data.locked_until)])}</span>}
+        {data.disabled && <span className="badge b-r">{tr("Désactivé")}</span>}
+        <span className="badge">{tr("{0} session(s) ouverte(s)", [data.active_sessions])}</span>
+      </div>
+      {data.env_admin && <p className="small muted" style={{ margin: 0 }}>{tr("Défini sur le serveur (POP_ADMIN_EMAILS), non modifiable ici.")}</p>}
+      <div><b style={{ fontWeight: 500 }}>{tr("Studios")}</b>
+        {data.studios.length === 0 ? <p className="small muted">{tr("Aucun studio.")}</p> : <ul style={{ margin: '6px 0 0', paddingLeft: 20 }}>{data.studios.map((s: any) => <li key={s.id}>{s.name} <span className="small muted">· {s.role}</span></li>)}</ul>}</div>
+      <div><b style={{ fontWeight: 500 }}>{tr("Derniers événements")}</b>
+        {data.events.length === 0 ? <p className="small muted">{tr("Aucun événement.")}</p> : <table className="tbl" style={{ marginTop: 6 }}><tbody>{data.events.map((e: any, i: number) => <tr key={i}><td className="small muted">{frDate(e.at)} {hhmm(e.at)}</td><td className="small">{actionLabel(e.action)}</td><td className="small muted">{e.detail}</td></tr>)}</tbody></table>}</div>
+      <div className="row" style={{ justifyContent: 'flex-end' }}><button className="btn" onClick={onClose}>{tr("Fermer")}</button></div>
+    </div>}
+  </Modal>
+}
+
 function Users() {
   const { toast, me } = useApp()
   // Un modérateur (#65) voit les comptes et dépanne les comptes ordinaires : débloquer, lien de mot de passe.
@@ -249,27 +273,35 @@ function Users() {
   const [link, setLink] = useState<any>(null)
   const [sent, setSent] = useState<Sent | null>(null)
   const [del, setDel] = useState<any>(null)
+  const [filtre, setFiltre] = useState('')
+  const [fiche, setFiche] = useState<number | null>(null)
   const run = async (fn: () => Promise<any>, msg: string) => { try { await fn(); toast(msg); reload() } catch (e: any) { toast(e.message, true) } }
   const set = async (id: number, patch: any, msg: string) => { try { await api.post(`/api/admin/users/${id}`, patch); toast(msg); reload() } catch (e: any) { toast(e.message, true) } }
   const list = (data ?? []).filter(u => !q || (u.name + ' ' + u.email + ' ' + (u.username ?? '')).toLowerCase().includes(q.toLowerCase()))
+    .filter(u => filtre === 'admins' ? u.is_admin : filtre === 'desactives' ? u.disabled : filtre === 'bloques' ? !!u.locked_until : true)
   return <section className="card">
-    <CardHead title={tr("Utilisateurs")} sub={data ? `${data.length} comptes` : ''}><input className="field" style={{ height: 34, width: 220 }} placeholder={tr("Chercher")} value={q} onChange={e => setQ(e.target.value)} /></CardHead>
+    <CardHead title={tr("Utilisateurs")} sub={data ? `${data.length} comptes` : ''}><input className="field" style={{ height: 34, width: 220 }} placeholder={tr("Chercher (nom, e-mail)")} value={q} onChange={e => setQ(e.target.value)} />
+      <select className="field" style={{ height: 34, width: 'auto' }} aria-label={tr("Filtrer")} value={filtre} onChange={e => setFiltre(e.target.value)}>
+        <option value="">{tr("Tous")}</option><option value="admins">{tr("Admins")}</option><option value="desactives">{tr("Désactivés")}</option><option value="bloques">{tr("Bloqués")}</option>
+      </select></CardHead>
+    {fiche && <FicheCompte id={fiche} onClose={() => setFiche(null)} />}
     {cred && <CredBox c={cred} onClose={() => setCred(null)} />}
     {link && <ResetLinkBox r={link} onClose={() => setLink(null)} />}
     {sent && <ActivationBox s={sent} onClose={() => setSent(null)} />}
     <div style={{ overflowX: 'auto' }}><table className="tbl"><thead><tr><th>{tr("Nom")}</th><th>{tr("Identifiant")}</th><th>E-mail</th><th>{tr("Inscrit")}</th><th>Vu</th><th>{tr("Studios")}</th><th>{tr("Tâches faites")}</th><th>{tr("Plan")}</th><th>{tr("Rôle")}</th><th /></tr></thead>
       <tbody>{list.map(u => <tr key={u.id} style={{ opacity: u.disabled ? 0.5 : 1 }}>
-        <td><b style={{ fontWeight: 500 }}>{u.name}</b>{u.me && <span className="small muted"> {tr("(vous)")}</span>}{u.must_change && <span className="badge b-o" style={{ marginLeft: 6 }} title={tr("N’a pas encore choisi son mot de passe")}>{tr("Mot de passe provisoire")}</span>}{u.activation_pending && <span className="badge b-o" style={{ marginLeft: 6 }} title={u.activation_sent_at ? tr("Lien envoyé le {0}", [frDate(u.activation_sent_at)]) : undefined}>{tr("En attente d’activation")}</span>}{u.activation_pending && u.activation_sent_at && <div className="small muted">{tr("Lien envoyé {0}", [ago(u.activation_sent_at)])}</div>}</td><td className="small mono">{u.username ?? '—'}</td><td className="small">{u.email}</td>
+        <td><button className="linkbtn" style={{ padding: 0, fontWeight: 500 }} onClick={() => setFiche(u.id)}>{u.name}</button>{u.me && <span className="small muted"> {tr("(vous)")}</span>}{u.must_change && <span className="badge b-o" style={{ marginLeft: 6 }} title={tr("N’a pas encore choisi son mot de passe")}>{tr("Mot de passe provisoire")}</span>}{u.activation_pending && <span className="badge b-o" style={{ marginLeft: 6 }} title={u.activation_sent_at ? tr("Lien envoyé le {0}", [frDate(u.activation_sent_at)]) : undefined}>{tr("En attente d’activation")}</span>}{u.activation_pending && u.activation_sent_at && <div className="small muted">{tr("Lien envoyé {0}", [ago(u.activation_sent_at)])}</div>}</td><td className="small mono">{u.username ?? '—'}</td><td className="small">{u.email}</td>
         <td className="small muted">{frDate(u.created_at)}</td><td className="small muted">{u.last_seen ? ago(u.last_seen) : '—'}</td>
         <td>{u.studios}</td><td>{u.tasks_done}</td>
         <td>{!admin ? <span className="small">{u.plan === 'pro' ? 'Pro' : 'Starter'}</span> : <PlanSelect value={u.plan ?? 'starter'} onChange={async e => { try { await api.post(`/api/admin/users/${u.id}/plan`, { plan: e.target.value }); toast(tr("Plan mis à jour")); reload() } catch (er: any) { toast(er.message, true) } }} />}</td>
-        <td><div className="row" style={{ gap: 4, flexWrap: 'wrap' }}>{admin && !u.me
+        <td><div className="row" style={{ gap: 4, flexWrap: 'wrap' }}>{u.env_admin ? <span className="badge b-v" title={tr("Défini sur le serveur (POP_ADMIN_EMAILS), non modifiable ici")}>{tr("Admin du serveur")}</span> : admin && !u.me
           ? <select className="field" style={{ width: 'auto' }} aria-label={tr("Rôle de {0}", [u.name])} value={roleOf(u)} onChange={e => { const r = e.target.value; if (confirm(tr(ROLE_ASK[r], [u.name]))) set(u.id, { is_admin: r === 'admin', is_moderator: r === 'moderator' }, tr("Rôle mis à jour")); else e.target.value = roleOf(u) }}>{ROLES.map(([v, l]) => <option key={v} value={v}>{tr(l)}</option>)}</select>
           : u.is_admin ? <span className="badge b-v">{tr("Admin")}</span> : u.is_moderator ? <span className="badge b-g">{tr("Modérateur")}</span> : <span className="badge">{tr("Utilisateur")}</span>}
           {u.disabled && <span className="badge b-r">{tr("Désactivé")}</span>}
           {u.locked_until && <span className="badge b-o" title={tr("Trop de mots de passe faux")}>{tr("Bloqué jusqu’à {0}", [hhmm(u.locked_until)])}</span>}</div></td>
         <td>{!u.me && (admin || !(u.is_admin || u.is_moderator)) && <div className="row" style={{ gap: 4, justifyContent: 'flex-end' }}>
           {admin && u.activation_pending && <button className="btn" style={{ height: 32 }} title={tr("Nouveau lien d’activation : l’ancien ne marchera plus")} onClick={async () => { try { const r = await api.post(`/api/admin/users/${u.id}/activation`); setSent({ ...r, username: u.username }); toast(r.mailed ? tr("Lien renvoyé par e-mail") : tr("Lien créé : copiez-le")); reload() } catch (e: any) { toast(e.message, true) } }}><Mail size={15} />{tr("Renvoyer le lien")}</button>}
+          <button className="iconbtn" data-tip={tr("Déconnecter partout")} aria-label={tr("Déconnecter partout")} onClick={() => { if (confirm(tr("Déconnecter {0} sur tous ses appareils ? Ses IA connectées devront aussi être reconnectées. Son compte reste actif.", [u.name]))) run(() => api.post(`/api/admin/users/${u.id}/logout`), tr("Déconnecté partout")) }}><LogOut size={16} /></button>
           {u.locked_until && <button className="iconbtn" data-tip={tr("Débloquer")} aria-label={tr("Débloquer")} onClick={() => run(() => api.post(`/api/admin/users/${u.id}/unlock`), tr("Compte débloqué"))}><LockOpen size={16} /></button>}
           <button className="iconbtn" data-tip={tr("Lien de nouveau mot de passe")} aria-label={tr("Lien de nouveau mot de passe")} onClick={async () => { try { const r = await api.post(`/api/admin/users/${u.id}/reset-link`); setLink(r); toast(r.mailed ? tr("Lien envoyé par e-mail") : tr("Lien créé : copiez-le")) } catch (e: any) { toast(e.message, true) } }}><Link2 size={16} /></button>
           {admin && !u.activation_pending && <button className="iconbtn" data-tip={tr("Nouveau mot de passe provisoire")} aria-label={tr("Nouveau mot de passe provisoire")} onClick={async () => { if (!confirm(tr("Donner un nouveau mot de passe provisoire à {0} ? Son mot de passe actuel ne marchera plus et il sera déconnecté.", [u.name]))) return; try { const r = await api.post(`/api/admin/users/${u.id}/password`); setCred({ ...r, name: u.name }); reload() } catch (e: any) { toast(e.message, true) } }}><KeyRound size={16} /></button>}

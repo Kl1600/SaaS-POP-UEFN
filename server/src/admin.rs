@@ -36,6 +36,28 @@ pub async fn is_admin(st: &AppState, uid: i64) -> Result<bool, AppError> {
             .map(|e| e.trim().to_lowercase())
             .any(|e| !e.is_empty() && e == email.to_lowercase()))
 }
+/// Adresse listée dans POP_ADMIN_EMAILS (administrateur défini sur le serveur, non modifiable dans POP).
+pub fn env_admin(email: &str) -> bool {
+    std::env::var("POP_ADMIN_EMAILS")
+        .unwrap_or_default()
+        .split(',')
+        .any(|e| !e.trim().is_empty() && e.trim().eq_ignore_ascii_case(email.trim()))
+}
+
+/// Administrateurs actifs (nommés ou du serveur, adresse vérifiée, compte non désactivé), hors `sauf`.
+async fn autres_admins(st: &AppState, sauf: i64) -> Result<i64, AppError> {
+    let rows: Vec<(i64, String, i64)> = sqlx::query_as(
+        "SELECT id, email, is_admin FROM users WHERE id <> ? AND disabled = 0 AND email_verified_at IS NOT NULL",
+    )
+    .bind(sauf)
+    .fetch_all(&st.db)
+    .await?;
+    Ok(rows
+        .iter()
+        .filter(|(_, e, a)| *a == 1 || env_admin(e))
+        .count() as i64)
+}
+
 /// Rôle dans l'équipe POP. L'ordre compte : un administrateur peut tout ce que peut un modérateur.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Staff {
@@ -374,6 +396,13 @@ pub async fn signup_allowed(
         .split(',')
         .any(|e| !e.trim().is_empty() && e.trim().eq_ignore_ascii_case(email));
     if env_admin {
+        // Une adresse admin qui arrive avec un lien d'accès validé : la ligne de liste d'attente passe « inscrit » (#39).
+        if let Some(t) = access.filter(|t| !t.is_empty()) {
+            let w: Option<(i64, String)> = sqlx::query_as("SELECT id, email FROM waitlist WHERE token_hash = ? AND status = 'approved' AND decided_at > datetime('now', '-30 days')").bind(sha256_hex(t)).fetch_optional(&st.db).await?;
+            if let Some((wid, _)) = w.filter(|w| w.1.eq_ignore_ascii_case(email)) {
+                return Ok(Some(wid));
+            }
+        }
         return Ok(None);
     }
     if users == 0 && crate::security::is_loopback(ip) {
@@ -754,7 +783,7 @@ pub async fn users(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> 
          FROM users u ORDER BY u.created_at DESC LIMIT 2000",
     ).fetch_all(&st.db).await?;
     Ok(Json(json!(rows.into_iter().map(|r| json!({
-        "id": r.0, "email": r.1, "name": r.2, "created_at": r.3, "last_seen": r.4, "is_admin": r.5 == 1, "disabled": r.6 == 1, "is_moderator": r.7 == 1,
+        "id": r.0, "email": r.1, "name": r.2, "created_at": r.3, "last_seen": r.4, "is_admin": r.5 == 1 || env_admin(&r.1), "env_admin": env_admin(&r.1), "disabled": r.6 == 1, "is_moderator": r.7 == 1,
         "studios": r.8, "tasks_done": r.9, "username": r.10, "must_change": r.11 == 1, "plan": r.12, "locked_until": r.13, "me": r.0 == u.id,
         "activation_pending": r.14 == 1, "activation_sent_at": r.15,
     })).collect::<Vec<_>>())))
@@ -775,6 +804,20 @@ pub async fn update_user(
     require(&st, &u).await?;
     if id == u.id {
         return Err(bad("Vous ne pouvez pas modifier votre propre compte ici."));
+    }
+    let (email, admin): (String, i64) =
+        sqlx::query_as("SELECT email, is_admin FROM users WHERE id = ?")
+            .bind(id)
+            .fetch_optional(&st.db)
+            .await?
+            .ok_or(AppError::NotFound)?;
+    if b.is_admin == Some(false) && env_admin(&email) {
+        return Err(bad("Administrateur défini sur le serveur (POP_ADMIN_EMAILS) : ce droit ne se retire pas ici."));
+    }
+    let perd = (b.is_admin == Some(false) && admin == 1)
+        || (b.disabled == Some(true) && (admin == 1 || env_admin(&email)));
+    if perd && autres_admins(&st, id).await? == 0 {
+        return Err(bad("C'est le dernier administrateur actif : nommez-en un autre avant de lui retirer ce droit ou de le désactiver."));
     }
     log(
         &st,
@@ -1077,6 +1120,77 @@ pub async fn user_reset_link(
     ))
 }
 
+/// Déconnecter partout (#39) : supprime les sessions et les jetons IA du compte, sans le désactiver.
+pub async fn logout_everywhere(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(id): Path<i64>,
+) -> ApiResult<Value> {
+    let (email, _) = target(&st, &u, id, Staff::Moderator).await?;
+    let s = sqlx::query("DELETE FROM sessions WHERE user_id = ?")
+        .bind(id)
+        .execute(&st.db)
+        .await?
+        .rows_affected();
+    let j = sqlx::query("DELETE FROM api_tokens WHERE user_id = ?")
+        .bind(id)
+        .execute(&st.db)
+        .await?
+        .rows_affected();
+    log(
+        &st,
+        &u,
+        "admin_deconnecte_partout",
+        &format!("{email} : {s} session(s), {j} jeton(s) IA"),
+    )
+    .await;
+    Ok(Json(json!({ "sessions": s, "tokens": j })))
+}
+
+/// Fiche d'un compte (#39) : studios et rôle, dernière visite, double authentification, blocage, désactivation,
+/// et les 20 derniers événements du journal de sécurité qui le concernent.
+pub async fn user_card(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(id): Path<i64>,
+) -> ApiResult<Value> {
+    require_mod(&st, &u).await?;
+    let r: Option<(String, String, Option<String>, i64, i64, i64, i64, Option<String>, String, String)> = sqlx::query_as(
+        "SELECT email, name, last_seen, totp_enabled, disabled, is_admin, is_moderator,
+                CASE WHEN locked_until > datetime('now') THEN locked_until END, created_at, plan FROM users WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_optional(&st.db)
+    .await?;
+    let r = r.ok_or(AppError::NotFound)?;
+    let studios: Vec<(i64, String, i64, String)> = sqlx::query_as(
+        "SELECT s.id, s.name, s.personal, m.role FROM memberships m JOIN studios s ON s.id = m.studio_id WHERE m.user_id = ? ORDER BY s.personal DESC, s.name",
+    )
+    .bind(id)
+    .fetch_all(&st.db)
+    .await?;
+    let sessions: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM sessions WHERE user_id = ? AND expires_at > datetime('now')",
+    )
+    .bind(id)
+    .fetch_one(&st.db)
+    .await?;
+    let evenements: Vec<(String, String, String, String)> = sqlx::query_as(
+        "SELECT action, detail, ip, at FROM audit_log WHERE user_id = ? OR (detail LIKE '%' || ? || '%') ORDER BY id DESC LIMIT 20",
+    )
+    .bind(id)
+    .bind(&r.0)
+    .fetch_all(&st.db)
+    .await?;
+    Ok(Json(json!({
+        "id": id, "email": r.0, "name": r.1, "last_seen": r.2, "two_factor": r.3 == 1, "disabled": r.4 == 1,
+        "is_admin": r.5 == 1 || env_admin(&r.0), "env_admin": env_admin(&r.0), "is_moderator": r.6 == 1, "locked_until": r.7,
+        "created_at": r.8, "plan": r.9, "active_sessions": sessions,
+        "studios": studios.into_iter().map(|(sid, n, p, role)| json!({ "id": sid, "name": if p == 1 { "Espace perso".to_string() } else { n }, "role": role })).collect::<Vec<_>>(),
+        "events": evenements.into_iter().map(|(a, d, ip, at)| json!({ "action": a, "detail": d, "ip": ip, "at": at })).collect::<Vec<_>>(),
+    })))
+}
+
 /// Lève le blocage après trop de mots de passe faux.
 pub async fn unlock_user(
     State(st): State<AppState>,
@@ -1262,6 +1376,144 @@ mod depannage_tests {
         .unwrap()
             > 0
     }
+    /// #39 : déconnecter partout (compte actif, reconnexion possible), fiche du compte, dernier administrateur.
+    #[tokio::test]
+    async fn fiche_deconnexion_dernier_admin() {
+        let st = crate::test_state().await;
+        let admin = user(&st, "chef@exemple.com", true).await;
+        let x = user(&st, "x@exemple.com", false).await;
+        sqlx::query("INSERT INTO api_tokens (user_id, name, token_hash) VALUES (?, 'IA', 'h')")
+            .bind(x.id)
+            .execute(&st.db)
+            .await
+            .unwrap();
+        let Json(r) = logout_everywhere(State(st.clone()), admin.clone(), Path(x.id))
+            .await
+            .unwrap();
+        assert_eq!(
+            (r["sessions"].as_u64(), r["tokens"].as_u64()),
+            (Some(1), Some(1))
+        );
+        let actif: i64 = sqlx::query_scalar("SELECT disabled FROM users WHERE id = ?")
+            .bind(x.id)
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        assert_eq!(actif, 0, "le compte reste actif");
+        assert!(
+            login(&st, "x@exemple.com", PW).await.is_ok(),
+            "reconnexion possible"
+        );
+        assert!(audited(&st, "admin_deconnecte_partout", admin.id).await);
+        assert!(
+            logout_everywhere(State(st.clone()), admin.clone(), Path(admin.id))
+                .await
+                .is_err(),
+            "pas sur soi-même"
+        );
+
+        let Json(f) = user_card(State(st.clone()), admin.clone(), Path(x.id))
+            .await
+            .unwrap();
+        assert_eq!(f["two_factor"], false);
+        assert_eq!(f["disabled"], false);
+        assert!(
+            f["events"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|e| e["action"] == "admin_deconnecte_partout"),
+            "{f}"
+        );
+
+        // Dernier administrateur actif : un admin désactivé ou à l'adresse non vérifiée ne compte pas.
+        assert_eq!(
+            autres_admins(&st, admin.id).await.unwrap(),
+            0,
+            "chef est le seul admin"
+        );
+        let second = user(&st, "second@exemple.com", true).await;
+        assert_eq!(autres_admins(&st, admin.id).await.unwrap(), 1);
+        sqlx::query("UPDATE users SET disabled = 1 WHERE id = ?")
+            .bind(second.id)
+            .execute(&st.db)
+            .await
+            .unwrap();
+        assert_eq!(
+            autres_admins(&st, admin.id).await.unwrap(),
+            0,
+            "un admin désactivé ne compte pas"
+        );
+        // Désactiver ou retirer un admin quand il en reste un autre : accepté.
+        sqlx::query("UPDATE users SET disabled = 0 WHERE id = ?")
+            .bind(second.id)
+            .execute(&st.db)
+            .await
+            .unwrap();
+        let patch = |a: Option<bool>, d: Option<bool>| {
+            Json(UserPatch {
+                is_admin: a,
+                is_moderator: None,
+                disabled: d,
+            })
+        };
+        update_user(
+            State(st.clone()),
+            admin.clone(),
+            Path(second.id),
+            patch(Some(false), None),
+        )
+        .await
+        .unwrap();
+    }
+
+    /// #39 : un admin du serveur (POP_ADMIN_EMAILS) apparaît admin, son droit ne se retire pas, et son inscription
+    /// avec un lien d'accès passe la ligne de liste d'attente à « inscrit ».
+    #[tokio::test]
+    async fn admin_du_serveur() {
+        assert!(!env_admin("serveur@exemple.com") || std::env::var("POP_ADMIN_EMAILS").is_ok());
+        let st = crate::test_state().await;
+        // Variable d'environnement propre à ce test (adresse unique, sans effet sur les autres tests).
+        let adr = "serveur-39@exemple.com";
+        let avant = std::env::var("POP_ADMIN_EMAILS").unwrap_or_default();
+        std::env::set_var("POP_ADMIN_EMAILS", format!("{avant},{adr}"));
+        let chef = user(&st, "chef39@exemple.com", true).await;
+        let srv = user(&st, adr, false).await;
+        let Json(l) = users(State(st.clone()), chef.clone()).await.unwrap();
+        let ligne = l
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|x| x["id"] == srv.id)
+            .unwrap()
+            .clone();
+        assert_eq!(
+            (ligne["is_admin"].clone(), ligne["env_admin"].clone()),
+            (json!(true), json!(true))
+        );
+        let e = update_user(
+            State(st.clone()),
+            chef.clone(),
+            Path(srv.id),
+            Json(UserPatch {
+                is_admin: Some(false),
+                is_moderator: None,
+                disabled: None,
+            }),
+        )
+        .await;
+        assert!(e.is_err());
+        // Lien d'accès validé pour une autre adresse admin du serveur.
+        let adr2 = "serveur-39b@exemple.com";
+        std::env::set_var("POP_ADMIN_EMAILS", format!("{avant},{adr},{adr2}"));
+        sqlx::query("INSERT INTO waitlist (email, name, status, token_hash, decided_at) VALUES (?, 'S', 'approved', ?, datetime('now'))")
+            .bind(adr2).bind(sha256_hex("jeton-39")).execute(&st.db).await.unwrap();
+        let w = signup_allowed(&st, adr2, "203.0.113.1", None, Some("jeton-39"))
+            .await
+            .unwrap();
+        assert!(w.is_some(), "le lien est lu pour l'adresse admin");
+    }
+
     /// Les quatre actions de dépannage, sur le compte `id`, par `u`.
     async fn all(st: &AppState, u: &AuthUser, id: i64) -> Vec<Result<Value, AppError>> {
         let s = || State(st.clone());
