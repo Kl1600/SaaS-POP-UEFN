@@ -2841,5 +2841,9 @@ const EN: Record<string, string> = {
  "Importer": "Import",
  "Fichiers Markdown (.md)": "Markdown files (.md)",
  "Un dossier entier": "A whole folder",
+ "Aucun projet UEFN relié": "No UEFN project linked",
+ "Votre relais est connecté, mais aucun projet n’est relié à cette map.": "Your relay is connected, but no project is linked to this map.",
+ "Aucun projet UEFN n’est relié à cette map.": "No UEFN project is linked to this map.",
+ "Créez le projet dans UEFN, puis reliez-le avec un code d’appairage pour cette map (ci-dessous). Télécharger UEFN Link à nouveau importerait tous vos projets et pourrait créer une map en double.": "Create the project in UEFN, then link it with a pairing code for this map (below). Downloading UEFN Link again would import all your projects and could create a duplicate map.",
 }
 export default EN

@@ -141,7 +141,7 @@ export default function Organizer() {
   return (
     <main className="content">
       <PageHead title={tr("Organiseur")} help={tr("L’outliner d’UEFN dans le navigateur : retrouvez, modifiez et rangez les acteurs du niveau à plusieurs.")}>
-        <span className={'badge ' + (st.status === 'connected' ? 'b-g' : st.status === 'closed' ? 'b-o' : 'b-r')}>{STATUS_LABEL[st.status]}</span>
+        <span className={'badge ' + (st.status === 'connected' ? 'b-g' : st.status === 'closed' ? 'b-o' : st.status === 'unlinked' ? '' : 'b-r')}>{STATUS_LABEL[st.status]}</span>
         <button className="btn" onClick={() => setShowLink(v => !v)}><Link2 size={16} />UEFN Link</button>
         <button className="btn" disabled={st.status !== 'connected'} onClick={() => act('refresh_actors', {}, tr("Acteurs actualisés"))}><RefreshCw size={16} />{tr("Actualiser")}</button>
         {/* Envoi complet (acteurs et Verse) dans la session de test en cours (#5). */}
@@ -149,12 +149,12 @@ export default function Organizer() {
       </PageHead>
       {/* Relais plus ancien que le serveur (#158) : des actions répondraient « action inconnue ». */}
       {st.stale && <div className="warn" role="alert"><AlertTriangle size={18} /><span style={{ flex: 1 }}>{tr("Relais périmé : votre UEFN Link est plus ancien que POP et ne connaît pas toutes les actions (session de test, poser un appareil, importer un fichier…). Téléchargez la nouvelle version, fermez l’ancienne fenêtre et lancez la nouvelle.")}</span><a className="btn pri" href={`/api/studios/${app.studio!.id}/relay/download`} download>{tr("Télécharger UEFN Link")}</a></div>}
-      {st.status !== 'connected' && <div className="warn"><AlertTriangle size={18} /><span>{tr("{0} : lecture seule sur le dernier état connu{1}. Vos modifications seront mises en attente et envoyées à l’ouverture.", [st.status === 'offline' ? tr("Relais hors ligne") : tr("UEFN fermé"), st.updated_at ? ` (${ago(st.updated_at)})` : ''])}</span></div>}
+      {!['connected', 'unlinked'].includes(st.status) && <div className="warn"><AlertTriangle size={18} /><span>{tr("{0} : lecture seule sur le dernier état connu{1}. Vos modifications seront mises en attente et envoyées à l’ouverture.", [st.status === 'offline' ? tr("Relais hors ligne") : tr("UEFN fermé"), st.updated_at ? ` (${ago(st.updated_at)})` : ''])}</span></div>}
       {st.approvals.length > 0 && <div className="warn" style={{ flexWrap: 'wrap' }}><AlertTriangle size={18} /><div style={{ flex: 1 }}>{st.approvals.map((p: any) => (
         <div key={p.id} className="row" style={{ flexWrap: 'wrap', padding: '4px 0' }}><span style={{ flex: 1 }}>{p.summary}</span>
           {canDelete && <><button className="btn" onClick={async () => { await api.post(`/api/approvals/${p.id}/approve`); reload() }}><Check size={15} />{tr("Valider")}</button><button className="btn" onClick={async () => { await api.post(`/api/approvals/${p.id}/refuse`); reload() }}><Ban size={15} />{tr("Refuser")}</button></>}</div>
       ))}</div></div>}
-      {(actors.length === 0 || showLink) && <Pairing status={st.status} tools={st.tools} />}
+      {(actors.length === 0 || showLink) && <Pairing status={st.status} tools={st.tools} elsewhere={!!st.relay_elsewhere} />}
 
       <div className="ogrid">
         <aside className="card oleft">
@@ -373,7 +373,7 @@ function Journal({ st, task, setTask, tasks, act, reload }: { st: any; task: num
   </div>
 }
 
-function Pairing({ status, tools }: { status: string; tools: any }) {
+function Pairing({ status, tools, elsewhere }: { status: string; tools: any; elsewhere?: boolean }) {
   const { map, studio, canEdit, toast } = useApp()
   const { data: devices, reload } = useLoad<any[]>(map ? `/api/maps/${map.id}/relay` : null, [map?.id])
   const [code, setCode] = useState<string | null>(null)
@@ -381,12 +381,17 @@ function Pairing({ status, tools }: { status: string; tools: any }) {
   const roles = tools?.roles ?? {}
   return <section className="card">
     <CardHead title={tr("Relier UEFN avec UEFN Link")} sub={tr("Le relais tourne sur le PC Windows où UEFN est ouvert. Il ne touche qu’au projet choisi et pilote UEFN par son serveur MCP officiel.")} />
+    {/* Map jamais reliée (#152) : le relais n'est pas en panne, il manque le projet ; l'appairage de cette map passe en premier. */}
+    {status === 'unlinked' && <div className="b-callout" style={{ marginBottom: 12 }}>
+      <b style={{ fontWeight: 500 }}>{elsewhere ? tr("Votre relais est connecté, mais aucun projet n’est relié à cette map.") : tr("Aucun projet UEFN n’est relié à cette map.")}</b>{' '}
+      {tr("Créez le projet dans UEFN, puis reliez-le avec un code d’appairage pour cette map (ci-dessous). Télécharger UEFN Link à nouveau importerait tous vos projets et pourrait créer une map en double.")}
+    </div>}
     <ol style={{ margin: 0, paddingLeft: 20, lineHeight: 1.9 }}>
       <li>{tr("Dans UEFN, projet ouvert :")}{' '}<b style={{ fontWeight: 500 }}>{tr("Projet → Paramètres du projet → Enable Project Python Scripts")}</b>{tr(", puis")}{' '}<b style={{ fontWeight: 500 }}>{tr("Édition → Préférences de l’éditeur → Model Context Protocol → Start Server")}</b>.</li>
       <li><a className="btn pri" style={{ height: 34 }} href={`/api/studios/${studio!.id}/relay/download`} download>{tr("Télécharger UEFN Link")}</a> <span className="small muted">{tr("déjà configuré pour votre compte (valable 24 h) : rien à taper.")}</span></li>
       <li>{tr("Double-cliquez sur")}{' '}<b style={{ fontWeight: 500 }}>pop-link.exe</b>{' '}{tr("sur le PC (Windows peut demander « Exécuter quand même »). Tous vos projets UEFN sont importés : une map par projet, synchronisée. Laissez la fenêtre ouverte.")}</li>
     </ol>
-    <details style={{ marginTop: 10 }}>
+    <details style={{ marginTop: 10 }} open={status === 'unlinked'}>
       <summary className="small" style={{ cursor: 'pointer' }}>{tr("Autre méthode : code d’appairage pour cette map seulement")}</summary>
       <div style={{ marginTop: 8 }}>{canEdit && <button className="btn" style={{ height: 34 }} onClick={async () => { try { setCode((await api.post(`/api/maps/${map!.id}/relay/pair`)).code) } catch (e: any) { toast(e.message, true) } }}>{tr("Obtenir un code")}</button>}
         {code && <span> → <b className="mono" style={{ fontSize: 18, letterSpacing: 2 }}>{code}</b> <span className="small muted">{tr("(10 minutes)")}</span></span>}
@@ -430,7 +435,7 @@ export function UefnLinkSettings() {
         <button className="btn" onClick={async () => { try { await api.post(`/api/approvals/${p.id}/refuse`); reload() } catch (e: any) { toast(e.message, true) } }}><X size={15} />{tr("Refuser")}</button></>}
       </div>)}
     </section>}
-    <Pairing status={st.status} tools={st.tools} />
+    <Pairing status={st.status} tools={st.tools} elsewhere={!!st.relay_elsewhere} />
     <section className="card">
       <CardHead title={tr("Journal des actions UEFN")} sub={tr("Ce que vous et vos IA avez fait dans le niveau ; chaque action s’annule.")} />
       <Journal st={st} task={task} setTask={setTask} tasks={tasks ?? []} act={act} reload={reload} />
