@@ -1133,3 +1133,14 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 @media (prefers-reduced-motion:reduce){.aiwait-dot{animation:none}}
 /* Bêta : une fois la demande envoyée, on ne garde que le message de confirmation (#282). */
 .lwbox:has(.lwdone) > .leyebrow,.lwbox:has(.lwdone) > h2,.lwbox:has(.lwdone) > .lwintro,.lwbox:has(.lwdone) > .lwerr{display:none}
+/* Popy : récap de la journée en premier message du chat (#284). */
+.gmsg.bot:has(.grecap){width:100%;max-width:100%;box-sizing:border-box}
+.grecap-hl{font-weight:500;font-size:15.5px;margin:0 0 8px !important}
+.grecap-pts{list-style:none;margin:0 0 10px;padding:0;display:grid;gap:6px;font-size:13.5px}
+.grecap-pts li{display:flex;gap:8px}
+.grecap-goal{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);font-size:13px;margin-bottom:10px}
+.grecap-sec{font-size:12px;color:var(--text3);margin:2px 0 6px}
+.grecap-tasks{display:grid;gap:6px}
+.grecap-task{display:flex;align-items:center;gap:8px;padding:6px 6px 6px 10px;border-radius:10px;background:var(--surface);border:1px solid var(--border)}
+.grecap-t{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:1px;background:none;border:0;padding:0;font:inherit;font-size:13.5px;color:inherit;text-align:left;cursor:pointer}
+.grecap-task .btn{height:30px;flex:none}
