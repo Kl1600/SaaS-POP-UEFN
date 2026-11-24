@@ -60,12 +60,12 @@ pub async fn create_token(
 
 /// Jetons du compte, avec leur map de travail (seulement si le compte y a encore accès).
 pub async fn tokens(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
-    let rows: Vec<(i64, String, String, String, String, Option<String>, i64, Option<i64>, Option<String>)> = sqlx::query_as(
-        "SELECT t.id, t.name, t.created_at, t.kind, t.scope, t.last_used, t.calls, m.id, m.name FROM api_tokens t
+    let rows: Vec<(i64, String, String, String, String, Option<String>, i64, Option<i64>, Option<String>, bool)> = sqlx::query_as(
+        "SELECT t.id, t.name, t.created_at, t.kind, t.scope, t.last_used, t.calls, m.id, m.name, t.oauth_client IS NOT NULL FROM api_tokens t
          LEFT JOIN maps m ON m.id = t.map_id AND EXISTS (SELECT 1 FROM memberships ms WHERE ms.studio_id = m.studio_id AND ms.user_id = t.user_id)
          WHERE t.user_id = ? ORDER BY t.id DESC",
     ).bind(u.id).fetch_all(&st.db).await?;
-    Ok(Json(json!(rows.into_iter().map(|(id, n, at, kind, scope, last, calls, mid, mname)| json!({"id": id, "name": n, "created_at": at, "kind": kind, "scope": scope, "last_used": last, "calls": calls, "map": mid.map(|i| json!({ "id": i, "name": mname }))})).collect::<Vec<_>>())))
+    Ok(Json(json!(rows.into_iter().map(|(id, n, at, kind, scope, last, calls, mid, mname, oauth)| json!({"id": id, "name": n, "created_at": at, "kind": kind, "scope": scope, "last_used": last, "calls": calls, "oauth": oauth, "map": mid.map(|i| json!({ "id": i, "name": mname }))})).collect::<Vec<_>>())))
 }
 
 #[derive(Deserialize)]
@@ -186,7 +186,7 @@ fn text(v: impl Into<String>, is_error: bool) -> Value {
 
 #[derive(Deserialize)]
 pub struct McpQ {
-    token: Option<String>,
+    pub token: Option<String>,
 }
 
 pub async fn mcp(
@@ -206,15 +206,20 @@ pub async fn mcp(
         .unwrap_or_default();
     let token = token.as_str();
     let row: Option<(i64, Option<i64>, String, String, String, i64)> = match sqlx::query_as(
-        "SELECT t.user_id, t.map_id, u.email, u.name, t.scope, t.id FROM api_tokens t JOIN users u ON u.id = t.user_id WHERE t.token_hash = ? AND u.disabled = 0",
+        "SELECT t.user_id, t.map_id, u.email, u.name, t.scope, t.id FROM api_tokens t JOIN users u ON u.id = t.user_id WHERE t.token_hash = ? AND u.disabled = 0 AND (t.expires_at IS NULL OR t.expires_at > datetime('now'))",
     ).bind(sha256_hex(token)).fetch_optional(&st.db).await {
         Ok(r) => r,
         Err(_) => return rpc_err(id, -32603, "Erreur interne"),
     };
     let Some((uid, mid, email, name, scope, agent)) = row else {
+        // L'en-tête dit à l'IA où trouver la connexion OAuth de POP (#285).
         return (
             StatusCode::UNAUTHORIZED,
-            Json(json!({ "error": "Jeton POP invalide." })),
+            [(
+                axum::http::header::WWW_AUTHENTICATE,
+                crate::oauth::www_authenticate(),
+            )],
+            Json(json!({ "error": "Jeton POP invalide ou expiré." })),
         )
             .into_response();
     };
