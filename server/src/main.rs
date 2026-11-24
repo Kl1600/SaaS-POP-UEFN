@@ -479,6 +479,7 @@ fn api() -> Router<AppState> {
         .route("/api/subtasks/{id}", patch(tasks::toggle_subtask))
         // Pages
         .route("/api/page-templates", get(pages::templates))
+        .route("/api/maps/{mid}/pages/import", post(pages::import_md))
         .route(
             "/api/maps/{mid}/pages",
             get(pages::tree).post(pages::create),

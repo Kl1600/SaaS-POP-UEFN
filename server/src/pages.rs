@@ -12,6 +12,7 @@ use axum::{
 };
 use serde::Deserialize;
 use serde_json::{json, Value};
+use std::collections::HashMap;
 
 fn b(t: &str, text: &str) -> Value {
     json!({ "id": random_token()[..10].to_string(), "type": t, "text": text })
@@ -667,6 +668,8 @@ pub fn from_markdown(md: &str) -> Vec<Value> {
     let mut out: Vec<Value> = vec![];
     let mut lines = md.lines().peekable();
     let mut para: Vec<String> = vec![];
+    // Ligne qui suit un élément de liste ou une citation sans ligne vide : elle le continue (texte replié).
+    let mut suite = false;
     let flush = |para: &mut Vec<String>, out: &mut Vec<Value>| {
         if !para.is_empty() {
             out.push(b("p", &para.join(" ")));
@@ -678,10 +681,12 @@ pub fn from_markdown(md: &str) -> Vec<Value> {
         let t = s.trim_start();
         if t.is_empty() {
             flush(&mut para, &mut out);
+            suite = false;
             continue;
         }
         if let Some(lang) = t.strip_prefix("```") {
             flush(&mut para, &mut out);
+            suite = false;
             let mut code = vec![];
             for c in lines.by_ref() {
                 if c.trim_start().starts_with("```") {
@@ -690,16 +695,13 @@ pub fn from_markdown(md: &str) -> Vec<Value> {
                 code.push(c.to_string());
             }
             let mut bl = b("code", &code.join("\n"));
-            bl["lang"] = json!(if lang.trim().is_empty() {
-                "verse"
-            } else {
-                lang.trim()
-            });
+            bl["lang"] = json!(lang.trim());
             out.push(bl);
             continue;
         }
         if t.starts_with('|') {
             flush(&mut para, &mut out);
+            suite = false;
             let mut rows = vec![];
             let mut cur = Some(t.to_string());
             while let Some(r) = cur {
@@ -724,7 +726,10 @@ pub fn from_markdown(md: &str) -> Vec<Value> {
             );
             continue;
         }
-        let (ty, rest) = if let Some(r) = t.strip_prefix("### ") {
+        let (ty, rest) = if let Some(r) = ["###### ", "##### ", "#### ", "### "]
+            .iter()
+            .find_map(|p| t.strip_prefix(p))
+        {
             ("h3", r)
         } else if let Some(r) = t.strip_prefix("## ") {
             ("h2", r)
@@ -741,6 +746,7 @@ pub fn from_markdown(md: &str) -> Vec<Value> {
             let mut bl = b("todo", r);
             bl["checked"] = json!(true);
             out.push(bl);
+            suite = true;
             continue;
         } else if let Some(r) = t.strip_prefix("- ").or(t.strip_prefix("* ")) {
             ("bullet", r)
@@ -755,10 +761,18 @@ pub fn from_markdown(md: &str) -> Vec<Value> {
         } else if t == "---" || t == "***" {
             ("divider", "")
         } else {
+            if suite && para.is_empty() {
+                if let Some(dernier) = out.last_mut() {
+                    let texte = format!("{} {t}", dernier["text"].as_str().unwrap_or(""));
+                    dernier["text"] = json!(texte.trim());
+                    continue;
+                }
+            }
             para.push(t.to_string());
             continue;
         };
         flush(&mut para, &mut out);
+        suite = matches!(ty, "bullet" | "number" | "todo" | "quote");
         out.push(b(ty, rest));
     }
     flush(&mut para, &mut out);
@@ -766,6 +780,199 @@ pub fn from_markdown(md: &str) -> Vec<Value> {
         out.push(b("p", ""));
     }
     out
+}
+
+#[derive(Deserialize)]
+pub struct ImportFile {
+    path: String,
+    content: String,
+}
+
+#[derive(Deserialize)]
+pub struct ImportIn {
+    files: Vec<ImportFile>,
+    parent_id: Option<i64>,
+}
+
+/// Fichiers Markdown importés en une fois (#129) : 300 fichiers, 1 Mo chacun, 10 Mo en tout.
+const IMPORT_MAX: (usize, usize, usize) = (300, 1_000_000, 10_000_000);
+
+/// Chemin propre d'un fichier importé : séparateurs `/`, sans `.` ni `..`.
+fn chemin_propre(p: &str) -> Vec<String> {
+    let mut out: Vec<String> = vec![];
+    for s in p.replace('\\', "/").split('/') {
+        match s.trim() {
+            "" | "." => {}
+            ".." => {
+                out.pop();
+            }
+            x => out.push(x.to_string()),
+        }
+    }
+    out
+}
+
+/// Réécrit les liens vers d'autres fichiers importés (`[CARTE](CARTE.md)`, `(../agents/web.md#x)`) en liens vers
+/// leurs pages POP. Les autres liens ne bougent pas.
+fn relier_liens(texte: &str, dossier: &[String], pages: &HashMap<String, i64>, mid: i64) -> String {
+    let re = regex::Regex::new(r"\]\(([^)\s]+?\.md)(#[^)\s]*)?\)").unwrap();
+    re.replace_all(texte, |c: &regex::Captures| {
+        let cible = &c[1];
+        if cible.contains("://") {
+            return c[0].to_string();
+        }
+        let mut p: Vec<String> = dossier.to_vec();
+        p.push(cible.to_string());
+        let cle = chemin_propre(&p.join("/")).join("/").to_lowercase();
+        match pages.get(&cle) {
+            Some(id) => format!("](/map/{mid}/pages/{id})"),
+            None => c[0].to_string(),
+        }
+    })
+    .into_owned()
+}
+
+/// Import de fichiers Markdown en pages (#129) : un fichier = une page ; un dossier = une page parente ; les liens
+/// entre fichiers importés deviennent des liens vers les pages POP ; pages partagées avec l'équipe.
+pub async fn import_md(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(mid): Path<i64>,
+    Json(entree): Json<ImportIn>,
+) -> ApiResult<Value> {
+    let ctx = map_ctx(&st, &u, mid).await?;
+    ctx.require(Role::Freelance)?;
+    let (max_n, max_un, max_tout) = IMPORT_MAX;
+    if entree.files.is_empty() {
+        return Err(bad("Aucun fichier Markdown à importer."));
+    }
+    if entree.files.len() > max_n {
+        return Err(bad(format!(
+            "{} fichiers : {max_n} au plus par import.",
+            entree.files.len()
+        )));
+    }
+    if entree.files.iter().map(|f| f.content.len()).sum::<usize>() > max_tout {
+        return Err(bad(
+            "Plus de 10 Mo de Markdown : importez le dossier en plusieurs fois.",
+        ));
+    }
+    for f in &entree.files {
+        let nom = f.path.rsplit(['/', '\\']).next().unwrap_or(&f.path);
+        let ext = nom
+            .rsplit_once('.')
+            .map(|(_, e)| e.to_lowercase())
+            .unwrap_or_default();
+        if !["md", "markdown"].contains(&ext.as_str()) {
+            return Err(bad(format!(
+                "« {nom} » n’est pas un fichier Markdown (.md) : rien n’a été importé."
+            )));
+        }
+        if f.content.len() > max_un {
+            return Err(bad(format!(
+                "« {nom} » dépasse 1 Mo : rien n’a été importé."
+            )));
+        }
+        if f.content.contains('\0') {
+            return Err(bad(format!(
+                "« {nom} » n’est pas du texte : rien n’a été importé."
+            )));
+        }
+    }
+    if let Some(p) = entree.parent_id {
+        let ok: Option<i64> = sqlx::query_scalar(
+            "SELECT id FROM pages WHERE id = ? AND map_id = ? AND deleted_at IS NULL",
+        )
+        .bind(p)
+        .bind(mid)
+        .fetch_optional(&st.db)
+        .await?;
+        ok.ok_or_else(|| bad("Page parente introuvable."))?;
+    }
+    let mut fichiers: Vec<(Vec<String>, &str)> = entree
+        .files
+        .iter()
+        .map(|f| (chemin_propre(&f.path), f.content.as_str()))
+        .filter(|(c, _)| !c.is_empty())
+        .collect();
+    fichiers.sort_by(|a, b| a.0.cmp(&b.0));
+    let mut tx = st.db.begin().await?;
+    // 1. Une page par dossier (une seule fois), puis une page vide par fichier : les liens ont besoin de tous les ids.
+    let mut dossiers: Vec<(String, i64)> = vec![];
+    let mut pages: HashMap<String, i64> = HashMap::new();
+    let mut ids = vec![];
+    for (chemin, _) in &fichiers {
+        let mut parent = entree.parent_id;
+        for i in 0..chemin.len() - 1 {
+            let cle = chemin[..=i].join("/").to_lowercase();
+            let id = match dossiers.iter().find(|d| d.0 == cle) {
+                Some(d) => d.1,
+                None => {
+                    let titre: String = chemin[i].chars().take(120).collect();
+                    let id: i64 = sqlx::query_scalar("INSERT INTO pages (map_id, parent_id, title, icon, blocks, share, created_by, updated_by) VALUES (?, ?, ?, '', ?, 'team', ?, ?) RETURNING id")
+                        .bind(mid).bind(parent).bind(&titre).bind(json!([b("p", "")]).to_string()).bind(u.id).bind(u.id)
+                        .fetch_one(&mut *tx).await?;
+                    dossiers.push((cle, id));
+                    id
+                }
+            };
+            parent = Some(id);
+        }
+        let nom = chemin.last().map(String::as_str).unwrap_or("");
+        let titre: String = nom
+            .rsplit_once('.')
+            .map(|(n, _)| n)
+            .unwrap_or(nom)
+            .chars()
+            .take(120)
+            .collect();
+        let id: i64 = sqlx::query_scalar("INSERT INTO pages (map_id, parent_id, title, icon, blocks, share, created_by, updated_by) VALUES (?, ?, ?, '', '[]', 'team', ?, ?) RETURNING id")
+            .bind(mid).bind(parent).bind(&titre).bind(u.id).bind(u.id)
+            .fetch_one(&mut *tx).await?;
+        pages.insert(chemin.join("/").to_lowercase(), id);
+        ids.push(id);
+    }
+    // 2. Contenu : liens entre fichiers réécrits ; un « # titre » en tête devient le titre de la page.
+    for ((chemin, contenu), id) in fichiers.iter().zip(&ids) {
+        let md = relier_liens(contenu, &chemin[..chemin.len() - 1], &pages, mid);
+        let mut blocks = from_markdown(&md);
+        let mut titre: Option<String> = None;
+        if blocks.len() > 1 && blocks[0]["type"] == "h1" {
+            titre = blocks[0]["text"]
+                .as_str()
+                .map(|s| s.chars().take(120).collect());
+            blocks.remove(0);
+        }
+        sqlx::query("UPDATE pages SET blocks = ?, title = COALESCE(?, title) WHERE id = ?")
+            .bind(json!(blocks).to_string())
+            .bind(&titre)
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
+    }
+    tx.commit().await?;
+    for id in dossiers.iter().map(|d| &d.1).chain(ids.iter()) {
+        let (t, bl): (String, String) =
+            sqlx::query_as("SELECT title, blocks FROM pages WHERE id = ?")
+                .bind(id)
+                .fetch_one(&st.db)
+                .await?;
+        snapshot(&st, *id, 1, &t, &bl, u.id).await?;
+    }
+    log_activity(
+        &st,
+        mid,
+        Some(u.id),
+        "page",
+        "Pages importées",
+        &format!("{} fichier(s) Markdown", ids.len()),
+    )
+    .await?;
+    notify(&st, mid, json!({ "t": "refresh", "what": "pages" }));
+    let premiere = dossiers.first().map(|d| d.1).or(ids.first().copied());
+    Ok(Json(
+        json!({ "pages": ids.len(), "folders": dossiers.len(), "first": premiere }),
+    ))
 }
 
 /// Page en Markdown, pour les IA (#147).
@@ -900,4 +1107,184 @@ pub async fn resolve_comment(
         .await?;
     notify(&st, mid, json!({ "t": "comments" }));
     Ok(Json(json!({ "ok": true })))
+}
+
+#[cfg(test)]
+mod tests_import {
+    use super::*;
+
+    async fn monde() -> (AppState, AuthUser, i64) {
+        let st = crate::test_state().await;
+        let sid: i64 = sqlx::query_scalar("INSERT INTO studios (name) VALUES ('S') RETURNING id")
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        let mid: i64 = sqlx::query_scalar(
+            "INSERT INTO maps (studio_id, name) VALUES (?, 'VaultRush') RETURNING id",
+        )
+        .bind(sid)
+        .fetch_one(&st.db)
+        .await
+        .unwrap();
+        let uid: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash) VALUES ('a@a.fr', 'Yanis', 'x') RETURNING id")
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO memberships (studio_id, user_id, role) VALUES (?, ?, 'member')")
+            .bind(sid)
+            .bind(uid)
+            .execute(&st.db)
+            .await
+            .unwrap();
+        let u = AuthUser {
+            id: uid,
+            email: "a@a.fr".into(),
+            name: "Yanis".into(),
+            sid: String::new(),
+        };
+        (st, u, mid)
+    }
+
+    async fn importer(
+        st: &AppState,
+        u: &AuthUser,
+        mid: i64,
+        files: Value,
+    ) -> Result<Value, AppError> {
+        let b = serde_json::from_value(json!({ "files": files })).unwrap();
+        import_md(State(st.clone()), u.clone(), Path(mid), Json(b))
+            .await
+            .map(|Json(v)| v)
+    }
+
+    const TOUT: &str = "# Carte\n\nIntro **gras**, *italique*, `code` et [lien](https://pop.example/x).\n\n## Zones\n- Banque\n- Toits\n\n1. Entrer\n2. Voler\n\n- [ ] Tester\n- [x] Poser\n\n> Attention aux gardes\n\n```verse\nPrint(\"Bonjour\")\n```\n\n| Zone | Joueurs |\n| --- | --- |\n| Banque | 4 |\n\n---\n\nVoir [les agents](agents/web.md) et [l'état](ETAT.md#haut).\n";
+
+    /// #129 : dossier avec sous-dossier, liens entre fichiers, titres, partage équipe, aller-retour Markdown.
+    #[tokio::test]
+    async fn importer_un_dossier() {
+        let (st, u, mid) = monde().await;
+        let r = importer(&st, &u, mid, json!([
+            { "path": "KB/CARTE.md", "content": TOUT },
+            { "path": "KB/ETAT.md", "content": "État du projet." },
+            { "path": "KB/agents/web.md", "content": "# Domaine web\n\nRetour à la [carte](../CARTE.md)." },
+        ])).await.unwrap();
+        assert_eq!(
+            (r["pages"].as_i64(), r["folders"].as_i64()),
+            (Some(3), Some(2)),
+            "{r}"
+        );
+        let rows: Vec<(i64, Option<i64>, String, String, String)> = sqlx::query_as(
+            "SELECT id, parent_id, title, share, blocks FROM pages WHERE map_id = ? ORDER BY id",
+        )
+        .bind(mid)
+        .fetch_all(&st.db)
+        .await
+        .unwrap();
+        let id = |t: &str| rows.iter().find(|r| r.2 == t).map(|r| r.0).unwrap();
+        let parent = |t: &str| rows.iter().find(|r| r.2 == t).and_then(|r| r.1);
+        // Arborescence : KB > (Carte, ETAT, agents > Domaine web) ; titres repris du « # » en tête.
+        assert_eq!(parent("Carte"), Some(id("KB")));
+        assert_eq!(parent("agents"), Some(id("KB")));
+        assert_eq!(parent("Domaine web"), Some(id("agents")));
+        assert!(rows.iter().all(|r| r.3 == "team"));
+        // Liens entre fichiers → pages POP ; liens externes inchangés.
+        let carte = &rows.iter().find(|r| r.2 == "Carte").unwrap().4;
+        assert!(
+            carte.contains(&format!(
+                "[les agents](/map/{mid}/pages/{})",
+                id("Domaine web")
+            )),
+            "{carte}"
+        );
+        assert!(
+            carte.contains(&format!("[l'état](/map/{mid}/pages/{})", id("ETAT"))),
+            "{carte}"
+        );
+        assert!(carte.contains("[lien](https://pop.example/x)"));
+        let web = &rows.iter().find(|r| r.2 == "Domaine web").unwrap().4;
+        assert!(
+            web.contains(&format!("(/map/{mid}/pages/{})", id("Carte"))),
+            "{web}"
+        );
+        // Chaque élément devient le bon bloc.
+        let bl: Vec<Value> = serde_json::from_str(carte).unwrap();
+        let types: Vec<&str> = bl.iter().map(|b| b["type"].as_str().unwrap()).collect();
+        for t in [
+            "p", "h2", "bullet", "number", "todo", "quote", "code", "table", "divider",
+        ] {
+            assert!(types.contains(&t), "{t} absent : {types:?}");
+        }
+        assert!(bl
+            .iter()
+            .any(|b| b["type"] == "todo" && b["checked"] == true));
+        assert_eq!(
+            bl.iter().find(|b| b["type"] == "table").unwrap()["rows"],
+            json!([["Zone", "Joueurs"], ["Banque", "4"]])
+        );
+        // Un élément de liste replié sur deux lignes reste un seul élément.
+        let l = from_markdown("- Adresse : x,\n  suite de l'adresse.\nAutre ligne\n\nParagraphe.");
+        assert_eq!(l.len(), 2, "{l:?}");
+        assert_eq!(l[0]["text"], "Adresse : x, suite de l'adresse. Autre ligne");
+        // Aller-retour : l'export redonne le même Markdown, à la mise en forme près.
+        let export = to_markdown("Carte", &json!(bl));
+        let norm = |s: &str| {
+            s.split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ")
+                .replace("| --- | --- |", "")
+                .replace("|--- | --- |", "")
+        };
+        for morceau in [
+            "**gras**",
+            "*italique*",
+            "`code`",
+            "- Banque",
+            "1. Voler",
+            "- [x] Poser",
+            "> Attention aux gardes",
+            "```verse",
+            "| Banque | 4 |",
+            "---",
+        ] {
+            assert!(
+                norm(&export).contains(morceau),
+                "{morceau} absent de l'export :\n{export}"
+            );
+        }
+        // Une version est gardée pour chaque page.
+        let v: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM page_versions")
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        assert_eq!(v, 5);
+    }
+
+    /// #129, critère 6 : fichier qui n'est pas du Markdown ou trop gros : refus clair, rien d'importé.
+    #[tokio::test]
+    async fn refus_clairs() {
+        let (st, u, mid) = monde().await;
+        for (files, attendu) in [
+            (
+                json!([{ "path": "notes.txt", "content": "x" }]),
+                "n’est pas un fichier Markdown",
+            ),
+            (
+                json!([{ "path": "a.md", "content": "x".repeat(1_000_001) }]),
+                "dépasse 1 Mo",
+            ),
+            (
+                json!([{ "path": "b.md", "content": "a\u{0}b" }]),
+                "n’est pas du texte",
+            ),
+            (json!([]), "Aucun fichier"),
+        ] {
+            let e = importer(&st, &u, mid, files).await.unwrap_err();
+            assert!(format!("{e}").contains(attendu), "{e}");
+        }
+        let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM pages")
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        assert_eq!(n, 0);
+    }
 }
