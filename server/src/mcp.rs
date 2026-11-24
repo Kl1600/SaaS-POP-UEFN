@@ -1992,6 +1992,32 @@ mod tests_compte {
         );
     }
 
+    /// #134 : la section « Mes agents » lit last_used : vide = en attente de connexion, rempli = connectée.
+    #[tokio::test]
+    async fn agent_en_attente_puis_connecte() {
+        let m = monde().await;
+        let t = jeton(&m, None, "write").await;
+        let last = || async {
+            sqlx::query_scalar::<_, Option<String>>(
+                "SELECT last_used FROM api_tokens WHERE user_id = ?",
+            )
+            .bind(m.uid)
+            .fetch_one(&m.st.db)
+            .await
+            .unwrap()
+        };
+        assert!(
+            last().await.is_none(),
+            "jeton créé : en attente de connexion"
+        );
+        let (err, txt) = mcp_call(&m.st, &t, "list_maps", json!({})).await;
+        assert!(!err, "{txt}");
+        assert!(
+            last().await.is_some(),
+            "après le premier appel MCP : connectée"
+        );
+    }
+
     #[tokio::test]
     async fn list_maps_puis_use_map() {
         let m = monde().await;

@@ -1197,3 +1197,20 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 .afaire-pill.err{background:var(--tr-bg);color:var(--tr)}
 .afaire-more{margin-top:-8px;margin-bottom:0}
 .afaire-more .linkbtn{padding:0}
+/* « Mes IA » sur l'accueil et pastille d'état de l'IA (#134) */
+.myai-name{display:inline-flex;align-items:center;gap:8px;min-width:0}
+.myai-name b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.myai-state{display:flex;align-items:center;gap:8px;margin:12px 0 4px;font-size:13px;color:var(--muted)}
+.myai-state.on{color:var(--text)}.myai-state.on .udot{background:var(--tg)}
+.myai-connect{margin-top:14px}
+.myai-drop{width:28px;height:28px;margin:-4px -6px -4px 0}
+.connectai-t{font-size:17px;font-weight:500;margin:0}
+.connectai-sub{margin:6px 0 14px}
+.connectai .aiwait{margin:12px 0 0}
+.connectai-ask{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}
+.connectai-ask .aiurl-v{flex:1;min-width:200px}
+.connectai-ok{font-size:15px;padding:14px 16px;margin:0 0 12px}
+.upill .aiwait-dot{width:8px;height:8px}
+.connectai-ptext{font-size:12px;max-height:220px;overflow:auto;white-space:pre-wrap;margin:0 0 10px}
+.connectai-more{margin-top:16px}.connectai-more>summary{cursor:pointer;color:var(--muted)}
+.connectai-more[open]>summary{margin-bottom:12px}
