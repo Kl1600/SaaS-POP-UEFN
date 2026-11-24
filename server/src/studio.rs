@@ -692,7 +692,9 @@ pub async fn integrations(
             .fetch_all(&st.db)
             .await?;
     let mut out = serde_json::Map::new();
-    for kind in ["discord", "github", "lore", "apify", "youtube"] {
+    for kind in [
+        "discord", "github", "lore", "apify", "youtube", "reddit", "x",
+    ] {
         let r = rows.iter().find(|r| r.0 == kind);
         let mut cfg: Value = r
             .map(|r| serde_json::from_str(&r.2).unwrap_or(json!({})))
@@ -735,7 +737,11 @@ pub async fn set_integration(
     if studio_role(&st, &u, sid).await? < Role::Admin {
         return Err(AppError::Forbidden);
     }
-    if !["discord", "github", "lore", "apify", "youtube"].contains(&kind.as_str()) {
+    if ![
+        "discord", "github", "lore", "apify", "youtube", "reddit", "x",
+    ]
+    .contains(&kind.as_str())
+    {
         return Err(AppError::NotFound);
     }
     let mut cfg = b.config.unwrap_or(json!({}));

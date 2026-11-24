@@ -1,8 +1,8 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
-import {
+import { Target,
   Home, FileText, PenTool, CalendarDays, KanbanSquare, Rocket, Coins, Users, Settings, LifeBuoy, PanelLeft,
-  Search, Bell, Plus, ChevronDown, Hexagon, LogOut, ListTree, Bot, ChartNoAxesCombined, Hash, Flame, Sparkle, Layers, Lock, Lightbulb, Sun, Moon } from 'lucide-react'
+  Search, Bell, Plus, ChevronDown, Hexagon, LogOut, ListTree, Bot, ChartNoAxesCombined, Layers, Lock, Sun, Moon } from 'lucide-react'
 import { useApp, studioName } from '../state'
 import { ago, api } from '../api'
 import { Avatar } from './ui'
@@ -26,9 +26,8 @@ const mapGroups = (mid: number): [string, Item[]][] => [
 ]
 /** Catégorie Analyse (plan du compte). */
 const analyseItems = (): Item[] => [
-  ['/analyse/idees', tr("Idées de maps"), Lightbulb],
-  ['/analyse/marche', tr("Marché"), ChartNoAxesCombined], ['/analyse/tendances', tr("Maps qui marchent"), Flame],
-  ['/analyse/lancements', tr("Meilleurs démarrages"), Sparkle], ['/analyse/videos', tr("Tendances vidéo"), Hash],
+  // Un seul salon (#316) : les pages détaillées restent joignables depuis « Maps à faire ».
+  ['/analyse/a-faire', tr("Maps à faire"), Target],
 ]
 
 export default function Layout() {

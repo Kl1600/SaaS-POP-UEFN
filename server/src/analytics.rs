@@ -1269,6 +1269,241 @@ async fn collect_youtube(
     Ok(n)
 }
 
+/// Messages Reddit (r/FortniteCreative et recherche) lus avec l'API officielle (#316). Il faut des identifiants
+/// d'application déjà approuvés par Reddit : il n'en délivre plus de nouveaux depuis le 31/10/2026.
+async fn collect_reddit(
+    st: &AppState,
+    sid: i64,
+    cfg: &Value,
+    social: &Value,
+) -> Result<usize, String> {
+    let id = secret(cfg, "client_id").ok_or("pas d'identifiant Reddit")?;
+    let key = secret(cfg, "key").ok_or("pas de secret Reddit")?;
+    let auth = std::env::var("POP_REDDIT_AUTH")
+        .unwrap_or_else(|_| "https://www.reddit.com/api/v1/access_token".into());
+    let base =
+        std::env::var("POP_REDDIT_API").unwrap_or_else(|_| "https://oauth.reddit.com".into());
+    let r = st
+        .http
+        .post(&auth)
+        .basic_auth(id, Some(key))
+        .header("user-agent", "POP-UEFN/1.0 (pop-uefn.com)")
+        .form(&[("grant_type", "client_credentials")])
+        .timeout(std::time::Duration::from_secs(25))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    let code = r.status().as_u16();
+    let v: Value = r.json().await.unwrap_or(Value::Null);
+    let Some(token) = v["access_token"].as_str().filter(|_| code == 200) else {
+        return Err(
+            "Reddit : identifiants refusés (application non approuvée ou secret faux)".into(),
+        );
+    };
+    let mut queries: Vec<String> = keywords(social);
+    queries.truncate(5);
+    let mut n = 0;
+    let mut urls: Vec<(String, String)> = vec![(
+        format!("{base}/r/FortniteCreative/top?t=week&limit=100&raw_json=1"),
+        "r/FortniteCreative".into(),
+    )];
+    for q in &queries {
+        urls.push((
+            format!(
+                "{base}/search?q={}&sort=top&t=week&limit=100&type=link&raw_json=1",
+                urlencoding(q)
+            ),
+            q.clone(),
+        ));
+    }
+    for (url, q) in urls {
+        let r = st
+            .http
+            .get(&url)
+            .bearer_auth(token)
+            .header("user-agent", "POP-UEFN/1.0 (pop-uefn.com)")
+            .timeout(std::time::Duration::from_secs(25))
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+        let code = r.status().as_u16();
+        let v: Value = r.json().await.unwrap_or(Value::Null);
+        if code != 200 {
+            return Err(format!("Reddit : erreur {code}"));
+        }
+        for vid in reddit_posts(&v, &q) {
+            if store(st, sid, &vid).await.is_ok() {
+                n += 1
+            }
+        }
+    }
+    Ok(n)
+}
+
+/// Messages Reddit d'une réponse « Listing » : score = vues, commentaires gardés.
+fn reddit_posts(v: &Value, query: &str) -> Vec<Vid> {
+    v["data"]["children"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|c| {
+            let d = &c["data"];
+            let id = d["id"].as_str()?;
+            if d["over_18"].as_bool().unwrap_or(false) {
+                return None;
+            }
+            let title = d["title"].as_str().unwrap_or("");
+            let body = d["selftext"].as_str().unwrap_or("");
+            let text = if body.is_empty() {
+                title.to_string()
+            } else {
+                format!("{title}\n{body}")
+            };
+            let created = d["created_utc"]
+                .as_f64()
+                .and_then(|t| chrono::DateTime::from_timestamp(t as i64, 0))
+                .map(|t| t.to_rfc3339());
+            let score = d["score"].as_i64().unwrap_or(0).max(0);
+            let mut hs = hashtags_in(&text);
+            if let Some(f) = d["link_flair_text"].as_str() {
+                let f = f.to_lowercase().replace(' ', "");
+                if f.len() > 1 && f.len() < 40 {
+                    hs.push(f)
+                }
+            }
+            hs.sort();
+            hs.dedup();
+            Some(Vid {
+                id: format!("rd:{id}"),
+                platform: "reddit",
+                query: query.into(),
+                text,
+                author: d["author"].as_str().unwrap_or("").into(),
+                url: format!(
+                    "https://www.reddit.com{}",
+                    d["permalink"].as_str().unwrap_or("")
+                ),
+                music: String::new(),
+                hashtags: hs,
+                created,
+                plays: score,
+                likes: score,
+                shares: 0,
+                comments: d["num_comments"].as_i64().unwrap_or(0),
+                thumb: String::new(),
+            })
+        })
+        .collect()
+}
+
+/// Messages X récents (API officielle, recherche des 7 derniers jours) avec le jeton de l'utilisateur (#316).
+/// La lecture est payante à l'usage chez X : on se limite à 3 recherches de 50 messages par collecte.
+async fn collect_x(st: &AppState, sid: i64, cfg: &Value, social: &Value) -> Result<usize, String> {
+    let token = secret(cfg, "token").ok_or("pas de jeton X")?;
+    let base = std::env::var("POP_X_API").unwrap_or_else(|_| "https://api.x.com/2".into());
+    let mut queries: Vec<String> = keywords(social);
+    queries.truncate(3);
+    let mut n = 0;
+    for q in &queries {
+        let url = format!(
+            "{base}/tweets/search/recent?query={}&max_results=50&tweet.fields=created_at,public_metrics,entities&expansions=author_id&user.fields=username",
+            urlencoding(&format!("{q} -is:retweet"))
+        );
+        let r = st
+            .http
+            .get(&url)
+            .bearer_auth(token)
+            .header("user-agent", "POP-UEFN/1.0")
+            .timeout(std::time::Duration::from_secs(25))
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+        let code = r.status().as_u16();
+        let v: Value = r.json().await.unwrap_or(Value::Null);
+        match code {
+            200 => {}
+            401 => return Err("X : jeton refusé".into()),
+            402 | 403 => {
+                return Err(
+                    "X : accès refusé (la lecture est payante : ajoutez du crédit dans la console développeur de X)".into(),
+                )
+            }
+            429 => return Err("X : limite atteinte, réessayez plus tard".into()),
+            c => return Err(format!("X : erreur {c}")),
+        }
+        for vid in x_posts(&v, q) {
+            if store(st, sid, &vid).await.is_ok() {
+                n += 1
+            }
+        }
+    }
+    Ok(n)
+}
+
+/// Messages X d'une réponse de recherche : impressions (sinon j'aime) = vues.
+fn x_posts(v: &Value, query: &str) -> Vec<Vid> {
+    let users: HashMap<String, String> = v["includes"]["users"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|u| {
+            Some((
+                u["id"].as_str()?.to_string(),
+                u["username"].as_str()?.to_string(),
+            ))
+        })
+        .collect();
+    v["data"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|t| {
+            let id = t["id"].as_str()?;
+            let text = t["text"].as_str().unwrap_or("").to_string();
+            let m = &t["public_metrics"];
+            let likes = m["like_count"].as_i64().unwrap_or(0);
+            let views = m["impression_count"]
+                .as_i64()
+                .filter(|x| *x > 0)
+                .unwrap_or(likes);
+            let author = t["author_id"]
+                .as_str()
+                .and_then(|a| users.get(a))
+                .cloned()
+                .unwrap_or_default();
+            let mut hs: Vec<String> = t["entities"]["hashtags"]
+                .as_array()
+                .cloned()
+                .unwrap_or_default()
+                .iter()
+                .filter_map(|h| h["tag"].as_str().map(|s| s.to_lowercase()))
+                .collect();
+            hs.extend(hashtags_in(&text));
+            hs.sort();
+            hs.dedup();
+            Some(Vid {
+                id: format!("x:{id}"),
+                platform: "x",
+                query: query.into(),
+                url: format!("https://x.com/i/web/status/{id}"),
+                text,
+                author,
+                music: String::new(),
+                hashtags: hs,
+                created: t["created_at"].as_str().map(String::from),
+                plays: views,
+                likes,
+                shares: m["retweet_count"].as_i64().unwrap_or(0),
+                comments: m["reply_count"].as_i64().unwrap_or(0),
+                thumb: String::new(),
+            })
+        })
+        .collect()
+}
+
 fn urlencoding(s: &str) -> String {
     s.bytes()
         .map(|b| {
@@ -1313,7 +1548,43 @@ async fn collect_all(st: &AppState, sid: i64, with_tiktok: bool) -> Result<Value
             Err(e) => json!({ "error": e }),
         };
     }
+    let rd = integ_cfg(st, sid, "reddit").await?;
+    if secret(&rd, "client_id").is_some() && secret(&rd, "key").is_some() {
+        let r = collect_reddit(st, sid, &rd, &social).await;
+        set_status(st, sid, "reddit", &r).await;
+        out["reddit"] = match r {
+            Ok(n) => json!(n),
+            Err(e) => json!({ "error": e }),
+        };
+    }
+    // X est payant à l'usage : seulement quand TikTok est collecté (bouton, ou une fois par jour en automatique).
+    let x = integ_cfg(st, sid, "x").await?;
+    if with_tiktok && secret(&x, "token").is_some() {
+        let r = collect_x(st, sid, &x, &social).await;
+        set_status(st, sid, "x", &r).await;
+        out["x"] = match r {
+            Ok(n) => json!(n),
+            Err(e) => json!({ "error": e }),
+        };
+    }
     Ok(out)
+}
+
+/// Sources configurées : YouTube (clé), TikTok (Apify), Reddit (identifiants), X (jeton).
+async fn sources_on(st: &AppState, sid: i64) -> Result<[(&'static str, bool); 4], AppError> {
+    let social = integ_cfg(st, sid, "apify").await?;
+    let yt = integ_cfg(st, sid, "youtube").await?;
+    let rd = integ_cfg(st, sid, "reddit").await?;
+    let x = integ_cfg(st, sid, "x").await?;
+    Ok([
+        ("youtube", secret(&yt, "key").is_some()),
+        ("tiktok", secret(&social, "token").is_some()),
+        ("x", secret(&x, "token").is_some()),
+        (
+            "reddit",
+            secret(&rd, "client_id").is_some() && secret(&rd, "key").is_some(),
+        ),
+    ])
 }
 
 /// Collecte automatique des vidéos : YouTube toutes les 6 h (gratuit) ; TikTok une fois par jour si « auto » est activé.
@@ -1321,7 +1592,7 @@ pub async fn social_loop(st: AppState) {
     tokio::time::sleep(std::time::Duration::from_secs(60)).await;
     let mut tick: u64 = 0;
     loop {
-        let rows: Vec<(i64, String, String)> = sqlx::query_as("SELECT studio_id, kind, config FROM integrations WHERE kind IN ('apify', 'youtube') AND enabled = 1").fetch_all(&st.db).await.unwrap_or_default();
+        let rows: Vec<(i64, String, String)> = sqlx::query_as("SELECT studio_id, kind, config FROM integrations WHERE kind IN ('apify', 'youtube', 'reddit', 'x') AND enabled = 1").fetch_all(&st.db).await.unwrap_or_default();
         let mut sids: Vec<i64> = rows.iter().map(|r| r.0).collect();
         sids.sort();
         sids.dedup();
@@ -1349,16 +1620,15 @@ pub async fn tiktok_refresh(
         return Err(AppError::Forbidden);
     }
     crate::billing::require_studio(&st, sid).await?;
-    let social = integ_cfg(&st, sid, "apify").await?;
-    let yt = integ_cfg(&st, sid, "youtube").await?;
-    if secret(&social, "token").is_none() && secret(&yt, "key").is_none() {
-        return Err(bad(
-            "Ajoutez une source : clé YouTube (gratuite) ou jeton Apify pour TikTok.",
-        ));
+    if !sources_on(&st, sid).await?.iter().any(|s| s.1) {
+        return Err(bad("Ajoutez une source : YouTube, TikTok, X ou Reddit."));
     }
     let out = collect_all(&st, sid, true).await?;
-    let total = out["tiktok"].as_i64().unwrap_or(0) + out["youtube"].as_i64().unwrap_or(0);
-    let errors: Vec<String> = ["tiktok", "youtube"]
+    let total: i64 = ["tiktok", "youtube", "reddit", "x"]
+        .iter()
+        .map(|k| out[*k].as_i64().unwrap_or(0))
+        .sum();
+    let errors: Vec<String> = ["tiktok", "youtube", "reddit", "x"]
         .iter()
         .filter_map(|k| out[*k]["error"].as_str().map(|e| e.to_string()))
         .collect();
@@ -1379,7 +1649,6 @@ pub async fn tiktok(
     studio_role(&st, &u, sid).await?;
     crate::billing::require_studio(&st, sid).await?;
     let social = integ_cfg(&st, sid, "apify").await?;
-    let yt = integ_cfg(&st, sid, "youtube").await?;
     let rows: Vec<(String, String, String, String, String, String, Option<String>, i64, i64, i64, i64, String, String, String)> = sqlx::query_as(
         "SELECT id, text, author, url, music, hashtags, created, plays, likes, shares, comments, fetched_at, platform, thumb FROM tt_videos WHERE studio_id = ? AND (created IS NULL OR created > datetime('now', '-30 days')) ORDER BY plays DESC LIMIT 5000",
     ).bind(sid).fetch_all(&st.db).await?;
@@ -1408,7 +1677,12 @@ pub async fn tiktok(
     for r in &rows {
         let a = age(&r.6);
         let is_recent = a.map(|a| a < 3.0).unwrap_or(false);
-        let pbit = if r.12 == "youtube" { 2 } else { 1 };
+        let pbit = match r.12.as_str() {
+            "youtube" => 2,
+            "reddit" => 4,
+            "x" => 8,
+            _ => 1,
+        };
         g_all += r.7;
         if is_recent {
             g_recent += r.7
@@ -1497,9 +1771,14 @@ pub async fn tiktok(
         json!({ "configured": on, "videos": by_platform.get(p).map(|x| x.0).unwrap_or(0), "last_ok": s.and_then(|s| s.2.clone()), "error": s.and_then(|s| s.3.clone()) })
     };
     let last: Option<String> = rows.iter().map(|r| r.11.clone()).max();
+    let on = sources_on(&st, sid).await?;
+    let mut sources = json!({});
+    for (p, c) in on {
+        sources[p] = src(p, c);
+    }
     Ok(Json(json!({
-        "configured": secret(&social, "token").is_some() || secret(&yt, "key").is_some(),
-        "sources": { "tiktok": src("tiktok", secret(&social, "token").is_some()), "youtube": src("youtube", secret(&yt, "key").is_some()) },
+        "configured": on.iter().any(|s| s.1),
+        "sources": sources,
         "followed": followed, "keywords": keywords(&social), "auto_tiktok": social["auto"].as_bool().unwrap_or(false),
         "total": rows.len(), "last_fetch": last, "hashtags": rank(tags, 3), "sounds": rank(sounds, 2), "maps": maps,
         "videos": videos.into_iter().take(36).map(|x| x.1).collect::<Vec<_>>(),
@@ -1644,4 +1923,47 @@ pub async fn rising_list(State(st): State<AppState>, u: AuthUser) -> ApiResult<V
         .fetch_one(&st.db)
         .await?;
     Ok(Json(json!({ "items": out, "checked_at": last })))
+}
+
+#[cfg(test)]
+mod tests_sources {
+    use super::*;
+
+    #[test]
+    fn reddit_et_x() {
+        let rd = json!({"data": {"children": [
+            {"data": {"id": "a1", "title": "Ma map tycoon #fortnite", "selftext": "", "score": 420, "num_comments": 12,
+                      "author": "bob", "permalink": "/r/FortniteCreative/comments/a1/x/", "created_utc": 1795500000.0,
+                      "link_flair_text": "Showcase", "over_18": false}},
+            {"data": {"id": "a2", "title": "nsfw", "over_18": true}}
+        ]}});
+        let v = reddit_posts(&rd, "r/FortniteCreative");
+        assert_eq!(v.len(), 1);
+        assert_eq!(v[0].id, "rd:a1");
+        assert_eq!(v[0].platform, "reddit");
+        assert_eq!(v[0].plays, 420);
+        assert_eq!(v[0].comments, 12);
+        assert!(v[0].hashtags.contains(&"fortnite".to_string()));
+        assert!(v[0].hashtags.contains(&"showcase".to_string()));
+        assert!(v[0]
+            .url
+            .starts_with("https://www.reddit.com/r/FortniteCreative/"));
+        assert!(v[0].created.as_deref().unwrap().starts_with("2026-"));
+
+        let x = json!({"data": [
+            {"id": "9", "text": "Nouvelle map #UEFN 1234-5678-9012", "author_id": "u1", "created_at": "2026-11-20T10:00:00.000Z",
+             "public_metrics": {"like_count": 30, "impression_count": 5000, "retweet_count": 4, "reply_count": 2},
+             "entities": {"hashtags": [{"tag": "UEFN"}]}},
+            {"id": "10", "text": "sans vues", "public_metrics": {"like_count": 7, "impression_count": 0}}
+        ], "includes": {"users": [{"id": "u1", "username": "createur"}]}});
+        let v = x_posts(&x, "uefn");
+        assert_eq!(v.len(), 2);
+        assert_eq!(
+            (v[0].id.as_str(), v[0].plays, v[0].author.as_str()),
+            ("x:9", 5000, "createur")
+        );
+        assert_eq!(v[0].hashtags, vec!["uefn".to_string()]);
+        assert_eq!(v[1].plays, 7);
+        assert!(reddit_posts(&json!({}), "q").is_empty() && x_posts(&json!({}), "q").is_empty());
+    }
 }

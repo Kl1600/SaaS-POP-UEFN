@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-24 · #316 · Analyse : salon « Maps à faire »
+- Fait : Analyse n'a plus qu'une entrée dans la barre (« Maps à faire », /analyse/a-faire) ; les pages détaillées restent joignables par un lien en bas du salon. Premier passage : 4 sources facultatives (YouTube, TikTok, X, Reddit) puis « Passer » (mémorisé par compte, localStorage) ; dans le salon, une ligne « Sources » toujours visible, chaque source connectable seule à tout moment (vert connecté, rouge erreur avec le message en info-bulle). Liste : rang, type de map, une phrase, concurrence, « Voir » (exemple qui marche). Reprise du début de travail d'une autre session.
+- Vérifié : navigateur 1440 et 390 px, connexions X et Reddit contre des serveurs simulés.
+
 ### 2026-11-24 · #290 · connexion en un clic par IA
 - Fait : IA connectées → « Connecter une IA en un clic » : onglets Claude (copie l'adresse puis ouvre claude.ai/settings/connectors), ChatGPT, Cursor (deeplink cursor://anysphere.cursor-deeplink/mcp/install, config base64 {url}), VS Code (vscode:mcp/install?{name,type:http,url}), Claude Code (commande), Autre ; 3 étapes chacun. La copie se fait avant l'ouverture d'onglet (sinon le presse-papiers refuse). Fiche Popy ai-connect mise à jour.
 - Vérifié : navigateur (rendu, boutons) ; deeplinks : format de la doc Cursor / VS Code, non ouverts ici (pas d'éditeur).
