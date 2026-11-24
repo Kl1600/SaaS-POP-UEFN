@@ -579,6 +579,7 @@ fn api() -> Router<AppState> {
         // Vérifications automatiques du niveau (#96) ; « /checks » est la checklist de la page Lancer (#130).
         .route("/api/maps/{mid}/level-checks", get(checks::get))
         .route("/api/maps/{mid}/agents", get(agents::list))
+        .route("/api/maps/{mid}/agents/activity", get(agents::activite))
         .route("/api/uefn-actions/{id}/undo", post(uefn::undo))
         .route("/api/approvals/{id}/{verdict}", post(uefn::decide))
         .route(

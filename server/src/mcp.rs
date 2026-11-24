@@ -328,7 +328,20 @@ pub async fn mcp(
                 );
             }
             let args = req["params"]["arguments"].clone();
-            match token_call(&st, &user, mid, agent, name, args).await {
+            let res = token_call(&st, &user, mid, agent, name, args.clone()).await;
+            // Fil d'activité de l'agent (#298) : seulement sur une map de travail, pas pour list_maps / use_map.
+            if let (Some(m), false) = (mid, matches!(name, "list_maps" | "use_map")) {
+                crate::agents::noter_appel(
+                    &st,
+                    agent,
+                    m,
+                    name,
+                    &args,
+                    res.as_ref().map_err(|_| ()),
+                )
+                .await;
+            }
+            match res {
                 Ok(v) => rpc_ok(
                     id,
                     text(serde_json::to_string_pretty(&v).unwrap_or_default(), false),
@@ -767,20 +780,10 @@ async fn call_as(
             );
             let aid: i64 = sqlx::query_scalar("INSERT INTO approvals (map_id, user_id, action, args, summary) VALUES (?, ?, 'actor_delete', ?, ?) RETURNING id")
                 .bind(mid).bind(user.id).bind(json!({ "ids": ids }).to_string()).bind(&summary).fetch_one(&st.db).await?;
-            let admins: Vec<i64> = sqlx::query_scalar("SELECT m.user_id FROM memberships m JOIN maps p ON p.studio_id = m.studio_id WHERE p.id = ? AND m.role IN ('owner', 'admin', 'member')").bind(mid).fetch_all(&st.db).await.unwrap_or_default();
-            for a in admins {
-                crate::account::notify_user(
-                    st,
-                    a,
-                    mid,
-                    "Une IA connectée demande à supprimer des acteurs : validation requise",
-                    "/organiseur",
-                )
-                .await;
-            }
+            prevenir_validation(st, mid, "Une IA connectée demande à supprimer des acteurs : validation requise").await;
             notify(st, mid, json!({ "t": "uefn", "what": "actors" }));
             Ok(
-                json!({ "pending_approval": aid, "message": "Suppression en attente : un membre doit la valider dans l’Organiseur de POP." }),
+                json!({ "pending_approval": aid, "message": "Suppression en attente : un membre doit la valider dans POP (Paramètres → UEFN Link) ou dans Forge." }),
             )
         }
         "list_verse_files" => {
@@ -879,7 +882,8 @@ async fn call_as(
                     let aid: i64 = sqlx::query_scalar("INSERT INTO approvals (map_id, user_id, action, args, summary) VALUES (?, ?, ?, ?, ?) RETURNING id")
                         .bind(m).bind(user.id).bind(undo["action"].as_str()).bind(undo["args"].to_string()).bind(&summary).fetch_one(&st.db).await?;
                     notify(st, mid, json!({ "t": "uefn", "what": "actors" }));
-                    return Ok(json!({ "pending_approval": aid, "message": "Annulation en attente : un membre doit la valider dans l’Organiseur de POP." }));
+                    prevenir_validation(st, m, "Une IA connectée demande une annulation qui retire des éléments : validation requise").await;
+                    return Ok(json!({ "pending_approval": aid, "message": "Annulation en attente : un membre doit la valider dans POP (Paramètres → UEFN Link) ou dans Forge." }));
                 }
             }
             crate::uefn::undo(State(st.clone()), user.clone(), Path(id))
@@ -891,6 +895,19 @@ async fn call_as(
 }
 
 /// Ajoute aux erreurs de compilation la fiche d'aide du moteur local (corrections par règles), quand elle existe.
+/// Prévient les membres de la map qu'une action demandée par une IA attend leur validation (cloche du site et de
+/// Forge, #298).
+async fn prevenir_validation(st: &AppState, mid: i64, texte: &str) {
+    let membres: Vec<i64> = sqlx::query_scalar("SELECT m.user_id FROM memberships m JOIN maps p ON p.studio_id = m.studio_id WHERE p.id = ? AND m.role IN ('owner', 'admin', 'member')")
+        .bind(mid)
+        .fetch_all(&st.db)
+        .await
+        .unwrap_or_default();
+    for u in membres {
+        crate::account::notify_user(st, u, mid, texte, "/parametres?onglet=uefn").await;
+    }
+}
+
 async fn aide_compilation(st: &AppState, mid: i64, r: &mut Value) {
     let Some(diags) = r["diagnostics"].as_array().cloned() else {
         return;
@@ -1853,6 +1870,39 @@ mod tests_compte {
             .await,
             Err(AppError::NotFound)
         ));
+    }
+
+    /// #298, critère 5 : next_task ne propose pas une tâche dont une dépendance n'est pas faite.
+    #[tokio::test]
+    async fn next_task_respecte_les_dependances() {
+        let m = monde().await;
+        let t = jeton(&m, None, "write").await;
+        mcp_call(&m.st, &t, "use_map", json!({ "map": m.equipe })).await;
+        let (err, txt) = mcp_call(
+            &m.st,
+            &t,
+            "create_task",
+            json!({ "title": "Poser les bases" }),
+        )
+        .await;
+        assert!(!err, "{txt}");
+        let n1 = serde_json::from_str::<Value>(&txt).unwrap()["number"]
+            .as_i64()
+            .unwrap();
+        let (err, txt) = mcp_call(
+            &m.st,
+            &t,
+            "create_task",
+            json!({ "title": "Tester les captures", "depends_on": [n1] }),
+        )
+        .await;
+        assert!(!err, "{txt}");
+        let (err, txt) = mcp_call(&m.st, &t, "next_task", json!({})).await;
+        assert!(!err, "{txt}");
+        assert!(
+            txt.contains("Poser les bases") && !txt.contains("Tester les captures"),
+            "{txt}"
+        );
     }
 
     #[tokio::test]

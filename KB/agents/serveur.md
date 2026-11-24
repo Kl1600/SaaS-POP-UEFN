@@ -151,3 +151,7 @@ Bloque : rien
 ### 2026-11-24 · #114 F28 · reprise d'une tâche interrompue
 - Fait : migration 0038 (`task_progress`), outil MCP `save_progress` (fait, reste, fichiers), note rendue par `claim_task` et `next_task` (`ta_tache`, `a_reprendre`) ; une réservation sans aucun appel MCP depuis 2 h se libère seule avec une note automatique (vérifié à la demande : claim_task, next_task, liste des agents ; pas de tâche de fond).
 - Vérifié : `cargo test` (`agents::reprise_d_une_tache`) et scénario MCP réel en local (agent A note puis libère, agent B reprend et reçoit la note).
+
+### 2026-11-24 · #298 · fil d'activité des agents et temps réel avec le kanban
+- Fait : migration 0039 (`agent_calls`, sans arguments, gardés 7 jours) ; chaque appel MCP d'un agent sur sa map est noté et poussé sur le WebSocket de la map (`{"t":"agent"}`) ; `GET /api/maps/{mid}/agents/activity` ; étape de la tâche dans `/agents` (écrit, compilé, testé, relu) ; `claim_task`, `release_task`, `save_progress` écrivent dans l'historique (via « IA ») et rafraîchissent le kanban ; notifications : compilation qui passe en échec, tâche bloquée par un agent, validation demandée (texte et lien vers Paramètres → UEFN Link, plus l'Organiseur retiré).
+- Vérifié : `cargo test` (`agents::fil_d_activite`, `mcp::next_task_respecte_les_dependances`) ; `next_task` respectait déjà les dépendances (`guide.rs`).

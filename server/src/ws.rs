@@ -40,6 +40,11 @@ impl Hub {
             .or_insert_with(|| broadcast::channel(256).0)
             .clone()
     }
+    /// Abonnement au canal d'une map (tests : vérifier ce qui part en temps réel).
+    #[cfg(test)]
+    pub fn subscribe(&self, map_id: i64) -> broadcast::Receiver<String> {
+        self.chan(map_id).subscribe()
+    }
     pub fn send(&self, map_id: i64, msg: Value) {
         let _ = self.chan(map_id).send(msg.to_string());
     }
