@@ -12,6 +12,7 @@ mod billing;
 mod boards;
 mod catalog;
 mod checks;
+mod ci;
 mod discover;
 mod engine;
 mod error;
@@ -399,6 +400,10 @@ fn api() -> Router<AppState> {
             "/api/studios/{sid}/discord/register",
             post(integrations::discord_register),
         )
+        .route("/api/studios/{sid}/github/ci/sync", post(ci::synchroniser))
+        .route("/api/maps/{mid}/ci/runs", get(ci::liste))
+        .route("/api/maps/{mid}/ci/runs/{id}", get(ci::detail))
+        .route("/api/maps/{mid}/ci/task/{number}", get(ci::de_la_tache))
         .route(
             "/api/studios/{sid}/github/sync",
             post(integrations::github_sync),
