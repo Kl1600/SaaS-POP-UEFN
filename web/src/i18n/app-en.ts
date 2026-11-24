@@ -1,6 +1,22 @@
 // Traduction anglaise de l'application. Clé = texte français de l'interface (ou du serveur), valeur = anglais.
 // Généré à partir des textes enveloppés dans tr(...) ; à compléter quand on ajoute des textes.
 const EN: Record<string, string> = {
+ "Liste mes maps POP": "List my POP maps",
+ "{0} connectée": "{0} connected",
+ "{0} IA connectées": "{0} AIs connected",
+ "Enregistrée dans POP : elle sera connectée à son premier appel.": "Registered in POP: it will be connected on its first call.",
+ "{0} · en attente de connexion": "{0} · waiting for connection",
+ "IA connectée": "AI connected",
+ "Demandez-lui maintenant :": "Now ask it:",
+ "Choisir une autre IA": "Choose another AI",
+ "POP se pilote avec votre IA (Claude, Cursor, Codex…) : elle voit vos maps, prend les tâches et agit dans UEFN. Connectez-la une fois pour tout votre compte.": "POP is driven by your AI (Claude, Cursor, Codex…): it sees your maps, takes tasks and acts in UEFN. Connect it once for your whole account.",
+ "{0} est enregistrée, en attente de connexion… Envoyez-lui un message pour qu’elle appelle POP.": "{0} is registered, waiting for connection… Send it a message so it calls POP.",
+ "Passer, je connecterai mon IA plus tard": "Skip, I’ll connect my AI later",
+ "Travaille sur ma map POP « {0} »": "Work on my POP map “{0}”",
+ "Connecte ton IA": "Connect your AI",
+ "Une fois connectée, demandez-lui :": "Once connected, ask it:",
+ "En attente de votre IA…": "Waiting for your AI…",
+ "Votre IA ne propose pas de se connecter ? Copiez sa configuration avec une clé API :": "Your AI does not offer to connect? Copy its configuration with an API key:",
  "Sans rôle : tous les outils de POP.": "No role: every POP tool.",
  "Sans rôle": "No role",
  "Orchestrateur": "Orchestrator",

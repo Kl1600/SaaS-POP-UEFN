@@ -11,7 +11,7 @@ import { AiLogo } from './AiLogo'
 
 export const ClientLogo = ({ kind, size }: { kind: string; size?: number }) => <AiLogo kind={kind} size={size} />
 
-type Client = { kind: string; name: string; where: string; config: (url: string, token: string) => string; note?: string }
+export type Client = { kind: string; name: string; where: string; config: (url: string, token: string) => string; note?: string }
 
 const json = (v: any) => JSON.stringify(v, null, 2)
 export const CLIENTS: Client[] = [
@@ -34,7 +34,6 @@ export function AccountAI() {
   // Rôles d'agents (#111) : consignes et outils permis, choisis par IA.
   const { data: roles } = useLoad<{ id: string; name: string; instructions: string }[]>('/api/agent-roles', [])
   const [open, setOpen] = useState<{ c: Client; token: string; id: number } | null>(null)
-  const [copied, setCopied] = useState(false)
   const url = `${location.origin}/mcp`
   // Une IA ne compte comme connectée qu'une fois qu'elle a appelé POP (#280) ; les autres jetons sont « en attente ».
   const live = (data ?? []).filter(t => t.last_used)
@@ -45,7 +44,7 @@ export function AccountAI() {
       for (const t of pending.filter(t => t.kind === c.kind)) await api.del(`/api/tokens/${t.id}`)
       const used = live.filter(t => t.kind === c.kind).length
       const r = await api.post('/api/me/tokens', { name: used ? `${c.name} ${used + 1}` : c.name, kind: c.kind, scope: 'write' })
-      setOpen({ c, token: r.token, id: r.id }); setCopied(false); reload()
+      setOpen({ c, token: r.token, id: r.id }); reload()
     } catch (e: any) { toast(e.message, true) }
   }
   const linked = !!open && live.some(t => t.id === open.id)
@@ -55,7 +54,6 @@ export function AccountAI() {
     const h = setInterval(reload, 3000)
     return () => clearInterval(h)
   }, [open, linked])
-  const copy = async (t: string) => { try { await navigator.clipboard.writeText(t); setCopied(true) } catch { toast(tr("Copie impossible : sélectionnez le texte."), true) } }
   return (<>
     <section className="card">
       <CardHead title={tr("IA connectées")} sub={tr("Connectez votre IA (Claude, Cursor, Codex…) une seule fois pour tout votre compte : elle voit vos maps perso et celles de vos studios, et choisit elle-même la map sur laquelle travailler.")} />
@@ -91,19 +89,34 @@ export function AccountAI() {
       </p>}
     </section>
 
-    {open && <Modal onClose={() => setOpen(null)} label={tr("Connecter {0}", [open.c.name])}>
-      <div className="row" style={{ justifyContent: 'space-between' }}><h2 style={{ margin: 0, fontWeight: 500, fontSize: 20 }}>{tr("Connecter {0}", [open.c.name])}</h2><button className="iconbtn" aria-label={tr("Fermer")} onClick={() => setOpen(null)}><X size={18} /></button></div>
-      <p className="small" style={{ margin: '12px 0 6px' }}>{open.c.where}</p>
-      <pre className="report mono" style={{ fontSize: 12 }}>{open.c.config(url, open.token)}</pre>
-      <div className="row" style={{ marginTop: 10 }}>
-        <button className="btn pri" onClick={() => copy(open.c.config(url, open.token))}>{copied ? <><Check size={16} />{tr("Copié")}</> : <><Copy size={16} />{tr("Copier")}</>}</button>
-        <span className="small muted">{tr("Le jeton ne sera plus affiché : copiez-le maintenant.")}</span>
-      </div>
-      {open.c.note && <p className="small muted">{open.c.note}</p>}
-      <div className={'aiwait' + (linked ? ' ok' : '')}>{linked ? <><Check size={16} />{tr("{0} est connectée à POP.", [open.c.name])}</> : <><span className="aiwait-dot" />{tr("En attente de connexion… L’IA apparaîtra dans « Vos IA » dès son premier appel.")}</>}</div>
-      <p className="small muted">{tr("Redémarrez l’IA puis demandez-lui par exemple : « Travaille sur ma map POP GrassCutter ». Elle liste vos maps (list_maps) et choisit la bonne (use_map) ; vous pourrez lui faire changer de map sans la reconnecter.")}</p>
-    </Modal>}
+    {open && <KeyModal c={open.c} token={open.token} linked={linked} onClose={() => setOpen(null)} />}
   </>)
+}
+
+/** Clé API d'une IA à copier, puis attente de son premier appel (#280). Repris par la fenêtre « Connecte ton IA » (#134). */
+export function KeyPanel({ c, token, linked }: { c: Client; token: string; linked: boolean }) {
+  const { toast } = useApp()
+  const [copied, setCopied] = useState(false)
+  const url = `${location.origin}/mcp`
+  const copy = async (t: string) => { try { await navigator.clipboard.writeText(t); setCopied(true) } catch { toast(tr("Copie impossible : sélectionnez le texte."), true) } }
+  return <>
+    <p className="small" style={{ margin: '12px 0 6px' }}>{c.where}</p>
+    <pre className="report mono" style={{ fontSize: 12 }}>{c.config(url, token)}</pre>
+    <div className="row" style={{ marginTop: 10 }}>
+      <button className="btn pri" onClick={() => copy(c.config(url, token))}>{copied ? <><Check size={16} />{tr("Copié")}</> : <><Copy size={16} />{tr("Copier")}</>}</button>
+      <span className="small muted">{tr("Le jeton ne sera plus affiché : copiez-le maintenant.")}</span>
+    </div>
+    {c.note && <p className="small muted">{c.note}</p>}
+    <div className={'aiwait' + (linked ? ' ok' : '')}>{linked ? <><Check size={16} />{tr("{0} est connectée à POP.", [c.name])}</> : <><span className="aiwait-dot" />{tr("En attente de connexion… L’IA apparaîtra dans « Vos IA » dès son premier appel.")}</>}</div>
+    <p className="small muted">{tr("Redémarrez l’IA puis demandez-lui par exemple : « Travaille sur ma map POP GrassCutter ». Elle liste vos maps (list_maps) et choisit la bonne (use_map) ; vous pourrez lui faire changer de map sans la reconnecter.")}</p>
+  </>
+}
+
+function KeyModal({ c, token, linked, onClose }: { c: Client; token: string; linked: boolean; onClose: () => void }) {
+  return <Modal onClose={onClose} label={tr("Connecter {0}", [c.name])}>
+    <div className="row" style={{ justifyContent: 'space-between' }}><h2 style={{ margin: 0, fontWeight: 500, fontSize: 20 }}>{tr("Connecter {0}", [c.name])}</h2><button className="iconbtn" aria-label={tr("Fermer")} onClick={onClose}><X size={18} /></button></div>
+    <KeyPanel c={c} token={token} linked={linked} />
+  </Modal>
 }
 
 /** Connexion en un clic par IA (#290) : l'IA ne connaît que l'adresse /mcp ; POP demande ensuite « Autoriser ». */
@@ -129,7 +142,7 @@ const QUICK: Quick[] = [
     run: () => {} },
 ]
 
-function OneClick({ url }: { url: string }) {
+export function OneClick({ url }: { url: string }) {
   const { toast } = useApp()
   const [sel, setSel] = useState('claude')
   const q = QUICK.find(x => x.id === sel)!

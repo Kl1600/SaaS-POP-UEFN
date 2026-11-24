@@ -400,6 +400,15 @@ fn consignes(role: Option<&str>, orch: bool, base: &str) -> String {
     }
 }
 
+/// « Passer » sur la fenêtre « Connecte ton IA » (#134) : elle ne s'ouvre plus pour ce compte.
+pub async fn ai_intro_skip(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
+    sqlx::query("UPDATE users SET ai_intro_skipped = 1 WHERE id = ?")
+        .bind(u.id)
+        .execute(&st.db)
+        .await?;
+    Ok(Json(json!({ "ok": true })))
+}
+
 const SANS_MAP: &str = "Aucune map de travail choisie pour cette IA. Appelez list_maps pour voir vos maps, puis use_map avec l'identifiant de la map sur laquelle travailler.";
 
 /// Appel d'un outil par un jeton MCP du compte (#145) : `list_maps` et `use_map` choisissent la map de travail ;
@@ -1990,6 +1999,44 @@ mod tests_compte {
             err && msg.contains("list_maps") && msg.contains("use_map"),
             "{msg}"
         );
+    }
+
+    /// #134 : « Passer » est gardé pour le compte et visible dans /api/me.
+    #[tokio::test]
+    async fn passer_connecte_ton_ia() {
+        let m = monde().await;
+        let u = AuthUser {
+            id: m.uid,
+            email: "ia@a.fr".into(),
+            name: "Yanis".into(),
+            sid: String::new(),
+        };
+        let skipped = || async {
+            let Json(me) = crate::auth::me(State(m.st.clone()), u.clone())
+                .await
+                .unwrap();
+            me["ai_intro_skipped"].as_bool().unwrap()
+        };
+        assert!(!skipped().await, "compte neuf : la fenêtre peut s'ouvrir");
+        ai_intro_skip(State(m.st.clone()), u.clone()).await.unwrap();
+        assert!(skipped().await, "« Passer » est gardé");
+        // Le premier appel MCP marque le jeton : c'est ce que lit la pastille (last_used).
+        let t = jeton(&m, None, "write").await;
+        let avant: Option<String> =
+            sqlx::query_scalar("SELECT last_used FROM api_tokens WHERE user_id = ?")
+                .bind(m.uid)
+                .fetch_one(&m.st.db)
+                .await
+                .unwrap();
+        assert!(avant.is_none(), "jeton créé : en attente de connexion");
+        mcp_call(&m.st, &t, "list_maps", json!({})).await;
+        let apres: Option<String> =
+            sqlx::query_scalar("SELECT last_used FROM api_tokens WHERE user_id = ?")
+                .bind(m.uid)
+                .fetch_one(&m.st.db)
+                .await
+                .unwrap();
+        assert!(apres.is_some(), "après le premier appel : connectée");
     }
 
     #[tokio::test]
