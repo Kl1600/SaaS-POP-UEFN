@@ -1,6 +1,8 @@
 // Traduction anglaise de l'application. Clé = texte français de l'interface (ou du serveur), valeur = anglais.
 // Généré à partir des textes enveloppés dans tr(...) ; à compléter quand on ajoute des textes.
 const EN: Record<string, string> = {
+ "Retirer cette tentative": "Remove this attempt",
+ "{0} retirée": "{0} removed",
  "Autres façons de connecter : en un clic depuis l’IA, ou configuration à copier": "Other ways to connect: one click from the AI, or a configuration to copy",
  "Le plus simple : donnez ce prompt à votre IA": "Easiest: give this prompt to your AI",
  "Il contient l’adresse de POP et une clé pour votre compte : votre IA s’ajoute POP toute seule. Pour les IA qui travaillent sur votre ordinateur (Claude Code, Codex, Cursor…).": "It contains POP’s address and a key for your account: your AI adds POP by itself. For AIs that work on your computer (Claude Code, Codex, Cursor…).",

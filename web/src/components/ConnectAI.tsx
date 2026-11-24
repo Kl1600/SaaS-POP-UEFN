@@ -63,6 +63,7 @@ export function AiPill() {
 /** Section « Mes agents » de l'accueil. */
 export function AgentsSection() {
   const nav = useNavigate()
+  const { toast } = useApp()
   const loc = useLocation()
   const ref = useRef<HTMLElement>(null)
   const [open, setOpen] = useState(false)
@@ -91,7 +92,13 @@ export function AgentsSection() {
       {ai.tokens.map(t => {
         const live = !!t.last_used
         return <div key={t.id} role="button" tabIndex={0} className="home-map agent-card" onClick={settings} onKeyDown={e => { if (e.key === 'Enter') settings() }}>
-          <span className="home-map-top"><span className="agent-name"><ClientLogo kind={t.kind} size={20} /><b>{t.name}</b></span></span>
+          <span className="home-map-top"><span className="agent-name"><ClientLogo kind={t.kind} size={20} /><b>{t.name}</b></span>
+            {!live && <button className="iconbtn agent-drop" aria-label={tr("Retirer {0}", [t.name])} data-tip={tr("Retirer cette tentative")} onClick={async e => {
+              // Tentative jamais aboutie : on retire sa clé (elle n'a jamais servi), sans passer par Paramètres.
+              e.stopPropagation()
+              try { await api.del(`/api/tokens/${t.id}`); ai.reload(); toast(tr("{0} retirée", [t.name])) } catch (er: any) { toast(er.message, true) }
+            }}><X size={16} /></button>}
+          </span>
           <span className="small muted">{t.oauth ? tr("Autorisée depuis l’IA") : clientName(t.kind)}{t.scope === 'read' ? ` · ${tr("Lecture seule")}` : ''}</span>
           <span className={'agent-state' + (live ? ' on' : '')}>{live ? <span className="udot" /> : <span className="aiwait-dot" />}{live ? tr("Connectée · {0}", [ago(t.last_used)]) : tr("En attente de connexion…")}</span>
           <span className="small muted">{t.map ? tr("Travaille sur « {0} »", [t.map.name]) : live ? tr("Aucune map choisie") : tr("Sera connectée à son premier appel")}</span>

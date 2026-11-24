@@ -1203,6 +1203,7 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 .agent-state{display:flex;align-items:center;gap:8px;margin:12px 0 4px;font-size:13px;color:var(--muted)}
 .agent-state.on{color:var(--text)}.agent-state.on .udot{background:var(--tg)}
 .agents-connect{margin-top:14px}
+.agent-drop{width:28px;height:28px;margin:-4px -6px -4px 0}
 .connectai-t{font-size:17px;font-weight:500;margin:0}
 .connectai-sub{margin:6px 0 14px}
 .connectai .aiwait{margin:12px 0 0}
