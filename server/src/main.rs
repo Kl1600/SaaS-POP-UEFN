@@ -48,6 +48,7 @@ mod ping;
 mod plan;
 mod privstats;
 mod questions;
+mod resume;
 mod roles;
 mod s3;
 mod scenarios;
@@ -658,6 +659,7 @@ fn api() -> Router<AppState> {
         // Vérifications automatiques du niveau (#96) ; « /checks » est la checklist de la page Lancer (#130).
         .route("/api/maps/{mid}/level-checks", get(checks::get))
         .route("/api/maps/{mid}/agents", get(agents::list))
+        .route("/api/maps/{mid}/resumes", get(resume::route))
         .route("/api/maps/{mid}/agents/activity", get(agents::activite))
         .route("/api/maps/{mid}/fil", get(fil::route))
         .route("/api/maps/{mid}/ping", post(ping::ping))
