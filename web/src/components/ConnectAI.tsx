@@ -124,13 +124,11 @@ export function ConnectAiButton() {
 /** Connexion d'une IA, dépliée dans la section. Passe seule à « connectée » dès le premier appel MCP d'une nouvelle IA. */
 function ConnectPanel({ ai, onClose }: { ai: AccountAI; onClose?: () => void }) {
   const { map, toast } = useApp()
-  const [copied, setCopied] = useState(false)
   // IA déjà connectées à l'ouverture : seule une nouvelle connexion fait passer à « connectée ».
   const before = useRef<Set<number> | null>(null)
   if (before.current === null && ai.tokens) before.current = new Set(ai.live.map(t => t.id))
   const fresh = before.current ? ai.live.find(t => !before.current!.has(t.id)) : undefined
   const ask = map ? tr("Travaille sur ma map POP « {0} »", [map.name]) : tr("Liste mes maps POP")
-  const copyAsk = async () => { try { await navigator.clipboard.writeText(ask); setCopied(true) } catch { toast(tr("Copie impossible : sélectionnez le texte."), true) } }
   // Clé API brute pour un onglet (#375) : l'onglet affiche lui-même la configuration à copier.
   const createRawKey = async (kind: string, name: string) => {
     try {
@@ -139,7 +137,6 @@ function ConnectPanel({ ai, onClose }: { ai: AccountAI; onClose?: () => void }) 
       ai.reload(); return r.token as string
     } catch (e: any) { toast(e.message, true); return null }
   }
-  const waiting = ai.pending[ai.pending.length - 1]
   const head = (title: string) => <div className="row" style={{ justifyContent: 'space-between' }}>
     <h3 className="connectai-t">{title}</h3>
     {onClose && <button className="iconbtn" aria-label={tr("Fermer")} onClick={onClose}><X size={18} /></button>}
@@ -151,18 +148,8 @@ function ConnectPanel({ ai, onClose }: { ai: AccountAI; onClose?: () => void }) 
     {onClose && <button className="btn pri" onClick={onClose}><Check size={16} />{tr("Terminé")}</button>}
   </div>
   return <div className="connectai">
-    {head(tr("Connecter une IA"))}
-    <p className="muted connectai-sub">{tr("POP se pilote avec votre IA (Claude, Cursor, Codex…) : elle voit vos maps, prend les tâches et agit dans UEFN. Connectez-la une fois pour tout votre compte.")}</p>
-    <ConnectTabs url={`${location.origin}/mcp`} onKey={createRawKey} />
-    <div className="aiwait" role="status">
-      <span className="aiwait-dot" />
-      {waiting ? tr("{0} est enregistrée, en attente de connexion… Envoyez-lui un message pour qu’elle appelle POP.", [waiting.name]) : tr("En attente de votre IA… Elle apparaîtra ici dès qu’elle sera connectée.")}
-    </div>
-    <div className="connectai-ask">
-      <span className="small">{tr("Une fois connectée, demandez-lui :")}</span>
-      <code className="aiurl-v">{ask}</code>
-      <button className="btn" onClick={copyAsk}>{copied ? <><Check size={15} />{tr("Copié")}</> : <><Copy size={15} />{tr("Copier")}</>}</button>
-    </div>
+    {head(tr("Connectez votre IA en 3 étapes"))}
+    <ConnectTabs url={`${location.origin}/mcp`} onKey={createRawKey} linked={!!fresh} />
     <details className="connectai-more">
       <summary className="small">{tr("Agents de code : un prompt qui leur fait ajouter POP tout seuls")}</summary>
       <PromptBlock ai={ai} />

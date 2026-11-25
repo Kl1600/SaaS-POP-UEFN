@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-25 · #379 · Connecter une IA en 3 étapes
+- Fait : ConnectTabs (AiTokens.tsx) : choix de l'IA (Claude, ChatGPT, Gemini, Le Chat en grand, les autres sous « Autres IA »), puis 3 étapes numérotées avec une phrase et un bouton chacune (copier ou installer, ouvrir l'IA ou coller, « Autoriser » qui passe au vert). Notes et clé de secours repliées dans « Besoin d'aide ? ».
+- Vérifié : navigateur 1440 px.
+
 ### 2026-11-25 · #375 · « Connecter une IA » par onglet
 - Fait : AiTokens.tsx : TABS / ConnectTabs, un onglet par IA (Claude, ChatGPT, Gemini, Le Chat, Cursor, VS Code, Windsurf, Codex, Claude Code, Gemini CLI, Autre client MCP), étapes vérifiées dans la doc officielle de chacune le 25/11/2026, adresse ou configuration OAuth à copier, liens profonds Cursor et VS Code, et clé API en secours par onglet. ConnectAI.tsx : les onglets remplacent l'ancien « en un clic » ; le prompt pour agents de code est replié. IA connectées : type, OAuth ou clé, dernier usage, bouton Révoquer. Logos ChatGPT, Le Chat, Gemini (AiLogo).
 - Vérifié : navigateur 1440 px, révocation testée avec Gemini CLI (Disconnected, 401).

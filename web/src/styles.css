@@ -1327,3 +1327,20 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 .aitabs .aikey{margin-top:12px;padding-top:10px;border-top:1px solid var(--border)}
 .aitabs .aiquick{flex-wrap:wrap}
 }
+/* Connecter une IA en 3 étapes (#379). */
+@layer app{
+.aipicks{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 10px}
+.aipick{display:inline-flex;align-items:center;gap:10px;height:48px;padding:0 18px;border-radius:14px;border:1px solid var(--border);background:var(--surface);color:var(--text);font:inherit;font-size:15px;cursor:pointer}
+.aipick:hover{border-color:var(--text3, #999)}
+.aipick.on{border-color:#ED753E;box-shadow:0 0 0 1px #ED753E inset}
+.aisteps3 .aiquick{margin-bottom:10px}
+.aistep{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:14px}
+.aistep li{display:flex;gap:14px;align-items:flex-start}
+.aistep li > div{flex:1;min-width:0}
+.aistep b{font-weight:500;display:block}
+.aistep-n{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:600;font-size:14px;background:var(--text);color:var(--bg, #fff)}
+.aistep li.ok .aistep-n{background:var(--tg, #2f9e44);color:#fff}
+.aistep .aiurl-v{display:block;margin-top:8px;word-break:break-all}
+.aistep pre.report{margin:8px 0 0;font-size:12px}
+.aistep .aiwait{margin-top:8px}
+}

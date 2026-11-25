@@ -2,7 +2,7 @@
 // travail elle-même (outils list_maps puis use_map). Depuis #285, l'IA peut aussi se connecter seule par OAuth
 // (on colle l'adresse /mcp, POP demande « Autoriser ») ; la clé API reste pour les autres.
 import { useState } from 'react'
-import { Check, Copy, Trash2, Lock, Unlock, ExternalLink, KeyRound } from 'lucide-react'
+import { Check, Copy, Trash2, Lock, Unlock, ExternalLink, KeyRound, ChevronDown } from 'lucide-react'
 import { ago, api } from '../api'
 import { useApp, useLoad } from '../state'
 import { CardHead } from './ui'
@@ -69,111 +69,116 @@ export function AccountAI() {
   </>)
 }
 
-/** « Connecter une IA » par onglet (#375) : une seule adresse MCP pour toutes les IA ; chaque onglet donne les étapes
- * de l'IA, vérifiées dans sa documentation officielle (novembre 2026), et ce qu'il faut copier. OAuth d'abord
- * (l'IA ouvre POP, on clique « Autoriser ») ; une clé API en secours pour les IA qui ne gèrent pas OAuth. */
+/** « Connecter une IA » en 3 étapes (#375, simplifié #379) : on choisit son IA, puis une phrase et un bouton par
+ * étape : copier, ouvrir l'IA ou coller, cliquer « Autoriser » dans POP. Étapes vérifiées dans la doc officielle de
+ * chaque IA (novembre 2026). La clé API reste en secours, repliée. */
 type Tab = {
   id: string; kind: string; name: string
-  steps: string[]
-  /** Ce qu'on copie : l'adresse, une commande ou une configuration (OAuth, sans clé). */
+  /** Étape 1 : ce qu'on copie (adresse, commande ou configuration), ou un lien d'installation. */
   copy: (url: string) => string
-  open?: { label: string; href: (url: string) => string }
-  note?: string
-  /** Même chose avec une clé API, pour les IA sans OAuth. */
+  install?: { label: string; href: (url: string) => string }
+  /** Étape 2 : où le coller, en une phrase ; bouton facultatif pour ouvrir l'IA. */
+  s2: string
+  open?: { label: string; href: string }
+  help?: string
+  /** Secours sans OAuth : la même chose avec une clé API. */
   key?: (url: string, k: string) => string
-  keyWhere?: string
 }
 const cfg = (v: any) => JSON.stringify(v, null, 2)
 const bearer = (k: string) => `Bearer ${k}`
+const MAIN = ['claude', 'chatgpt', 'gemini', 'lechat']
 export const TABS: Tab[] = [
-  { id: 'claude', kind: 'claude_desktop', name: 'Claude',
-    steps: [tr("Sur claude.ai ou dans l’application Claude : Personnaliser → Connecteurs."), tr("Cliquez « Ajouter un connecteur personnalisé », collez l’adresse de POP, puis « Ajouter »."), tr("Cliquez « Connecter » : la page POP s’ouvre, cliquez « Autoriser ».")],
-    copy: u => u, open: { label: tr("Ouvrir Claude"), href: () => 'https://claude.ai/customize/connectors' },
-    note: tr("Offre gratuite : un seul connecteur personnalisé. Équipe et Entreprise : un propriétaire ajoute d’abord POP dans Paramètres de l’organisation → Connecteurs."),
-    key: (u, k) => `${u}?token=${k}`, keyWhere: tr("Adresse à coller à la place (la clé est dedans) :") },
-  { id: 'chatgpt', kind: 'chatgpt', name: 'ChatGPT',
-    steps: [tr("Sur chatgpt.com (ordinateur), ouvrez Plugins (chatgpt.com/plugins)."), tr("Bouton + → « Add custom MCP server » : nom POP, collez l’adresse de POP sous « Connection », authentification OAuth."), tr("Cochez l’avertissement, « Create as a plugin », installez-le, puis cliquez « Autoriser » dans la page POP."), tr("Dans une conversation, tapez @ et choisissez POP.")],
-    copy: u => u, open: { label: tr("Ouvrir ChatGPT"), href: () => 'https://chatgpt.com/plugins' },
-    note: tr("Selon OpenAI : sur le web seulement ; outils en écriture avec les offres Business, Enterprise et Edu, lecture seule avec Pro.") },
-  { id: 'gemini', kind: 'gemini', name: 'Gemini',
-    steps: [tr("Sur gemini.google.com (ordinateur) : Paramètres → Connected Apps (ou Personal Intelligence → Connected Apps)."), tr("Sous « Custom apps », cliquez « Add a custom app » et collez l’adresse de POP, puis « Next »."), tr("Suivez les instructions : la page POP s’ouvre, cliquez « Autoriser ».")],
-    copy: u => u, open: { label: tr("Ouvrir Gemini"), href: () => 'https://gemini.google.com' },
-    note: tr("Selon Google, pour l’instant : 18 ans ou plus, aux États-Unis, compte Google personnel, Gemini en anglais, historique activé. Ensuite, POP marche aussi dans l’application mobile.") },
-  { id: 'lechat', kind: 'lechat', name: 'Le Chat',
-    steps: [tr("Dans Le Chat (Mistral) : panneau de gauche → Intelligence → Connecteurs."), tr("« + Add Connector », onglet « Custom MCP Connector » : nom pop, serveur : collez l’adresse de POP, authentification OAuth."), tr("Cliquez « Connect » : la page POP s’ouvre, cliquez « Autoriser ».")],
-    copy: u => u, open: { label: tr("Ouvrir Le Chat"), href: () => 'https://chat.mistral.ai' },
-    note: tr("Réservé aux administrateurs de l’espace (par défaut sur les offres Free, Pro et Student)."),
-    key: (_u, k) => k, keyWhere: tr("Ou choisissez l’authentification « HTTP Bearer Token » et collez cette clé :") },
-  { id: 'cursor', kind: 'cursor', name: 'Cursor',
-    steps: [tr("Cliquez « Installer dans Cursor » et acceptez, ou ajoutez la configuration dans ~/.cursor/mcp.json."), tr("Dans Cursor, Réglages → MCP : cliquez « Connect » à côté de pop."), tr("La page POP s’ouvre : cliquez « Autoriser ».")],
-    copy: u => cfg({ mcpServers: { pop: { url: u } } }),
-    open: { label: tr("Installer dans Cursor"), href: u => `cursor://anysphere.cursor-deeplink/mcp/install?name=pop&config=${encodeURIComponent(btoa(JSON.stringify({ url: u })))}` },
-    key: (u, k) => cfg({ mcpServers: { pop: { url: u, headers: { Authorization: bearer(k) } } } }), keyWhere: tr("Fichier ~/.cursor/mcp.json :") },
-  { id: 'vscode', kind: 'vscode', name: 'VS Code',
-    steps: [tr("Cliquez « Installer dans VS Code », ou ajoutez la configuration dans .vscode/mcp.json (commande « MCP: Add Server »)."), tr("Démarrez le serveur pop : VS Code ouvre la connexion dans le navigateur."), tr("La page POP s’ouvre : cliquez « Autoriser ». Les outils sont dans le mode Agent de Copilot.")],
-    copy: u => cfg({ servers: { pop: { type: 'http', url: u } } }),
-    open: { label: tr("Installer dans VS Code"), href: u => `vscode:mcp/install?${encodeURIComponent(JSON.stringify({ name: 'pop', type: 'http', url: u }))}` },
-    key: (u, k) => cfg({ servers: { pop: { type: 'http', url: u, headers: { Authorization: bearer(k) } } } }), keyWhere: tr("Fichier .vscode/mcp.json :") },
-  { id: 'windsurf', kind: 'windsurf', name: 'Windsurf',
-    steps: [tr("Dans Cascade, menu MCP → « View raw config » (fichier ~/.codeium/windsurf/mcp_config.json) et collez la configuration."), tr("Enregistrez et cliquez « Refresh » : Windsurf ouvre la page POP."), tr("Cliquez « Autoriser ».")],
-    copy: u => cfg({ mcpServers: { pop: { serverUrl: u } } }),
-    key: (u, k) => cfg({ mcpServers: { pop: { serverUrl: u, headers: { Authorization: bearer(k) } } } }), keyWhere: tr("Fichier ~/.codeium/windsurf/mcp_config.json :") },
-  { id: 'codex', kind: 'codex', name: 'Codex',
-    steps: [tr("Dans un terminal, lancez la commande (elle ajoute pop à ~/.codex/config.toml, partagé par la CLI et l’extension)."), tr("Puis lancez : codex mcp login pop"), tr("La page POP s’ouvre : cliquez « Autoriser ».")],
-    copy: u => `codex mcp add pop --url ${u}`,
-    key: (u, k) => `[mcp_servers.pop]\nurl = "${u}"\nhttp_headers = { "Authorization" = "Bearer ${k}" }`, keyWhere: tr("Dans ~/.codex/config.toml :") },
-  { id: 'claude_code', kind: 'claude_code', name: 'Claude Code',
-    steps: [tr("Dans un terminal, lancez la commande."), tr("Lancez Claude Code et tapez /mcp, choisissez pop puis « Authenticate » (ou : claude mcp login pop)."), tr("La page POP s’ouvre : cliquez « Autoriser ».")],
-    copy: u => `claude mcp add --transport http --scope user pop ${u}`,
-    key: (u, k) => `claude mcp add --transport http --scope user pop ${u} --header "Authorization: Bearer ${k}"`, keyWhere: tr("Dans un terminal :") },
-  { id: 'gemini_cli', kind: 'gemini_cli', name: 'Gemini CLI',
-    steps: [tr("Dans un terminal, lancez la commande."), tr("Lancez gemini et tapez /mcp auth pop."), tr("La page POP s’ouvre : cliquez « Autoriser ».")],
-    copy: u => `gemini mcp add --transport http --scope user pop ${u}`,
-    key: (u, k) => `gemini mcp add --transport http --scope user pop ${u} --header "Authorization: Bearer ${k}"`, keyWhere: tr("Dans un terminal :") },
-  { id: 'autre', kind: 'autre', name: tr("Autre client MCP"),
-    steps: [tr("Ajoutez un serveur MCP distant « Streamable HTTP » (parfois « HTTP ») avec l’adresse de POP."), tr("Si votre IA gère la connexion OAuth de MCP, elle ouvre POP : cliquez « Autoriser »."), tr("Sinon, créez une clé : en-tête Authorization: Bearer, ou adresse avec ?token=. Anciens clients : transport SSE à l’adresse /sse.")],
-    copy: u => u,
-    key: (u, k) => tr("Adresse : {0}\nEn-tête : Authorization: Bearer {1}\nOu adresse avec la clé : {0}?token={1}\nAncien transport SSE : {2}?token={1}", [u, k, u.replace(/\/mcp$/, '/sse')]), keyWhere: tr("À copier dans votre client :") },
+  { id: 'claude', kind: 'claude_desktop', name: 'Claude', copy: u => u,
+    s2: tr("Dans Claude, cliquez « Ajouter un connecteur personnalisé » et collez l’adresse."), open: { label: tr("Ouvrir Claude"), href: 'https://claude.ai/customize/connectors' },
+    help: tr("Le bouton ouvre la page des connecteurs de Claude. Sinon : Paramètres → Connecteurs. Offre gratuite : un seul connecteur personnalisé."),
+    key: (u, k) => `${u}?token=${k}` },
+  { id: 'chatgpt', kind: 'chatgpt', name: 'ChatGPT', copy: u => u,
+    s2: tr("Dans ChatGPT, cliquez + puis « Add custom MCP server » et collez l’adresse."), open: { label: tr("Ouvrir ChatGPT"), href: 'https://chatgpt.com/plugins' },
+    help: tr("Sur ordinateur (chatgpt.com). Selon OpenAI : écriture avec Business, Enterprise et Edu, lecture seule avec Pro."),
+    key: (u, k) => `${u}?token=${k}` },
+  { id: 'gemini', kind: 'gemini', name: 'Gemini', copy: u => u,
+    s2: tr("Dans Gemini, Paramètres → Connected Apps → « Add a custom app », collez l’adresse."), open: { label: tr("Ouvrir Gemini"), href: 'https://gemini.google.com' },
+    help: tr("Selon Google, pour l’instant : 18 ans ou plus, aux États-Unis, compte personnel, Gemini en anglais.") },
+  { id: 'lechat', kind: 'lechat', name: 'Le Chat', copy: u => u,
+    s2: tr("Dans Le Chat, Connecteurs → « + Add Connector » → « Custom MCP Connector », collez l’adresse."), open: { label: tr("Ouvrir Le Chat"), href: 'https://chat.mistral.ai' },
+    help: tr("Réservé à l’administrateur de l’espace (vous, sur les offres Free, Pro et Student)."),
+    key: (_u, k) => k },
+  { id: 'cursor', kind: 'cursor', name: 'Cursor', copy: u => cfg({ mcpServers: { pop: { url: u } } }),
+    install: { label: tr("Installer dans Cursor"), href: u => `cursor://anysphere.cursor-deeplink/mcp/install?name=pop&config=${encodeURIComponent(btoa(JSON.stringify({ url: u })))}` },
+    s2: tr("Dans Cursor, Réglages → MCP : cliquez « Connect » à côté de pop."),
+    key: (u, k) => cfg({ mcpServers: { pop: { url: u, headers: { Authorization: bearer(k) } } } }) },
+  { id: 'vscode', kind: 'vscode', name: 'VS Code', copy: u => cfg({ servers: { pop: { type: 'http', url: u } } }),
+    install: { label: tr("Installer dans VS Code"), href: u => `vscode:mcp/install?${encodeURIComponent(JSON.stringify({ name: 'pop', type: 'http', url: u }))}` },
+    s2: tr("Dans VS Code, démarrez le serveur pop (mode Agent de Copilot)."),
+    key: (u, k) => cfg({ servers: { pop: { type: 'http', url: u, headers: { Authorization: bearer(k) } } } }) },
+  { id: 'windsurf', kind: 'windsurf', name: 'Windsurf', copy: u => cfg({ mcpServers: { pop: { serverUrl: u } } }),
+    s2: tr("Dans Windsurf : Cascade → MCP → « View raw config », collez, puis « Refresh »."),
+    key: (u, k) => cfg({ mcpServers: { pop: { serverUrl: u, headers: { Authorization: bearer(k) } } } }) },
+  { id: 'codex', kind: 'codex', name: 'Codex', copy: u => `codex mcp add pop --url ${u}`,
+    s2: tr("Collez la commande dans un terminal (sinon ensuite : codex mcp login pop)."),
+    key: (u, k) => `[mcp_servers.pop]\nurl = "${u}"\nhttp_headers = { "Authorization" = "Bearer ${k}" }` },
+  { id: 'claude_code', kind: 'claude_code', name: 'Claude Code', copy: u => `claude mcp add --transport http --scope user pop ${u}`,
+    s2: tr("Collez la commande dans un terminal, puis tapez /mcp dans Claude Code et choisissez pop."),
+    key: (u, k) => `claude mcp add --transport http --scope user pop ${u} --header "Authorization: Bearer ${k}"` },
+  { id: 'gemini_cli', kind: 'gemini_cli', name: 'Gemini CLI', copy: u => `gemini mcp add --transport http --scope user pop ${u}`,
+    s2: tr("Collez la commande dans un terminal, puis tapez /mcp auth pop dans Gemini."),
+    key: (u, k) => `gemini mcp add --transport http --scope user pop ${u} --header "Authorization: Bearer ${k}"` },
+  { id: 'autre', kind: 'autre', name: tr("Autre IA"), copy: u => u,
+    s2: tr("Dans votre IA, ajoutez un serveur MCP « HTTP » avec cette adresse."),
+    help: tr("Anciens clients : transport SSE à l’adresse /sse."),
+    key: (u, k) => tr("Adresse : {0}\nEn-tête : Authorization: Bearer {1}\nOu adresse avec la clé : {0}?token={1}", [u, k]) },
 ]
 
-/** Onglets « Connecter une IA ». `onKey` crée une clé API pour l'onglet (secours sans OAuth). */
-export function ConnectTabs({ url, onKey }: { url: string; onKey: (kind: string, name: string) => Promise<string | null> }) {
+/** Choix de l'IA puis 3 étapes. `linked` : l'IA est connectée (l'étape 3 passe au vert). */
+export function ConnectTabs({ url, onKey, linked }: { url: string; onKey: (kind: string, name: string) => Promise<string | null>; linked?: boolean }) {
   const { toast } = useApp()
   const [sel, setSel] = useState('claude')
+  const [more, setMore] = useState(false)
   const [copied, setCopied] = useState('')
   const [key, setKey] = useState<{ tab: string; k: string } | null>(null)
   const t = TABS.find(x => x.id === sel)!
   const copy = async (txt: string, what: string) => { try { await navigator.clipboard.writeText(txt); setCopied(what) } catch { toast(tr("Copie impossible : sélectionnez le texte."), true) } }
   const text = t.copy(url)
-  const deep = t.open && t.open.href(url).match(/^(cursor|vscode):/)
-  return <div className="aiurl aitabs">
-    <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-      <b style={{ fontWeight: 500 }}>{tr("Adresse MCP de POP, la même pour toutes les IA :")}</b>
-      <code className="aiurl-v" style={{ flex: 1, minWidth: 220 }}>{url}</code>
-      <button className="btn" onClick={() => copy(url, 'url')}>{copied === 'url' ? <><Check size={15} />{tr("Copiée")}</> : <><Copy size={15} />{tr("Copier")}</>}</button>
+  const what = text === url ? tr("l’adresse") : text.startsWith('{') ? tr("la configuration") : tr("la commande")
+  const pick = (id: string) => { setSel(id); setCopied(''); setKey(null) }
+  const btn = (x: Tab, big: boolean) => <button key={x.id} role="tab" aria-selected={x.id === sel} className={(big ? 'aipick' : '') + (x.id === sel ? ' on' : '')} onClick={() => pick(x.id)}><ClientLogo kind={x.kind} size={big ? 22 : 16} />{x.name}</button>
+  return <div className="aisteps3">
+    <div className="aipicks" role="tablist" aria-label={tr("Votre IA")}>
+      {TABS.filter(x => MAIN.includes(x.id)).map(x => btn(x, true))}
+      <button className={'aipick' + (!MAIN.includes(sel) ? ' on' : '')} aria-expanded={more} onClick={() => setMore(m => !m)}>{tr("Autres IA")}<ChevronDown size={16} /></button>
     </div>
-    <div className="aiquick" role="tablist" aria-label={tr("Choisissez votre IA")}>{TABS.map(x => <button key={x.id} role="tab" aria-selected={x.id === sel} className={x.id === sel ? 'on' : ''} onClick={() => { setSel(x.id); setCopied(''); setKey(null) }}><ClientLogo kind={x.kind} size={16} />{x.name}</button>)}</div>
-    <div role="tabpanel" aria-label={t.name}>
-      <ol className="aisteps small">{t.steps.map((s, i) => <li key={i}>{s}</li>)}</ol>
-      {text !== url && <pre className="report mono" style={{ fontSize: 12, margin: '0 0 10px' }}>{text}</pre>}
-      <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-        {t.open && deep && <a className="btn pri" href={t.open.href(url)}>{t.open.label}</a>}
-        <button className={'btn' + (t.open && deep ? '' : ' pri')} onClick={() => copy(text, 'main')}>{copied === 'main' ? <><Check size={15} />{tr("Copié")}</> : <><Copy size={15} />{text === url ? tr("Copier l’adresse") : text.startsWith('{') ? tr("Copier la configuration") : tr("Copier la commande")}</>}</button>
-        {t.open && !deep && <a className="btn" href={t.open.href(url)} target="_blank" rel="noopener noreferrer"><ExternalLink size={15} />{t.open.label}</a>}
-      </div>
-      {t.note && <p className="small muted" style={{ marginBottom: 0 }}>{t.note}</p>}
-      {t.key && <div className="aikey">
-        {!key || key.tab !== t.id
-          ? <button className="linkbtn small" onClick={async () => { const k = await onKey(t.kind, t.name); if (k) setKey({ tab: t.id, k }) }}><KeyRound size={14} /> {tr("Pas de connexion OAuth ? Utiliser une clé API à la place")}</button>
-          : <>
-            <p className="small" style={{ margin: '10px 0 6px' }}>{t.keyWhere}</p>
-            <pre className="report mono" style={{ fontSize: 12, margin: 0 }}>{t.key(url, key.k)}</pre>
-            <div className="row" style={{ marginTop: 8, gap: 8 }}>
-              <button className="btn" onClick={() => copy(t.key!(url, key.k), 'key')}>{copied === 'key' ? <><Check size={15} />{tr("Copié")}</> : <><Copy size={15} />{tr("Copier")}</>}</button>
-              <span className="small muted">{tr("La clé ne sera plus affichée : copiez-la maintenant. Révocable dans « IA connectées ».")}</span>
-            </div>
-          </>}
-      </div>}
-    </div>
+    {(more || !MAIN.includes(sel)) && <div className="aiquick" role="tablist">{TABS.filter(x => !MAIN.includes(x.id)).map(x => btn(x, false))}</div>}
+    <ol className="aistep">
+      <li><span className="aistep-n">1</span><div>
+        <b>{t.install ? tr("Installez POP dans {0}", [t.name]) : tr("Copiez {0}", [what])}</b>
+        {text !== url && !t.install && <pre className="report mono">{text}</pre>}
+        {text === url && <code className="aiurl-v">{url}</code>}
+        <div className="row" style={{ gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+          {t.install && <a className="btn pri" href={t.install.href(url)}>{t.install.label}</a>}
+          <button className={'btn' + (t.install ? '' : ' pri')} onClick={() => copy(text, 'main')}>{copied === 'main' ? <><Check size={15} />{tr("Copié")}</> : <><Copy size={15} />{t.install ? tr("ou copier la configuration") : tr("Copier")}</>}</button>
+        </div>
+      </div></li>
+      <li><span className="aistep-n">2</span><div>
+        <b>{t.s2}</b>
+        {t.open && <div style={{ marginTop: 8 }}><a className="btn" href={t.open.href} target="_blank" rel="noopener noreferrer"><ExternalLink size={15} />{t.open.label}</a></div>}
+      </div></li>
+      <li className={linked ? 'ok' : ''}><span className="aistep-n">{linked ? <Check size={16} /> : 3}</span><div>
+        <b>{tr("Cliquez « Autoriser » sur la page POP qui s’ouvre.")}</b>
+        <div className={'aiwait' + (linked ? ' ok' : '')} role="status">{linked ? <><Check size={16} />{tr("Connectée !")}</> : <><span className="aiwait-dot" />{tr("En attente de votre IA…")}</>}</div>
+      </div></li>
+    </ol>
+    {(t.help || t.key) && <details className="connectai-more">
+      <summary className="small">{tr("Besoin d’aide ?")}</summary>
+      {t.help && <p className="small muted">{t.help}</p>}
+      {t.key && (!key || key.tab !== t.id
+        ? <button className="linkbtn small" onClick={async () => { const k = await onKey(t.kind, t.name); if (k) setKey({ tab: t.id, k }) }}><KeyRound size={14} /> {tr("Ça ne marche pas ? Utiliser une clé API à la place")}</button>
+        : <>
+          <pre className="report mono" style={{ fontSize: 12 }}>{t.key(url, key.k)}</pre>
+          <div className="row" style={{ gap: 8 }}>
+            <button className="btn" onClick={() => copy(t.key!(url, key.k), 'key')}>{copied === 'key' ? <><Check size={15} />{tr("Copié")}</> : <><Copy size={15} />{tr("Copier")}</>}</button>
+            <span className="small muted">{tr("La clé ne sera plus affichée. Révocable dans « IA connectées ».")}</span>
+          </div>
+        </>)}
+    </details>}
   </div>
 }
