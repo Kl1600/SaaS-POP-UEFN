@@ -795,6 +795,44 @@ pub const SHAPES: &[(&str, &str)] = &[
     ("cone", "/Engine/BasicShapes/Cone"),
 ];
 
+/// Dispersion (#118) : `nombre` points dans un disque (centre, rayon en cm), à `ecart` cm au moins l'un de
+/// l'autre, tirés avec une graine (même graine → mêmes positions). Erreur si la place manque.
+pub fn disperser(
+    centre: [f64; 3],
+    rayon: f64,
+    nombre: usize,
+    ecart: f64,
+    graine: u64,
+) -> Result<Vec<[f64; 3]>, String> {
+    let mut s = graine
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
+    let mut alea = || {
+        s = s
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        (s >> 11) as f64 / (1u64 << 53) as f64
+    };
+    let mut pts: Vec<[f64; 3]> = vec![];
+    let mut essais = 0;
+    while pts.len() < nombre {
+        essais += 1;
+        if essais > nombre * 60 + 1000 {
+            return Err(format!("Seulement {} élément(s) sur {nombre} tiennent dans ce rayon avec cet écart : agrandissez la zone ou réduisez le nombre ou l'écart.", pts.len()));
+        }
+        let r = rayon * alea().sqrt();
+        let a = alea() * std::f64::consts::TAU;
+        let p = [centre[0] + r * a.cos(), centre[1] + r * a.sin(), centre[2]];
+        if pts
+            .iter()
+            .all(|q| (q[0] - p[0]).hypot(q[1] - p[1]) >= ecart)
+        {
+            pts.push(p);
+        }
+    }
+    Ok(pts)
+}
+
 /// Valide une pose de mesh avant tout envoi à UEFN (#148) et remplace `shape` par le chemin du mesh.
 /// Rend le libellé du journal. Positions en cm (±20 km), rotation en degrés (±3 600), échelle de 0,001 à 1 000.
 fn propres_len(args: &Value) -> usize {
@@ -1159,6 +1197,78 @@ async fn prepare(
             ))
         }
 
+        "actor_scatter" => {
+            // Dispersion de props (#118) : positions tirées ici, puis une seule action annulable en bloc.
+            let props: Vec<String> = args["props"]
+                .as_array()
+                .cloned()
+                .unwrap_or_default()
+                .iter()
+                .filter_map(|x| x.as_str().map(|s| s.trim().to_string()))
+                .collect();
+            if props.is_empty()
+                || props.len() > 20
+                || props.iter().any(|p| !p.starts_with('/') || p.len() > 400)
+            {
+                return Err(bad(
+                    "Dispersion : de 1 à 20 props (chemins d’assets /Game/… ou /Fortnite…).",
+                ));
+            }
+            let centre = args["center"].as_array().filter(|v| {
+                v.len() == 3
+                    && v.iter().all(|x| {
+                        x.as_f64()
+                            .is_some_and(|f| f.is_finite() && f.abs() <= 1_000_000.0)
+                    })
+            });
+            let Some(centre) = centre.map(|v| {
+                [
+                    v[0].as_f64().unwrap(),
+                    v[1].as_f64().unwrap(),
+                    v[2].as_f64().unwrap(),
+                ]
+            }) else {
+                return Err(bad(
+                    "Dispersion : centre invalide (trois nombres en cm, 10 km au plus).",
+                ));
+            };
+            let rayon = args["radius"].as_f64().unwrap_or(f64::NAN);
+            if !(100.0..=100_000.0).contains(&rayon) {
+                return Err(bad("Dispersion : rayon de 100 à 100 000 cm (1 m à 1 km)."));
+            }
+            let nombre = args["count"].as_u64().unwrap_or(0) as usize;
+            if !(1..=300).contains(&nombre) {
+                return Err(bad("Dispersion : de 1 à 300 éléments (count)."));
+            }
+            let ecart = args["min_spacing"].as_f64().unwrap_or(0.0);
+            if !ecart.is_finite() || !(0.0..=rayon).contains(&ecart) {
+                return Err(bad("Dispersion : écart minimal de 0 au rayon (cm)."));
+            }
+            let dossier = args["folder"]
+                .as_str()
+                .filter(|f| !f.trim().is_empty())
+                .unwrap_or("Dispersion")
+                .trim()
+                .to_string();
+            check_len("Dossier", &dossier, 1, 200)?;
+            check_lock(&dossier)?;
+            let tourner = args["random_rotation"].as_bool().unwrap_or(true);
+            let graine = args["seed"]
+                .as_u64()
+                .unwrap_or_else(|| rand::random::<u32>() as u64);
+            let pts = disperser(centre, rayon, nombre, ecart, graine).map_err(bad)?;
+            let items: Vec<Value> = pts
+                .iter()
+                .enumerate()
+                .map(|(i, p)| {
+                    let lacet = if tourner { (graine.wrapping_add(i as u64).wrapping_mul(2654435761) % 360) as f64 } else { 0.0 };
+                    json!({ "asset": props[i % props.len()], "location": p, "rotation": [0.0, lacet, 0.0], "name": "", "folder": dossier })
+                })
+                .collect();
+            *args = json!({ "items": items, "seed": graine });
+            Ok((format!("Dispersion : {nombre} élément(s) dans un rayon de {} m (dossier « {dossier} »)", (rayon / 100.0).round()), Value::Null, None))
+        }
+
         "mesh_spawn" => {
             // Poser un mesh (#148) : forme de base ou mesh du Content Browser, avec échelle.
             let quoi = check_mesh_args(args)?;
@@ -1458,6 +1568,7 @@ async fn run_action(
     let secs = if matches!(
         action,
         "actor_blockout"
+            | "actor_scatter"
             | "compile"
             | "push_session"
             | "render_topview"
@@ -1501,7 +1612,11 @@ async fn run_action(
                 }
                 if matches!(
                     action,
-                    "actor_duplicate" | "actor_spawn" | "mesh_spawn" | "actor_blockout"
+                    "actor_duplicate"
+                        | "actor_spawn"
+                        | "mesh_spawn"
+                        | "actor_blockout"
+                        | "actor_scatter"
                 ) {
                     if let Some(ids) = data.get("created_ids") {
                         extra_undo = Some(
@@ -2130,6 +2245,64 @@ mod tests_rangement {
         );
         let args: Value = serde_json::from_str(&args).unwrap();
         assert_eq!(args["items"][3]["folder"], "Blockout");
+        // Dispersion (#118) : zone ou nombre invalides refusés avant tout envoi ; sinon une seule action.
+        let base = json!({ "props": ["/Game/Arbres/Chene"], "center": [0.0, 0.0, 0.0], "radius": 2000.0, "count": 50, "min_spacing": 150.0, "seed": 7 });
+        for (k, v) in [
+            ("radius", json!(10.0)),
+            ("count", json!(0)),
+            ("count", json!(5000)),
+            ("center", json!([0, "x", 0])),
+            ("props", json!(["arbre"])),
+            ("min_spacing", json!(99999.0)),
+        ] {
+            let mut a = base.clone();
+            a[k] = v;
+            assert!(exec(&st, o(), "actor_scatter", a).await.is_err(), "{k}");
+        }
+        let mut serre = base.clone();
+        serre["radius"] = json!(200.0);
+        let e = exec(&st, o(), "actor_scatter", serre).await.unwrap_err();
+        assert!(format!("{e:?}").contains("tiennent"), "{e:?}");
+        let n: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM uefn_actions WHERE action = 'actor_scatter'")
+                .fetch_one(&st.db)
+                .await
+                .unwrap();
+        assert_eq!(n, 0);
+        let _ = exec(&st, o(), "actor_scatter", base.clone()).await;
+        let (resume, args): (String, String) =
+            sqlx::query_as("SELECT summary, args FROM uefn_actions WHERE action = 'actor_scatter'")
+                .fetch_one(&st.db)
+                .await
+                .unwrap();
+        assert_eq!(
+            resume,
+            "Dispersion : 50 élément(s) dans un rayon de 20 m (dossier « Dispersion »)"
+        );
+        let args: Value = serde_json::from_str(&args).unwrap();
+        let pts: Vec<[f64; 2]> = args["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|x| {
+                [
+                    x["location"][0].as_f64().unwrap(),
+                    x["location"][1].as_f64().unwrap(),
+                ]
+            })
+            .collect();
+        assert_eq!(pts.len(), 50);
+        for (i, p) in pts.iter().enumerate() {
+            assert!(p[0].hypot(p[1]) <= 2000.0 + 1e-6);
+            for q in &pts[i + 1..] {
+                assert!((p[0] - q[0]).hypot(p[1] - q[1]) >= 150.0, "chevauchement");
+            }
+        }
+        assert_eq!(
+            disperser([0.0; 3], 2000.0, 50, 150.0, 7).unwrap()[3][0],
+            pts[3][0],
+            "même graine, mêmes positions"
+        );
     }
 }
 

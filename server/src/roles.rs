@@ -93,6 +93,7 @@ pub const ROLES: &[Role] = &[
                 "duplicate_actors",
                 "delete_actors",
                 "place_device",
+                "scatter_props",
                 "place_mesh",
                 "save_device_config",
                 "apply_device_config",
