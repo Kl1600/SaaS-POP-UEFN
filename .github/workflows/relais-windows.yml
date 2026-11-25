@@ -1,4 +1,4 @@
-# Relais pop-link.exe recompilé sous Windows (#358). Les agents IA ne peuvent pas compiler pour Windows : quand une
+# Relais pop-link.exe et installateur de POP Forge recompilés sous Windows (#358, #80). Les agents IA ne peuvent pas compiler pour Windows : quand une
 # branche de tâche change le relais (link/), ce workflow construit pop-link.exe sur un runner Windows, le copie dans
 # web/public/downloads/, reconstruit web/dist (sous Linux, fins de ligne LF) et pousse un commit sur la même branche.
 # Rien n'est jamais poussé sur main ; le commit du robot ne touche pas link/, donc pas de boucle.
@@ -12,6 +12,13 @@ on:
       - 'link/Cargo.toml'
       - 'link/Cargo.lock'
       - 'link/build.rs'
+      - 'forge/src/**'
+      - 'forge/ui/**'
+      - 'forge/icons/**'
+      - 'forge/Cargo.toml'
+      - 'forge/Cargo.lock'
+      - 'forge/tauri.conf.json'
+      - 'forge/build.rs'
   workflow_dispatch:
 
 permissions:
@@ -39,6 +46,20 @@ jobs:
           name: pop-link
           path: link/target/release/pop-link.exe
           retention-days: 3
+      # Installateur de POP Forge (#80) : Forge embarque le relais, il est reconstruit quand link/ ou forge/ change.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: forge
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npx --yes @tauri-apps/cli@2 build --bundles nsis -- --locked
+        working-directory: forge
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pop-forge
+          path: forge/target/release/bundle/nsis/*.exe
+          retention-days: 3
 
   commit:
     name: commit sur la branche
@@ -53,6 +74,14 @@ jobs:
           name: pop-link
           path: /tmp/pop-link
       - run: cp /tmp/pop-link/pop-link.exe web/public/downloads/pop-link.exe
+      - uses: actions/download-artifact@v4
+        with:
+          name: pop-forge
+          path: /tmp/pop-forge
+      - name: installateur de Forge et sa version
+        run: |
+          cp /tmp/pop-forge/*.exe web/public/downloads/pop-forge-setup.exe
+          python3 -c "import json,datetime; v=json.load(open('forge/tauri.conf.json'))['version']; json.dump({'version': v, 'date': datetime.date.today().isoformat()}, open('web/public/downloads/pop-forge.json','w'))"
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -68,11 +97,11 @@ jobs:
             echo "pop-link.exe déjà à jour."; exit 0
           fi
           n=$(echo "$BRANCHE" | sed -n 's#^issue/\([0-9]\+\)-.*#\1#p')
-          titre="pop-link.exe recompilé sous Windows (CI)"
+          titre="pop-link.exe et installateur de Forge recompilés sous Windows (CI)"
           if [ -n "$n" ]; then msg="#$n : $titre"; else msg="$titre"; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add web/public/downloads/pop-link.exe web/dist
+          git add web/public/downloads/pop-link.exe web/public/downloads/pop-forge-setup.exe web/public/downloads/pop-forge.json web/dist
           git commit -q --cleanup=verbatim -m "$msg"
           for i in 1 2 3; do
             git pull -q --rebase origin "$BRANCHE" && git push -q origin "HEAD:$BRANCHE" && exit 0
