@@ -50,6 +50,14 @@ impl Hub {
     pub fn send(&self, map_id: i64, msg: Value) {
         let _ = self.chan(map_id).send(msg.to_string());
     }
+    /// Canal d'un compte (#296), sur toutes ses connexions, quelle que soit la map ouverte : clé négative.
+    pub fn send_user(&self, user_id: i64, msg: Value) {
+        let _ = self.chan(-user_id).send(msg.to_string());
+    }
+    #[cfg(test)]
+    pub fn subscribe_user(&self, user_id: i64) -> broadcast::Receiver<String> {
+        self.chan(-user_id).subscribe()
+    }
     fn presence_list(&self, map_id: i64) -> Value {
         let p = self.presence.lock().unwrap();
         let mut seen = HashMap::new();
@@ -109,6 +117,7 @@ pub async fn ws_handler(
 async fn run(st: AppState, user: AuthUser, map_id: i64, can_edit: bool, socket: WebSocket) {
     let conn = st.hub.next.fetch_add(1, Ordering::Relaxed);
     let mut rx = st.hub.chan(map_id).subscribe();
+    let mut urx = st.hub.chan(-user.id).subscribe();
     let (mut tx, mut inbound) = socket.split();
     st.hub.set_presence(
         map_id,
@@ -125,6 +134,11 @@ async fn run(st: AppState, user: AuthUser, map_id: i64, can_edit: bool, socket: 
     loop {
         tokio::select! {
             msg = rx.recv() => match msg {
+                Ok(text) => { if tx.send(Message::Text(text.into())).await.is_err() { break; } }
+                Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                Err(_) => break,
+            },
+            msg = urx.recv() => match msg {
                 Ok(text) => { if tx.send(Message::Text(text.into())).await.is_err() { break; } }
                 Err(broadcast::error::RecvError::Lagged(_)) => continue,
                 Err(_) => break,

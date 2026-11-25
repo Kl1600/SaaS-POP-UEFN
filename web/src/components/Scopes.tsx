@@ -1,16 +1,20 @@
 // Portées de la dashboard : une map (/map/:mid/…) ou un studio (/studio/:sid/…).
 import { useEffect } from 'react'
-import { Navigate, Outlet, useLocation, useParams } from 'react-router-dom'
+import { Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useApp } from '../state'
 import { resolvePath } from '../routes'
 
 /** /map/:mid/… : choisit la map de l'adresse, et n'affiche la page qu'une fois cette map chargée. */
 export function MapScope() {
   const { mid } = useParams()
-  const { me, map, setMapId, setStudioId } = useApp()
+  const { me, map, setMapId, setStudioId, mapSync } = useApp()
   const id = Number(mid)
   const exists = !!me?.studios.some(s => s.maps.some(m => m.id === id))
-  useEffect(() => { if (exists) { setStudioId(null); if (map?.id !== id) setMapId(id) } }, [id, exists])
+  const nav = useNavigate()
+  const loc = useLocation()
+  useEffect(() => { if (exists) { setStudioId(null); if (map?.id !== id || me?.current_map !== id) setMapId(id) } }, [id, exists])
+  // Map changée dans Forge ou une autre fenêtre (#296) : on suit, sur le même écran.
+  useEffect(() => { if (mapSync && map && map.id !== id) nav(loc.pathname.replace(/^\/map\/\d+/, `/map/${map.id}`) + loc.search, { replace: true }) }, [mapSync])
   if (!exists) return <Navigate to="/" replace />
   if (map?.id !== id) return null
   return <Outlet />

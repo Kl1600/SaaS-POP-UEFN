@@ -6,7 +6,7 @@ export type MapInfo = { id: number; name: string; genre: string; release_date: s
 export type Studio = { id: number; name: string; role: string; personal?: boolean; analyse?: boolean; maps: MapInfo[] }
 /** Nom affiché d’un studio : « Mes maps » pour l’espace perso. */
 export const studioName = (s?: { name: string; personal?: boolean } | null) => s ? (s.personal ? tr("Mes maps (seul)") : s.name) : ""
-export type Me = { user: { id: number; name: string; email: string }; credits: number; studios: Studio[]; admin?: boolean; moderator?: boolean; admin_pending?: number; username?: string | null; must_change_password?: boolean; plan?: string; trial_until?: string | null; analyse?: boolean; billing_state?: string; ai_credits?: number; email_verified?: boolean; announcement?: { id: number; text: string; level: string } | null }
+export type Me = { user: { id: number; name: string; email: string }; credits: number; studios: Studio[]; admin?: boolean; moderator?: boolean; admin_pending?: number; username?: string | null; must_change_password?: boolean; plan?: string; trial_until?: string | null; analyse?: boolean; billing_state?: string; ai_credits?: number; email_verified?: boolean; announcement?: { id: number; text: string; level: string } | null; current_map?: number | null }
 export type Presence = { uid: number; name: string; place: string; page?: string }
 
 type Ctx = {
@@ -16,6 +16,8 @@ type Ctx = {
   studio: Studio | null
   map: MapInfo | null
   setMapId: (id: number) => void
+  /** Augmente quand une autre fenêtre du compte (Forge ou le site) change la map courante (#296). */
+  mapSync: number
   /** Studio affiché par les pages /studio/:sid (sinon : celui de la map en cours). */
   setStudioId: (id: number | null) => void
   role: string
@@ -41,10 +43,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [toastMsg, setToast] = useState<{ m: string; bad: boolean; action?: { label: string; run: () => void }; k: number } | null>(null)
   const [presence, setPresence] = useState<Presence[]>([])
   const subs = useRef(new Set<(m: any) => void>())
+  const first = useRef(false)
+  const [mapSync, setMapSync] = useState(0)
   const sock = useRef<WebSocket | null>(null)
 
   const reload = useCallback(async () => {
-    try { setMe(await api.get<Me>('/api/me')) } catch { setMe(null) } finally { setLoading(false) }
+    try {
+      const m = await api.get<Me>('/api/me')
+      setMe(m)
+      // Map courante du compte (#296), la même dans Forge et sur le site ; localStorage ne sert qu'en secours.
+      if (m.current_map && !first.current) setMapIdState(m.current_map)
+      first.current = true
+    } catch { setMe(null) } finally { setLoading(false) }
   }, [])
   useEffect(() => { reload() }, [reload])
 
@@ -54,7 +64,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const map = cur?.m ?? null
   const role = studio?.role ?? 'viewer'
 
-  const setMapId = (id: number) => { setMapIdState(id); try { localStorage.setItem('pop.map', String(id)) } catch {} }
+  const setMapId = (id: number) => {
+    setMapIdState(id); try { localStorage.setItem('pop.map', String(id)) } catch {}
+    if (id !== me?.current_map) api.put('/api/me/current-map', { map_id: id }).then(() => setMe(m => m && { ...m, current_map: id })).catch(() => {})
+  }
   const toggleDark = () => setDark(d => { try { localStorage.setItem('pop.dark', d ? '0' : '1') } catch {}; return !d })
   const toastTimer = useRef<any>(null)
   const toast = useCallback((m: string, bad = false, action?: { label: string; run: () => void }) => {
@@ -75,6 +88,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         try {
           const m = JSON.parse(e.data)
           if (m.t === 'presence') setPresence(m.users)
+          if (m.t === 'current_map' && typeof m.map_id === 'number') {
+            setMapIdState(m.map_id); setMe(x => x && { ...x, current_map: m.map_id }); setMapSync(n => n + 1)
+            try { localStorage.setItem('pop.map', String(m.map_id)) } catch {}
+          }
           subs.current.forEach(fn => fn(m))
         } catch {}
       }
@@ -92,10 +109,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const value = useMemo<Ctx>(() => ({
-    me, loading, reload, studio, map, setMapId, setStudioId, role,
+    me, loading, reload, studio, map, setMapId, mapSync, setStudioId, role,
     canEdit: role !== 'viewer', isAdmin: role === 'owner' || role === 'admin',
     dark, toggleDark, toast, presence, subscribe, send,
-  }), [me, loading, studio, map, role, dark, presence])
+  }), [me, loading, studio, map, role, dark, presence, mapSync])
 
   return (
     <C.Provider value={value}>
