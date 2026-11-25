@@ -367,10 +367,13 @@ pub async fn mcp(
         "ping" => rpc_ok(id, json!({})),
         "tools/list" => rpc_ok(
             id,
-            json!({ "tools": tools().as_array().cloned().unwrap_or_default().into_iter().filter(|t| { let n = t["name"].as_str().unwrap_or(""); (scope != "read" || READ_TOOLS.contains(&n)) && permis(n) }).collect::<Vec<_>>() }),
+            json!({ "tools": tools().as_array().cloned().unwrap_or_default().into_iter().filter(|t| { let n = t["name"].as_str().unwrap_or(""); scope != "off" && (scope != "read" || READ_TOOLS.contains(&n)) && permis(n) }).collect::<Vec<_>>() }),
         ),
         "tools/call" => {
             let name = req["params"]["name"].as_str().unwrap_or("");
+            if scope == "off" {
+                return rpc_ok(id, text("Cette IA a été coupée dans POP Forge (écran Agents) : un humain doit la réactiver avant qu'elle puisse agir.", true));
+            }
             if scope == "read" && !READ_TOOLS.contains(&name) {
                 return rpc_ok(id, text("Cette IA est en lecture seule dans POP (IA connectées → autoriser les modifications).", true));
             }
@@ -2103,6 +2106,71 @@ mod tests_compte {
             .await
             .unwrap();
         t
+    }
+
+    /// Écran Agents de Forge (#94) : couper, lecture seule, attribuer une tâche visible par next_task.
+    #[tokio::test]
+    async fn ecran_agents_couper_lire_attribuer() {
+        let m = monde().await;
+        let t = jeton(&m, Some(m.equipe), "write").await;
+        let aid: i64 = sqlx::query_scalar("SELECT id FROM api_tokens WHERE token_hash = ?")
+            .bind(sha256_hex(&t))
+            .fetch_one(&m.st.db)
+            .await
+            .unwrap();
+        let u = AuthUser {
+            id: m.uid,
+            email: "ia@a.fr".into(),
+            name: "Yanis".into(),
+            sid: String::new(),
+        };
+        let mode = |s: &str| {
+            crate::agents::route_mode(
+                State(m.st.clone()),
+                u.clone(),
+                Path((m.equipe, aid)),
+                Json(serde_json::from_value(json!({ "mode": s })).unwrap()),
+            )
+        };
+        let (err, _) = mcp_call(
+            &m.st,
+            &t,
+            "create_task",
+            json!({ "title": "Système de score" }),
+        )
+        .await;
+        assert!(!err);
+        mode("off").await.unwrap();
+        let (err, msg) = mcp_call(&m.st, &t, "list_tasks", json!({})).await;
+        assert!(err && msg.contains("coupée"), "{msg}");
+        mode("read").await.unwrap();
+        assert!(!mcp_call(&m.st, &t, "list_tasks", json!({})).await.0);
+        let (err, msg) = mcp_call(&m.st, &t, "create_task", json!({ "title": "Interdit" })).await;
+        assert!(err && msg.contains("lecture seule"), "{msg}");
+        mode("write").await.unwrap();
+        let _ = crate::agents::route_attribuer(
+            State(m.st.clone()),
+            u.clone(),
+            Path((m.equipe, aid)),
+            Json(serde_json::from_value(json!({ "number": 1 })).unwrap()),
+        )
+        .await
+        .unwrap();
+        let (_, msg) = mcp_call(&m.st, &t, "next_task", json!({})).await;
+        assert!(
+            msg.contains("Système de score"),
+            "tâche attribuée visible côté MCP : {msg}"
+        );
+        assert!(mode("nimporte").await.is_err());
+        // Un agent d'une autre map n'est pas atteignable par cette route.
+        assert!(crate::agents::route_mode(
+            State(m.st.clone()),
+            u.clone(),
+            Path((m.autre, aid)),
+            Json(serde_json::from_value(json!({ "mode": "off" })).unwrap())
+        )
+        .await
+        .is_err());
     }
 
     #[tokio::test]

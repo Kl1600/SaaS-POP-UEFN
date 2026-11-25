@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Bell, Bot, Building2, Check, ChevronsUpDown, ExternalLink, Hammer, Home, Library, Minus, Moon, RefreshCw, Square, Sun, User, Wrench, X } from 'lucide-react'
 import LangPicker from '../components/LangPicker'
+import { ForgeAgents } from '../components/ForgeAgents'
 import { useApp, studioName, useLive, useLoad } from '../state'
 import { ago, api } from '../api'
 import { tr } from '../i18n/t'
@@ -28,7 +29,6 @@ const SECTIONS: [Section, string, any][] = [
 ]
 // Écrans encore vides : ce qu'ils feront et les issues qui les rempliront (critère 7 de #78).
 const A_VENIR: Partial<Record<Section, [string, string]>> = {
-  agents: [tr("Lancer une équipe d'agents, parler à chacun ou à toute l'équipe, suivre leur travail en direct."), '#94, #95, #112, #298'],
   construire: [tr("Compiler, lancer la session de test, lire les erreurs en français, et savoir si la map est prête à publier."), '#83, #97, #301'],
   bibliotheque: [tr("Tout ce que le studio réutilise : modules Verse, 3D, images et sons, installés en un clic."), '#86, #92'],
   outils: [tr("Assets inutilisés, ambiances lumineuses, renommer et supprimer sans risque."), tr("issues à créer après les écrans principaux")],
@@ -110,6 +110,7 @@ export default function Forge() {
       <main className="content" style={{ padding: '40px 28px', width: '100%', maxWidth: 920, margin: '0 auto', boxSizing: 'border-box' }}>
         {section === 'accueil' ? <Accueil invoke={invoke} etat={etat} liaison={liaison} relie={relie} relire={lire} />
           : section === 'reglages' ? <Reglages />
+          : section === 'agents' ? (app.map ? <ForgeAgents mapId={app.map.id} /> : <p className="muted">{tr("Choisissez une map.")}</p>)
             : <AVenir section={section} titre={titre ?? ''} />}
       </main>
     </div>

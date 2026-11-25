@@ -669,6 +669,14 @@ fn api() -> Router<AppState> {
         .route("/api/maps/{mid}/agents", get(agents::list))
         .route("/api/maps/{mid}/resumes", get(resume::route))
         .route("/api/maps/{mid}/agents/activity", get(agents::activite))
+        .route(
+            "/api/maps/{mid}/agents/{aid}/mode",
+            post(agents::route_mode),
+        )
+        .route(
+            "/api/maps/{mid}/agents/{aid}/assign",
+            post(agents::route_attribuer),
+        )
         .route("/api/maps/{mid}/fil", get(fil::route))
         .route("/api/maps/{mid}/ping", post(ping::ping))
         .route("/api/maps/{mid}/questions", get(questions::route_liste))

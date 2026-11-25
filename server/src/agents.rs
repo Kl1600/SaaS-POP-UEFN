@@ -202,10 +202,12 @@ pub async fn activite(
     map_ctx(&st, &u, mid).await?;
     let rows: Vec<(i64, String, Option<String>, String, bool, String, Option<i64>)> = sqlx::query_as(
         "SELECT c.id, a.name, a.role, c.tool, c.ok, c.at, t.number FROM agent_calls c JOIN api_tokens a ON a.id = c.agent_id
-         LEFT JOIN tasks t ON t.id = c.task_id WHERE c.map_id = ? AND c.id > ? ORDER BY c.id DESC LIMIT 50",
+         LEFT JOIN tasks t ON t.id = c.task_id WHERE c.map_id = ? AND c.id > ? AND (? = 0 OR c.agent_id = ?) ORDER BY c.id DESC LIMIT 50",
     )
     .bind(mid)
     .bind(q.get("after").copied().unwrap_or(0))
+    .bind(q.get("agent").copied().unwrap_or(0))
+    .bind(q.get("agent").copied().unwrap_or(0))
     .fetch_all(&st.db)
     .await?;
     Ok(Json(json!(rows
@@ -776,4 +778,122 @@ mod tests {
             .await
             .unwrap();
     }
+}
+
+/// Agent de la map `mid` : (propriétaire, nom). Introuvable s'il n'est pas sur cette map.
+async fn agent_de(st: &AppState, mid: i64, aid: i64) -> Result<(i64, String), AppError> {
+    sqlx::query_as("SELECT user_id, name FROM api_tokens WHERE id = ? AND map_id = ?")
+        .bind(aid)
+        .bind(mid)
+        .fetch_optional(&st.db)
+        .await?
+        .ok_or(AppError::NotFound)
+}
+
+#[derive(serde::Deserialize)]
+pub struct ModeIn {
+    mode: String,
+}
+
+/// `POST /api/maps/{mid}/agents/{aid}/mode` (écran Agents de Forge, #94) : `write` (agit), `read` (lecture seule)
+/// ou `off` (coupé : plus aucun outil). Par le propriétaire de l'agent ou un admin du studio.
+pub async fn route_mode(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path((mid, aid)): Path<(i64, i64)>,
+    Json(b): Json<ModeIn>,
+) -> ApiResult<Value> {
+    let ctx = map_ctx(&st, &u, mid).await?;
+    let (owner, nom) = agent_de(&st, mid, aid).await?;
+    if owner != u.id {
+        ctx.require(crate::access::Role::Admin)?;
+    }
+    let (scope, quoi) = match b.mode.as_str() {
+        "write" => ("write", "peut de nouveau modifier"),
+        "read" => ("read", "passé en lecture seule"),
+        "off" => ("off", "coupé"),
+        _ => return Err(crate::error::bad("Mode inconnu : write, read ou off.")),
+    };
+    sqlx::query("UPDATE api_tokens SET scope = ? WHERE id = ?")
+        .bind(scope)
+        .bind(aid)
+        .execute(&st.db)
+        .await?;
+    crate::access::log_activity(
+        &st,
+        mid,
+        Some(u.id),
+        "agent",
+        &format!("Agent « {nom} » {quoi}"),
+        "",
+    )
+    .await?;
+    crate::access::notify(&st, mid, json!({ "t": "refresh", "what": "ai" }));
+    Ok(Json(json!({ "ok": true, "scope": scope })))
+}
+
+#[derive(serde::Deserialize)]
+pub struct AttribuerIn {
+    number: Option<i64>,
+}
+
+/// `POST /api/maps/{mid}/agents/{aid}/assign` (#94) : un humain attribue une tâche à un agent (lui seul pourra la
+/// réserver, il la voit dans next_task) ; `number` absent = l'agent n'a plus de tâche attribuée.
+pub async fn route_attribuer(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path((mid, aid)): Path<(i64, i64)>,
+    Json(b): Json<AttribuerIn>,
+) -> ApiResult<Value> {
+    let ctx = map_ctx(&st, &u, mid).await?;
+    ctx.can_edit()?;
+    let (_, nom) = agent_de(&st, mid, aid).await?;
+    let Some(number) = b.number else {
+        sqlx::query("UPDATE tasks SET agent_id = NULL WHERE agent_id = ? AND map_id = ? AND status <> 'done'")
+            .bind(aid)
+            .bind(mid)
+            .execute(&st.db)
+            .await?;
+        crate::access::notify(&st, mid, json!({ "t": "refresh", "what": "tasks" }));
+        return Ok(Json(json!({ "ok": true })));
+    };
+    let (tid, status): (i64, String) =
+        sqlx::query_as("SELECT id, status FROM tasks WHERE map_id = ? AND number = ?")
+            .bind(mid)
+            .bind(number)
+            .fetch_optional(&st.db)
+            .await?
+            .ok_or_else(|| crate::error::bad(format!("Tâche #{number} introuvable.")))?;
+    if status == "done" {
+        return Err(crate::error::bad(format!(
+            "La tâche #{number} est déjà faite."
+        )));
+    }
+    // Une tâche réservée par un autre agent reste à lui : on n'arrache pas le travail en cours.
+    let pris: Option<(i64, String)> =
+        sqlx::query_as("SELECT id, name FROM api_tokens WHERE task_id = ?")
+            .bind(tid)
+            .fetch_optional(&st.db)
+            .await?;
+    if let Some((pid, pnom)) = pris.filter(|p| p.0 != aid) {
+        let _ = pid;
+        return Err(AppError::Conflict(format!(
+            "La tâche #{number} est en cours chez l'agent « {pnom} ». Attendez qu'il la finisse ou la libère."
+        )));
+    }
+    sqlx::query("UPDATE tasks SET agent_id = ? WHERE id = ?")
+        .bind(aid)
+        .bind(tid)
+        .execute(&st.db)
+        .await?;
+    sqlx::query("INSERT INTO task_events (task_id, user_id, what, via) VALUES (?, ?, ?, 'Forge')")
+        .bind(tid)
+        .bind(u.id)
+        .bind(format!("Attribuée à l'agent « {nom} »"))
+        .execute(&st.db)
+        .await?;
+    crate::access::notify(&st, mid, json!({ "t": "refresh", "what": "tasks" }));
+    Ok(Json(
+        json!({ "ok": true, "message": format!("Tâche #{number} attribuée à « {nom} ».") }),
+    ))
 }
