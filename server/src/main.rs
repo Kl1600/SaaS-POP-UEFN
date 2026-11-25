@@ -21,6 +21,7 @@ mod billing;
 mod boards;
 mod catalog;
 mod checks;
+mod courante;
 mod device_configs;
 mod discover;
 mod engine;
@@ -364,6 +365,7 @@ fn api() -> Router<AppState> {
             post(analytics::tiktok_refresh),
         )
         .route("/api/me", get(auth::me).delete(manage::delete_me))
+        .route("/api/me/current-map", put(courante::changer))
         .route("/api/me/export", get(manage::export_me))
         .route(
             "/api/studios/{sid}",
