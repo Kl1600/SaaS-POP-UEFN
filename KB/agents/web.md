@@ -246,3 +246,10 @@ Bloque : rien
 - Corrigé en passant : `AiLogo` suffixe les id des dégradés (un logo caché rendait les autres copies invisibles).
 - Vérifié : `cargo test` (`agent_en_attente_puis_connecte`) ; navigateur en local, appels MCP réels par HTTP ; testé par l'humain avec Claude Code et le prompt.
 - Leçon : un mot = une chose ; « IA » = l'outil connecté au compte, « agent » = une IA au travail sur une tâche (rôle, `claim_task`).
+### 2026-11-24 · #78 F4 · interface de Forge d'après les maquettes validées
+- Fait : `web/src/pages/Forge.tsx` refait (barre latérale Accueil, Agents, Construire, Bibliothèque, Outils ; sélecteur studio / map ; « Ouvrir POP » ; profil avec menu : Réglages, IA connectées, thème, mon compte, déconnexion ; cloche des notifications ; « En ce moment » = agents de la map et leur tâche avec « Voir dans POP ») ; liaison : seulement une map existante + « Créer la map dans POP » (navigateur) ; écrans vides avec leurs issues. Branche rebasée sur `main` (92 commits de retard) et réduite à un seul commit.
+- Vérifié : `tsc` + build ; Forge compilé sous Linux (`cargo build`) ; page `/forge` vue dans Chrome avec un relais simulé pour la capture (clair, sombre, menu du profil). Pas vérifié : Windows, vrai UEFN, garde de navigation dans WebView2 (PC de benybens).
+
+### 2026-11-24 · #78 · retours de Kl1600 sur Forge (test Windows)
+- Fait : la fenêtre de Forge n'a plus le cadre ni le menu de Windows (`decorations(false)`) ; barre de titre dessinée par la page (`TitleBar` dans Forge.tsx, `.barre` dans forge/ui/index.html) : glisser = déplacer, double-clic = agrandir, réduire / agrandir / fermer par la commande `fenetre` ; l'ancien menu (état du relais, changer l'adresse, recharger, F5) est dans le menu du profil par `action_forge`. Sélecteur de map sur le modèle de `MapSwitcher` du site (classes `mapsw-*`), sans gestion des maps (renvoi vers POP). Un compte sans map n'a plus l'écran de bienvenue du site (« Télécharger UEFN Link ») dans Forge.
+- Vérifié : Chrome sans tête avec un pont Tauri simulé (appels `fenetre` et `action_forge`, choix de map), `cargo test` de forge sous Linux ; reste à voir dans la vraie fenêtre Windows.

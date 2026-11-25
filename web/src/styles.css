@@ -1274,4 +1274,40 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 .top .crumb{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .app.drawer-open .side .acct > span.acct-txt{display:flex !important}
 .app.drawer-open .side .acct .acct-chev{display:inline-block !important}
+/* POP Forge (#78), d'après les maquettes validées le 24/11 : sélecteur de map, menu du profil, titres sobres. */
+@layer app{
+.forge-shell{display:flex;flex-direction:column;height:calc(100vh / var(--ui-zoom));background:rgb(0,0,0);overflow:hidden}
+.forge-titlebar{flex:0 0 34px;display:flex;align-items:stretch;background:rgb(0,0,0);color:rgb(140,140,140);font-family:'Plus Jakarta Sans',Inter,system-ui,sans-serif;font-size:12.5px;user-select:none;-webkit-user-select:none}
+.forge-titlebar-nom{display:flex;align-items:center;padding-left:16px;letter-spacing:.02em}
+.forge-titlebar button{width:46px;display:inline-flex;align-items:center;justify-content:center;border:0;background:none;color:rgb(163,163,163);cursor:default;transition:background .12s,color .12s}
+.forge-titlebar button:hover{background:rgb(28,28,28);color:rgb(245,245,245)}
+.forge-titlebar button.fermer:hover{background:rgb(196,43,28);color:#fff}
+.forge-titlebar button:focus-visible{outline:2px solid #ED753E;outline-offset:-2px}
+.forge-shell .app{height:calc(100vh / var(--ui-zoom) - 34px);min-height:0}
+.forge-shell .side{height:calc(100vh / var(--ui-zoom) - 34px);padding-top:8px}
+.forge-shell .main{margin-top:0;height:calc(100vh / var(--ui-zoom) - 34px - 12px)}
+.forge .forge-profil{width:100%;display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid #1f1f1f;border-radius:14px;background:transparent;color:#f5f5f5;font:inherit;cursor:pointer}
+.forge .forge-profil.on{border-color:#3a3a3a;background:#0e0e0e}
+.forge .forge-avatar{width:32px;height:32px;border-radius:50%;background:#f5f5f5;color:#0a0a0a;display:inline-flex;align-items:center;justify-content:center;font-weight:600;font-size:14px;flex:none}
+.forge .forge-menu{position:fixed;left:12px;width:260px;bottom:76px;background:#0f0f0f;border:1px solid #262626;border-radius:14px;padding:6px;display:flex;flex-direction:column;box-shadow:0 12px 32px rgba(0,0,0,.5);z-index:20}
+.forge .forge-menu button{display:flex;align-items:center;justify-content:space-between;gap:10px;height:38px;padding:0 10px;border:0;border-radius:9px;background:none;color:#f5f5f5;font:inherit;font-size:14px;cursor:pointer;text-align:left}
+.forge .forge-menu button:hover,.forge .forge-menu button:focus-visible{background:#1c1c1c}
+.forge .forge-menu button span{color:#8c8c8c;font-size:13px}
+.forge .forge-menu hr{border:0;height:1px;background:#262626;margin:6px 4px}
+.forge .forge-notifs{position:absolute;right:0;top:46px;width:360px;max-height:min(70vh,520px);display:flex;flex-direction:column;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:14px;box-shadow:0 16px 40px rgba(0,0,0,.18);z-index:30;overflow:hidden}
+.forge .forge-notifs-tete{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border)}
+.forge .forge-notifs-tete b{font-weight:500}
+.forge .forge-notifs-liste{overflow:auto}
+.forge .forge-notif{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);font-size:14px;line-height:1.4}
+.forge .forge-notif:last-child{border-bottom:0}
+.forge .forge-notif-point{width:7px;height:7px;border-radius:50%;margin-top:7px;flex:none;background:transparent}
+.forge .forge-notif.nouv .forge-notif-point{background:#ED753E}
+.forge .forge-maps{border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.forge .forge-map-ligne{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:10px}
+.forge .forge-maps .forge-map-ligne:last-child{border-bottom:0}
+.forge .stack > .forge-map-ligne{border:1px solid var(--border);border-radius:12px;flex-direction:row;align-items:center}
+.forge .forge-ligne{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.forge .forge-point{width:9px;height:9px;border-radius:50%;flex:none}
+.forge .forge-h1{margin:0;font-size:30px;font-weight:500;letter-spacing:-.02em}
+.forge .forge-h2{margin:0 0 6px;font-size:15px;font-weight:500;color:var(--text2)}
 }

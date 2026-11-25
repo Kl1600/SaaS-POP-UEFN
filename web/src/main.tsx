@@ -36,6 +36,7 @@ const Landing = lazy(() => import('./pages/Landing'))
 const Admin = lazy(() => import('./pages/Admin'))
 const Authorize = lazy(() => import('./pages/Authorize'))
 const Organizer = lazy(() => import('./pages/Organizer'))
+const Forge = lazy(() => import('./pages/Forge'))
 const L = (C: any) => <Suspense fallback={<main className="content"><p className="muted" style={{ padding: 28 }}>{tr("Chargement…")}</p></main>}><C /></Suspense>
 
 function Gate() {
@@ -56,9 +57,13 @@ function Gate() {
   // Connecté depuis la page de connexion : on part sur l'accueil (l'adresse ne reste pas « /connexion »).
   if (['/connexion', '/inscription'].includes(loc.pathname)) return <Navigate to="/" replace />
   if (me.studios.length === 0) return <Onboarding />
-  if (me.studios.every(s => s.maps.length === 0)) return <Welcome />
+  // Forge contient déjà le relais : pas d'écran de bienvenue du site (« Télécharger UEFN Link ») dans Forge, son
+  // Accueil relie UEFN lui-même (test de Kl1600 du 24/11).
+  if (me.studios.every(s => s.maps.length === 0) && !loc.pathname.startsWith('/forge')) return <Welcome />
   return (
     <Routes>
+      {/* POP Forge (#78) : interface propre de l'application de bureau, sans la barre du site. */}
+      <Route path="forge" element={L(Forge)} />
       <Route element={<Layout />}>
         <Route index element={<Home />} />
         <Route path="map/:mid" element={<MapScope />}>

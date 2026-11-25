@@ -4,36 +4,52 @@
 <meta charset="utf-8">
 <title>POP Forge</title>
 <style>
-  :root { --fond:#f4f4f4; --carte:#fff; --texte:#0a0a0a; --doux:#6b6b6b; --bord:#e2e2e2; --btn:#0a0a0a; --btn-texte:#fff; --err:#b00020; }
-  @media (prefers-color-scheme: dark) {
-    :root { --fond:#000; --carte:#0f0f0f; --texte:#fafafa; --doux:#a3a3a3; --bord:#262626; --btn:#fafafa; --btn-texte:#0a0a0a; --err:#ff6b6b; }
-  }
+  /* Même identité que POP (page de connexion du site) : fond noir, carte blanche arrondie, logo POP,
+     police Plus Jakarta Sans, bouton principal en dégradé orange. */
+  @font-face { font-family:'Plus Jakarta Sans'; font-weight:400; src:url(fonts/plus-jakarta-sans-latin-400-normal.woff2) format('woff2'); }
+  @font-face { font-family:'Plus Jakarta Sans'; font-weight:500; src:url(fonts/plus-jakarta-sans-latin-500-normal.woff2) format('woff2'); }
+  @font-face { font-family:'Plus Jakarta Sans'; font-weight:600; src:url(fonts/plus-jakarta-sans-latin-600-normal.woff2) format('woff2'); }
+  :root { --carte:rgb(255,255,255); --texte:rgb(10,10,10); --doux:rgb(115,115,115); --bord:rgb(235,235,235); --err:rgb(217,45,32);
+          --accent-grad:linear-gradient(90deg,#ED753E,#EF8D46); }
   * { box-sizing: border-box; }
-  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center; background:var(--fond);
-         color:var(--texte); font-family:system-ui,-apple-system,"Segoe UI",sans-serif; }
-  .carte { width:min(460px,92vw); background:var(--carte); border:1px solid var(--bord); border-radius:20px; padding:32px; }
-  .logo { width:44px; height:44px; border-radius:12px; background:var(--texte); color:var(--fond); display:flex;
-          align-items:center; justify-content:center; font-weight:700; font-size:24px; margin-bottom:20px; }
-  h1 { font-size:22px; font-weight:600; margin:0 0 6px; }
-  p { color:var(--doux); margin:0 0 20px; line-height:1.45; font-size:14px; }
-  label { display:block; font-size:13px; font-weight:500; margin-bottom:6px; }
-  input { width:100%; height:42px; border:1px solid var(--bord); border-radius:10px; padding:0 12px; font-size:15px;
-          background:transparent; color:var(--texte); }
-  input:focus { outline:2px solid var(--texte); outline-offset:1px; }
-  button { margin-top:16px; width:100%; height:42px; border:0; border-radius:10px; background:var(--btn);
-           color:var(--btn-texte); font-size:15px; font-weight:500; cursor:pointer; }
+  body { margin:0; min-height:100vh; display:grid; place-items:center; background:rgb(0,0,0); padding:24px;
+         color:var(--texte); font-family:'Plus Jakarta Sans',Inter,system-ui,sans-serif; font-size:15px; line-height:1.5; }
+  .carte { width:min(420px,100%); background:var(--carte); border:1px solid var(--bord); border-radius:22px; padding:26px; }
+  .logo { height:56px; margin:0 auto 24px; display:block; filter:invert(1); }
+  h1 { font-size:22px; font-weight:400; margin:0 0 6px; letter-spacing:-0.01em; }
+  p { color:var(--doux); margin:0 0 20px; font-size:14px; }
+  label { display:block; font-size:13px; color:var(--doux); margin:0 0 6px; }
+  input, select { width:100%; height:42px; border:1px solid var(--bord); border-radius:10px; padding:0 12px; font:inherit;
+                  background:var(--carte); color:var(--texte); outline:none; margin-bottom:12px; }
+  input:focus, select:focus { border-color:var(--doux); }
+  button { margin-top:4px; width:100%; height:42px; border:1px solid transparent; border-radius:10px; font:inherit; font-weight:500;
+           cursor:pointer; background:var(--accent-grad); color:#fff;
+           box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 1px 2px rgba(237,117,62,.25); }
+  button:hover { opacity:.88; }
   button:disabled { opacity:.5; cursor:default; }
-  .erreur { color:var(--err); font-size:14px; margin:14px 0 0; min-height:1em; }
+  .lien { margin-top:8px; background:var(--carte); color:var(--texte); border-color:var(--bord); box-shadow:none; }
+  .erreur { color:var(--err); font-size:14px; margin:12px 0 0; min-height:1em; }
   .petit { font-size:12px; margin:16px 0 0; }
-  select { width:100%; height:42px; border:1px solid var(--bord); border-radius:10px; padding:0 8px; font-size:14px;
-           background:var(--carte); color:var(--texte); margin-bottom:12px; }
-  .lien { background:transparent; color:var(--texte); border:1px solid var(--bord); }
-  .etat { font-size:13px; padding:8px 12px; border:1px solid var(--bord); border-radius:999px; display:inline-block; margin-bottom:16px; }
+  /* Barre de titre propre à Forge : la fenêtre n'a plus le cadre de Windows (#78). */
+  .barre { position:fixed; top:0; left:0; right:0; height:34px; display:flex; align-items:stretch; color:rgb(140,140,140);
+           font-size:12.5px; user-select:none; -webkit-user-select:none; }
+  .barre span { display:flex; align-items:center; padding-left:16px; flex:1; letter-spacing:.02em; }
+  .barre button { all:unset; width:46px; display:inline-flex; align-items:center; justify-content:center; color:rgb(163,163,163); }
+  .barre button:hover { background:rgb(28,28,28); color:rgb(245,245,245); }
+  .barre button.fermer:hover { background:rgb(196,43,28); color:#fff; }
+  .barre svg { width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.5; }
+  .etat { font-size:13px; padding:6px 12px; border:1px solid var(--bord); border-radius:999px; display:inline-block; margin-bottom:16px; }
 </style>
 </head>
 <body>
+<div class="barre" id="barre">
+  <span>POP Forge</span>
+  <button data-action="reduire" aria-label="Réduire" title="Réduire"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+  <button data-action="agrandir" aria-label="Agrandir" title="Agrandir"><svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="1.5"/></svg></button>
+  <button data-action="fermer" class="fermer" aria-label="Fermer" title="Fermer"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+</div>
 <main class="carte">
-  <div class="logo">P</div>
+  <img class="logo" src="logo.png" alt="POP">
   <h1>POP Forge</h1>
   <p id="intro">Connexion à POP…</p>
   <form id="f" hidden>
@@ -41,12 +57,12 @@
     <input id="adresse" autocomplete="url" spellcheck="false" placeholder="pop.mon-studio.fr ou http://192.168.1.20:8080">
     <button id="ok" type="submit">Se connecter</button>
     <div class="erreur" id="erreur" role="alert"></div>
-    <p class="petit">L'adresse est retenue. Pour la changer plus tard : menu POP Forge → Changer l'adresse de POP.</p>
+    <p class="petit">L'adresse est retenue. Pour la changer plus tard : menu du profil (en bas à gauche) → Changer l'adresse de POP.</p>
   </form>
   <form id="r" hidden>
     <div class="etat" id="etat">État du relais…</div>
     <label for="code">Code d'appairage</label>
-    <input id="code" inputmode="numeric" autocomplete="off" placeholder="POP → Organiseur → UEFN Link → « Obtenir un code »" style="margin-bottom:12px">
+    <input id="code" inputmode="numeric" autocomplete="off" placeholder="POP → Organiseur → UEFN Link → « Obtenir un code »">
     <label for="projet">Projet UEFN</label>
     <select id="projet"></select>
     <input id="autre" hidden spellcheck="false" placeholder="Chemin complet du dossier du projet UEFN">

@@ -1,5 +1,13 @@
 // Page locale de POP Forge : demande l'adresse de POP, la fait vérifier par Forge, puis Forge ouvre POP.
 const invoke = window.__TAURI__.core.invoke;
+// Barre de titre (#78) : glisser déplace la fenêtre, double-clic l'agrandit, boutons à droite.
+(() => {
+  const barre = document.getElementById('barre');
+  const fen = action => invoke('fenetre', { action }).catch(() => {});
+  barre.addEventListener('mousedown', e => { if (e.button === 0 && e.detail === 1 && !e.target.closest('button')) fen('deplacer'); });
+  barre.addEventListener('dblclick', e => { if (!e.target.closest('button')) fen('agrandir'); });
+  barre.querySelectorAll('button').forEach(b => b.addEventListener('click', () => fen(b.dataset.action)));
+})();
 const $ = (id) => document.getElementById(id);
 
 function montrer(adresse, erreur) {
