@@ -2,6 +2,8 @@
 //!
 //! Bibliothèque utilisée par `pop-link.exe` (`main.rs`, ligne de commande) et par POP Forge, qui fait tourner le
 //! relais dans son propre processus : [`start`] démarre le relais et rend une [`Handle`] (état, journal, arrêt).
+//!
+//! `pop-link.exe` (téléchargeable sur le site) est recompilé sous Windows par le workflow « relais Windows » (#358).
 mod digest;
 mod files;
 mod mcpdriver;

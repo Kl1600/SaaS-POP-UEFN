@@ -122,7 +122,7 @@ jobs:
           EXE: ${{ needs.changements.outputs.relais_exe }}
         run: |
           if [ "$EXE" != 1 ]; then
-            echo "::error::link/ a changé mais pas web/public/downloads/pop-link.exe. Recompilez sous Windows (cd link && cargo build --release), copiez link/target/release/pop-link.exe dans web/public/downloads/, reconstruisez le web (cd web && npm run build) et commitez."
+            echo "::error::link/ a changé mais pas web/public/downloads/pop-link.exe. Attendez le commit du workflow « relais Windows » sur la branche (#358), ou recompilez sous Windows (cd link && cargo build --release), copiez link/target/release/pop-link.exe dans web/public/downloads/, reconstruisez le web (cd web && npm run build) et commitez."
             exit 1
           fi
           echo "pop-link.exe mis à jour avec le code du relais."

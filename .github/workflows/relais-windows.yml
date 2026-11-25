@@ -1,0 +1,81 @@
+# Relais pop-link.exe recompilé sous Windows (#358). Les agents IA ne peuvent pas compiler pour Windows : quand une
+# branche de tâche change le relais (link/), ce workflow construit pop-link.exe sur un runner Windows, le copie dans
+# web/public/downloads/, reconstruit web/dist (sous Linux, fins de ligne LF) et pousse un commit sur la même branche.
+# Rien n'est jamais poussé sur main ; le commit du robot ne touche pas link/, donc pas de boucle.
+name: relais Windows
+
+on:
+  push:
+    branches: ['issue/**', 'outillage/**']
+    paths:
+      - 'link/src/**'
+      - 'link/Cargo.toml'
+      - 'link/Cargo.lock'
+      - 'link/build.rs'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: relais-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    name: pop-link.exe (Windows, release)
+    if: github.ref != 'refs/heads/main'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: link
+      - run: cargo build --release --locked
+        working-directory: link
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pop-link
+          path: link/target/release/pop-link.exe
+          retention-days: 3
+
+  commit:
+    name: commit sur la branche
+    needs: windows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: pop-link
+          path: /tmp/pop-link
+      - run: cp /tmp/pop-link/pop-link.exe web/public/downloads/pop-link.exe
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --no-audit --no-fund && npx vite build
+        working-directory: web
+      - name: commit et push
+        env:
+          BRANCHE: ${{ github.ref_name }}
+        run: |
+          if [ -z "$(git status --porcelain -- web/public/downloads web/dist)" ]; then
+            echo "pop-link.exe déjà à jour."; exit 0
+          fi
+          n=$(echo "$BRANCHE" | sed -n 's#^issue/\([0-9]\+\)-.*#\1#p')
+          titre="pop-link.exe recompilé sous Windows (CI)"
+          if [ -n "$n" ]; then msg="#$n : $titre"; else msg="$titre"; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/public/downloads/pop-link.exe web/dist
+          git commit -q --cleanup=verbatim -m "$msg"
+          for i in 1 2 3; do
+            git pull -q --rebase origin "$BRANCHE" && git push -q origin "HEAD:$BRANCHE" && exit 0
+            sleep 5
+          done
+          echo "::error::impossible de pousser sur $BRANCHE"; exit 1
