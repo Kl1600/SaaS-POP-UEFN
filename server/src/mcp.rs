@@ -2175,6 +2175,80 @@ mod tests_compte {
         .is_err());
     }
 
+    /// #376 : chacun ne voit et ne pilote que ses propres IA, même dans le même studio.
+    #[tokio::test]
+    async fn on_ne_voit_pas_les_ia_des_autres() {
+        let m = monde().await;
+        let ben = q(&m.st, "INSERT INTO users (email, name, password_hash) VALUES ('ben@a.fr', 'Ben', 'x') RETURNING id").await;
+        sqlx::query("INSERT INTO memberships (studio_id, user_id, role) VALUES (?, ?, 'member')")
+            .bind(m.sid_equipe)
+            .bind(ben)
+            .execute(&m.st.db)
+            .await
+            .unwrap();
+        let t_moi = jeton(&m, Some(m.equipe), "write").await;
+        let t_ben = format!("pop_test_{}", random_token());
+        sqlx::query("INSERT INTO api_tokens (user_id, map_id, name, token_hash, scope) VALUES (?, ?, 'IA de Ben', ?, 'write')").bind(ben).bind(m.equipe).bind(sha256_hex(&t_ben)).execute(&m.st.db).await.unwrap();
+        mcp_call(&m.st, &t_moi, "list_tasks", json!({})).await;
+        mcp_call(&m.st, &t_ben, "list_tasks", json!({})).await;
+        let aid_ben: i64 = sqlx::query_scalar("SELECT id FROM api_tokens WHERE user_id = ?")
+            .bind(ben)
+            .fetch_one(&m.st.db)
+            .await
+            .unwrap();
+        let moi = AuthUser {
+            id: m.uid,
+            email: "ia@a.fr".into(),
+            name: "Yanis".into(),
+            sid: String::new(),
+        };
+        let Json(liste) = crate::agents::list(State(m.st.clone()), moi.clone(), Path(m.equipe))
+            .await
+            .unwrap();
+        assert_eq!(liste.as_array().unwrap().len(), 1);
+        assert_eq!(liste[0]["name"], "IA");
+        let Json(journal) = crate::agents::activite(
+            State(m.st.clone()),
+            moi.clone(),
+            Path(m.equipe),
+            axum::extract::Query(Default::default()),
+        )
+        .await
+        .unwrap();
+        assert!(
+            journal
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|c| c["agent"] == "IA"),
+            "{journal}"
+        );
+        let Json(r) = crate::resume::route(State(m.st.clone()), moi.clone(), Path(m.equipe))
+            .await
+            .unwrap();
+        assert!(r["agents"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|a| a["name"] != "IA de Ben"));
+        assert!(crate::agents::route_mode(
+            State(m.st.clone()),
+            moi.clone(),
+            Path((m.equipe, aid_ben)),
+            Json(serde_json::from_value(json!({ "mode": "off" })).unwrap())
+        )
+        .await
+        .is_err());
+        assert!(crate::agents::route_attribuer(
+            State(m.st.clone()),
+            moi.clone(),
+            Path((m.equipe, aid_ben)),
+            Json(serde_json::from_value(json!({ "number": null })).unwrap())
+        )
+        .await
+        .is_err());
+    }
+
     #[tokio::test]
     async fn creer_un_jeton_de_compte() {
         let m = monde().await;

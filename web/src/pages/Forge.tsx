@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom'
 import { Bell, Bot, Building2, Check, ChevronsUpDown, ExternalLink, Hammer, Home, Library, Minus, Moon, RefreshCw, Square, Sun, User, Wrench, X } from 'lucide-react'
 import LangPicker from '../components/LangPicker'
 import { ForgeAgents } from '../components/ForgeAgents'
+import { Selecteur } from '../components/Selecteur'
 import { useApp, studioName, useLive, useLoad } from '../state'
 import { ago, api } from '../api'
 import { tr } from '../i18n/t'
@@ -348,10 +349,9 @@ function Accueil({ invoke, liaison, relire }: { invoke: Invoke; etat: string; li
               <button className={'btn' + (p ? '' : ' pri')} onClick={() => setOuverte(ouverte === m.id ? null : m.id)}>{p ? tr("Changer de projet") : tr("Relier")}</button>
             </div>
             {ouverte === m.id && <div className="forge-ligne">
-              <select className="field" style={{ flex: 1, minWidth: 220 }} value={sel} onChange={e => setChoix(c => ({ ...c, [m.id]: e.target.value }))}>
-                {!sel && <option value="">{tr("Choisir le projet UEFN…")}</option>}
-                {[...new Set([...(sel ? [sel] : []), ...projets])].map(x => <option key={x} value={x}>{nomDossier(x)}{ouvert === x ? ' · ' + tr("ouvert dans UEFN") : ''}{relies.has(x.toLowerCase()) ? ' · ' + tr("déjà relié") : ''}</option>)}
-              </select>
+              <Selecteur label={tr("Projet UEFN pour {0}", [m.nom])} placeholder={tr("Choisir le projet UEFN…")} value={sel || undefined}
+                options={[...new Set([...(sel ? [sel] : []), ...projets])].map(x => ({ value: x, label: nomDossier(x) + (ouvert === x ? ' · ' + tr("ouvert dans UEFN") : '') + (relies.has(x.toLowerCase()) ? ' · ' + tr("déjà relié") : '') }))}
+                onChange={v => setChoix(c => ({ ...c, [m.id]: v }))} />
               <button className="btn" onClick={() => parcourir(m.id)}>{tr("Parcourir…")}</button>
               <button className="btn pri" disabled={!sel || occupe !== null} onClick={() => relier(m.id, sel)}>{occupe === String(m.id) ? tr("Liaison…") : tr("Relier")}</button>
             </div>}

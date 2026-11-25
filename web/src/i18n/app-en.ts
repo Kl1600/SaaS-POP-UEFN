@@ -1693,6 +1693,7 @@ const EN: Record<string, string> = {
  "Ctrl/Cmd+clic : ajouter · Maj+clic : plage · Ctrl+Z : annuler": "Ctrl/Cmd+click: add · Shift+click: range · Ctrl+Z: undo",
  "Détails": "Details",
  "Vue du dessus": "Top view",
+ "Projet UEFN pour {0}": "UEFN project for {0}",
  "Interface": "Interface",
  "écrit": "written",
  "compilé": "compiled",
