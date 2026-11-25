@@ -111,6 +111,7 @@ export default function Forge() {
         <button className="iconbtn" aria-label={app.dark ? tr("Thème clair") : tr("Thème sombre")} onClick={app.toggleDark}>{app.dark ? <Sun size={20} strokeWidth={1.5} /> : <Moon size={20} strokeWidth={1.5} />}</button>
       </div>
       <main className="content" style={{ padding: '40px 28px', width: '100%', maxWidth: 920, margin: '0 auto', boxSizing: 'border-box' }}>
+        {app.map && section !== 'reglages' && <Bandeau mapId={app.map.id} etat={etat} aller={setSection} />}
         {section === 'accueil' ? <Accueil invoke={invoke} etat={etat} liaison={liaison} relie={relie} relire={lire} />
           : section === 'reglages' ? <Reglages />
           : section === 'agents' ? (app.map ? <ForgeAgents mapId={app.map.id} /> : <p className="muted">{tr("Choisissez une map.")}</p>)
@@ -276,6 +277,11 @@ function Reglages() {
       {ligne(tr("Langue"), '', <LangPicker app />)}
       {ligne(tr("Thème"), '', <button className="btn" onClick={app.toggleDark}>{app.dark ? tr("Sombre") : tr("Clair")}</button>)}
       {ligne(tr("Mises à jour"), tr("Proposées automatiquement, à venir (#79)"), null)}
+      {ligne(tr("Diagnostic"), tr("État de Forge, du relais et de la map, à coller dans une demande d’aide"), <button className="btn" onClick={async () => {
+        const d = app.map ? await api.get(`/api/maps/${app.map.id}/diagnostic`).catch(() => null) : null
+        const txt = [`POP Forge · ${navigator.userAgent}`, `Serveur : ${location.origin}`, `Map : ${app.map?.name ?? '—'}`, ...(d?.problems ?? []).map((p: any) => `- ${p.title}`)].join('\n')
+        try { await navigator.clipboard.writeText(txt); app.toast(tr("Diagnostic copié")) } catch { app.toast(txt) }
+      }}>{tr("Copier le diagnostic")}</button>)}
     </section>
   </div>
 }
@@ -422,5 +428,34 @@ function ForgePro() {
         <p className="small muted" style={{ marginBottom: 0 }}>{tr("Forge se débloque tout seul dès que l’abonnement est actif.")}</p>
       </div>
     </div>
+  </div>
+}
+
+/** États et dépannage (#300) : chaque problème de la map avec son action et l'aide en un clic. */
+function Bandeau({ mapId, etat, aller }: { mapId: number; etat: string; aller: (s: any) => void }) {
+  const app = useApp()
+  const { data, reload } = useLoad<any>(`/api/maps/${mapId}/diagnostic`, [mapId, etat])
+  const [aide, setAide] = useState<string | null>(null)
+  useEffect(() => app.subscribe(m => { if (m?.t === 'uefn' || m?.t === 'agent' || m?.t === 'relay') reload() }), [mapId])
+  useEffect(() => { const t = setInterval(reload, 30000); return () => clearInterval(t) }, [mapId])
+  const pbs: any[] = data?.problems ?? []
+  if (!pbs.length) return null
+  const agir = (p: any) => {
+    if (p.action === 'accueil') aller('accueil')
+    else if (p.action === 'construire') aller('construire')
+    else if (p.action === 'agents') aller('agents')
+    else if (p.action === 'reessayer') reload()
+    else setAide(aide === p.code ? null : p.code)
+  }
+  return <div className="stack" style={{ gap: 8, marginBottom: 22 }} role="status" aria-label={tr("État de Forge")}>
+    {pbs.map((p, i) => <div key={i} className="card" style={{ padding: '10px 14px', borderColor: 'var(--red)' }}>
+      <div className="forge-ligne">
+        <span className="forge-point" style={{ background: 'var(--red)' }} aria-hidden="true" />
+        <span style={{ flex: 1 }}>{tr(p.title)}</span>
+        <button className="btn" onClick={() => agir(p)}>{tr(p.label)}</button>
+        <button className="linkbtn" onClick={() => setAide(aide === p.code + i ? null : p.code + i)}>{tr("Pourquoi ?")}</button>
+      </div>
+      {(aide === p.code + i || aide === p.code) && <p className="small" style={{ margin: '8px 0 0' }}>{tr(p.help)}</p>}
+    </div>)}
   </div>
 }

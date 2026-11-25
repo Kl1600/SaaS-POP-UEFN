@@ -36,6 +36,7 @@ const COMMUNS: &[&str] = &[
     "device_graph",
     "read_messages",
     "send_message",
+    "forge_help",
 ];
 
 /// Ce qu'un agent fait de ses tâches : réserver, passer en cours ou fini, signaler un problème par une tâche.
