@@ -99,3 +99,28 @@ pub async fn require_forge(st: &AppState, uid: i64) -> Result<(), AppError> {
         Err(AppError::Guard("forge_pro", "POP Forge est inclus dans l'abonnement Pro (essai compris). Passez à Pro depuis POP : Paramètres → Abonnement.".into()))
     }
 }
+
+/// `GET /api/forge/download` (#80) : dernière version publiée de l'installateur de Forge (fichier construit par le
+/// workflow « relais Windows » dans web/public/downloads). Réservé à qui a Forge (#102).
+pub async fn forge_download(
+    axum::extract::State(st): axum::extract::State<AppState>,
+    u: crate::auth::AuthUser,
+) -> crate::error::ApiResult<serde_json::Value> {
+    require_forge(&st, u.id).await?;
+    let dir = std::path::PathBuf::from(
+        std::env::var("POP_WEB_DIR").unwrap_or_else(|_| "../web/dist".into()),
+    )
+    .join("downloads");
+    let info: serde_json::Value = std::fs::read_to_string(dir.join("pop-forge.json"))
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default();
+    let dispo = dir.join("pop-forge-setup.exe").is_file();
+    Ok(axum::Json(serde_json::json!({
+        "available": dispo,
+        "version": info["version"],
+        "date": info["date"],
+        "url": if dispo { serde_json::json!("/downloads/pop-forge-setup.exe") } else { serde_json::Value::Null },
+        "size": std::fs::metadata(dir.join("pop-forge-setup.exe")).map(|m| m.len()).unwrap_or(0),
+    })))
+}

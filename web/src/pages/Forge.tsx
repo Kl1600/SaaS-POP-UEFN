@@ -63,17 +63,8 @@ export default function Forge() {
     window.addEventListener('keydown', f); return () => window.removeEventListener('keydown', f)
   }, [])
 
-  if (!invoke) {
-    return <div className={'app' + (app.dark ? ' dark' : '')}>
-      <div className="main" style={{ margin: 12, padding: 32 }}>
-        <div className="card" style={{ maxWidth: 560 }}>
-          <h2>{tr("POP Forge")}</h2>
-          <p className="muted">{tr("Cette page s'ouvre dans POP Forge, l'application Windows de POP qui construit la map dans UEFN avec vos IA.")}</p>
-          <button className="btn" onClick={() => navigate('/')}>{tr("Retour à POP")}</button>
-        </div>
-      </div>
-    </div>
-  }
+  // Ouverte dans un navigateur : page de téléchargement de Forge (#80).
+  if (!invoke) return <Telecharger />
 
   if (app.me && app.me.forge === false) return <ForgePro />
 
@@ -457,5 +448,53 @@ function Bandeau({ mapId, etat, aller }: { mapId: number; etat: string; aller: (
       </div>
       {(aide === p.code + i || aide === p.code) && <p className="small" style={{ margin: '8px 0 0' }}>{tr(p.help)}</p>}
     </div>)}
+  </div>
+}
+
+/** Page de téléchargement de POP Forge (#80), quand /forge s'ouvre dans un navigateur. */
+function Telecharger() {
+  const app = useApp()
+  const navigate = useNavigate()
+  const [info, setInfo] = useState<any>(null)
+  const [refus, setRefus] = useState('')
+  useEffect(() => { api.get('/api/forge/download').then(setInfo).catch((e: any) => setRefus(e.message)) }, [])
+  return <div className={'app' + (app.dark ? ' dark' : '')}>
+    <div className="main" style={{ margin: 12, padding: 32, overflow: 'auto' }}>
+      <div className="stack" style={{ maxWidth: 680, margin: '0 auto', gap: 18 }}>
+        <h1 style={{ margin: 0, fontWeight: 500 }}>{tr("Télécharger POP Forge")}</h1>
+        <p className="muted" style={{ margin: 0 }}>{tr("L’application Windows de POP : vos IA construisent la map dans UEFN, vous suivez et pilotez tout au même endroit.")}</p>
+        <section className="card" style={{ padding: 20 }}>
+          {refus ? <>
+            <p style={{ marginTop: 0 }}>{refus}</p>
+            <button className="btn pri" onClick={() => navigate('/parametres')}>{tr("Voir l’abonnement Pro")}</button>
+          </> : !info ? <p className="muted" style={{ margin: 0 }}>{tr("Chargement…")}</p> : !info.available ? <p style={{ margin: 0 }}>{tr("Aucune version publiée pour l’instant : revenez bientôt.")}</p> : <>
+            <div className="forge-ligne" style={{ justifyContent: 'space-between' }}>
+              <div><b>{tr("POP Forge {0}", [info.version ?? ''])}</b><div className="small muted">{tr("Windows 10 ou 11, 64 bits · {0} Mo · publiée le {1}", [Math.max(1, Math.round(info.size / 1e6)), info.date ?? '—'])}</div></div>
+              <a className="btn pri" href={info.url} download>{tr("Télécharger l’installateur")}</a>
+            </div>
+          </>}
+        </section>
+        <section className="card" style={{ padding: 20 }}>
+          <h2 style={{ marginTop: 0, fontSize: 17, fontWeight: 500 }}>{tr("Configuration requise")}</h2>
+          <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>
+            <li>{tr("Windows 10 ou 11, 64 bits.")}</li>
+            <li>{tr("Unreal Editor for Fortnite (UEFN) installé, avec son serveur MCP pour piloter le projet.")}</li>
+            <li>{tr("Un compte POP avec l’abonnement Pro (essai gratuit compris).")}</li>
+          </ul>
+        </section>
+        <section className="card" style={{ padding: 20 }}>
+          <h2 style={{ marginTop: 0, fontSize: 17, fontWeight: 500 }}>{tr("Si Windows affiche « Windows a protégé votre ordinateur »")}</h2>
+          <p style={{ marginTop: 0 }}>{tr("Pendant la bêta, l’installateur n’est pas encore signé : Windows SmartScreen le signale comme une application inconnue. C’est normal.")}</p>
+          <ol style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>
+            <li>{tr("Cliquez sur « Informations complémentaires ».")}</li>
+            <li>{tr("Vérifiez que l’éditeur indiqué est « POP » ou « Éditeur inconnu » et que le fichier s’appelle pop-forge-setup.exe.")}</li>
+            <li>{tr("Cliquez sur « Exécuter quand même », puis suivez l’installation.")}</li>
+            <li>{tr("Au premier lancement, entrez l’adresse de POP : pop-uefn.com, puis connectez-vous.")}</li>
+          </ol>
+        </section>
+        <p className="small muted" style={{ margin: 0 }}>{tr("Sans Forge, vous pouvez toujours relier UEFN avec le relais seul : POP → IA connectées → pop-link.exe.")}</p>
+        <div><button className="btn" onClick={() => navigate('/')}>{tr("Retour à POP")}</button></div>
+      </div>
+    </div>
   </div>
 }

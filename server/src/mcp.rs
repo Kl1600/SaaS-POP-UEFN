@@ -550,7 +550,11 @@ async fn token_call(
 ) -> Result<Value, AppError> {
     match name {
         // Aide de Forge (#300) : sans map de travail.
-        "forge_help" => return Ok(crate::aide_forge::chercher(a["query"].as_str().unwrap_or(""))),
+        "forge_help" => {
+            return Ok(crate::aide_forge::chercher(
+                a["query"].as_str().unwrap_or(""),
+            ))
+        }
         "list_maps" => {
             let rows: Vec<(i64, String, String, String, i64, String)> = sqlx::query_as(
                 "SELECT m.id, m.name, s.name, ms.role, s.personal, m.status FROM maps m JOIN studios s ON s.id = m.studio_id
