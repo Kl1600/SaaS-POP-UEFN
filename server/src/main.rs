@@ -15,6 +15,7 @@ mod aiplan;
 mod aipop;
 mod analytics;
 mod announce;
+mod assets;
 mod auth;
 mod billing;
 mod boards;
@@ -691,6 +692,13 @@ fn api() -> Router<AppState> {
         .route("/api/verse-versions/{id}/revert", post(verse::revert))
         .route("/api/maps/{mid}/verse/symbols", get(verse::symbols))
         .route("/api/maps/{mid}/verse/send", post(verse::send))
+        .route(
+            "/api/studios/{sid}/assets",
+            get(assets::list).post(assets::create),
+        )
+        .route("/api/assets/{id}/confirm", post(assets::confirm))
+        .route("/api/assets/{id}/download", get(assets::download))
+        .route("/api/assets/{id}", delete(assets::delete))
         .route(
             "/api/studios/{sid}/library",
             get(library::list).post(library::create),
