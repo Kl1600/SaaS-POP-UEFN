@@ -5,6 +5,7 @@ import { useApp, useLive, useLoad } from '../state'
 import { CardHead, Modal, PageHead, Tabs } from '../components/ui'
 import { tr, tx } from '../i18n/t'
 import LaunchDiscover from './LaunchDiscover'
+import { Scenarios } from '../components/Scenarios'
 
 const ST: Record<string, [string, string, any]> = { ok: [tr("Conforme"), 'b-g', CheckCircle2], warn: [tr("À corriger"), 'b-o', AlertTriangle], block: [tr("Bloquant"), 'b-r', Ban], todo: [tr("À vérifier"), '', Circle] }
 
@@ -16,7 +17,7 @@ export default function Launch() {
       <Tabs value={tab} onChange={setTab} items={[['discover', 'Discover'], ['checks', tr("Vérification")], ['swap', tr("Test")], ['dday', tr("Jour J")]]} />
       {tab === 'discover' && <LaunchDiscover />}
       {tab === 'checks' && <Checks />}
-      {tab === 'swap' && <Swap />}
+      {tab === 'swap' && <><Scenarios /><Swap /></>}
       {tab === 'dday' && <DDay />}
     </main>
   )

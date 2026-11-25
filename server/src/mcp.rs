@@ -211,6 +211,8 @@ fn tools() -> Value {
         }), &["question", "choices"]),
         tool("get_answer", "Réponse du créateur à une question posée avec ask_user (null tant qu'il n'a pas répondu).", json!({ "question_id": { "type": "integer" } }), &["question_id"]),
         tool("get_feasibility", "Avis de faisabilité de la map : faisable, tendu ou pas faisable, heures disponibles jusqu'à la sortie, heures nécessaires (1 h par tâche ouverte), marge, et corrections chiffrées (date, heures, tâches à confier à l'IA ou à retirer).", json!({}), &[]),
+        tool("list_scenarios", "Scénarios de test de la map (#348) : étapes (action, résultat attendu), statut (draft = proposé par une IA, à valider ; ready = jouable) et dernier passage (version, réussies, échouées, régressions).", json!({}), &[]),
+        tool("propose_scenario", "Propose un scénario de test à partir des tâches (#348) : title, steps [{ action, expected }] (1 à 50, une action claire par étape, ex. « Va au spawn et achète l'arme »). Il reste brouillon tant qu'un humain ne l'a pas validé ; ce sont des humains qui le jouent.", json!({ "title": { "type": "string" }, "steps": { "type": "array", "items": { "type": "object", "properties": { "action": { "type": "string" }, "expected": { "type": "string" } } } } }), &["title", "steps"]),
         tool("list_milestones", "Jalons et objectifs du planning de la map (date, heure, type, détail).", json!({}), &[]),
         tool("add_milestone", "Ajoute un jalon au planning : title, date AAAA-MM-JJ ; facultatifs : time HH:MM, detail, kind (jalon par défaut).", json!({ "title": { "type": "string" }, "date": { "type": "string" }, "time": { "type": "string" }, "detail": { "type": "string" }, "kind": { "type": "string" } }), &["title", "date"]),
         tool("list_agents", "Agents IA de la map : identifiant, nom, rôle, tâche en cours, actif ou non, et lequel est l'Orchestrateur.", json!({}), &[]),
@@ -263,6 +265,7 @@ const READ_TOOLS: &[&str] = &[
     "list_milestones",
     "get_answer",
     "get_feasibility",
+    "list_scenarios",
 ];
 
 fn rpc_ok(id: Value, result: Value) -> Response {
@@ -930,6 +933,11 @@ async fn call_as(
         "ask_user" => crate::questions::ask_user(st, mid, agent_requis()?, &a).await,
         "get_answer" => crate::questions::get_answer(st, mid, &a).await,
         "get_feasibility" => crate::faisabilite::avis_de_la_map(st, mid).await,
+        "list_scenarios" => crate::scenarios::liste(st, mid).await,
+        "propose_scenario" => {
+            let id = crate::scenarios::creer(st, &ctx, a["title"].as_str().unwrap_or(""), &a["steps"], Some(agent_requis()?)).await?;
+            Ok(json!({ "id": id, "status": "draft", "message": "Scénario proposé : un humain doit le valider (Lancer et suivre → Test) avant qu'il soit joué." }))
+        }
         "list_skills" => Ok(json!(crate::skills::liste(st, ctx.studio_id).await?)),
         "get_skill" => {
             crate::skills::lire(st, ctx.studio_id, a["name"].as_str().unwrap_or("")).await

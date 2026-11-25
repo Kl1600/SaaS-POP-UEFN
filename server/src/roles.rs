@@ -30,6 +30,7 @@ const COMMUNS: &[&str] = &[
     "list_pages",
     "read_page",
     "list_milestones",
+    "list_scenarios",
 ];
 
 /// Ce qu'un agent fait de ses tâches : réserver, passer en cours ou fini, signaler un problème par une tâche.
@@ -39,6 +40,7 @@ const TACHES: &[&str] = &[
     "save_progress",
     "set_task_status",
     "create_task",
+    "propose_scenario",
 ];
 
 /// Conception de la map (#147) : tableau blanc, documentation, jalons.

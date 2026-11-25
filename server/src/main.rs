@@ -47,6 +47,7 @@ mod privstats;
 mod questions;
 mod roles;
 mod s3;
+mod scenarios;
 mod security;
 mod skills;
 mod stripe;
@@ -571,6 +572,38 @@ fn api() -> Router<AppState> {
         )
         .route("/api/playtests/{lid}/feedback", post(launch::give_feedback))
         .route("/api/maps/{mid}/churn", get(launch::churn))
+        .route(
+            "/api/maps/{mid}/scenarios",
+            get(scenarios::route_liste).post(scenarios::route_creer),
+        )
+        .route(
+            "/api/scenarios/{sid}",
+            put(scenarios::route_modifier).delete(scenarios::route_supprimer),
+        )
+        .route(
+            "/api/scenarios/{sid}/validate",
+            post(scenarios::route_valider),
+        )
+        .route(
+            "/api/scenarios/{sid}/runs",
+            get(scenarios::route_passages).post(scenarios::route_jouer),
+        )
+        .route(
+            "/api/scenario-runs/{rid}/results/{step}",
+            put(scenarios::route_verdict),
+        )
+        .route(
+            "/api/scenario-runs/{rid}/results/{step}/task",
+            post(scenarios::route_tache),
+        )
+        .route(
+            "/api/scenario-runs/{rid}/finish",
+            post(scenarios::route_finir),
+        )
+        .route(
+            "/api/scenario-runs/{rid}/capture",
+            post(scenarios::route_capture),
+        )
         // Rémunérer
         .route(
             "/api/maps/{mid}/revenues",
