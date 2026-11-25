@@ -96,6 +96,7 @@ pub const ROLES: &[Role] = &[
                 "delete_actors",
                 "place_device",
                 "scatter_props",
+                "capture_island",
                 "place_mesh",
                 "save_device_config",
                 "apply_device_config",

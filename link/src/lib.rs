@@ -489,6 +489,38 @@ impl Link {
                     bail!("Lore : {}", String::from_utf8_lossy(&st.stderr));
                 }
             }
+            "capture_island" => {
+                // Photo de l'île (#306) : envoyée directement au stockage objet par le lien signé du serveur POP.
+                self.need_uefn()?;
+                let url = a["put_url"].as_str().unwrap_or("");
+                if !url.starts_with("https://") {
+                    bail!("lien d'envoi de la capture invalide");
+                }
+                let (w, h) = (
+                    a["width"].as_u64().unwrap_or(1920) as u32,
+                    a["height"].as_u64().unwrap_or(1080) as u32,
+                );
+                let png = self
+                    .mcp
+                    .capture(&a["location"], &a["rotation"], w, h)
+                    .await?;
+                let n = png.len();
+                let r = reqwest::Client::new()
+                    .put(url)
+                    .header("content-type", "image/png")
+                    .body(png)
+                    .send()
+                    .await?;
+                if !r.status().is_success() {
+                    bail!(
+                        "envoi de la capture refusé par le stockage ({})",
+                        r.status()
+                    );
+                }
+                out["bytes"] = json!(n);
+                out["width"] = json!(w);
+                out["height"] = json!(h);
+            }
             "render_topview" => {
                 self.need_uefn()?;
                 let (img, b) = self.mcp.topview().await?;
