@@ -1003,7 +1003,7 @@ pub fn parse_diagnostics(out: &str) -> Vec<Value> {
             continue;
         };
         let nums: Vec<usize> = rest[..close]
-            .split(|c| c == ',' || c == ' ')
+            .split([',', ' '])
             .filter_map(|x| x.trim().parse().ok())
             .collect();
         let msg = rest[close + 1..].trim_start_matches(':').trim();
@@ -1018,8 +1018,8 @@ pub fn parse_diagnostics(out: &str) -> Vec<Value> {
             .map(|c| c.to_string())
             .unwrap_or_default();
         let message = msg
-            .splitn(2, ':')
-            .nth(1)
+            .split_once(':')
+            .map(|x| x.1)
             .map(|m| m.trim())
             .filter(|m| !m.is_empty())
             .unwrap_or(msg);

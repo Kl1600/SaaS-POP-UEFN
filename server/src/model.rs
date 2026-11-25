@@ -301,7 +301,7 @@ async fn train(st: &AppState) -> Result<(), sqlx::Error> {
         let (mut w, mut b) = (vec![0.0; 5], 0.0);
         let m = idx.len().max(1) as f64;
         for _ in 0..800 {
-            let mut gw = vec![0.0; 5];
+            let mut gw = [0.0; 5];
             let mut gb = 0.0;
             for &i in idx {
                 let p = 1.0

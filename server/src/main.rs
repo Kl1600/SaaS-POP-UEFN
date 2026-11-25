@@ -1,3 +1,4 @@
+#![allow(clippy::type_complexity)] // Lignes SQL lues en tuples (sqlx) : un alias de type par requête ne les rendrait pas plus lisibles.
 /// Requête SQL assemblée avec `format!` à partir de morceaux écrits dans le code (constantes, noms de tables) :
 /// jamais de saisie de l'utilisateur, les valeurs passent toujours par `bind` (sqlx 0.9, #28).
 #[macro_export]

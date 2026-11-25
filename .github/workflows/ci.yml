@@ -98,12 +98,15 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt
+          components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: server
       # Format unique du code Rust (#8) : en cas d'échec, lancez « cargo fmt » dans server/ et commitez.
       - run: cargo fmt --check
+        working-directory: server
+      # Avertissements clippy bloquants (#9) : corrigez-les, ou justifiez un #[allow(...)] par un commentaire.
+      - run: cargo clippy --locked -- -D warnings
         working-directory: server
       - run: cargo build --locked
         working-directory: server
@@ -136,12 +139,15 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt
+          components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: link
       # Format unique du code Rust (#8) : en cas d'échec, lancez « cargo fmt » dans link/ et commitez.
       - run: cargo fmt --check
+        working-directory: link
+      # Avertissements clippy bloquants (#9) : corrigez-les, ou justifiez un #[allow(...)] par un commentaire.
+      - run: cargo clippy --locked -- -D warnings
         working-directory: link
       - run: cargo build --locked
         working-directory: link

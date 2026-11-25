@@ -412,7 +412,7 @@ pub async fn preview(
                         .collect()
                 })
                 .unwrap_or_default();
-            voted.sort_by(|a, b| b.0.cmp(&a.0));
+            voted.sort_by_key(|a| std::cmp::Reverse(a.0));
             for (_, t) in voted.into_iter().take(10) {
                 let k = tasks.len();
                 tasks.push(PlanTask {

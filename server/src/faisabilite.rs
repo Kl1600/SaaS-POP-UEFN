@@ -60,6 +60,7 @@ fn capacite(equipe: &[Personne], debut: Date, fin: Date) -> f64 {
 
 /// Avis : `taches` heures de travail (1 h par tâche), dont `ia_pct` % confiées à l'IA, marge `marge_pct` %.
 /// `a_retirer` : les tâches les moins prioritaires, dans l'ordre où on les retirerait.
+#[allow(clippy::too_many_arguments)] // les données du calcul, sans structure à part pour un seul appel
 pub fn avis(
     aujourd_hui: Date,
     debut: Option<Date>,
@@ -204,7 +205,7 @@ pub async fn avis_de_la_map(st: &AppState, mid: i64) -> Result<Value, AppError> 
     .await?;
     let (taches, source) = if total == 0 {
         (
-            crate::plan::taille_du_gabarit(&crate::lancement::gabarit(&genre)) as i64,
+            crate::plan::taille_du_gabarit(crate::lancement::gabarit(&genre)) as i64,
             "gabarit",
         )
     } else {

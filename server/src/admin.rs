@@ -750,7 +750,7 @@ pub async fn journal(
                 t.2.iter().any(|m| {
                     let m = m.replace('\\', "");
                     match m.strip_suffix('%') {
-                        Some(p) => a.starts_with(&p),
+                        Some(p) => a.starts_with(p),
                         None => a == m,
                     }
                 })

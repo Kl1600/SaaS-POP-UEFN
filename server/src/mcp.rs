@@ -227,6 +227,7 @@ fn tools() -> Value {
 }
 
 /// Noms de tous les outils du serveur MCP.
+#[cfg(test)]
 pub(crate) fn tool_names() -> Vec<String> {
     tools()
         .as_array()
@@ -881,7 +882,7 @@ async fn call_as(
                 .fetch_optional(&st.db)
                 .await?;
         r.map(|r| r.0)
-            .ok_or_else(|| crate::error::bad(&format!("Tâche #{n} introuvable dans cette map.")))
+            .ok_or_else(|| crate::error::bad(format!("Tâche #{n} introuvable dans cette map.")))
     };
     match name {
         "check_level" => crate::checks::rapport(st, mid).await,

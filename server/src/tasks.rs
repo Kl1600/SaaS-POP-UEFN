@@ -433,7 +433,7 @@ pub async fn update(
         check_assignee(&st, &ctx, a).await?;
         // Prendre une tâche déjà prise par un autre, ou la lui retirer : réservé aux responsables.
         if ctx.role < Role::Admin && t.assignee_id.is_some_and(|x| x != u.id) {
-            return Err(bad(&format!(
+            return Err(bad(format!(
                 "#{} est déjà prise par {}. Demandez-lui de la rendre, ou à un admin du studio.",
                 t.number,
                 t.assignee_name.as_deref().unwrap_or("quelqu’un d’autre")

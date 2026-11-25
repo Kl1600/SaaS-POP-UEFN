@@ -271,6 +271,47 @@ pub async fn admin_audit(State(st): State<AppState>, u: AuthUser) -> ApiResult<V
         .collect::<Vec<_>>())))
 }
 
+/// Mots de passe refusés : trop courts, trop communs, ou contenant l'identifiant.
+pub fn password_policy(pw: &str, email: &str) -> Result<(), AppError> {
+    let n = pw.chars().count();
+    if n < 10 {
+        return Err(bad("Le mot de passe doit faire au moins 10 caractères."));
+    }
+    if n > 200 {
+        return Err(bad("Mot de passe trop long."));
+    }
+    let low = pw.to_lowercase();
+    const COMMON: &[&str] = &[
+        "password",
+        "motdepasse",
+        "123456",
+        "azerty",
+        "qwerty",
+        "fortnite",
+        "1234567890",
+        "0123456789",
+        "abcdef",
+        "soleil",
+        "bonjour",
+        "iloveyou",
+        "admin",
+    ];
+    if COMMON.iter().any(|c| low.contains(c)) && n < 16 {
+        return Err(bad("Ce mot de passe est trop courant : ajoutez des mots ou des chiffres moins prévisibles."));
+    }
+    let first = low.chars().next().unwrap_or(' ');
+    if low.chars().all(|c| c == first) {
+        return Err(bad("Ce mot de passe est trop simple."));
+    }
+    let local = email.split('@').next().unwrap_or("").to_lowercase();
+    if local.len() >= 3 && low.contains(&local) {
+        return Err(bad(
+            "Le mot de passe ne doit pas contenir votre adresse e-mail.",
+        ));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::{client_ip, ProxyMode};
@@ -353,45 +394,4 @@ mod tests {
             PEER
         );
     }
-}
-
-/// Mots de passe refusés : trop courts, trop communs, ou contenant l'identifiant.
-pub fn password_policy(pw: &str, email: &str) -> Result<(), AppError> {
-    let n = pw.chars().count();
-    if n < 10 {
-        return Err(bad("Le mot de passe doit faire au moins 10 caractères."));
-    }
-    if n > 200 {
-        return Err(bad("Mot de passe trop long."));
-    }
-    let low = pw.to_lowercase();
-    const COMMON: &[&str] = &[
-        "password",
-        "motdepasse",
-        "123456",
-        "azerty",
-        "qwerty",
-        "fortnite",
-        "1234567890",
-        "0123456789",
-        "abcdef",
-        "soleil",
-        "bonjour",
-        "iloveyou",
-        "admin",
-    ];
-    if COMMON.iter().any(|c| low.contains(c)) && n < 16 {
-        return Err(bad("Ce mot de passe est trop courant : ajoutez des mots ou des chiffres moins prévisibles."));
-    }
-    let first = low.chars().next().unwrap_or(' ');
-    if low.chars().all(|c| c == first) {
-        return Err(bad("Ce mot de passe est trop simple."));
-    }
-    let local = email.split('@').next().unwrap_or("").to_lowercase();
-    if local.len() >= 3 && low.contains(&local) {
-        return Err(bad(
-            "Le mot de passe ne doit pas contenir votre adresse e-mail.",
-        ));
-    }
-    Ok(())
 }

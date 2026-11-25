@@ -1196,7 +1196,7 @@ async fn compute(st: &AppState) -> Result<Value, AppError> {
     }
 
     // Notation en centiles.
-    let col = |f: &dyn Fn(&N) -> Option<f64>| ns.iter().filter_map(|n| f(n)).collect::<Vec<f64>>();
+    let col = |f: &dyn Fn(&N) -> Option<f64>| ns.iter().filter_map(f).collect::<Vec<f64>>();
     let wt = weights(st).await;
     let rising: HashSet<String> = crate::analytics::rising_codes(st).await;
     let c_players = col(&|n| Some((n.players as f64).ln_1p()));
@@ -1353,7 +1353,7 @@ async fn compute(st: &AppState) -> Result<Value, AppError> {
             }
         }
         let mut wv: Vec<(String, usize)> = wc.into_iter().filter(|x| x.1 >= 3).collect();
-        wv.sort_by(|a, b| b.1.cmp(&a.1));
+        wv.sort_by_key(|a| std::cmp::Reverse(a.1));
         let series: Vec<Value> = days.iter().map(|d| json!({ "day": d, "players": aggs[n.t].islands.iter().filter_map(|&i| isl[i].by_day.get(d)).sum::<i64>() })).collect();
 
         opp_by_t.insert(n.t, score);
