@@ -1957,7 +1957,10 @@ mod tests_compte {
     }
 
     async fn q(st: &AppState, sql: &str) -> i64 {
-        sqlx::query_scalar(sql).fetch_one(&st.db).await.unwrap()
+        sqlx::query_scalar(sqlx::AssertSqlSafe(sql.to_string()))
+            .fetch_one(&st.db)
+            .await
+            .unwrap()
     }
 
     async fn monde() -> Monde {

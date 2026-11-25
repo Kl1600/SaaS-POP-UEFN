@@ -30,7 +30,7 @@ pub async fn trial_until(st: &AppState, uid: i64) -> Result<Option<String>, AppE
 }
 
 pub async fn user_analyse(st: &AppState, uid: i64) -> Result<bool, AppError> {
-    Ok(sqlx::query_scalar::<_, i64>(&format!(
+    Ok(sqlx::query_scalar::<_, i64>(crate::sql!(
         "SELECT COUNT(*) FROM users u WHERE u.id = ? AND {SQL_PRO}"
     ))
     .bind(uid)
@@ -41,7 +41,7 @@ pub async fn user_analyse(st: &AppState, uid: i64) -> Result<bool, AppError> {
 
 /// Le créateur du studio a-t-il un plan qui comprend Analyse ?
 pub async fn studio_analyse(st: &AppState, sid: i64) -> Result<bool, AppError> {
-    let n: i64 = sqlx::query_scalar(&format!("SELECT COUNT(*) FROM memberships m JOIN users u ON u.id = m.user_id WHERE m.studio_id = ? AND m.role = 'owner' AND {SQL_PRO}"))
+    let n: i64 = sqlx::query_scalar(crate::sql!("SELECT COUNT(*) FROM memberships m JOIN users u ON u.id = m.user_id WHERE m.studio_id = ? AND m.role = 'owner' AND {SQL_PRO}"))
         .bind(sid).fetch_one(&st.db).await?;
     Ok(n > 0)
 }
@@ -64,7 +64,7 @@ pub async fn require_market(st: &AppState, u: &AuthUser) -> Result<(), AppError>
     if user_analyse(st, u.id).await? {
         return Ok(());
     }
-    let ok: i64 = sqlx::query_scalar(&format!(
+    let ok: i64 = sqlx::query_scalar(crate::sql!(
         "SELECT COUNT(*) FROM memberships me JOIN studios s ON s.id = me.studio_id AND s.personal = 0
          JOIN memberships o ON o.studio_id = s.id AND o.role = 'owner' JOIN users u ON u.id = o.user_id
          WHERE me.user_id = ? AND {SQL_PRO}",

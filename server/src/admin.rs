@@ -294,7 +294,7 @@ async fn courbes(st: &AppState, jours: i64) -> Result<Value, AppError> {
     let parjour = |sql: String| {
         let (st, depuis) = (st.clone(), depuis.clone());
         async move {
-            sqlx::query_as::<_, (String, i64)>(&sql)
+            sqlx::query_as::<_, (String, i64)>(sqlx::AssertSqlSafe(sql.as_str()))
                 .bind(depuis)
                 .fetch_all(&st.db)
                 .await
@@ -717,7 +717,7 @@ pub async fn journal(
             Option<String>,
             Option<String>,
         ),
-    >(&sql)
+    >(sqlx::AssertSqlSafe(sql.as_str()))
     .bind(q.who)
     .bind((page - 1) * 50);
     for m in &motifs {

@@ -1,3 +1,11 @@
+/// Requête SQL assemblée avec `format!` à partir de morceaux écrits dans le code (constantes, noms de tables) :
+/// jamais de saisie de l'utilisateur, les valeurs passent toujours par `bind` (sqlx 0.9, #28).
+#[macro_export]
+macro_rules! sql {
+    ($($t:tt)*) => {
+        sqlx::AssertSqlSafe(format!($($t)*))
+    };
+}
 mod access;
 mod account;
 mod activation;

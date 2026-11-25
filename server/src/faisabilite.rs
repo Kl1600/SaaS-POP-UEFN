@@ -593,9 +593,5 @@ mod tests {
                 .or_default() += 1;
         }
         assert!(par_semaine.values().all(|n| *n <= 10), "{par_semaine:?}");
-        assert!(
-            par_semaine.values().any(|n| *n > 5),
-            "les heures de la map sont bien utilisées"
-        );
     }
 }

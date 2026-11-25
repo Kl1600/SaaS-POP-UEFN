@@ -58,7 +58,7 @@ pub async fn task_ctx(
     u: &AuthUser,
     task_id: i64,
 ) -> Result<(MapCtx, TaskRow), AppError> {
-    let t: TaskRow = sqlx::query_as(&format!("{TASK_SELECT} WHERE t.id = ?"))
+    let t: TaskRow = sqlx::query_as(crate::sql!("{TASK_SELECT} WHERE t.id = ?"))
         .bind(task_id)
         .fetch_one(&st.db)
         .await?;
@@ -72,7 +72,7 @@ pub async fn list(
     Path(mid): Path<i64>,
 ) -> ApiResult<Value> {
     map_ctx(&st, &u, mid).await?;
-    let tasks: Vec<TaskRow> = sqlx::query_as(&format!(
+    let tasks: Vec<TaskRow> = sqlx::query_as(crate::sql!(
         "{TASK_SELECT} WHERE t.map_id = ? ORDER BY t.number"
     ))
     .bind(mid)

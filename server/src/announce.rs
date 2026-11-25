@@ -12,17 +12,18 @@ const ACTIVE: &str = "removed_at IS NULL AND (ends_at IS NULL OR ends_at > datet
 
 /// L'annonce à montrer à ce compte (null s'il l'a fermée ou s'il n'y en a pas). Utilisée par /api/me.
 pub async fn for_user(st: &AppState, uid: i64) -> Result<Value, AppError> {
-    let r: Option<(i64, String, String)> = sqlx::query_as(&format!(
+    let r: Option<(i64, String, String)> = sqlx::query_as(crate::sql!(
         "SELECT id, text, level FROM announcements WHERE {ACTIVE} AND id NOT IN (SELECT announcement_id FROM announcement_dismissals WHERE user_id = ?) ORDER BY id DESC LIMIT 1"
     ))
     .bind(uid)
     .fetch_optional(&st.db)
     .await?;
     // Seule la plus récente compte : une annonce plus ancienne fermée ne doit pas laisser revenir une plus ancienne encore.
-    let last: Option<i64> =
-        sqlx::query_scalar(&format!("SELECT MAX(id) FROM announcements WHERE {ACTIVE}"))
-            .fetch_one(&st.db)
-            .await?;
+    let last: Option<i64> = sqlx::query_scalar(crate::sql!(
+        "SELECT MAX(id) FROM announcements WHERE {ACTIVE}"
+    ))
+    .fetch_one(&st.db)
+    .await?;
     Ok(match r {
         Some((id, text, level)) if Some(id) == last => {
             json!({ "id": id, "text": text, "level": level })
@@ -47,7 +48,7 @@ pub async fn dismiss(
 /// Administration : l'annonce active, avec le nombre de comptes qui l'ont fermée.
 pub async fn current(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
     crate::security::require_admin(&st, &u).await?;
-    let r: Option<(i64, String, String, Option<String>, String, i64)> = sqlx::query_as(&format!(
+    let r: Option<(i64, String, String, Option<String>, String, i64)> = sqlx::query_as(crate::sql!(
         "SELECT a.id, a.text, a.level, a.ends_at, a.created_at, (SELECT COUNT(*) FROM announcement_dismissals d WHERE d.announcement_id = a.id) FROM announcements a WHERE {ACTIVE} ORDER BY a.id DESC LIMIT 1"
     ))
     .fetch_optional(&st.db)
@@ -96,7 +97,7 @@ pub async fn publish(
             Some(t.format("%Y-%m-%d %H:%M:%S").to_string())
         }
     };
-    sqlx::query(&format!(
+    sqlx::query(crate::sql!(
         "UPDATE announcements SET removed_at = datetime('now') WHERE {ACTIVE}"
     ))
     .execute(&st.db)
@@ -114,7 +115,7 @@ pub async fn publish(
 
 pub async fn remove(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
     crate::security::require_admin(&st, &u).await?;
-    sqlx::query(&format!(
+    sqlx::query(crate::sql!(
         "UPDATE announcements SET removed_at = datetime('now') WHERE {ACTIVE}"
     ))
     .execute(&st.db)
