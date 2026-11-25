@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-25 · #371 · l'Organiseur retiré du site vitrine
+- Fait : Landing.tsx : bloc de fonctionnalité et capture de l'Organiseur retirés (FEATURES garde l'index du texte, k), entrée du méga-menu masquée (index 4), ligne « Organiseur d'acteurs » du comparatif masquée (ORGANISEUR_ROW) ; mention retirée de l'accroche dans les 16 langues. Les textes restent dans les dictionnaires.
+- Vérifié : navigateur 1440 px, fr et en.
+
 ### 2026-11-25 · #372 · Dashboard sans les trois blocs du haut
 - Fait : Overview.tsx n'affiche plus la scène du studio (#176), les premiers pas avec l'IA (#146) ni le parcours de questions de cadrage (#135), à la demande de Kl1600. Les composants Parcours et PremiersPas sont retirés de la page ; StudioScene.tsx et les routes serveur (suggestions, questions, outil MCP ask_user) restent.
 - Vérifié : navigateur 1440 px sur une map avec données.
