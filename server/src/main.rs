@@ -21,6 +21,7 @@ mod assets;
 mod auth;
 mod billing;
 mod boards;
+mod captures;
 mod catalog;
 mod checks;
 mod courante;
@@ -661,6 +662,7 @@ fn api() -> Router<AppState> {
             get(devices::route_catalogue),
         )
         .route("/api/maps/{mid}/devices/graph", get(devices::route_graphe))
+        .route("/api/maps/{mid}/captures", get(captures::route_liste))
         .route("/api/maps/{mid}/uefn/topview", get(uefn::topview))
         .route("/api/maps/{mid}/uefn/action", post(uefn::action))
         .route("/api/maps/{mid}/uefn/journal", get(uefn::journal))

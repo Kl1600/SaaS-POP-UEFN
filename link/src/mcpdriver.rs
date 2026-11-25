@@ -476,6 +476,63 @@ impl Mcp {
         Ok((id, list))
     }
 
+    /// Photo de l'île depuis une caméra (#306) : rend le PNG. La vue de l'éditeur est toujours remise comme avant,
+    /// même si la capture échoue.
+    pub async fn capture(
+        &mut self,
+        location: &Value,
+        rotation: &Value,
+        w: u32,
+        h: u32,
+    ) -> Result<Vec<u8>> {
+        let file = std::env::temp_dir().join(format!(
+            "pop_capture_{}.png",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)?
+                .as_millis()
+        ));
+        let f = file.to_string_lossy().replace('\\', "/");
+        let args = json!({ "location": location, "rotation": rotation, "width": w, "height": h, "file": f }).to_string();
+        let out = self
+            .python(&format!(
+                "ARGS = {}\n{}",
+                serde_json::to_string(&args)?,
+                PY_CAPTURE
+            ))
+            .await?;
+        let avant = out
+            .lines()
+            .rev()
+            .find_map(|l| l.trim().strip_prefix("CAPTURE=").map(String::from))
+            .ok_or_else(|| anyhow!("UEFN n'a pas lancé la capture : {}", out.trim()))?;
+        // Attendre le fichier (capture asynchrone), 60 s au plus, et qu'il ne grossisse plus.
+        let mut taille = 0;
+        let mut png = Err(anyhow!("aucune image produite par UEFN en 60 s"));
+        for _ in 0..120 {
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            let n = std::fs::metadata(&file).map(|m| m.len()).unwrap_or(0);
+            if n > 0 && n == taille {
+                png = std::fs::read(&file).map_err(anyhow::Error::from);
+                break;
+            }
+            taille = n;
+        }
+        let fin = self
+            .python(&format!(
+                "ARGS = {}\n{}",
+                serde_json::to_string(&avant)?,
+                PY_CAPTURE_FIN
+            ))
+            .await;
+        let _ = std::fs::remove_file(&file);
+        let png = png?;
+        fin?;
+        if !png.starts_with(b"\x89PNG") {
+            bail!("le fichier produit par UEFN n'est pas une image PNG");
+        }
+        Ok(png)
+    }
+
     /// Importe `file` (fichier sur ce PC) dans le dossier `folder` du projet ; rend les chemins des assets créés.
     pub async fn import(&mut self, file: &str, folder: &str, project: &str) -> Result<Vec<String>> {
         let args = json!({ "file": file, "folder": folder, "project": project }).to_string();
@@ -1088,6 +1145,34 @@ for root in ('/Fortnite', '/Game'):
         pkg = str(d.package_name)
         out.append({'name': n, 'path': pkg + '.' + n, 'folder': pkg.rsplit('/', 1)[0]})
 print(json.dumps({'version': unreal.SystemLibrary.get_engine_version(), 'devices': out[:8000]}))
+"#;
+
+/// Photo de l'île (#306), étape 1 : garde la vue de l'éditeur, passe en vue jeu (sans icônes ni aides), place la
+/// caméra et demande la capture haute résolution. La capture est asynchrone : le fichier arrive aux images suivantes.
+const PY_CAPTURE: &str = r#"import unreal, json
+A = json.loads(ARGS)
+ues = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
+les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
+info = ues.get_level_viewport_camera_info()
+if isinstance(info, tuple) and len(info) == 3: info = info[1:]
+loc0, rot0 = info
+avant = {'loc': [loc0.x, loc0.y, loc0.z], 'rot': [rot0.pitch, rot0.yaw, rot0.roll], 'game': 1 if les.editor_get_game_view() else 0}
+l, r = A['location'], A['rotation']
+ues.set_level_viewport_camera_info(unreal.Vector(l[0], l[1], l[2]), unreal.Rotator(roll=r[2], pitch=r[0], yaw=r[1]))
+les.editor_set_game_view(True)
+unreal.AutomationLibrary.take_high_res_screenshot(A['width'], A['height'], A['file'], None, False, False)
+print('CAPTURE=' + json.dumps(avant))
+"#;
+
+/// Photo de l'île (#306), étape 2 : remet la vue de l'éditeur comme avant la capture.
+const PY_CAPTURE_FIN: &str = r#"import unreal, json
+A = json.loads(ARGS)
+ues = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
+les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
+l, r = A['loc'], A['rot']
+ues.set_level_viewport_camera_info(unreal.Vector(l[0], l[1], l[2]), unreal.Rotator(roll=r[2], pitch=r[0], yaw=r[1]))
+les.editor_set_game_view(A['game'] == 1)
+print('RESTORED')
 "#;
 
 const PY_LIST: &str = r#"import unreal, json
