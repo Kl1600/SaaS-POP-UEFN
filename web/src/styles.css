@@ -1254,3 +1254,24 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 .act-construit .scene-corps,.act-planifie .scene-corps,.act-dessine .scene-corps,.act-pilote .scene-corps,.act-studio .scene-corps{animation:scene-respire 2.4s ease-in-out infinite}
 @media (prefers-reduced-motion:reduce){.scene *{animation:none!important}}
 @media (max-width:600px){.scene-bulle{position:static;max-width:none;margin-top:8px}}
+/* Téléphone (#360) : la barre latérale reste à gauche, en icônes ; le bouton « Replier » l'ouvre par-dessus la page. */
+@media (max-width:760px){
+.app{flex-direction:row}
+.side,.app.collapsed .side{flex:0 0 60px;height:100vh;height:100dvh;max-height:none;position:sticky;top:0;padding:14px 6px;overflow-y:auto}
+.side .nav{flex-direction:column;flex-wrap:nowrap}
+.app.collapsed .side .navsec{display:none}
+.main{margin:8px 8px 8px 0;height:auto;flex:1 1 0;min-width:0}
+.app.drawer-open .side{position:fixed;left:0;top:0;bottom:0;width:272px;flex-basis:auto;z-index:70;background:#000;padding:20px 14px;box-shadow:8px 0 40px rgba(0,0,0,.4)}
+.app.drawer-open .side .navsec{display:block}
+.side-scrim{position:fixed;inset:0;z-index:69;background:rgba(0,0,0,.45)}
+.app.drawer-open .main{margin-left:68px}
+.app.collapsed .acct-menu{left:66px}
+}
+/* L'avatar du compte reste visible quand le nom est masqué (#360). */
+@media (max-width:900px){.acct > span.acct-av{display:grid}}
+@media (max-width:760px){
+.top{flex-wrap:nowrap;gap:6px}
+.top .crumb{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.app.drawer-open .side .acct > span.acct-txt{display:flex !important}
+.app.drawer-open .side .acct .acct-chev{display:inline-block !important}
+}
