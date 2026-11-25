@@ -213,6 +213,10 @@ fn tools() -> Value {
         tool("get_feasibility", "Avis de faisabilité de la map : faisable, tendu ou pas faisable, heures disponibles jusqu'à la sortie, heures nécessaires (1 h par tâche ouverte), marge, et corrections chiffrées (date, heures, tâches à confier à l'IA ou à retirer).", json!({}), &[]),
         tool("list_scenarios", "Scénarios de test de la map (#348) : étapes (action, résultat attendu), statut (draft = proposé par une IA, à valider ; ready = jouable) et dernier passage (version, réussies, échouées, régressions).", json!({}), &[]),
         tool("propose_scenario", "Propose un scénario de test à partir des tâches (#348) : title, steps [{ action, expected }] (1 à 50, une action claire par étape, ex. « Va au spawn et achète l'arme »). Il reste brouillon tant qu'un humain ne l'a pas validé ; ce sont des humains qui le jouent.", json!({ "title": { "type": "string" }, "steps": { "type": "array", "items": { "type": "object", "properties": { "action": { "type": "string" }, "expected": { "type": "string" } } } } }), &["title", "steps"]),
+        tool("list_device_configs", "Configurations d'appareils réutilisables du studio (#89) : nom, type (class), options et réglages @editable. Cherchez-y avant de régler un appareil à la main.", json!({ "query": { "type": "string" } }), &[]),
+        tool("save_device_config", "Enregistre la configuration d'un appareil du niveau (son type et ses réglages, lus dans UEFN) dans la bibliothèque du studio, sous un nom.", json!({ "actor_id": { "type": "string" }, "name": { "type": "string" }, "description": { "type": "string" }, "asset": { "type": "string", "description": "Chemin de l'asset de l'appareil (facultatif)" } }), &["actor_id", "name"]),
+        tool("apply_device_config", "Applique une configuration enregistrée à des appareils du même type (une action annulable).", json!({ "config_id": { "type": "integer" }, "ids": { "type": "array", "items": { "type": "string" } } }), &["config_id", "ids"]),
+        tool("place_configured_device", "Pose un appareil déjà configuré (depuis son asset, ou copie d'un appareil du même type du niveau), puis applique ses réglages. Annulable.", json!({ "config_id": { "type": "integer" }, "name": { "type": "string" }, "folder": { "type": "string" }, "location": { "type": "array", "items": { "type": "number" } }, "rotation": { "type": "array", "items": { "type": "number" } } }), &["config_id"]),
         tool("list_milestones", "Jalons et objectifs du planning de la map (date, heure, type, détail).", json!({}), &[]),
         tool("add_milestone", "Ajoute un jalon au planning : title, date AAAA-MM-JJ ; facultatifs : time HH:MM, detail, kind (jalon par défaut).", json!({ "title": { "type": "string" }, "date": { "type": "string" }, "time": { "type": "string" }, "detail": { "type": "string" }, "kind": { "type": "string" } }), &["title", "date"]),
         tool("list_agents", "Agents IA de la map : identifiant, nom, rôle, tâche en cours, actif ou non, et lequel est l'Orchestrateur.", json!({}), &[]),
@@ -266,6 +270,7 @@ const READ_TOOLS: &[&str] = &[
     "get_answer",
     "get_feasibility",
     "list_scenarios",
+    "list_device_configs",
 ];
 
 fn rpc_ok(id: Value, result: Value) -> Response {
@@ -932,6 +937,17 @@ async fn call_as(
         "save_progress" => crate::agents::save_progress(st, agent_requis()?, &a).await,
         "ask_user" => crate::questions::ask_user(st, mid, agent_requis()?, &a).await,
         "get_answer" => crate::questions::get_answer(st, mid, &a).await,
+        "list_device_configs" => Ok(json!(crate::device_configs::liste(st, ctx.studio_id, a["query"].as_str().unwrap_or("")).await?)),
+        "save_device_config" => {
+            let b: crate::device_configs::Enregistrer = serde_json::from_value(json!({ "actor_id": a["actor_id"], "name": a["name"], "description": a["description"].as_str().unwrap_or(""), "asset": a["asset"].as_str().unwrap_or("") }))
+                .map_err(|_| bad("actor_id et name : du texte."))?;
+            crate::device_configs::enregistrer(st, &ctx, &b).await
+        }
+        "apply_device_config" => {
+            let ids: Vec<String> = a["ids"].as_array().cloned().unwrap_or_default().iter().filter_map(|x| x.as_str().map(String::from)).collect();
+            crate::device_configs::appliquer(st, o(), a["config_id"].as_i64().ok_or_else(|| bad("config_id attendu."))?, &ids).await
+        }
+        "place_configured_device" => crate::device_configs::poser(st, &ctx, "mcp", agent, a["config_id"].as_i64().ok_or_else(|| bad("config_id attendu."))?, &a).await,
         "get_feasibility" => crate::faisabilite::avis_de_la_map(st, mid).await,
         "list_scenarios" => crate::scenarios::liste(st, mid).await,
         "propose_scenario" => {

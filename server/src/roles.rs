@@ -31,6 +31,7 @@ const COMMUNS: &[&str] = &[
     "read_page",
     "list_milestones",
     "list_scenarios",
+    "list_device_configs",
 ];
 
 /// Ce qu'un agent fait de ses tâches : réserver, passer en cours ou fini, signaler un problème par une tâche.
@@ -93,6 +94,9 @@ pub const ROLES: &[Role] = &[
                 "delete_actors",
                 "place_device",
                 "place_mesh",
+                "save_device_config",
+                "apply_device_config",
+                "place_configured_device",
                 "set_island_settings",
                 "get_island_settings",
                 "import_asset",
