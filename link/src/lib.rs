@@ -171,6 +171,27 @@ fn log(ui: &Shared, action: &str, res: &str) {
 
 // ---------- Pilote : le vrai UEFN via son serveur MCP ----------
 
+/// Script Python qui affiche les dossiers du projet ouvert dans UEFN et le chemin du monde (nom de la map).
+const OPEN_PROJECT_PY: &str = "import unreal\nprint(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_dir()))\nprint(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_plugins_dir()))\ntry:\n    print(unreal.EditorLevelLibrary.get_editor_world().get_path_name())\nexcept Exception: pass";
+
+/// Parmi `projects`, celui qui est ouvert dans UEFN (serveur MCP démarré), sinon `None`.
+pub async fn open_project(projects: &[PathBuf]) -> Option<PathBuf> {
+    let first = projects.first()?;
+    let mut m = mcpdriver::Mcp::new(mcpdriver::find_url(None, first), HashMap::new());
+    if !m.alive().await {
+        return None;
+    }
+    let out = m.python(OPEN_PROJECT_PY).await.ok()?.to_lowercase();
+    projects
+        .iter()
+        .find(|p| {
+            p.file_name()
+                .map(|n| out.contains(&n.to_string_lossy().to_lowercase()))
+                .unwrap_or(false)
+        })
+        .cloned()
+}
+
 struct Link {
     open: Open,
     all_projects: Vec<String>,
@@ -206,7 +227,12 @@ impl Link {
                         .unwrap_or_default()
                 })
                 .collect();
-            let out = self.mcp.python("import unreal\nprint(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_dir()))\nprint(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_plugins_dir()))\ntry:\n    print(unreal.EditorLevelLibrary.get_editor_world().get_path_name())\nexcept Exception: pass").await.unwrap_or_default().to_lowercase();
+            let out = self
+                .mcp
+                .python(OPEN_PROJECT_PY)
+                .await
+                .unwrap_or_default()
+                .to_lowercase();
             let by_python = self
                 .all_projects
                 .iter()

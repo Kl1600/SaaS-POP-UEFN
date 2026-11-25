@@ -13,10 +13,7 @@ mod relay;
 
 use serde::{Deserialize, Serialize};
 use std::{path::PathBuf, sync::Mutex, time::Duration};
-use tauri::{
-    menu::{Menu, MenuItem, PredefinedMenuItem, Submenu},
-    AppHandle, Manager, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
-};
+use tauri::{AppHandle, Manager, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use url::Host;
 
 /// Réglages gardés dans `%APPDATA%\app.pop.forge\forge.json`.
@@ -112,6 +109,54 @@ fn main_window(app: &AppHandle) -> Result<WebviewWindow, String> {
         .ok_or_else(|| "Fenêtre principale introuvable.".into())
 }
 
+/// Autorise la page `/forge` du serveur POP choisi à appeler les commandes du relais (et seulement elles).
+fn autoriser(app: &AppHandle, u: &Url) {
+    let origin = u.origin().ascii_serialization();
+    let cap = tauri::ipc::CapabilityBuilder::new("pop-forge-distant")
+        .window("main")
+        .remote(format!("{origin}/*"))
+        .permission("allow-projets")
+        .permission("allow-etat-relais")
+        .permission("allow-relier")
+        .permission("allow-projet-ouvert")
+        .permission("allow-liaison")
+        .permission("allow-fenetre")
+        .permission("allow-choisir-dossier")
+        .permission("allow-action-forge");
+    let _ = app.add_capability(cap);
+}
+
+/// Garde de navigation : Forge n'affiche que sa page locale et l'écran /forge du serveur POP choisi. Toute autre page
+/// (le site POP, un lien externe) s'ouvre dans le navigateur de l'utilisateur.
+fn autorise(app: &AppHandle, url: &Url) -> bool {
+    if url.scheme() == "tauri"
+        || url.host_str() == Some("tauri.localhost")
+        || url.scheme() == "about"
+    {
+        return true;
+    }
+    let pop = load(app).server.and_then(|s| normalize(&s).ok());
+    let meme = pop.map(|p| p.origin() == url.origin()).unwrap_or(false);
+    if meme
+        && (url.path() == "/forge"
+            || url.path().starts_with("/forge/")
+            || url.path().starts_with("/api/"))
+    {
+        return true;
+    }
+    if matches!(url.scheme(), "http" | "https") {
+        let _ = tauri_plugin_opener::open_url(url.as_str(), None::<&str>);
+    }
+    false
+}
+
+/// Ouvre l'interface de Forge servie par POP (`/forge`).
+fn ouvrir(app: &AppHandle, u: &Url) -> Result<(), String> {
+    autoriser(app, u);
+    let forge = u.join("forge").map_err(|e| e.to_string())?;
+    main_window(app)?.navigate(forge).map_err(|e| e.to_string())
+}
+
 /// Résultat pour la page locale : adresse à préremplir et erreur à afficher.
 #[derive(Serialize)]
 struct Start {
@@ -137,7 +182,7 @@ async fn start(app: AppHandle, change: bool) -> Result<Start, String> {
     let u = normalize(&server)?;
     match check(&u).await {
         Ok(()) => {
-            main_window(&app)?.navigate(u).map_err(|e| e.to_string())?;
+            ouvrir(&app, &u)?;
             Ok(Start {
                 address: server,
                 error: None,
@@ -157,16 +202,159 @@ async fn connect(app: AppHandle, address: String) -> Result<(), String> {
     check(&u).await?;
     let s = u.as_str().trim_end_matches('/').to_string();
     save(&app, &Settings { server: Some(s) })?;
-    main_window(&app)?.navigate(u).map_err(|e| e.to_string())
+    ouvrir(&app, &u)
 }
 
-/// Projets UEFN trouvés dans `Documents\Fortnite Projects`.
+/// Projets UEFN : ceux que trouve pop-link (`Documents\Fortnite Projects`, aussi sous OneDrive), ceux du vrai dossier
+/// Documents de Windows quand il a été déplacé (autre disque, autre nom : test de Kl1600 du 24/11), ceux qu'UEFN a
+/// ouverts récemment, et ceux déjà reliés.
+fn tous_les_projets() -> Vec<PathBuf> {
+    let mut out = pop_link::find_projects();
+    let mut ajouter = |p: PathBuf| {
+        if est_un_projet(&p) && !out.contains(&p) {
+            out.push(p);
+        }
+    };
+    for p in projets_recents_uefn() {
+        ajouter(p);
+    }
+    if let Ok(c) = pop_link::load() {
+        for l in liens_de(&c) {
+            ajouter(PathBuf::from(l.project));
+        }
+    }
+    if let Some(docs) = dirs::document_dir() {
+        if let Ok(rd) = std::fs::read_dir(docs.join("Fortnite Projects")) {
+            for e in rd.flatten() {
+                let p = e.path();
+                if est_un_projet(&p) && !out.contains(&p) {
+                    out.push(p);
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Projets cités dans les réglages d'UEFN (projets récents) : chemins `….uefnproject` trouvés dans les fichiers `.ini`
+/// de `%LOCALAPPDATA%\UnrealEditorFortnite\Saved\Config`. Sans ces fichiers, rien (la recherche reste complète
+/// avec le dossier Documents et « Parcourir… »).
+fn projets_recents_uefn() -> Vec<PathBuf> {
+    let Some(base) = dirs::data_local_dir() else {
+        return vec![];
+    };
+    let mut out = vec![];
+    let mut pile = vec![base
+        .join("UnrealEditorFortnite")
+        .join("Saved")
+        .join("Config")];
+    while let Some(d) = pile.pop() {
+        let Ok(rd) = std::fs::read_dir(&d) else {
+            continue;
+        };
+        for e in rd.flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                pile.push(p);
+            } else if p.extension().is_some_and(|x| x.eq_ignore_ascii_case("ini")) {
+                if let Ok(txt) = std::fs::read_to_string(&p) {
+                    out.extend(chemins_uefnproject(&txt));
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Dossiers des projets cités dans un texte (`C:/…/MonIle/MonIle.uefnproject`, guillemets ou non).
+fn chemins_uefnproject(txt: &str) -> Vec<PathBuf> {
+    let mut out = vec![];
+    for morceau in txt.split(['"', '=', ',', '(', ')', '\n']) {
+        let m = morceau.trim();
+        if m.to_lowercase().ends_with(".uefnproject") && m.len() > 14 {
+            if let Some(dossier) =
+                std::path::Path::new(&m.replace('/', std::path::MAIN_SEPARATOR_STR)).parent()
+            {
+                let d = dossier.to_path_buf();
+                if !out.contains(&d) {
+                    out.push(d);
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Projets reliés dans la configuration du relais : liste de liaisons, ou ancien appairage d'un seul projet.
+fn liens_de(c: &pop_link::Config) -> Vec<pop_link::ProjLink> {
+    if !c.links.is_empty() {
+        c.links.clone()
+    } else if !c.project.is_empty() {
+        vec![pop_link::ProjLink {
+            project: c.project.clone(),
+            map: c.map.clone(),
+            token: c.token.clone(),
+        }]
+    } else {
+        vec![]
+    }
+}
+
+/// Un dossier de projet UEFN contient un fichier `.uefnproject`.
+fn est_un_projet(p: &std::path::Path) -> bool {
+    std::fs::read_dir(p)
+        .map(|r| {
+            r.flatten()
+                .any(|f| f.path().extension().is_some_and(|x| x == "uefnproject"))
+        })
+        .unwrap_or(false)
+}
+
+/// Projets UEFN trouvés sur ce PC.
 #[tauri::command]
 fn projets() -> Vec<String> {
-    pop_link::find_projects()
+    tous_les_projets()
         .into_iter()
         .map(|p| p.to_string_lossy().to_string())
         .collect()
+}
+
+/// Projet ouvert dans UEFN (parmi ceux trouvés sur ce PC), s'il y en a un.
+#[tauri::command]
+async fn projet_ouvert() -> Option<String> {
+    pop_link::open_project(&tous_les_projets())
+        .await
+        .map(|p| p.to_string_lossy().to_string())
+}
+
+/// Liaisons du relais : serveur et, pour chaque projet UEFN relié, sa map POP (plusieurs maps, retour de Kl1600).
+#[tauri::command]
+fn liaison() -> Option<serde_json::Value> {
+    let c = pop_link::load().ok()?;
+    let liens = liens_de(&c);
+    let premier = liens.first().cloned().unwrap_or_default();
+    Some(serde_json::json!({
+        "projet": premier.project, "map": premier.map, "serveur": c.server,
+        "liens": liens.iter().map(|l| serde_json::json!({ "projet": l.project, "map": l.map })).collect::<Vec<_>>(),
+    }))
+}
+
+/// « Parcourir… » : choisir le dossier d'un projet UEFN dans l'explorateur de Windows.
+#[tauri::command]
+async fn choisir_dossier(app: AppHandle) -> Option<String> {
+    use tauri_plugin_dialog::DialogExt;
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.dialog()
+        .file()
+        .set_title("Dossier du projet UEFN")
+        .pick_folder(move |d| {
+            let _ = tx.send(d);
+        });
+    rx.await
+        .ok()
+        .flatten()
+        .and_then(|d| d.into_path().ok())
+        .map(|p| p.to_string_lossy().to_string())
 }
 
 /// État du relais en quelques mots.
@@ -188,39 +376,71 @@ async fn relier(app: AppHandle, code: String, projet: String) -> Result<String, 
     if !std::path::Path::new(&projet).is_dir() {
         return Err(format!("Dossier introuvable : {projet}"));
     }
+    if !est_un_projet(std::path::Path::new(&projet)) {
+        return Err(format!("{projet} ne contient pas de projet UEFN (fichier .uefnproject) : vérifiez le chemin du dossier."));
+    }
     let device = std::env::var("COMPUTERNAME").unwrap_or_else(|_| "POP Forge".into());
+    // Plusieurs projets reliés à la fois (une map POP par projet) : la nouvelle liaison s'ajoute aux autres et
+    // remplace celle du même projet ou de la même map.
+    let avant = pop_link::load().ok();
     pop_link::pair(&server, &code, &projet, &device)
         .await
         .map_err(|e| format!("Liaison refusée : {e:#}"))?;
+    if let (Some(avant), Ok(mut c)) = (avant, pop_link::load()) {
+        if avant.server.trim_end_matches('/') == c.server.trim_end_matches('/') {
+            let nouveau = pop_link::ProjLink {
+                project: c.project.clone(),
+                map: c.map.clone(),
+                token: c.token.clone(),
+            };
+            let mut liens: Vec<pop_link::ProjLink> = liens_de(&avant)
+                .into_iter()
+                .filter(|l| l.project != nouveau.project && l.map != nouveau.map)
+                .collect();
+            liens.push(nouveau);
+            c.links = liens;
+            c.digests_dir = c.digests_dir.or(avant.digests_dir);
+            c.uefn_mcp_url = c.uefn_mcp_url.or(avant.uefn_mcp_url);
+            c.lore_cmd = c.lore_cmd.or(avant.lore_cmd);
+            if c.tools.is_empty() {
+                c.tools = avant.tools;
+            }
+            pop_link::save(&c).map_err(|e| format!("Configuration non enregistrée : {e:#}"))?;
+        }
+    }
     relay::demarrer(&app).await;
     Ok(relay::libelle(&app))
 }
 
-fn menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
-    let change = MenuItem::with_id(
-        app,
-        "changer",
-        "Changer l'adresse de POP…",
-        true,
-        None::<&str>,
-    )?;
-    let reload = MenuItem::with_id(app, "recharger", "Recharger", true, Some("F5"))?;
-    let quit = PredefinedMenuItem::quit(app, Some("Quitter"))?;
-    let forge = Submenu::with_items(
-        app,
-        "POP Forge",
-        true,
-        &[
-            &change,
-            &reload,
-            &PredefinedMenuItem::separator(app)?,
-            &quit,
-        ],
-    )?;
-    let relier = MenuItem::with_id(app, "relier", "Relier un projet UEFN…", true, None::<&str>)?;
-    let etat = MenuItem::with_id(app, "etat", "Page d'état du relais", true, None::<&str>)?;
-    let link = Submenu::with_items(app, "UEFN Link", true, &[&relier, &etat])?;
-    Menu::with_items(app, &[&forge, &link])
+/// Barre de titre propre à Forge (#78, retour de Kl1600 du 24/11) : la fenêtre n'a plus le cadre ni le menu de
+/// Windows ; la page dessine sa barre et appelle cette commande pour réduire, agrandir, fermer ou déplacer.
+#[tauri::command]
+fn fenetre(window: WebviewWindow, action: String) -> Result<(), String> {
+    match action.as_str() {
+        "reduire" => window.minimize(),
+        "agrandir" => {
+            if window.is_maximized().unwrap_or(false) {
+                window.unmaximize()
+            } else {
+                window.maximize()
+            }
+        }
+        "fermer" => window.close(),
+        "deplacer" => window.start_dragging(),
+        _ => return Err(format!("Action de fenêtre inconnue : {action}")),
+    }
+    .map_err(|e| e.to_string())
+}
+
+/// Ce que proposait l'ancien menu de Windows, maintenant dans le menu du profil de Forge : changer l'adresse de
+/// POP, relier un projet, page d'état du relais, accueil, recharger.
+#[tauri::command]
+fn action_forge(app: AppHandle, id: String) -> Result<(), String> {
+    if !["changer", "relier", "etat", "accueil", "recharger"].contains(&id.as_str()) {
+        return Err(format!("Action inconnue : {id}"));
+    }
+    on_menu(&app, &id);
+    Ok(())
 }
 
 fn on_menu(app: &AppHandle, id: &str) {
@@ -247,6 +467,12 @@ fn on_menu(app: &AppHandle, id: &str) {
                     .build();
             }
         }
+        "accueil" => {
+            let server = load(app).server.and_then(|s| normalize(&s).ok());
+            if let Some(u) = server {
+                let _ = ouvrir(app, &u);
+            }
+        }
         "recharger" => {
             let _ = w.reload();
         }
@@ -256,6 +482,8 @@ fn on_menu(app: &AppHandle, id: &str) {
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(Home(Mutex::new(None)))
         .manage(relay::Relay::default())
         .invoke_handler(tauri::generate_handler![
@@ -263,14 +491,24 @@ fn main() {
             connect,
             projets,
             etat_relais,
-            relier
+            relier,
+            projet_ouvert,
+            liaison,
+            fenetre,
+            action_forge,
+            choisir_dossier
         ])
-        .menu(menu)
-        .on_menu_event(|app, e| on_menu(app, e.id().as_ref()))
         .setup(|app| {
-            if let Some(w) = app.get_webview_window("main") {
-                *app.state::<Home>().0.lock().unwrap() = w.url().ok();
-            }
+            let h = app.handle().clone();
+            let w = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
+                .title("POP Forge")
+                .decorations(false)
+                .inner_size(1400.0, 900.0)
+                .min_inner_size(900.0, 600.0)
+                .center()
+                .on_navigation(move |u| autorise(&h, u))
+                .build()?;
+            *app.state::<Home>().0.lock().unwrap() = w.url().ok();
             let h = app.handle().clone();
             tauri::async_runtime::spawn(async move { relay::demarrer(&h).await });
             relay::suivre(app.handle().clone());
@@ -309,6 +547,15 @@ mod tests {
         let ferme = normalize("http://127.0.0.1:1").unwrap();
         let e = tauri::async_runtime::block_on(check(&ferme)).unwrap_err();
         assert!(e.contains("ne répond pas"), "{e}");
+    }
+
+    #[test]
+    fn projets_recents() {
+        let ini = "[/Script/X]\nRecentlyOpenedProjectFiles=(ProjectName=\"C:/Users/ben/Documents/Fortnite Projects/VaultRush/VaultRush.uefnproject\",LastOpenTime=1)\nAutre=D:/UEFN/Grass Cutter/Grass Cutter.uefnproject\n";
+        let p = super::chemins_uefnproject(ini);
+        assert_eq!(p.len(), 2, "{p:?}");
+        assert!(p[0].to_string_lossy().ends_with("VaultRush"));
+        assert!(p[1].to_string_lossy().ends_with("Grass Cutter"));
     }
 
     #[test]
