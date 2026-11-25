@@ -1,3 +1,5 @@
+// Liste des outils MCP (json! imbriqués) : au-delà de la limite par défaut de 128 expansions.
+#![recursion_limit = "256"]
 /// Requête SQL assemblée avec `format!` à partir de morceaux écrits dans le code (constantes, noms de tables) :
 /// jamais de saisie de l'utilisateur, les valeurs passent toujours par `bind` (sqlx 0.9, #28).
 #[macro_export]
@@ -23,6 +25,7 @@ mod catalog;
 mod checks;
 mod courante;
 mod device_configs;
+mod devices;
 mod discover;
 mod engine;
 mod error;
@@ -653,6 +656,11 @@ fn api() -> Router<AppState> {
             "/api/studios/{sid}/device-configs/{id}",
             delete(device_configs::route_supprimer),
         )
+        .route(
+            "/api/maps/{mid}/devices/catalog",
+            get(devices::route_catalogue),
+        )
+        .route("/api/maps/{mid}/devices/graph", get(devices::route_graphe))
         .route("/api/maps/{mid}/uefn/topview", get(uefn::topview))
         .route("/api/maps/{mid}/uefn/action", post(uefn::action))
         .route("/api/maps/{mid}/uefn/journal", get(uefn::journal))

@@ -101,7 +101,7 @@ fn ready(st: &AppState, map_id: i64, action: &str) -> bool {
 }
 
 /// Envoie une commande au relais et attend sa réponse.
-async fn relay_call(
+pub(crate) async fn relay_call(
     st: &AppState,
     map_id: i64,
     action: &str,

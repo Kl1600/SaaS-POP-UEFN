@@ -222,6 +222,8 @@ fn tools() -> Value {
             "items": { "type": "array", "items": { "type": "object" } },
             "folder": { "type": "string" }
         }), &["items"]),
+        tool("search_devices", "Cherche un appareil dans le catalogue d'UEFN (#119), en français ou en anglais (« bouton », « minuteur », « distributeur »…). Rend son nom et son chemin d'asset, à passer à place_device (asset).", json!({ "query": { "type": "string" } }), &["query"]),
+        tool("device_graph", "Graphe des liens entre appareils du niveau (#119) : liens d'événements et références @editable des appareils Verse ; broken = cible absente du niveau.", json!({}), &[]),
         tool("list_milestones", "Jalons et objectifs du planning de la map (date, heure, type, détail).", json!({}), &[]),
         tool("add_milestone", "Ajoute un jalon au planning : title, date AAAA-MM-JJ ; facultatifs : time HH:MM, detail, kind (jalon par défaut).", json!({ "title": { "type": "string" }, "date": { "type": "string" }, "time": { "type": "string" }, "detail": { "type": "string" }, "kind": { "type": "string" } }), &["title", "date"]),
         tool("list_agents", "Agents IA de la map : identifiant, nom, rôle, tâche en cours, actif ou non, et lequel est l'Orchestrateur.", json!({}), &[]),
@@ -276,6 +278,8 @@ const READ_TOOLS: &[&str] = &[
     "get_feasibility",
     "list_scenarios",
     "list_device_configs",
+    "search_devices",
+    "device_graph",
 ];
 
 fn rpc_ok(id: Value, result: Value) -> Response {
@@ -953,6 +957,8 @@ async fn call_as(
             crate::device_configs::appliquer(st, o(), a["config_id"].as_i64().ok_or_else(|| bad("config_id attendu."))?, &ids).await
         }
         "place_configured_device" => crate::device_configs::poser(st, &ctx, "mcp", agent, a["config_id"].as_i64().ok_or_else(|| bad("config_id attendu."))?, &a).await,
+        "search_devices" => crate::devices::chercher(st, mid, a["query"].as_str().unwrap_or("")).await,
+        "device_graph" => crate::devices::graphe_de_la_map(st, mid).await,
         "get_feasibility" => crate::faisabilite::avis_de_la_map(st, mid).await,
         "list_scenarios" => crate::scenarios::liste(st, mid).await,
         "propose_scenario" => {

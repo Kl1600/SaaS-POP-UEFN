@@ -309,6 +309,17 @@ impl Mcp {
         self.known("props_set").is_some() || self.known("verse_props_set").is_some()
     }
 
+    /// Catalogue des appareils de la version d'UEFN ouverte (#119).
+    pub async fn device_catalog(&mut self) -> Result<Value> {
+        let out = self.python(PY_CATALOG).await?;
+        let line = out
+            .lines()
+            .rev()
+            .find(|l| l.trim_start().starts_with('{'))
+            .ok_or_else(|| anyhow!("catalogue des appareils illisible"))?;
+        Ok(serde_json::from_str(line.trim())?)
+    }
+
     pub async fn list_actors(&mut self) -> Result<Vec<Value>> {
         let out = self.python(PY_LIST).await?;
         let line = out
@@ -1059,6 +1070,24 @@ for a in sub.get_all_level_actors():
     kind = 'landscape' if 'Landscape' in cls else 'actor'
     out.append({'x': o.x, 'y': o.y, 'ex': e.x, 'ey': e.y, 'top': o.z + e.z, 'kind': kind})
 print(json.dumps(out[:6000]))
+"#;
+
+/// Catalogue des appareils créatifs (#119) : Blueprints dont le nom contient « Device » sous /Fortnite et /Game,
+/// lus dans l'Asset Registry, avec la version du moteur pour ne relire qu'à chaque nouvelle version d'UEFN.
+const PY_CATALOG: &str = r#"import unreal, json
+ar = unreal.AssetRegistryHelpers.get_asset_registry()
+out = []
+for root in ('/Fortnite', '/Game'):
+    try:
+        f = unreal.ARFilter(package_paths=[root], recursive_paths=True, class_paths=[unreal.TopLevelAssetPath('/Script/Engine', 'Blueprint')])
+    except Exception:
+        f = unreal.ARFilter(package_paths=[root], recursive_paths=True, class_names=['Blueprint'])
+    for d in ar.get_assets(f):
+        n = str(d.asset_name)
+        if 'device' not in n.lower(): continue
+        pkg = str(d.package_name)
+        out.append({'name': n, 'path': pkg + '.' + n, 'folder': pkg.rsplit('/', 1)[0]})
+print(json.dumps({'version': unreal.SystemLibrary.get_engine_version(), 'devices': out[:8000]}))
 "#;
 
 const PY_LIST: &str = r#"import unreal, json
