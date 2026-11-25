@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ago, api } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { tr } from '../i18n/t'
@@ -17,6 +17,7 @@ export function ForgeAgents({ mapId }: { mapId: number }) {
   const { data: res, reload: relireRes } = useLoad<any>(`/api/maps/${mapId}/resumes`, [mapId])
   const { data: taches, reload: relireTaches } = useLoad<any>(`/api/maps/${mapId}/tasks`, [mapId])
   const [journal, setJournal] = useState<number | null>(null)
+  const [fil, setFil] = useState<number | null>(null)
   const tout = () => { reload(); relireRes() }
   useLive(['ai', 'agents', 'fil'], tout)
   useLive(['tasks'], () => { reload(); relireTaches() })
@@ -29,6 +30,7 @@ export function ForgeAgents({ mapId }: { mapId: number }) {
   return <div className="stack" style={{ gap: 18 }}>
     <h1 className="forge-h1">{tr("Agents")}</h1>
     {res?.equipe?.phrase && <p style={{ margin: 0 }}>{res.equipe.phrase}</p>}
+    {data.length > 1 && <Equipe mapId={mapId} />}
     {!data.length && <p className="muted">{tr("Aucune IA connectée à cette map. Connectez votre IA (Claude Code, Codex, Cursor…) depuis POP : IA connectées.")}</p>}
     {data.map(a => {
       const phrase = res?.agents?.find((x: any) => x.id === a.id)?.phrase
@@ -50,8 +52,10 @@ export function ForgeAgents({ mapId }: { mapId: number }) {
           {app.canEdit && <Selecteur label={tr("Attribuer une tâche à {0}", [a.name])} placeholder={tr("Attribuer une tâche…")}
             options={ouvertes.map(t => ({ value: String(t.number), label: `#${t.number} ${t.title}` }))}
             onChange={v => agir(() => api.post(`/api/maps/${mapId}/agents/${a.id}/assign`, { number: Number(v) }), tr("Tâche attribuée"))} />}
+          <button className="btn" onClick={() => setFil(fil === a.id ? null : a.id)}>{fil === a.id ? tr("Fermer la discussion") : tr("Écrire")}</button>
           <button className="linkbtn" onClick={() => setJournal(journal === a.id ? null : a.id)}>{journal === a.id ? tr("Masquer le journal") : tr("Journal")}</button>
         </div>
+        {fil === a.id && <Fil mapId={mapId} agent={a.id} nom={a.name} />}
         {journal === a.id && <Journal mapId={mapId} agent={a.id} />}
       </div>
     })}
@@ -72,4 +76,48 @@ function Journal({ mapId, agent }: { mapId: number; agent: number }) {
       <span className="small muted">{ago(c.at)}</span>
     </div>)}
   </div>
+}
+
+/** Fil de discussion avec une IA (#381) : l'IA lit avec read_messages et répond avec send_message. */
+function Fil({ mapId, agent, nom }: { mapId: number; agent: number; nom: string }) {
+  const app = useApp()
+  const { data, reload } = useLoad<any[]>(`/api/maps/${mapId}/agents/${agent}/messages`, [mapId, agent])
+  useLive(['messages'], reload)
+  const [texte, setTexte] = useState('')
+  const bas = useRef<HTMLDivElement>(null)
+  useEffect(() => { bas.current?.scrollIntoView({ block: 'nearest' }) }, [data?.length])
+  const envoyer = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!texte.trim()) return
+    try { await api.post(`/api/maps/${mapId}/agents/${agent}/messages`, { body: texte }); setTexte(''); reload() } catch (er: any) { app.toast(er.message, true) }
+  }
+  return <div className="forge-fil">
+    <div className="forge-fil-liste" role="log" aria-label={tr("Discussion avec {0}", [nom])}>
+      {!data?.length && <p className="small muted" style={{ margin: 0 }}>{tr("Écrivez à {0} : il lira votre message entre deux actions et vous répondra ici.", [nom])}</p>}
+      {data?.map(m => <div key={m.id} className={'forge-bulle' + (m.from === 'ia' ? ' ia' : '')}>
+        <div>{m.body}</div>
+        <div className="small muted">{m.from === 'ia' ? nom : tr("Vous")}{m.team ? ' · ' + tr("à toute l’équipe") : ''} · {ago(m.at)}{m.from !== 'ia' ? ' · ' + (m.read ? tr("lu") : tr("pas encore lu")) : ''}</div>
+      </div>)}
+      <div ref={bas} />
+    </div>
+    <form className="forge-ligne" onSubmit={envoyer}>
+      <textarea className="field" style={{ flex: 1, minHeight: 44, padding: 10, resize: 'vertical' }} value={texte} maxLength={4000} placeholder={tr("Votre message à {0}…", [nom])} aria-label={tr("Message à {0}", [nom])}
+        onChange={e => setTexte(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); envoyer(e as any) } }} />
+      <button className="btn pri" disabled={!texte.trim()}>{tr("Envoyer")}</button>
+    </form>
+  </div>
+}
+
+/** Message à toutes ses IA de la map (#381). */
+function Equipe({ mapId }: { mapId: number }) {
+  const app = useApp()
+  const [texte, setTexte] = useState('')
+  const envoyer = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try { const r = await api.post(`/api/maps/${mapId}/agents/messages`, { body: texte }); setTexte(''); app.toast(tr("Envoyé à {0} IA", [r.agents])) } catch (er: any) { app.toast(er.message, true) }
+  }
+  return <form className="forge-ligne" onSubmit={envoyer}>
+    <input className="field" style={{ flex: 1 }} value={texte} maxLength={4000} placeholder={tr("Écrire à toute l’équipe…")} aria-label={tr("Message à toute l’équipe")} onChange={e => setTexte(e.target.value)} />
+    <button className="btn" disabled={!texte.trim()}>{tr("Envoyer à toutes")}</button>
+  </form>
 }

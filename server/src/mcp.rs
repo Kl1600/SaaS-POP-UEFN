@@ -228,6 +228,8 @@ fn tools() -> Value {
         }), &["items"]),
         tool("search_devices", "Cherche un appareil dans le catalogue d'UEFN (#119), en français ou en anglais (« bouton », « minuteur », « distributeur »…). Rend son nom et son chemin d'asset, à passer à place_device (asset).", json!({ "query": { "type": "string" } }), &["query"]),
         tool("device_graph", "Graphe des liens entre appareils du niveau (#119) : liens d'événements et références @editable des appareils Verse ; broken = cible absente du niveau.", json!({}), &[]),
+        tool("read_messages", "Messages que votre humain vous a écrits dans POP Forge (#381), à vous ou à toute l'équipe : à lire entre deux actions (next_task signale les non lus). Répondez avec send_message.", json!({}), &[]),
+        tool("send_message", "Répond à votre humain dans votre fil de POP Forge (#381) : body, texte court en français.", json!({ "body": { "type": "string" } }), &["body"]),
         tool("list_milestones", "Jalons et objectifs du planning de la map (date, heure, type, détail).", json!({}), &[]),
         tool("add_milestone", "Ajoute un jalon au planning : title, date AAAA-MM-JJ ; facultatifs : time HH:MM, detail, kind (jalon par défaut).", json!({ "title": { "type": "string" }, "date": { "type": "string" }, "time": { "type": "string" }, "detail": { "type": "string" }, "kind": { "type": "string" } }), &["title", "date"]),
         tool("list_agents", "Agents IA de la map : identifiant, nom, rôle, tâche en cours, actif ou non, et lequel est l'Orchestrateur.", json!({}), &[]),
@@ -284,6 +286,8 @@ const READ_TOOLS: &[&str] = &[
     "list_device_configs",
     "search_devices",
     "device_graph",
+    "read_messages",
+    "send_message",
 ];
 
 fn rpc_ok(id: Value, result: Value) -> Response {
@@ -375,7 +379,7 @@ pub async fn mcp(
                 "protocolVersion": req["params"]["protocolVersion"].as_str().unwrap_or("2025-06-18"),
                 "capabilities": { "tools": {} },
                 "serverInfo": { "name": "pop", "version": "0.1.0" },
-                "instructions": consignes(role.as_deref(), orch, "Commencez par list_maps puis use_map pour choisir la map de travail (gardée par POP). Outils POP : gérer les tâches de la map (list_tasks, next_task, create_task, set_task_status, comment_task) et piloter UEFN via le relais du créateur. Avant de travailler, lisez les compétences utiles (list_skills, get_skill : la méthode de POP et les règles du studio), prenez une tâche avec next_task et passez-la en cours ; notez votre progression avec save_progress à chaque étape et avant de vous arrêter (un autre agent pourra reprendre) ; quand elle est finie, passez-la en done avec une note. Toute action UEFN est journalisée et annulable ; les suppressions attendent une validation humaine.")
+                "instructions": consignes(role.as_deref(), orch, "Commencez par list_maps puis use_map pour choisir la map de travail (gardée par POP). Outils POP : gérer les tâches de la map (list_tasks, next_task, create_task, set_task_status, comment_task) et piloter UEFN via le relais du créateur. Avant de travailler, lisez les compétences utiles (list_skills, get_skill : la méthode de POP et les règles du studio), prenez une tâche avec next_task et passez-la en cours ; notez votre progression avec save_progress à chaque étape et avant de vous arrêter (un autre agent pourra reprendre) ; quand elle est finie, passez-la en done avec une note. Votre humain peut vous écrire depuis POP Forge : lisez vos messages (read_messages) entre deux actions et répondez avec send_message. Toute action UEFN est journalisée et annulable ; les suppressions attendent une validation humaine.")
             }),
         ),
         m if m.starts_with("notifications/") => StatusCode::ACCEPTED.into_response(),
@@ -1004,6 +1008,8 @@ async fn call_as(
                     .await?;
             Ok(v)
         }
+        "read_messages" => crate::messages::lire_pour_agent(st, agent_requis()?).await,
+        "send_message" => crate::messages::ecrire_par_agent(st, agent_requis()?, mid, &a).await,
         "next_task" => {
             let crate::Json(v) = crate::guide::guide(
                 State(st.clone()),
@@ -1019,6 +1025,10 @@ async fn call_as(
                 r["ta_tache"] = p["ta_tache"].clone();
                 r["a_reprendre"] = p["a_reprendre"].clone();
                 r["attribuees"] = p["attribuees"].clone();
+                let n = crate::messages::non_lus(st, ag).await?;
+                if n > 0 {
+                    r["messages_non_lus"] = json!(format!("{n} message(s) de votre humain : lisez-les avec read_messages avant de continuer."));
+                }
             }
             Ok(r)
         }
