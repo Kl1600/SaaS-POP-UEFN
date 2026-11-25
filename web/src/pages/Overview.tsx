@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  Clock, Ban, CheckSquare, Flag, Coins, Users, Zap, Activity, ArrowRight, Upload, FileText, PenTool, AlertTriangle, MessageSquare, CheckCircle2, Rocket, Bot, User, Radio, ArrowLeft, HelpCircle, Pencil, Lightbulb, Map as MapIcon, RefreshCcw, EyeOff,
+  Clock, Ban, CheckSquare, Flag, Coins, Users, Zap, Activity, ArrowRight, Upload, FileText, PenTool, AlertTriangle, MessageSquare, CheckCircle2, Rocket, Bot, User, Radio, 
 } from 'lucide-react'
 import { ago, api, euros, frDate } from '../api'
 import { useApp, useLive, useLoad } from '../state'
@@ -8,7 +8,6 @@ import { CardHead, Drawer, Empty, PageHead, tagLabel } from '../components/ui'
 import { tr, tx } from '../i18n/t'
 import { useNav } from '../routes'
 import { AvisFaisabilite } from '../components/Faisabilite'
-import StudioScene from '../components/StudioScene'
 
 const ICON: Record<string, [any, string]> = {
   checkin: [Upload, 'i-g'], board: [PenTool, 'i-n'], page: [FileText, 'i-n'], blocked: [Ban, 'i-r'], done: [CheckCircle2, 'i-g'],
@@ -57,9 +56,6 @@ export default function Overview() {
         <button className="btn pri" onClick={() => nav('/taches')}>{tr("Ouvrir les tâches")}</button>
       </PageHead>
 
-      {map && <StudioScene mapId={map.id} />}
-      {map && <PremiersPas mapId={map.id} />}
-      {map && <Parcours mapId={map.id} />}
 
       <section className="tiles six" aria-label={tr("Indicateurs")}>
         <div className="card"><div className="lab"><Clock size={18} strokeWidth={1.5} />{tr("Tâches en cours")}</div><div className="num">{t.doing}</div><div className="muted">{tr("{0} / {1} finies au total", [t.done, t.total])}</div></div>
@@ -192,70 +188,6 @@ function FilAvancement({ mapId }: { mapId: number }) {
   )
 }
 
-/** Parcours de questions-boutons (#135) : une question à la fois, posée par POP (cadrage) ou par l'IA (ask_user),
- * réponse en un clic ; retour en arrière ; une fois au bout, les réponses restent visibles et modifiables. */
-function Parcours({ mapId }: { mapId: number }) {
-  const { toast } = useApp()
-  const { data, reload } = useLoad<{ questions: any[]; can_answer: boolean }>(`/api/maps/${mapId}/questions`, [mapId])
-  useLive(['questions'], reload)
-  const [pos, setPos] = useState<number | null>(null)
-  const [autre, setAutre] = useState('')
-  const [voir, setVoir] = useState(false)
-  useEffect(() => { setPos(null); setAutre('') }, [mapId])
-  if (!data) return null
-  const qs = data.questions
-  const premiere = qs.findIndex(q => !q.answer)
-  const i = pos ?? premiere
-  const q = i >= 0 ? qs[i] : null
-  const repondre = async (rep: string) => {
-    if (!q) return
-    try {
-      await api.post(`/api/maps/${mapId}/questions/${q.id}`, { answer: rep })
-      setAutre(''); await reload()
-      // Après une réponse : la question suivante sans réponse (ou fin du parcours).
-      setPos(null)
-    } catch (e: any) { toast(e.message, true) }
-  }
-  const faites = qs.filter(x => x.answer).length
-  if (!q) {
-    return (<>
-      <OnLance mapId={mapId} />
-      <section className="card">
-        <CardHead icon={<CheckCircle2 size={22} strokeWidth={1.5} />} title={tr("Cadrage de la map")} sub={tr("{0} réponses · modifiables à tout moment", [faites])} />
-        {voir ? <div className="list">
-          {qs.map((x, k) => <div key={x.id} className="li">
-            <span className="ico i-n">{x.author === 'ia' ? <Bot size={20} strokeWidth={1.5} /> : <HelpCircle size={20} strokeWidth={1.5} />}</span>
-            <div style={{ flex: 1, minWidth: 0 }}><div>{tx(x.question)}</div><div className="small muted">{tx(x.answer)}{x.answered_by ? ` · ${x.answered_by}` : ''}</div></div>
-            {data.can_answer && <button className="btn" onClick={() => setPos(k)}><Pencil size={15} strokeWidth={1.5} />{tr("Modifier")}</button>}
-          </div>)}
-        </div> : null}
-        <button className="btn more" onClick={() => setVoir(!voir)}>{voir ? tr("Masquer les réponses") : tr("Voir les réponses")}<ArrowRight size={16} strokeWidth={1.5} /></button>
-      </section>
-    </>)
-  }
-  const precedente = i > 0 ? i - 1 : null
-  return (
-    <section className="card" aria-live="polite">
-      <CardHead icon={q.author === 'ia' ? <Bot size={22} strokeWidth={1.5} /> : <HelpCircle size={22} strokeWidth={1.5} />}
-        title={tx(q.question)}
-        sub={q.author === 'ia' ? tr("Question de votre IA « {0} »", [q.agent ?? 'IA']) : tr("Cadrage de la map · question {0} sur {1}", [Math.min(i + 1, qs.length), qs.length])} />
-      {!data.can_answer && <p className="small muted" style={{ marginTop: 0 }}>{tr("Vous pouvez voir les questions, mais pas y répondre : il faut le droit de modifier cette map.")}</p>}
-      <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
-        {q.choices.map((c: string) => <button key={c} className={'btn' + (q.answer === c ? ' pri' : '')} disabled={!data.can_answer} onClick={() => repondre(c)}>{tx(c)}</button>)}
-      </div>
-      {q.other && data.can_answer && <form className="row" style={{ gap: 8, marginTop: 10 }} onSubmit={e => { e.preventDefault(); if (autre.trim()) repondre(autre) }}>
-        <input className="field" style={{ flex: 1, maxWidth: 360 }} placeholder={tr("Autre réponse (facultatif)")} value={autre} onChange={e => setAutre(e.target.value)} maxLength={200} />
-        <button className="btn" disabled={!autre.trim()}>{tr("Répondre")}</button>
-      </form>}
-      <div className="row" style={{ gap: 8, marginTop: 12 }}>
-        {precedente !== null && <button className="btn" onClick={() => setPos(precedente)}><ArrowLeft size={16} strokeWidth={1.5} />{tr("Retour")}</button>}
-        {pos !== null && <button className="btn" onClick={() => setPos(null)}>{tr("Revenir à la suite")}</button>}
-        {q.answer && <span className="small muted">{tr("Réponse actuelle : {0}", [q.answer])}</span>}
-      </div>
-    </section>
-  )
-}
-
 /** « On lance ? » (#136) : à la fin du parcours, résumé de ce que POP crée (tâches, jalons, premières tâches de
  * l'IA) et un seul bouton. Sur une map qui a déjà des tâches, POP demande quoi faire au lieu de créer des doublons. */
 function OnLance({ mapId }: { mapId: number }) {
@@ -304,45 +236,3 @@ function OnLance({ mapId }: { mapId: number }) {
 }
 
 
-const PAS_ICONE: Record<string, any> = { design: FileText, layout: MapIcon, brainstorm: Lightbulb, boucle: RefreshCcw }
-
-/** Premiers pas d'une map neuve avec son IA (#146) : un clic crée le document (page ou tableau) et une tâche pour
- * l'IA connectée, puis ouvre le document. Seulement quand une IA travaille sur la map ; masquable pour la map. */
-function PremiersPas({ mapId }: { mapId: number }) {
-  const { toast } = useApp()
-  const nav = useNav()
-  const { data, reload } = useLoad<any>(`/api/maps/${mapId}/suggestions`, [mapId])
-  useLive(['ai', 'tasks'], reload)
-  const cle = `pop.suggestions.masquees.${mapId}`
-  const [masque, setMasque] = useState(() => { try { return localStorage.getItem(cle) === '1' } catch { return false } })
-  useEffect(() => { try { setMasque(localStorage.getItem(cle) === '1') } catch { setMasque(false) } }, [cle])
-  const [occupe, setOccupe] = useState<string | null>(null)
-  if (!data || !data.ai || masque) return null
-  const restants = data.items.filter((x: any) => !x.done)
-  if (restants.length === 0) return null
-  const demarrer = async (k: string) => {
-    setOccupe(k)
-    try {
-      const r = await api.post<any>(`/api/maps/${mapId}/suggestions/${k}`)
-      if (r.created) toast(tr("Tâche #{0} donnée à {1}", [r.task, r.ai ?? 'IA']))
-      nav(r.kind === 'page' ? `/pages/${r.id}` : `/tableau/${r.id}`)
-    } catch (e: any) { toast(e.message, true) } finally { setOccupe(null) }
-  }
-  const masquer = () => { try { localStorage.setItem(cle, '1') } catch {}; setMasque(true) }
-  return (
-    <section className="card">
-      <CardHead icon={<Lightbulb size={22} strokeWidth={1.5} />} title={tr("Premiers pas avec {0}", [data.ai])} sub={tr("Un clic crée le document et donne à votre IA la tâche de le remplir avec vous")} />
-      {!data.can_start && <p className="small muted" style={{ marginTop: 0 }}>{tr("Il faut être membre du studio pour lancer ces premiers pas.")}</p>}
-      <div className="list">
-        {restants.map((x: any) => { const I = PAS_ICONE[x.key] ?? Lightbulb; return (
-          <div key={x.key} className="li">
-            <span className="ico i-n"><I size={20} strokeWidth={1.5} /></span>
-            <div style={{ flex: 1, minWidth: 0 }}>{tx(x.label)}</div>
-            <button className="btn" disabled={!data.can_start || occupe !== null} onClick={() => demarrer(x.key)}>{occupe === x.key ? tr("Création…") : tr("Démarrer")}</button>
-          </div>
-        ) })}
-      </div>
-      <button className="btn more" onClick={masquer}><EyeOff size={16} strokeWidth={1.5} />{tr("Masquer les suggestions")}</button>
-    </section>
-  )
-}
