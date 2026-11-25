@@ -43,6 +43,7 @@ mod link;
 mod mail;
 mod manage;
 mod mcp;
+mod mcp_sse;
 mod model;
 mod money;
 mod oauth;
@@ -197,6 +198,7 @@ async fn csrf(req: Request<Body>, next: Next) -> Response {
         && !path.starts_with("/api/hooks/")
         && !path.starts_with("/api/relay/")
         && path != "/mcp"
+        && path != "/messages"
         && !(path.starts_with("/oauth/") && path != "/oauth/authorize")
     {
         let ok = req.headers().get("x-pop").and_then(|v| v.to_str().ok()) == Some("1");
@@ -743,6 +745,13 @@ fn api() -> Router<AppState> {
         .route("/api/agent-roles", get(mcp::roles))
         .route("/api/tokens/{id}", delete(mcp::delete_token))
         .route("/mcp", post(mcp::mcp))
+        // Ancien transport HTTP + SSE, pour les clients MCP qui ne parlent pas Streamable HTTP (#375).
+        .route("/sse", get(mcp_sse::ouvrir))
+        .route("/messages", post(mcp_sse::message))
+        .route(
+            "/.well-known/oauth-protected-resource/sse",
+            get(oauth::protected_resource_sse),
+        )
         .route(
             "/.well-known/oauth-protected-resource",
             get(oauth::protected_resource),

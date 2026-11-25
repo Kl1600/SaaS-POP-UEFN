@@ -40,8 +40,13 @@ pub fn resource_url() -> String {
 
 /// En-tête `WWW-Authenticate` de la réponse 401 du serveur MCP : il dit à l'IA où trouver comment se connecter.
 pub fn www_authenticate() -> HeaderValue {
+    www_authenticate_for("mcp")
+}
+
+/// Même en-tête pour une autre adresse du serveur MCP (`sse` : ancien transport, #375).
+pub fn www_authenticate_for(chemin: &str) -> HeaderValue {
     HeaderValue::from_str(&format!(
-        "Bearer resource_metadata=\"{}/.well-known/oauth-protected-resource/mcp\"",
+        "Bearer resource_metadata=\"{}/.well-known/oauth-protected-resource/{chemin}\"",
         base()
     ))
     .unwrap_or_else(|_| HeaderValue::from_static("Bearer"))
@@ -53,6 +58,17 @@ pub fn www_authenticate() -> HeaderValue {
 pub async fn protected_resource() -> Json<Value> {
     Json(json!({
         "resource": resource_url(),
+        "authorization_servers": [base()],
+        "scopes_supported": ["mcp", "mcp:read"],
+        "bearer_methods_supported": ["header"],
+        "resource_name": "POP",
+    }))
+}
+
+/// Même description pour l'ancien transport SSE : la ressource est alors l'adresse `/sse` (#375).
+pub async fn protected_resource_sse() -> Json<Value> {
+    Json(json!({
+        "resource": format!("{}/sse", base()),
         "authorization_servers": [base()],
         "scopes_supported": ["mcp", "mcp:read"],
         "bearer_methods_supported": ["header"],
@@ -246,7 +262,7 @@ fn resource_ok(r: &Option<String>) -> bool {
         None => true,
         Some(r) => {
             let r = r.trim_end_matches('/');
-            r == resource_url() || r == base()
+            r == resource_url() || r == base() || r == format!("{}/sse", base())
         }
     }
 }
@@ -448,8 +464,12 @@ pub fn kind_of(name: &str) -> &'static str {
         || n.contains("copilot")
     {
         "vscode"
-    } else if n.contains("codex") || n.contains("openai") || n.contains("chatgpt") {
+    } else if n.contains("codex") {
         "codex"
+    } else if n.contains("chatgpt") || n.contains("openai") {
+        "chatgpt"
+    } else if n.contains("mistral") || n.contains("le chat") || n.contains("lechat") {
+        "lechat"
     } else if n.contains("gemini") {
         "gemini"
     } else {
@@ -685,6 +705,8 @@ pub async fn cleanup(st: &AppState) {
 /// CORS pour les points publics (découverte, jetons, MCP) : utilisés par des IA dans le navigateur, sans cookie.
 pub fn is_public_path(p: &str) -> bool {
     p == "/mcp"
+        || p == "/sse"
+        || p == "/messages"
         || p.starts_with("/.well-known/oauth-")
         || p == "/oauth/token"
         || p == "/oauth/register"
@@ -712,7 +734,9 @@ mod tests_oauth {
         assert!(!redirect_ok("data:text/html,x"));
         assert_eq!(kind_of("Claude Code (pop)"), "claude_code");
         assert_eq!(kind_of("Claude"), "claude_desktop");
-        assert_eq!(kind_of("ChatGPT"), "codex");
+        assert_eq!(kind_of("ChatGPT"), "chatgpt");
+        assert_eq!(kind_of("Codex"), "codex");
+        assert_eq!(kind_of("Mistral Le Chat"), "lechat");
         assert_eq!(kind_of("Visual Studio Code"), "vscode");
     }
 

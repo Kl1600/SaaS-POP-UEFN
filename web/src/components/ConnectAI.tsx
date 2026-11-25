@@ -4,12 +4,12 @@
 // - Pastille dans la barre du haut : aucune IA → « Connecter une IA » ; en attente ; connectée.
 // État lu dans /api/me/tokens : last_used vide = en attente de connexion, rempli = premier appel MCP reçu.
 import { useEffect, useRef, useState } from 'react'
-import { Check, Copy, ArrowLeft, X, Plus, Bot, Settings2 } from 'lucide-react'
+import { Check, Copy, X, Plus, Bot, Settings2 } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { ago, api } from '../api'
 import { useApp } from '../state'
 import { tr } from '../i18n/t'
-import { CLIENTS, ClientLogo, KeyPanel, OneClick, clientName, type Client } from './AiTokens'
+import { CLIENTS, ClientLogo, ConnectTabs, clientName } from './AiTokens'
 
 export type AccountAI = { tokens: any[] | null; live: any[]; pending: any[]; reload: () => void }
 
@@ -121,12 +121,9 @@ export function ConnectAiButton() {
   return <div className="card myai-connect"><ConnectPanel ai={ai} onClose={none ? undefined : () => setOpen(false)} /></div>
 }
 
-const KEY_KINDS = ['claude_desktop', 'claude_code', 'cursor', 'codex', 'autre']
-
 /** Connexion d'une IA, dépliée dans la section. Passe seule à « connectée » dès le premier appel MCP d'une nouvelle IA. */
 function ConnectPanel({ ai, onClose }: { ai: AccountAI; onClose?: () => void }) {
   const { map, toast } = useApp()
-  const [key, setKey] = useState<{ c: Client; token: string; id: number } | null>(null)
   const [copied, setCopied] = useState(false)
   // IA déjà connectées à l'ouverture : seule une nouvelle connexion fait passer à « connectée ».
   const before = useRef<Set<number> | null>(null)
@@ -134,13 +131,13 @@ function ConnectPanel({ ai, onClose }: { ai: AccountAI; onClose?: () => void }) 
   const fresh = before.current ? ai.live.find(t => !before.current!.has(t.id)) : undefined
   const ask = map ? tr("Travaille sur ma map POP « {0} »", [map.name]) : tr("Liste mes maps POP")
   const copyAsk = async () => { try { await navigator.clipboard.writeText(ask); setCopied(true) } catch { toast(tr("Copie impossible : sélectionnez le texte."), true) } }
-  const createKey = async (c: Client) => {
+  // Clé API brute pour un onglet (#375) : l'onglet affiche lui-même la configuration à copier.
+  const createRawKey = async (kind: string, name: string) => {
     try {
-      // Un seul jeton en attente par IA : l'ancien, jamais utilisé, est remplacé (comme dans Paramètres).
-      for (const t of ai.pending.filter(t => t.kind === c.kind && !t.oauth)) await api.del(`/api/tokens/${t.id}`)
-      const r = await api.post('/api/me/tokens', { name: c.name, kind: c.kind, scope: 'write' })
-      setKey({ c, token: r.token, id: r.id }); ai.reload()
-    } catch (e: any) { toast(e.message, true) }
+      for (const t of ai.pending.filter(t => t.kind === kind && !t.oauth)) await api.del(`/api/tokens/${t.id}`)
+      const r = await api.post('/api/me/tokens', { name, kind, scope: 'write' })
+      ai.reload(); return r.token as string
+    } catch (e: any) { toast(e.message, true); return null }
   }
   const waiting = ai.pending[ai.pending.length - 1]
   const head = (title: string) => <div className="row" style={{ justifyContent: 'space-between' }}>
@@ -153,18 +150,13 @@ function ConnectPanel({ ai, onClose }: { ai: AccountAI; onClose?: () => void }) 
     <p className="small" style={{ margin: '0 0 12px' }}>{tr("Demandez-lui maintenant :")} <b style={{ fontWeight: 500 }}>{ask}</b></p>
     {onClose && <button className="btn pri" onClick={onClose}><Check size={16} />{tr("Terminé")}</button>}
   </div>
-  if (key) return <div className="connectai">
-    {head(tr("Connecter {0}", [key.c.name]))}
-    <KeyPanel c={key.c} token={key.token} linked={false} />
-    <button className="linkbtn" onClick={() => setKey(null)}><ArrowLeft size={14} /> {tr("Choisir une autre IA")}</button>
-  </div>
   return <div className="connectai">
     {head(tr("Connecter une IA"))}
     <p className="muted connectai-sub">{tr("POP se pilote avec votre IA (Claude, Cursor, Codex…) : elle voit vos maps, prend les tâches et agit dans UEFN. Connectez-la une fois pour tout votre compte.")}</p>
-    <PromptBlock ai={ai} />
+    <ConnectTabs url={`${location.origin}/mcp`} onKey={createRawKey} />
     <div className="aiwait" role="status">
       <span className="aiwait-dot" />
-      {waiting ? tr("{0} est enregistrée, en attente de connexion… Envoyez-lui un message pour qu’elle appelle POP.", [waiting.name]) : tr("En attente de votre IA…")}
+      {waiting ? tr("{0} est enregistrée, en attente de connexion… Envoyez-lui un message pour qu’elle appelle POP.", [waiting.name]) : tr("En attente de votre IA… Elle apparaîtra ici dès qu’elle sera connectée.")}
     </div>
     <div className="connectai-ask">
       <span className="small">{tr("Une fois connectée, demandez-lui :")}</span>
@@ -172,14 +164,8 @@ function ConnectPanel({ ai, onClose }: { ai: AccountAI; onClose?: () => void }) 
       <button className="btn" onClick={copyAsk}>{copied ? <><Check size={15} />{tr("Copié")}</> : <><Copy size={15} />{tr("Copier")}</>}</button>
     </div>
     <details className="connectai-more">
-      <summary className="small">{tr("Autres façons de connecter : en un clic depuis l’IA, ou configuration à copier")}</summary>
-      <OneClick url={`${location.origin}/mcp`} />
-      <p className="small muted" style={{ margin: '14px 0 8px' }}>{tr("Votre IA ne propose pas de se connecter ? Copiez sa configuration avec une clé API :")}</p>
-      <div className="aigrid">
-        {CLIENTS.filter(c => KEY_KINDS.includes(c.kind)).map(c => <button key={c.kind} className="aicard" onClick={() => createKey(c)}>
-          <ClientLogo kind={c.kind} size={20} /><b style={{ fontWeight: 500, flex: 1 }}>{c.name}</b><span className="small">{tr("Clé API")}</span>
-        </button>)}
-      </div>
+      <summary className="small">{tr("Agents de code : un prompt qui leur fait ajouter POP tout seuls")}</summary>
+      <PromptBlock ai={ai} />
     </details>
   </div>
 }

@@ -6,12 +6,15 @@ import cursor from '@lobehub/icons-static-svg/icons/cursor.svg?raw'
 import codex from '@lobehub/icons-static-svg/icons/codex-color.svg?raw'
 import windsurf from '@lobehub/icons-static-svg/icons/windsurf.svg?raw'
 import copilot from '@lobehub/icons-static-svg/icons/copilot-color.svg?raw'
-import gemini from '@lobehub/icons-static-svg/icons/geminicli-color.svg?raw'
+import geminiCli from '@lobehub/icons-static-svg/icons/geminicli-color.svg?raw'
+import gemini from '@lobehub/icons-static-svg/icons/gemini-color.svg?raw'
+import openai from '@lobehub/icons-static-svg/icons/openai.svg?raw'
+import mistral from '@lobehub/icons-static-svg/icons/mistral-color.svg?raw'
 import mcp from '@lobehub/icons-static-svg/icons/mcp.svg?raw'
 import { useId } from 'react'
 
 const SVG: Record<string, string> = {
-  claude_code: claudeCode, claude_desktop: claude, cursor, codex, windsurf, vscode: copilot, gemini, autre: mcp,
+  claude_code: claudeCode, claude_desktop: claude, cursor, codex, windsurf, vscode: copilot, gemini, gemini_cli: geminiCli, chatgpt: openai, lechat: mistral, autre: mcp,
 }
 
 /** Logo d'une IA par son type de client ; un type inconnu prend le logo MCP. Les fichiers viennent du paquet, pas d'une saisie. */

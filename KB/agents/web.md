@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-25 · #375 · « Connecter une IA » par onglet
+- Fait : AiTokens.tsx : TABS / ConnectTabs, un onglet par IA (Claude, ChatGPT, Gemini, Le Chat, Cursor, VS Code, Windsurf, Codex, Claude Code, Gemini CLI, Autre client MCP), étapes vérifiées dans la doc officielle de chacune le 25/11/2026, adresse ou configuration OAuth à copier, liens profonds Cursor et VS Code, et clé API en secours par onglet. ConnectAI.tsx : les onglets remplacent l'ancien « en un clic » ; le prompt pour agents de code est replié. IA connectées : type, OAuth ou clé, dernier usage, bouton Révoquer. Logos ChatGPT, Le Chat, Gemini (AiLogo).
+- Vérifié : navigateur 1440 px, révocation testée avec Gemini CLI (Disconnected, 401).
+
 ### 2026-11-25 · #371 · l'Organiseur retiré du site vitrine
 - Fait : Landing.tsx : bloc de fonctionnalité et capture de l'Organiseur retirés (FEATURES garde l'index du texte, k), entrée du méga-menu masquée (index 4), ligne « Organiseur d'acteurs » du comparatif masquée (ORGANISEUR_ROW) ; mention retirée de l'accroche dans les 16 langues. Les textes restent dans les dictionnaires.
 - Vérifié : navigateur 1440 px, fr et en.

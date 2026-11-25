@@ -36,6 +36,9 @@ const KINDS: &[&str] = &[
     "windsurf",
     "vscode",
     "gemini",
+    "gemini_cli",
+    "chatgpt",
+    "lechat",
     "autre",
 ];
 
@@ -294,6 +297,17 @@ fn text(v: impl Into<String>, is_error: bool) -> Value {
     json!({ "content": [{ "type": "text", "text": v.into() }], "isError": is_error })
 }
 
+/// Indications MCP standard sur chaque outil (#375) : lecture seule ou non, destructif ou non. Les IA (ChatGPT,
+/// Claude…) s'en servent pour décider quand demander une confirmation.
+fn annoter(mut t: Value) -> Value {
+    let n = t["name"].as_str().unwrap_or("").to_string();
+    let lecture = READ_TOOLS.contains(&n.as_str());
+    let destructif = n.starts_with("delete_");
+    t["annotations"] =
+        json!({ "readOnlyHint": lecture, "destructiveHint": destructif, "openWorldHint": false });
+    t
+}
+
 #[derive(Deserialize)]
 pub struct McpQ {
     pub token: Option<String>,
@@ -368,7 +382,7 @@ pub async fn mcp(
         "ping" => rpc_ok(id, json!({})),
         "tools/list" => rpc_ok(
             id,
-            json!({ "tools": tools().as_array().cloned().unwrap_or_default().into_iter().filter(|t| { let n = t["name"].as_str().unwrap_or(""); scope != "off" && (scope != "read" || READ_TOOLS.contains(&n)) && permis(n) }).collect::<Vec<_>>() }),
+            json!({ "tools": tools().as_array().cloned().unwrap_or_default().into_iter().filter(|t| { let n = t["name"].as_str().unwrap_or(""); scope != "off" && (scope != "read" || READ_TOOLS.contains(&n)) && permis(n) }).map(annoter).collect::<Vec<_>>() }),
         ),
         "tools/call" => {
             let name = req["params"]["name"].as_str().unwrap_or("");
