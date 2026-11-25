@@ -158,8 +158,9 @@ Une branche longue qui mélange plusieurs sujets ne se relit pas, ne se teste pa
   `server/migrations/`. On ne modifie jamais une migration existante (le CI le refuse).
 - **`web/dist` est versionné** : après un changement dans `web/`, reconstruisez (`npm run build`) et commitez
   `web/dist` (le CI vérifie qu'il est à jour).
-- **`pop-link.exe`** : après un changement dans `link/`, recompilez en release sous Windows et copiez l'exécutable
-  dans `web/public/downloads/pop-link.exe`, puis reconstruisez le web.
+- **`pop-link.exe`** : après un changement dans `link/`, le workflow « relais Windows » (#358) le recompile sous
+  Windows et pousse sur la branche un commit avec `web/public/downloads/pop-link.exe` et `web/dist` à jour.
+  Attendez ce commit (`git pull --rebase` sur votre branche) avant `done`. À la main seulement s'il échoue.
 
 ### Vérifier avant `review`
 ```
