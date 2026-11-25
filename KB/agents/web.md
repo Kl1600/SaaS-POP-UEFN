@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-25 · #372 · Dashboard sans les trois blocs du haut
+- Fait : Overview.tsx n'affiche plus la scène du studio (#176), les premiers pas avec l'IA (#146) ni le parcours de questions de cadrage (#135), à la demande de Kl1600. Les composants Parcours et PremiersPas sont retirés de la page ; StudioScene.tsx et les routes serveur (suggestions, questions, outil MCP ask_user) restent.
+- Vérifié : navigateur 1440 px sur une map avec données.
+
 ### 2026-11-25 · #368 · retour à la version précédente du site vitrine
 - Fait : Landing.tsx et landing.css remis comme avant #362 (demande de Kl1600) ; les menus à jour de la capture (fr, en) sont gardés.
 - Vérifié : navigateur 1440 px.
