@@ -25,6 +25,9 @@ const ROWS: (string | boolean)[][] = [
   [], [false, true], [false, true], [true, true], [true, true], [true, true],
 ]
 
+// Ligne « Organiseur d'acteurs » du comparatif, retirée avec l'Organiseur (#371).
+const ORGANISEUR_ROW = 8
+
 function useReveal() {
   useEffect(() => {
     const els = document.querySelectorAll('.lp [data-reveal]')
@@ -68,14 +71,6 @@ function TasksShot({ m }: { m: M }) {
     </div>
   </div></div>
 }
-function OrganizerShot({ m }: { m: M }) {
-  const rows = [['Spawn_Rouge_01', 'Player Spawner', m.red], ['Spawn_Rouge_02', 'Player Spawner', m.red], ['Bouton_Score', 'Button', 'Gameplay'], ['Minuteur_Manche', 'Timer', 'Gameplay'], ['Barriere_Zone2', 'Barrier', 'Zone 2']]
-  return <div className="mock" aria-hidden><div className="mpad">
-    <div className="msearch" dir="ltr">tag:equipe_rouge type:spawner</div>
-    {rows.map((r, i) => <div key={r[0]} className={'mact' + (i < 2 ? ' sel' : '')}><span className="mono">{r[0]}</span><em>{r[1]}</em><small>{r[2]}</small></div>)}
-    <div className="mbulk">{m.selected} · <span>{m.rename}</span><span>{m.move}</span><span>{m.dup}</span></div>
-  </div></div>
-}
 function BoardShot({ m }: { m: M }) {
   return <div className="mock wbshot" aria-hidden>
     <div className="bfmt"><b>B</b><i>I</i><u>U</u><s>S</s><span className="bsw" style={{ background: '#ED753E' }} /><span className="bsw" style={{ background: '#0090FF' }} /></div>
@@ -99,18 +94,18 @@ function MoneyShot({ m }: { m: M }) {
   </div></div>
 }
 
+// L'Organiseur est retiré de l'app (décision du 22/11) : k = index du texte dans t.feat.items (#371).
 const FEATURES = [
-  { n: '01', id: 'f-taches', icon: ListChecks, Shot: TasksShot },
-  { n: '02', id: 'f-organiseur', icon: Boxes, Shot: OrganizerShot },
-  { n: '03', id: 'f-tableau', icon: PenTool, Shot: BoardShot },
-  { n: '04', id: 'f-analyse', icon: LineChart, Shot: MarketShot },
-  { n: '05', id: 'f-gains', icon: Coins, Shot: MoneyShot },
+  { n: '01', k: 0, id: 'f-taches', icon: ListChecks, Shot: TasksShot },
+  { n: '02', k: 2, id: 'f-tableau', icon: PenTool, Shot: BoardShot },
+  { n: '03', k: 3, id: 'f-analyse', icon: LineChart, Shot: MarketShot },
+  { n: '04', k: 4, id: 'f-gains', icon: Coins, Shot: MoneyShot },
 ]
 
 // Menu « Fonctionnalités » : icône et section visée pour chaque entrée (textes dans t.menu.items, même ordre).
 const MENU_ITEMS: { icon: typeof ListChecks; to: string; soon?: boolean }[] = [
   { icon: ListChecks, to: 'f-taches' }, { icon: FileText, to: 'f-taches' }, { icon: PenTool, to: 'f-tableau' }, { icon: Users, to: 'f-taches' },
-  { icon: Boxes, to: 'f-organiseur' }, { icon: Link2, to: 'f-organiseur' }, { icon: Bot, to: 'ia' }, { icon: Hammer, to: 'tarifs', soon: true },
+  { icon: Boxes, to: 'ia' }, { icon: Link2, to: 'ia' }, { icon: Bot, to: 'ia' }, { icon: Hammer, to: 'tarifs', soon: true },
   { icon: LineChart, to: 'f-analyse' }, { icon: Flame, to: 'f-analyse' }, { icon: Rocket, to: 'fonctionnalites' }, { icon: Coins, to: 'f-gains' },
 ]
 
@@ -134,7 +129,7 @@ function FeaturesMenu({ t, go }: { t: Dict; go: (id: string) => (e: React.MouseE
       <div className="lmega-cols">
         {t.menu.groups.map((g, gi) => <div key={g} className="lmega-col">
           <span className="lmega-h">{g}</span>
-          {t.menu.items.slice(gi * 4, gi * 4 + 4).map((it, j) => { const m = MENU_ITEMS[gi * 4 + j]; return <a key={it.t} href={'#' + m.to} onClick={pick(m.to)} className="lmega-item">
+          {t.menu.items.map((it, k) => ({ it, k })).filter(({ k }) => k !== 4 && Math.floor(k / 4) === gi).map(({ it, k }) => { const m = MENU_ITEMS[k]; return <a key={it.t} href={'#' + m.to} onClick={pick(m.to)} className="lmega-item">
             <span className="lmega-ic"><m.icon size={19} strokeWidth={1.6} /></span>
             <span><b>{it.t}{m.soon && <em className="ltag soon">{t.pricing.soon}</em>}</b><small>{it.d}</small></span>
           </a> })}
@@ -209,7 +204,7 @@ export default function Landing() {
 
     <section className="lsec" id="fonctionnalites">
       <div className="lhead" data-reveal><span className="leyebrow">{t.feat.eyebrow}</span><h2>{t.feat.h2}</h2><p>{t.feat.p}</p></div>
-      <div className="lfeats">{FEATURES.map((f, i) => { const it = t.feat.items[i]; return <article key={f.n} id={f.id} className={'lfeat' + (i % 2 ? ' rev' : '')} data-reveal>
+      <div className="lfeats">{FEATURES.map((f, i) => { const it = t.feat.items[f.k]; return <article key={f.n} id={f.id} className={'lfeat' + (i % 2 ? ' rev' : '')} data-reveal>
         <div className="ltxt">
           <span className="lnum"><b>{f.n}</b><f.icon size={15} />{it.tag}</span>
           <h3>{it.h}</h3><p>{it.p}</p>
@@ -237,7 +232,7 @@ export default function Landing() {
       </div> })}</div>
       <div className="ltable" data-reveal><table>
         <thead><tr><th>{P.compare}</th>{P.plans.map(p => <th key={p.name}>{p.name}</th>)}</tr></thead>
-        <tbody>{ROWS.map((vals, r) => vals.length === 0 ? <tr key={r} className="grp"><td colSpan={3}>{P.rows[r]}</td></tr> :
+        <tbody>{ROWS.map((vals, r) => r === ORGANISEUR_ROW ? null : vals.length === 0 ? <tr key={r} className="grp"><td colSpan={3}>{P.rows[r]}</td></tr> :
           <tr key={r}><td>{P.rows[r]}</td>{vals.map((v, i) => <td key={i}>{cell(v)}</td>)}</tr>)}</tbody>
       </table></div>
     </section>
