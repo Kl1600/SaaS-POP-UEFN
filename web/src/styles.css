@@ -1322,3 +1322,8 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 .sel-opt{display:block;width:100%;text-align:left;padding:8px 10px;border:0;border-radius:8px;background:none;color:var(--text);font:inherit;font-size:14px;line-height:1.35;cursor:pointer;white-space:normal}
 .sel-opt.on{background:var(--hover)}
 }
+/* Connecter une IA par onglet (#375). */
+@layer app{
+.aitabs .aikey{margin-top:12px;padding-top:10px;border-top:1px solid var(--border)}
+.aitabs .aiquick{flex-wrap:wrap}
+}
