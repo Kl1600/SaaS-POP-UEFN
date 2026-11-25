@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-25 · #368 · retour à la version précédente du site vitrine
+- Fait : Landing.tsx et landing.css remis comme avant #362 (demande de Kl1600) ; les menus à jour de la capture (fr, en) sont gardés.
+- Vérifié : navigateur 1440 px.
+
 ### 2026-11-25 · #362 · site vitrine simple et hiérarchisé
 - Fait : Landing.tsx : nav sans méga-menu ; hero avec un seul bouton principal (« Voir les fonctionnalités » en lien discret), sans ligne « micro » ; retirés : bandeau de logos, bloc avant/après, chiffres, grandes captures alternées et listes à puces ; fonctions en liste courte (icône, titre, première phrase seulement, fonction first()) avec l'IA en dernière ligne ; tarifs en 2 cartes, comparatif replié (<details>) ; FAQ toute repliée. Capture de l'app : menus actuels (fr, en). Les textes inutilisés restent dans les dictionnaires.
 - Vérifié : navigateur 1440 et 390 px.
