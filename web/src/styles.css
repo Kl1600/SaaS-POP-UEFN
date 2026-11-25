@@ -1274,6 +1274,7 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 .top .crumb{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .app.drawer-open .side .acct > span.acct-txt{display:flex !important}
 .app.drawer-open .side .acct .acct-chev{display:inline-block !important}
+}
 /* POP Forge (#78), d'après les maquettes validées le 24/11 : sélecteur de map, menu du profil, titres sobres. */
 @layer app{
 .forge-shell{display:flex;flex-direction:column;height:calc(100vh / var(--ui-zoom));background:rgb(0,0,0);overflow:hidden}
