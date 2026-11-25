@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Bell, Bot, Building2, Check, ChevronsUpDown, ExternalLink, Hammer, Home, Library, Minus, Moon, RefreshCw, Square, Sun, User, Wrench, X } from 'lucide-react'
 import LangPicker from '../components/LangPicker'
-import { useApp, studioName, useLoad } from '../state'
+import { useApp, studioName, useLive, useLoad } from '../state'
 import { ago, api } from '../api'
 import { tr } from '../i18n/t'
 import { cssRect } from '../zoom'
@@ -374,18 +374,30 @@ function Accueil({ invoke, liaison, relire }: { invoke: Invoke; etat: string; li
 
 /** Les agents de la map et leur tâche (registre #93), avec « Voir dans POP » sur chaque tâche. */
 function EnCeMoment({ mapId }: { mapId: number }) {
-  const { data } = useLoad<any[]>(`/api/maps/${mapId}/agents`, [mapId])
+  const { data, reload } = useLoad<any[]>(`/api/maps/${mapId}/agents`, [mapId])
+  // Résumés en français fabriqués par POP à partir du journal MCP (#321) : équipe, agents, tâches terminées.
+  const { data: res, reload: relireRes } = useLoad<any>(`/api/maps/${mapId}/resumes`, [mapId])
+  useLive(['agents', 'tasks', 'fil'], () => { reload(); relireRes() })
   if (!data) return null
+  const phraseDe = (id: number) => res?.agents?.find((x: any) => x.id === id)?.phrase
   return <section>
     <h2 className="forge-h2">{tr("En ce moment")}</h2>
+    {res?.equipe?.phrase && <p style={{ margin: '0 0 8px' }}>{res.equipe.phrase}</p>}
     {data.length === 0 && <p className="muted" style={{ margin: 0 }}>{tr("Aucune IA ne travaille sur cette map.")}</p>}
     {data.map(a => <div key={a.id} className="li">
       <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: a.task ? 'var(--tg)' : 'var(--text3)' }} />
       <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', lineHeight: 1.35 }}>
         <span>{a.task ? `#${a.task.number} ${a.task.title}` : tr("Pas de tâche réservée")}</span>
-        <span className="small muted">{a.name}{a.last_action ? ' · ' + a.last_action : ''}</span>
+        <span className="small muted">{a.name}{phraseDe(a.id) ? ' · ' + phraseDe(a.id) : a.last_action ? ' · ' + a.last_action : ''}</span>
       </span>
       {a.task && <button className="linkbtn" onClick={() => ouvrirPOP(`/map/${mapId}/taches?q=%23${a.task.number}`)}>{tr("Voir dans POP")}</button>}
+    </div>)}
+    {(res?.taches ?? []).slice(0, 3).map((x: any) => <div key={x.number} className="li">
+      <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--text3)' }} />
+      <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', lineHeight: 1.35 }}>
+        <span>#{x.number} {x.title}</span>
+        <span className="small muted">{x.par ? x.par + ' · ' : ''}{x.phrase}</span>
+      </span>
     </div>)}
   </section>
 }

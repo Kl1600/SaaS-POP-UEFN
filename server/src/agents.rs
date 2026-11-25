@@ -113,12 +113,13 @@ pub async fn noter_appel(
             .fetch_optional(&st.db)
             .await?;
         let ok_appel = ok && erreurs == 0;
-        let id: i64 = sqlx::query_scalar("INSERT INTO agent_calls (agent_id, map_id, task_id, tool, ok) VALUES (?, ?, ?, ?, ?) RETURNING id")
+        let id: i64 = sqlx::query_scalar("INSERT INTO agent_calls (agent_id, map_id, task_id, tool, ok, detail) VALUES (?, ?, ?, ?, ?, ?) RETURNING id")
             .bind(agent)
             .bind(mid)
             .bind(cible)
             .bind(tool)
             .bind(ok_appel)
+            .bind(crate::resume::detail(tool, a, erreurs))
             .fetch_one(&st.db)
             .await?;
         sqlx::query("DELETE FROM agent_calls WHERE map_id = ? AND at < datetime('now', '-7 days')")
@@ -145,7 +146,11 @@ pub async fn noter_appel(
 }
 
 /// Étape de la tâche réservée d'un agent, d'après ses appels depuis qu'il l'a prise : écrit, compilé, testé, relu.
-async fn etape(st: &AppState, agent: i64, task_id: i64) -> Result<Option<&'static str>, AppError> {
+pub(crate) async fn etape(
+    st: &AppState,
+    agent: i64,
+    task_id: i64,
+) -> Result<Option<&'static str>, AppError> {
     let outils: Vec<(String, bool)> = sqlx::query_as(
         "SELECT c.tool, c.ok FROM agent_calls c JOIN api_tokens a ON a.id = c.agent_id
          WHERE c.agent_id = ? AND c.task_id = ? AND c.at >= COALESCE(a.task_since, c.at)",
