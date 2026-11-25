@@ -230,6 +230,7 @@ fn tools() -> Value {
         tool("device_graph", "Graphe des liens entre appareils du niveau (#119) : liens d'événements et références @editable des appareils Verse ; broken = cible absente du niveau.", json!({}), &[]),
         tool("read_messages", "Messages que votre humain vous a écrits dans POP Forge (#381), à vous ou à toute l'équipe : à lire entre deux actions (next_task signale les non lus). Répondez avec send_message.", json!({}), &[]),
         tool("send_message", "Répond à votre humain dans votre fil de POP Forge (#381) : body, texte court en français.", json!({ "body": { "type": "string" } }), &["body"]),
+        tool("forge_help", "Pages d'aide de POP Forge (#300) : UEFN fermé, serveur MCP arrêté, relais à mettre à jour, compilation en échec, agent qui ne répond plus, liaison, abonnement. query : la question (vide = toutes les pages).", json!({ "query": { "type": "string" } }), &[]),
         tool("list_milestones", "Jalons et objectifs du planning de la map (date, heure, type, détail).", json!({}), &[]),
         tool("add_milestone", "Ajoute un jalon au planning : title, date AAAA-MM-JJ ; facultatifs : time HH:MM, detail, kind (jalon par défaut).", json!({ "title": { "type": "string" }, "date": { "type": "string" }, "time": { "type": "string" }, "detail": { "type": "string" }, "kind": { "type": "string" } }), &["title", "date"]),
         tool("list_agents", "Agents IA de la map : identifiant, nom, rôle, tâche en cours, actif ou non, et lequel est l'Orchestrateur.", json!({}), &[]),
@@ -288,6 +289,7 @@ const READ_TOOLS: &[&str] = &[
     "device_graph",
     "read_messages",
     "send_message",
+    "forge_help",
 ];
 
 fn rpc_ok(id: Value, result: Value) -> Response {
@@ -547,6 +549,8 @@ async fn token_call(
     a: Value,
 ) -> Result<Value, AppError> {
     match name {
+        // Aide de Forge (#300) : sans map de travail.
+        "forge_help" => return Ok(crate::aide_forge::chercher(a["query"].as_str().unwrap_or(""))),
         "list_maps" => {
             let rows: Vec<(i64, String, String, String, i64, String)> = sqlx::query_as(
                 "SELECT m.id, m.name, s.name, ms.role, s.personal, m.status FROM maps m JOIN studios s ON s.id = m.studio_id

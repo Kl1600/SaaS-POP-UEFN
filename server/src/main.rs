@@ -13,6 +13,7 @@ mod account;
 mod activation;
 mod admin;
 mod agents;
+mod aide_forge;
 mod aiplan;
 mod aipop;
 mod analytics;
@@ -671,6 +672,7 @@ fn api() -> Router<AppState> {
         .route("/api/maps/{mid}/uefn/action", post(uefn::action))
         .route("/api/maps/{mid}/uefn/journal", get(uefn::journal))
         .route("/api/maps/{mid}/build", get(construire::etat))
+        .route("/api/maps/{mid}/diagnostic", get(aide_forge::route))
         // Vérifications automatiques du niveau (#96) ; « /checks » est la checklist de la page Lancer (#130).
         .route("/api/maps/{mid}/level-checks", get(checks::get))
         .route("/api/maps/{mid}/agents", get(agents::list))
