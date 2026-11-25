@@ -97,6 +97,7 @@ pub const ROLES: &[Role] = &[
                 "save_device_config",
                 "apply_device_config",
                 "place_configured_device",
+                "blockout",
                 "set_island_settings",
                 "get_island_settings",
                 "import_asset",
