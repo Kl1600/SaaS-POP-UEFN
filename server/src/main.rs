@@ -24,6 +24,7 @@ mod boards;
 mod captures;
 mod catalog;
 mod checks;
+mod construire;
 mod courante;
 mod device_configs;
 mod devices;
@@ -669,6 +670,7 @@ fn api() -> Router<AppState> {
         .route("/api/maps/{mid}/uefn/topview", get(uefn::topview))
         .route("/api/maps/{mid}/uefn/action", post(uefn::action))
         .route("/api/maps/{mid}/uefn/journal", get(uefn::journal))
+        .route("/api/maps/{mid}/build", get(construire::etat))
         // Vérifications automatiques du niveau (#96) ; « /checks » est la checklist de la page Lancer (#130).
         .route("/api/maps/{mid}/level-checks", get(checks::get))
         .route("/api/maps/{mid}/agents", get(agents::list))
