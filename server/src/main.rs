@@ -14,8 +14,6 @@ mod activation;
 mod admin;
 mod agents;
 mod aide_forge;
-mod aiplan;
-mod aipop;
 mod analytics;
 mod announce;
 mod assets;
@@ -331,10 +329,6 @@ fn api() -> Router<AppState> {
         .route("/api/forge/download", get(billing::forge_download))
         .route("/api/billing/checkout", post(stripe::checkout))
         .route("/api/billing/portal", post(stripe::portal))
-        .route("/api/admin/ai", get(aipop::admin_report))
-        .route("/api/admin/users/{id}/credits", post(aipop::admin_grant))
-        .route("/api/maps/{mid}/ai/plan", post(aiplan::propose))
-        .route("/api/maps/{mid}/ai/plan/apply", post(aiplan::apply))
         .route(
             "/api/maps/{mid}/private-stats",
             get(privstats::get).post(privstats::import),

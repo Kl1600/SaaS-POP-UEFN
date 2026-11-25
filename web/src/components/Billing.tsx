@@ -1,7 +1,7 @@
-// Abonnement (Starter / Pro), crédits IA et écran de fin d'essai. Les paiements passent par Stripe.
+// Abonnement (Starter / Pro) et écran de fin d'essai. Les paiements passent par Stripe.
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { CreditCard, Sparkles, Check, LogOut, Download } from 'lucide-react'
+import { CreditCard, Check, LogOut, Download } from 'lucide-react'
 import { api } from '../api'
 import { useApp, useLoad } from '../state'
 import { CardHead } from './ui'
@@ -32,14 +32,14 @@ function Plans({ b }: { b: any }) {
   })}</div>
 }
 
-/** Paramètres → Abonnement et crédits IA. */
+/** Paramètres → Abonnement. */
 export function BillingSettings() {
   const { toast, reload: reloadMe } = useApp()
   const { data: b, reload } = useLoad<any>('/api/billing')
   const [sp, setSp] = useSearchParams()
   useEffect(() => {
-    const ok = sp.get('paiement') === 'ok' || sp.get('credits') === 'ok'
-    if (ok) { toast(sp.get('credits') ? tr("Paiement reçu : vos crédits arrivent dans quelques secondes.") : tr("Paiement reçu : votre abonnement est actif.")); setTimeout(() => { reload(); reloadMe() }, 2500); setSp({}, { replace: true }) }
+    const ok = sp.get('paiement') === 'ok'
+    if (ok) { toast(tr("Paiement reçu : votre abonnement est actif.")); setTimeout(() => { reload(); reloadMe() }, 2500); setSp({}, { replace: true }) }
   }, [])
   if (!b) return null
   const active = ['active', 'trialing', 'past_due'].includes(b.sub_status)
@@ -53,12 +53,6 @@ export function BillingSettings() {
         {b.has_customer && b.configured && <button className="btn" onClick={() => go('/api/billing/portal', {}, toast)}>{tr("Gérer, factures, résilier")}</button>}
       </CardHead>
       {!b.configured ? <p className="small muted" style={{ margin: 0 }}>{tr("Les paiements ne sont pas encore ouverts : pendant la bêta, POP est gratuit.")}</p> : b.source !== 'manual' && <Plans b={b} />}
-    </section>
-    <section className="card">
-      <CardHead icon={<Sparkles size={18} />} title={tr("Crédits IA : {0}", [b.ai_credits])} sub={tr("Pour l’IA de POP (par exemple le plan de production). Chaque demande retire son coût réel, affiché avant et après. Les crédits n’expirent pas.")} />
-      {!b.configured || b.packs.length === 0 ? <p className="small muted" style={{ margin: 0 }}>{tr("L’achat de crédits n’est pas encore ouvert.")}</p> :
-        <div className="bpacks">{b.packs.map((p: any) => <button key={p.id} className="bpack" onClick={() => go('/api/billing/checkout', { kind: 'credits', pack: p.id }, toast)}>
-          <b>{tr("{0} crédits", [p.credits.toLocaleString(LOCALE)])}</b><span>{p.price}</span></button>)}</div>}
     </section>
   </>
 }

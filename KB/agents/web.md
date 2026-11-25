@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-25 · #384 · crédits IA retirés de l'interface
+- Fait : carte « Crédits IA » et packs retirés de Paramètres → Abonnement (Billing.tsx) ; bouton du plan de production par l'IA retiré de Tâches (AiPlan.tsx supprimé) ; onglet admin « Paiements et IA » retiré ; ligne « Crédits » retirée des CGV.
+- Vérifié : navigateur 1440 px (Abonnement, Tâches, Administration, CGV).
+
 ### 2026-11-25 · #379 · Connecter une IA en 3 étapes
 - Fait : ConnectTabs (AiTokens.tsx) : choix de l'IA (Claude, ChatGPT, Gemini, Le Chat en grand, les autres sous « Autres IA »), puis 3 étapes numérotées avec une phrase et un bouton chacune (copier ou installer, ouvrir l'IA ou coller, « Autoriser » qui passe au vert). Notes et clé de secours repliées dans « Besoin d'aide ? ».
 - Vérifié : navigateur 1440 px.
