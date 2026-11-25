@@ -290,8 +290,8 @@ impl Link {
                 out["actors"] = json!(self.mcp.list_actors().await?);
             }
 
-            "actor_blockout" => {
-                // Blockout (#116) : tout ou rien ; si un élément échoue, ceux déjà posés sont retirés.
+            "actor_blockout" | "actor_scatter" => {
+                // Blockout (#116) et dispersion (#118) : tout ou rien ; si un élément échoue, ceux déjà posés sont retirés.
                 self.need_uefn()?;
                 let mut ids = vec![];
                 for it in a["items"].as_array().cloned().unwrap_or_default() {
@@ -301,8 +301,13 @@ impl Link {
                             if !ids.is_empty() {
                                 let _ = self.mcp.delete(&ids).await;
                             }
+                            let quoi = if action == "actor_blockout" {
+                                "Blockout"
+                            } else {
+                                "Dispersion"
+                            };
                             bail!(
-                                "Blockout arrêté à l'élément {} : {e:#} (rien n'est resté posé)",
+                                "{quoi} arrêté(e) à l'élément {} : {e:#} (rien n'est resté posé)",
                                 ids.len() + 1
                             );
                         }
