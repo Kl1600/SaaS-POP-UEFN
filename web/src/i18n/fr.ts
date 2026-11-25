@@ -51,7 +51,7 @@ const fr = {
   final: { h2a: 'Votre prochaine map', h2b: 'commence ici.', p: 'Rejoignez la liste d’attente : on vous envoie votre accès dès qu’une place se libère.' },
   foot: { legalTitle: 'Légal', made: 'Fait par des créateurs Fortnite, pour des créateurs Fortnite.', legal: 'Fortnite et UEFN sont des marques d’Epic Games. POP n’est ni affilié à Epic Games ni approuvé par Epic Games.', product: 'Produit', help: 'Aide', account: 'Compte' },
   mock: {
-    overview: 'Vue d’ensemble', nav: ['Vue d’ensemble', 'Pages', 'Tableau blanc', 'Tâches', 'Organiseur', 'Marché'],
+    overview: 'Dashboard', nav: ['Dashboard', 'Planifier', 'Tâches', 'Pages', 'Tableau blanc', 'Maps à faire'],
     hello: 'Bonjour Léa, je vous propose de commencer par #42.', late: '2 tâches en retard (la plus ancienne était prévue le 12 nov.).', mile: 'Objectif « Bêta » dans 5 jours : 9 tâches à finir, retard prévu de 1 jour.',
     take: 'Prendre', start: 'Commencer', unlocks: 'débloque 3 autres tâches', today: 'prévue aujourd’hui', waits: 'attend #42',
     todo: 'À faire', doing: 'En cours', done: 'Fait', tasks: ['Système de score', 'Décor de la zone 2', 'Écran de fin', 'Playtest interne', 'Spawn des joueurs', 'Tempête'],

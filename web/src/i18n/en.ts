@@ -50,7 +50,7 @@ const en: Dict = {
   final: { h2a: 'Your next map', h2b: 'starts here.', p: 'Join the waitlist: we’ll send you access as soon as a spot opens.' },
   foot: { legalTitle: 'Legal', made: 'Made by Fortnite creators, for Fortnite creators.', legal: 'Fortnite and UEFN are trademarks of Epic Games. POP is not affiliated with or endorsed by Epic Games.', product: 'Product', help: 'Help', account: 'Account' },
   mock: {
-    overview: 'Overview', nav: ['Overview', 'Pages', 'Whiteboard', 'Tasks', 'Organizer', 'Market'],
+    overview: 'Dashboard', nav: ['Dashboard', 'Plan', 'Tasks', 'Pages', 'Whiteboard', 'Maps to make'],
     hello: 'Hi Léa, I suggest starting with #42.', late: '2 tasks late (the oldest was due on Nov 12).', mile: '“Beta” milestone in 5 days: 9 tasks left, expected delay of 1 day.',
     take: 'Take', start: 'Start', unlocks: 'unblocks 3 other tasks', today: 'due today', waits: 'waiting for #42',
     todo: 'To do', doing: 'In progress', done: 'Done', tasks: ['Score system', 'Zone 2 scenery', 'End screen', 'Internal playtest', 'Player spawn', 'Storm'],
