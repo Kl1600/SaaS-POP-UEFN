@@ -8,6 +8,7 @@ import { CardHead, PageHead, Tabs } from '../components/ui'
 import { STATUS_LABEL } from '../uefnState'
 import { tr, tx } from '../i18n/t'
 import { RangementModal } from '../components/Rangement'
+import { Appareils } from '../components/Appareils'
 import { cssRect, uiScale } from '../zoom'
 
 type Actor = {
@@ -50,7 +51,7 @@ export default function Organizer() {
   const [sel, setSel] = useState<string[]>([])
   const [anchor, setAnchor] = useState<string | null>(null)
   const [closed, setClosed] = useState<Set<string>>(new Set())
-  const [tab, setTab] = useState<'details' | 'top' | 'journal'>('details')
+  const [tab, setTab] = useState<'details' | 'top' | 'devices' | 'journal'>('details')
   const [task, setTask] = useState<number | ''>('')
   const [showLink, setShowLink] = useState(false)
   // Après une annulation ou un changement venu d'UEFN, le panneau Détails relit les valeurs réelles (#6).
@@ -177,10 +178,11 @@ export default function Organizer() {
         </aside>
 
         <section className="card oright">
-          <Tabs value={tab} onChange={setTab} items={[['details', tr("Détails")], ['top', tr("Vue du dessus")], ['journal', tr("Changements et journal")]]} />
+          <Tabs value={tab} onChange={setTab} items={[['details', tr("Détails")], ['top', tr("Vue du dessus")], ['devices', tr("Appareils")], ['journal', tr("Changements et journal")]]} />
           <div style={{ marginTop: 16 }}>
             {tab === 'details' && (selected.length === 0 ? <p className="muted">{tr("Sélectionnez un ou plusieurs acteurs dans l’arbre.")}</p> : selected.length === 1 ? <Details a={selected[0]} all={actors} tags={st.tags} update={update} canEdit={canEdit} me={me?.user.email ?? ''} connected={st.status === 'connected'} rev={rev} /> : <Bulk list={selected} tags={st.tags} update={update} canEdit={canEdit} connected={st.status === 'connected'} />)}
             {tab === 'top' && <TopView actors={vis} sel={sel} setSel={setSel} update={update} canEdit={canEdit} hasImage={st.has_topview} bounds={st.topview_bounds} refresh={() => act('render_topview', {}, tr("Vue du dessus rendue par UEFN"))} connected={st.status === 'connected'} />}
+            {tab === 'devices' && <Appareils mapId={map!.id} canEdit={canEdit} connected={st.status === 'connected'} act={act} />}
             {tab === 'journal' && <Journal st={st} task={task} setTask={setTask} tasks={tasks ?? []} act={act} reload={refresh} />}
           </div>
         </section>

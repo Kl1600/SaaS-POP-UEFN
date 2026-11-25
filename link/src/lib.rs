@@ -385,6 +385,10 @@ impl Link {
                     )
                     .await?;
             }
+            "device_catalog" => {
+                self.need_uefn()?;
+                out["catalog"] = self.mcp.device_catalog().await?;
+            }
             "refresh_actors" => {
                 self.need_uefn()?;
                 out["actors"] = json!(self.mcp.list_actors().await?);
