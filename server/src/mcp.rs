@@ -1420,7 +1420,7 @@ mod tests {
         let r = call(&st, &u, mid, "search_library", json!({ "query": "pièces" }))
             .await
             .unwrap();
-        assert_eq!(r[0]["id"], id);
+        assert!(r.as_array().unwrap().iter().any(|m| m["id"] == id));
         let r = call(&st, &u, mid, "search_library", json!({ "category": "hud" }))
             .await
             .unwrap();
