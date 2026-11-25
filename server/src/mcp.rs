@@ -217,6 +217,10 @@ fn tools() -> Value {
         tool("save_device_config", "Enregistre la configuration d'un appareil du niveau (son type et ses réglages, lus dans UEFN) dans la bibliothèque du studio, sous un nom.", json!({ "actor_id": { "type": "string" }, "name": { "type": "string" }, "description": { "type": "string" }, "asset": { "type": "string", "description": "Chemin de l'asset de l'appareil (facultatif)" } }), &["actor_id", "name"]),
         tool("apply_device_config", "Applique une configuration enregistrée à des appareils du même type (une action annulable).", json!({ "config_id": { "type": "integer" }, "ids": { "type": "array", "items": { "type": "string" } } }), &["config_id", "ids"]),
         tool("place_configured_device", "Pose un appareil déjà configuré (depuis son asset, ou copie d'un appareil du même type du niveau), puis applique ses réglages. Annulable.", json!({ "config_id": { "type": "integer" }, "name": { "type": "string" }, "folder": { "type": "string" }, "location": { "type": "array", "items": { "type": "number" } }, "rotation": { "type": "array", "items": { "type": "number" } } }), &["config_id"]),
+        tool("blockout", "Blockout (#116) : pose d'un coup une liste d'appareils d'après un plan (jusqu'à 200). Chaque élément : asset (chemin /Game/… ou /Fortnite…) ou like (id d'un appareil du niveau à copier), location [x, y, z] en cm, rotation [tangage, lacet, roulis] facultative, name, folder (« Blockout » par défaut). Une seule action dans le journal, annulable en bloc ; un élément invalide fait tout refuser avant l'envoi.", json!({
+            "items": { "type": "array", "items": { "type": "object" } },
+            "folder": { "type": "string" }
+        }), &["items"]),
         tool("list_milestones", "Jalons et objectifs du planning de la map (date, heure, type, détail).", json!({}), &[]),
         tool("add_milestone", "Ajoute un jalon au planning : title, date AAAA-MM-JJ ; facultatifs : time HH:MM, detail, kind (jalon par défaut).", json!({ "title": { "type": "string" }, "date": { "type": "string" }, "time": { "type": "string" }, "detail": { "type": "string" }, "kind": { "type": "string" } }), &["title", "date"]),
         tool("list_agents", "Agents IA de la map : identifiant, nom, rôle, tâche en cours, actif ou non, et lequel est l'Orchestrateur.", json!({}), &[]),
@@ -1129,6 +1133,7 @@ async fn call_as(
             )
             .await
         }
+        "blockout" => exec(st, o(), "actor_blockout", json!({ "items": a["items"], "folder": a["folder"] })).await,
         "place_mesh" => {
             exec(
                 st,

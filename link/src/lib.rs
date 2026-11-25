@@ -264,6 +264,27 @@ impl Link {
                 out["actors"] = json!(self.mcp.list_actors().await?);
             }
 
+            "actor_blockout" => {
+                // Blockout (#116) : tout ou rien ; si un élément échoue, ceux déjà posés sont retirés.
+                self.need_uefn()?;
+                let mut ids = vec![];
+                for it in a["items"].as_array().cloned().unwrap_or_default() {
+                    match self.mcp.spawn(&it).await {
+                        Ok(id) => ids.push(id),
+                        Err(e) => {
+                            if !ids.is_empty() {
+                                let _ = self.mcp.delete(&ids).await;
+                            }
+                            bail!(
+                                "Blockout arrêté à l'élément {} : {e:#} (rien n'est resté posé)",
+                                ids.len() + 1
+                            );
+                        }
+                    }
+                }
+                out["created_ids"] = json!(ids);
+                out["actors"] = json!(self.mcp.list_actors().await?);
+            }
             "mesh_spawn" => {
                 self.need_uefn()?;
                 out["created_ids"] = json!([self.mcp.spawn_mesh(a).await?]);

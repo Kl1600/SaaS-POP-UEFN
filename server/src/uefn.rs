@@ -797,6 +797,10 @@ pub const SHAPES: &[(&str, &str)] = &[
 
 /// Valide une pose de mesh avant tout envoi à UEFN (#148) et remplace `shape` par le chemin du mesh.
 /// Rend le libellé du journal. Positions en cm (±20 km), rotation en degrés (±3 600), échelle de 0,001 à 1 000.
+fn propres_len(args: &Value) -> usize {
+    args["items"].as_array().map(|a| a.len()).unwrap_or(0)
+}
+
 pub fn check_mesh_args(args: &mut Value) -> Result<String, AppError> {
     let shape = args["shape"].as_str().unwrap_or("").trim().to_lowercase();
     let mesh = args["mesh"].as_str().unwrap_or("").trim().to_string();
@@ -1074,6 +1078,85 @@ async fn prepare(
                 format!("{nom} ({modele})")
             };
             Ok((format!("Pose : {quoi}"), Value::Null, None))
+        }
+
+        "actor_blockout" => {
+            // Blockout (#116) : des appareils posés d'un coup, d'après un plan ; une seule action, annulable en bloc.
+            let items = args["items"].as_array().cloned().unwrap_or_default();
+            if items.is_empty() || items.len() > 200 {
+                return Err(bad("Blockout : de 1 à 200 éléments (items)."));
+            }
+            let defaut = args["folder"]
+                .as_str()
+                .filter(|f| !f.trim().is_empty())
+                .unwrap_or("Blockout")
+                .trim()
+                .to_string();
+            check_len("Dossier", &defaut, 1, 200)?;
+            check_lock(&defaut)?;
+            let mut propres = vec![];
+            for (i, it) in items.iter().enumerate() {
+                let n = i + 1;
+                let asset = it["asset"].as_str().unwrap_or("").trim();
+                let like = it["like"].as_str().unwrap_or("").trim();
+                if like.is_empty() && (!asset.starts_with('/') || asset.len() > 400) {
+                    return Err(bad(format!("Élément {n} : indiquez l’asset (chemin /Game/… ou /Fortnite…) ou un appareil modèle du niveau (like).")));
+                }
+                if !like.is_empty() && by_id(like).is_none() {
+                    return Err(bad(format!(
+                        "Élément {n} : appareil modèle introuvable : {like}"
+                    )));
+                }
+                let pos = it["location"].as_array().filter(|v| {
+                    v.len() == 3
+                        && v.iter().all(|x| {
+                            x.as_f64()
+                                .is_some_and(|f| f.is_finite() && f.abs() <= 1_000_000.0)
+                        })
+                });
+                let Some(pos) = pos else {
+                    return Err(bad(format!(
+                        "Élément {n} : position invalide (trois nombres en cm, 10 km au plus)."
+                    )));
+                };
+                if !it["rotation"].is_null()
+                    && !it["rotation"].as_array().is_some_and(|v| {
+                        v.len() == 3 && v.iter().all(|x| x.as_f64().is_some_and(f64::is_finite))
+                    })
+                {
+                    return Err(bad(format!(
+                        "Élément {n} : rotation invalide (trois nombres)."
+                    )));
+                }
+                let nom = it["name"].as_str().unwrap_or("").trim();
+                check_len("Nom", nom, 0, 120)?;
+                let dossier = it["folder"]
+                    .as_str()
+                    .filter(|f| !f.trim().is_empty())
+                    .map(|f| f.trim().to_string())
+                    .unwrap_or_else(|| defaut.clone());
+                check_len("Dossier", &dossier, 1, 200)?;
+                check_lock(&dossier)?;
+                let mut p = json!({ "location": pos, "name": nom, "folder": dossier });
+                if like.is_empty() {
+                    p["asset"] = json!(asset)
+                } else {
+                    p["like"] = json!(like)
+                }
+                if !it["rotation"].is_null() {
+                    p["rotation"] = it["rotation"].clone()
+                }
+                propres.push(p);
+            }
+            *args = json!({ "items": propres });
+            Ok((
+                format!(
+                    "Blockout : {} élément(s) posés (dossier « {defaut} »)",
+                    propres_len(args)
+                ),
+                Value::Null,
+                None,
+            ))
         }
 
         "mesh_spawn" => {
@@ -1374,7 +1457,8 @@ async fn run_action(
     }
     let secs = if matches!(
         action,
-        "compile"
+        "actor_blockout"
+            | "compile"
             | "push_session"
             | "render_topview"
             | "lore_checkin"
@@ -1415,7 +1499,10 @@ async fn run_action(
                         );
                     }
                 }
-                if matches!(action, "actor_duplicate" | "actor_spawn" | "mesh_spawn") {
+                if matches!(
+                    action,
+                    "actor_duplicate" | "actor_spawn" | "mesh_spawn" | "actor_blockout"
+                ) {
                     if let Some(ids) = data.get("created_ids") {
                         extra_undo = Some(
                             json!({ "action": "actor_delete", "args": { "ids": ids } }).to_string(),
@@ -2007,6 +2094,42 @@ mod tests_rangement {
         assert_eq!(undo["action"], "actor_update_raw");
         assert_eq!(undo["args"]["patches"][0]["changes"]["name"], "Button2");
         assert_eq!(undo["args"]["patches"][0]["changes"]["folder"], "");
+
+        // Blockout (#116) : un élément invalide fait tout refuser avant l'envoi (aucune action journalisée).
+        let bon = |x: f64| json!({ "asset": "/Game/Devices/Button", "location": [x, 0.0, 0.0], "name": format!("B{x}") });
+        let mut items: Vec<Value> = (0..10).map(|i| bon(i as f64 * 300.0)).collect();
+        items[7]["location"] = json!([1.0, "oups", 0.0]);
+        assert!(exec(&st, o(), "actor_blockout", json!({ "items": items }))
+            .await
+            .is_err());
+        items[7]["location"] = json!([1e9, 0.0, 0.0]);
+        assert!(
+            exec(&st, o(), "actor_blockout", json!({ "items": items }))
+                .await
+                .is_err(),
+            "10 km au plus"
+        );
+        let avant: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM uefn_actions WHERE action = 'actor_blockout'")
+                .fetch_one(&st.db)
+                .await
+                .unwrap();
+        assert_eq!(avant, 0);
+        // Plan valide : une seule action, dossier « Blockout » par défaut, envoyée au relais (en file s'il est absent).
+        items[7] = bon(2100.0);
+        let _ = exec(&st, o(), "actor_blockout", json!({ "items": items })).await;
+        let (resume, args): (String, String) = sqlx::query_as(
+            "SELECT summary, args FROM uefn_actions WHERE action = 'actor_blockout'",
+        )
+        .fetch_one(&st.db)
+        .await
+        .unwrap();
+        assert_eq!(
+            resume,
+            "Blockout : 10 élément(s) posés (dossier « Blockout »)"
+        );
+        let args: Value = serde_json::from_str(&args).unwrap();
+        assert_eq!(args["items"][3]["folder"], "Blockout");
     }
 }
 
