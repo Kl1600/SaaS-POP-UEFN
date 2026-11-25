@@ -314,7 +314,29 @@ pub async fn route(
     Path(mid): Path<i64>,
 ) -> ApiResult<Value> {
     map_ctx(&st, &u, mid).await?;
-    Ok(Json(resumes(&st, mid).await?))
+    let mut r = resumes(&st, mid).await?;
+    // Chacun ne voit que ses propres IA (#376) : les agents des autres membres et leur nom sont retirés.
+    let miens: Vec<(i64, String)> =
+        sqlx::query_as("SELECT id, name FROM api_tokens WHERE map_id = ? AND user_id = ?")
+            .bind(mid)
+            .bind(u.id)
+            .fetch_all(&st.db)
+            .await?;
+    if let Some(a) = r["agents"].as_array_mut() {
+        a.retain(|x| miens.iter().any(|m| Some(m.0) == x["id"].as_i64()));
+    }
+    for t in r["taches"].as_array_mut().into_iter().flatten() {
+        if let Some(p) = t["par"].as_array_mut() {
+            p.retain(|n| {
+                n.as_str().is_some_and(|n| {
+                    miens
+                        .iter()
+                        .any(|m| n == m.1 || n.starts_with(&format!("{} · ", m.1)))
+                })
+            });
+        }
+    }
+    Ok(Json(r))
 }
 
 #[cfg(test)]

@@ -26,9 +26,10 @@ pub async fn list(
                 (SELECT x.summary FROM uefn_actions x WHERE x.agent_id = a.id ORDER BY x.id DESC LIMIT 1), a.task_id, a.role,
                 (SELECT c.tool FROM agent_calls c WHERE c.agent_id = a.id ORDER BY c.id DESC LIMIT 1)
          FROM api_tokens a JOIN users u ON u.id = a.user_id LEFT JOIN tasks t ON t.id = a.task_id
-         WHERE a.map_id = ? ORDER BY a.last_used IS NULL, a.last_used DESC, a.id DESC",
+         WHERE a.map_id = ? AND a.user_id = ? ORDER BY a.last_used IS NULL, a.last_used DESC, a.id DESC",
     )
     .bind(mid)
+    .bind(u.id)
     .fetch_all(&st.db)
     .await?;
     let orch = crate::orchestre::de_la_map(&st, mid).await?;
@@ -202,9 +203,10 @@ pub async fn activite(
     map_ctx(&st, &u, mid).await?;
     let rows: Vec<(i64, String, Option<String>, String, bool, String, Option<i64>)> = sqlx::query_as(
         "SELECT c.id, a.name, a.role, c.tool, c.ok, c.at, t.number FROM agent_calls c JOIN api_tokens a ON a.id = c.agent_id
-         LEFT JOIN tasks t ON t.id = c.task_id WHERE c.map_id = ? AND c.id > ? AND (? = 0 OR c.agent_id = ?) ORDER BY c.id DESC LIMIT 50",
+         LEFT JOIN tasks t ON t.id = c.task_id WHERE c.map_id = ? AND a.user_id = ? AND c.id > ? AND (? = 0 OR c.agent_id = ?) ORDER BY c.id DESC LIMIT 50",
     )
     .bind(mid)
+    .bind(u.id)
     .bind(q.get("after").copied().unwrap_or(0))
     .bind(q.get("agent").copied().unwrap_or(0))
     .bind(q.get("agent").copied().unwrap_or(0))
@@ -781,13 +783,17 @@ mod tests {
 }
 
 /// Agent de la map `mid` : (propriétaire, nom). Introuvable s'il n'est pas sur cette map.
-async fn agent_de(st: &AppState, mid: i64, aid: i64) -> Result<(i64, String), AppError> {
-    sqlx::query_as("SELECT user_id, name FROM api_tokens WHERE id = ? AND map_id = ?")
-        .bind(aid)
-        .bind(mid)
-        .fetch_optional(&st.db)
-        .await?
-        .ok_or(AppError::NotFound)
+/// Seules les IA du compte connecté sont visibles et pilotables (#376) : celle d'un autre membre est introuvable.
+async fn agent_de(st: &AppState, mid: i64, aid: i64, uid: i64) -> Result<(i64, String), AppError> {
+    sqlx::query_as(
+        "SELECT user_id, name FROM api_tokens WHERE id = ? AND map_id = ? AND user_id = ?",
+    )
+    .bind(aid)
+    .bind(mid)
+    .bind(uid)
+    .fetch_optional(&st.db)
+    .await?
+    .ok_or(AppError::NotFound)
 }
 
 #[derive(serde::Deserialize)]
@@ -804,10 +810,8 @@ pub async fn route_mode(
     Json(b): Json<ModeIn>,
 ) -> ApiResult<Value> {
     let ctx = map_ctx(&st, &u, mid).await?;
-    let (owner, nom) = agent_de(&st, mid, aid).await?;
-    if owner != u.id {
-        ctx.require(crate::access::Role::Admin)?;
-    }
+    let (_, nom) = agent_de(&st, mid, aid, u.id).await?;
+    let _ = &ctx;
     let (scope, quoi) = match b.mode.as_str() {
         "write" => ("write", "peut de nouveau modifier"),
         "read" => ("read", "passé en lecture seule"),
@@ -847,7 +851,7 @@ pub async fn route_attribuer(
 ) -> ApiResult<Value> {
     let ctx = map_ctx(&st, &u, mid).await?;
     ctx.can_edit()?;
-    let (_, nom) = agent_de(&st, mid, aid).await?;
+    let (_, nom) = agent_de(&st, mid, aid, u.id).await?;
     let Some(number) = b.number else {
         sqlx::query("UPDATE tasks SET agent_id = NULL WHERE agent_id = ? AND map_id = ? AND status <> 'done'")
             .bind(aid)

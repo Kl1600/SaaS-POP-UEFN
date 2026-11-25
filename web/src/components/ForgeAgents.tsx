@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { ago, api } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { tr } from '../i18n/t'
+import { Selecteur } from './Selecteur'
 
 // Écran Agents de Forge (#94) : les IA connectées à la map, leur tâche et son étape, leur résumé en français (#321),
 // leur journal d'appels MCP en direct ; attribuer une tâche, passer en lecture seule ou couper un agent.
@@ -46,11 +47,9 @@ export function ForgeAgents({ mapId }: { mapId: number }) {
         <div>{a.task ? <>#{a.task.number} {a.task.title}{a.task.step ? <span className="badge" style={{ marginLeft: 8 }}>{ETAPES[a.task.step] ?? a.task.step}</span> : null}</> : <span className="muted">{tr("Pas de tâche réservée")}</span>}</div>
         {(phrase || a.last_action) && <div className="small muted">{phrase ?? a.last_action}</div>}
         <div className="forge-ligne">
-          {app.canEdit && <select className="field" style={{ maxWidth: 360 }} aria-label={tr("Attribuer une tâche à {0}", [a.name])} value=""
-            onChange={e => e.target.value && agir(() => api.post(`/api/maps/${mapId}/agents/${a.id}/assign`, { number: Number(e.target.value) }), tr("Tâche attribuée"))}>
-            <option value="">{tr("Attribuer une tâche…")}</option>
-            {ouvertes.map(t => <option key={t.number} value={t.number}>#{t.number} {t.title}</option>)}
-          </select>}
+          {app.canEdit && <Selecteur label={tr("Attribuer une tâche à {0}", [a.name])} placeholder={tr("Attribuer une tâche…")}
+            options={ouvertes.map(t => ({ value: String(t.number), label: `#${t.number} ${t.title}` }))}
+            onChange={v => agir(() => api.post(`/api/maps/${mapId}/agents/${a.id}/assign`, { number: Number(v) }), tr("Tâche attribuée"))} />}
           <button className="linkbtn" onClick={() => setJournal(journal === a.id ? null : a.id)}>{journal === a.id ? tr("Masquer le journal") : tr("Journal")}</button>
         </div>
         {journal === a.id && <Journal mapId={mapId} agent={a.id} />}
