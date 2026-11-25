@@ -84,3 +84,18 @@ pub async fn require_studio(st: &AppState, sid: i64) -> Result<(), AppError> {
         Err(refused())
     }
 }
+
+/// Forge (#102) : réservé à l'abonnement Pro (essai compris) et aux administrateurs de la plateforme. Les IA
+/// connectées par MCP au site n'en dépendent pas.
+pub async fn has_forge(st: &AppState, uid: i64) -> Result<bool, AppError> {
+    Ok(user_analyse(st, uid).await? || crate::admin::is_admin(st, uid).await?)
+}
+
+/// Refus en français des routes propres à Forge pour un compte sans Pro.
+pub async fn require_forge(st: &AppState, uid: i64) -> Result<(), AppError> {
+    if has_forge(st, uid).await? {
+        Ok(())
+    } else {
+        Err(AppError::Guard("forge_pro", "POP Forge est inclus dans l'abonnement Pro (essai compris). Passez à Pro depuis POP : Paramètres → Abonnement.".into()))
+    }
+}

@@ -2138,6 +2138,11 @@ mod tests_compte {
     #[tokio::test]
     async fn ecran_agents_couper_lire_attribuer() {
         let m = monde().await;
+        sqlx::query("UPDATE users SET plan = 'pro' WHERE id = ?")
+            .bind(m.uid)
+            .execute(&m.st.db)
+            .await
+            .unwrap();
         let t = jeton(&m, Some(m.equipe), "write").await;
         let aid: i64 = sqlx::query_scalar("SELECT id FROM api_tokens WHERE token_hash = ?")
             .bind(sha256_hex(&t))
@@ -2203,6 +2208,11 @@ mod tests_compte {
     #[tokio::test]
     async fn on_ne_voit_pas_les_ia_des_autres() {
         let m = monde().await;
+        sqlx::query("UPDATE users SET plan = 'pro' WHERE id = ?")
+            .bind(m.uid)
+            .execute(&m.st.db)
+            .await
+            .unwrap();
         let ben = q(&m.st, "INSERT INTO users (email, name, password_hash) VALUES ('ben@a.fr', 'Ben', 'x') RETURNING id").await;
         sqlx::query("INSERT INTO memberships (studio_id, user_id, role) VALUES (?, ?, 'member')")
             .bind(m.sid_equipe)
@@ -2271,6 +2281,58 @@ mod tests_compte {
         )
         .await
         .is_err());
+    }
+
+    /// #102 : Forge réservé à Pro (essai compris) ; les IA connectées par MCP marchent sans Pro.
+    #[tokio::test]
+    async fn forge_reserve_a_pro() {
+        let m = monde().await;
+        let t = jeton(&m, Some(m.equipe), "write").await;
+        let aid: i64 = sqlx::query_scalar("SELECT id FROM api_tokens WHERE token_hash = ?")
+            .bind(sha256_hex(&t))
+            .fetch_one(&m.st.db)
+            .await
+            .unwrap();
+        let u = AuthUser {
+            id: m.uid,
+            email: "ia@a.fr".into(),
+            name: "Yanis".into(),
+            sid: String::new(),
+        };
+        let ecrire = || {
+            crate::messages::route_ecrire(
+                State(m.st.clone()),
+                u.clone(),
+                Path((m.equipe, aid)),
+                Json(serde_json::from_value(json!({ "body": "coucou" })).unwrap()),
+            )
+        };
+        sqlx::query("UPDATE users SET plan = 'starter', trial_until = NULL WHERE id = ?")
+            .bind(m.uid)
+            .execute(&m.st.db)
+            .await
+            .unwrap();
+        assert!(!crate::billing::has_forge(&m.st, m.uid).await.unwrap());
+        assert!(
+            matches!(ecrire().await, Err(AppError::Guard("forge_pro", _))),
+            "Starter : 403 avec un message"
+        );
+        assert!(
+            !mcp_call(&m.st, &t, "list_tasks", json!({})).await.0,
+            "MCP sans Pro"
+        );
+        sqlx::query("UPDATE users SET trial_until = datetime('now', '+3 days') WHERE id = ?")
+            .bind(m.uid)
+            .execute(&m.st.db)
+            .await
+            .unwrap();
+        assert!(ecrire().await.is_ok(), "essai Pro en cours");
+        sqlx::query("UPDATE users SET plan = 'pro', trial_until = NULL WHERE id = ?")
+            .bind(m.uid)
+            .execute(&m.st.db)
+            .await
+            .unwrap();
+        assert!(ecrire().await.is_ok(), "Pro");
     }
 
     #[tokio::test]

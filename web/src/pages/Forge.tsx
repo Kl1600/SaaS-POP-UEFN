@@ -75,6 +75,8 @@ export default function Forge() {
     </div>
   }
 
+  if (app.me && app.me.forge === false) return <ForgePro />
+
   const relie = !!liaison && memeServeur(liaison.serveur, location.origin) && etat !== 'UEFN non relié'
   const projetCourant = (liaison?.liens ?? []).find(l => app.map && l.map.toLowerCase() === app.map.name.toLowerCase())?.projet
   const titre = section === 'reglages' ? tr("Réglages") : SECTIONS.find(s => s[0] === section)?.[1]
@@ -401,4 +403,23 @@ function EnCeMoment({ mapId }: { mapId: number }) {
       </span>
     </div>)}
   </section>
+}
+
+/** Forge réservé à l'abonnement Pro, essai compris (#102) : se débloque sans redémarrer dès que l'abonnement est actif. */
+function ForgePro() {
+  const app = useApp()
+  useEffect(() => { const t = setInterval(() => app.reload(), 10000); return () => clearInterval(t) }, [])
+  return <div className={'app forge' + (app.dark ? ' dark' : '')}>
+    <div className="main" style={{ margin: 12, padding: 32, display: 'grid', placeItems: 'center' }}>
+      <div className="card" style={{ maxWidth: 560, padding: 28 }}>
+        <h1 className="forge-h1">{tr("Forge est inclus dans l’abonnement Pro")}</h1>
+        <p className="muted">{tr("POP Forge construit votre map dans UEFN avec vos IA : agents, liaison au projet, outils. Il est réservé à l’abonnement Pro, essai gratuit compris. Vos IA connectées au site continuent de marcher sans Pro.")}</p>
+        <div className="forge-ligne">
+          <button className="btn pri" onClick={() => ouvrirPOP('/parametres')}>{tr("Voir l’abonnement Pro")}</button>
+          <button className="btn" onClick={() => app.reload()}>{tr("J’ai changé d’abonnement")}</button>
+        </div>
+        <p className="small muted" style={{ marginBottom: 0 }}>{tr("Forge se débloque tout seul dès que l’abonnement est actif.")}</p>
+      </div>
+    </div>
+  </div>
 }

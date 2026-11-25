@@ -52,6 +52,7 @@ pub async fn route_fil(
     u: AuthUser,
     Path((mid, aid)): Path<(i64, i64)>,
 ) -> ApiResult<Value> {
+    crate::billing::require_forge(&st, u.id).await?;
     map_ctx(&st, &u, mid).await?;
     mon_agent(&st, mid, aid, u.id).await?;
     Ok(Json(fil(&st, aid).await?))
@@ -64,6 +65,7 @@ pub async fn route_ecrire(
     Path((mid, aid)): Path<(i64, i64)>,
     Json(b): Json<MessageIn>,
 ) -> ApiResult<Value> {
+    crate::billing::require_forge(&st, u.id).await?;
     map_ctx(&st, &u, mid).await?;
     mon_agent(&st, mid, aid, u.id).await?;
     let b = texte(&b.body)?;
@@ -85,6 +87,7 @@ pub async fn route_equipe(
     Path(mid): Path<i64>,
     Json(b): Json<MessageIn>,
 ) -> ApiResult<Value> {
+    crate::billing::require_forge(&st, u.id).await?;
     map_ctx(&st, &u, mid).await?;
     let b = texte(&b.body)?;
     let ids: Vec<i64> = sqlx::query_scalar(
@@ -176,7 +179,7 @@ mod tests {
         let mut us = vec![];
         for e in ["moi@a.fr", "ben@a.fr"] {
             let id: i64 = sqlx::query_scalar(
-                "INSERT INTO users (email, name, password_hash) VALUES (?, ?, 'x') RETURNING id",
+                "INSERT INTO users (email, name, password_hash, plan) VALUES (?, ?, 'x', 'pro') RETURNING id",
             )
             .bind(e)
             .bind(e)

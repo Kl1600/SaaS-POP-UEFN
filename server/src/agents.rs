@@ -809,6 +809,7 @@ pub async fn route_mode(
     Path((mid, aid)): Path<(i64, i64)>,
     Json(b): Json<ModeIn>,
 ) -> ApiResult<Value> {
+    crate::billing::require_forge(&st, u.id).await?;
     let ctx = map_ctx(&st, &u, mid).await?;
     let (_, nom) = agent_de(&st, mid, aid, u.id).await?;
     let _ = &ctx;
@@ -849,6 +850,7 @@ pub async fn route_attribuer(
     Path((mid, aid)): Path<(i64, i64)>,
     Json(b): Json<AttribuerIn>,
 ) -> ApiResult<Value> {
+    crate::billing::require_forge(&st, u.id).await?;
     let ctx = map_ctx(&st, &u, mid).await?;
     ctx.can_edit()?;
     let (_, nom) = agent_de(&st, mid, aid, u.id).await?;
