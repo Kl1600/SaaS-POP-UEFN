@@ -23,6 +23,10 @@ FAIT | #70 IA d'analyse : garder chaque prédiction, la vérifier après coup et
 Owner : Kl1600 | Sur la tâche : Claude Code, pour Kl1600
 Fait : migration 0027 (ia_models, ia_predictions), model.rs (temporal_split, auc, brier, record_predictions, grade, admin_learning), onglet Admin
 Reste : rien ; prochaines étapes #71 (signaux) et #72 (modèle)
+EN COURS | #91 Forge F17 · Serveur : bibliothèque d'assets dans un stockage objet à part | 21/11 02:10
+Owner : Kl1600 | Sur la tâche : Claude Code, pour Kl1600
+Fait : migration 0030, assets.rs (envoi direct vers R2 par lien signé SigV4, quotas, droits), variables deploy/, tests
+Reste : créer le bucket R2 et sa clé (humain), test réel
 Bloque : rien
 ```
 
