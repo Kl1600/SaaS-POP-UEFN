@@ -3161,5 +3161,14 @@ const EN: Record<string, string> = {
  "Derniers événements": "Latest events",
  "Aucun événement.": "No events.",
  "Admin : déconnecté partout": "Admin: signed out everywhere",
+ "Nom de la configuration": "Configuration name",
+ "Configuration « {0} » enregistrée": "Configuration “{0}” saved",
+ "Configuration appliquée": "Configuration applied",
+ "Configurations réutilisables": "Reusable configurations",
+ "Enregistrer la configuration": "Save the configuration",
+ "{0} réglage(s)": "{0} setting(s)",
+ "Appareil configuré posé": "Configured device placed",
+ "Poser une copie": "Place a copy",
+ "Aucune configuration de ce type dans la bibliothèque du studio.": "No configuration of this type in the studio library.",
 }
 export default EN

@@ -243,6 +243,7 @@ function Details({ a, all, tags, update, canEdit, me, connected, rev }: { a: Act
       {schema.length > 0 ? <div className="ofields">{schema.map((s: any) => <Field key={`${s.key}:${tick}:${rev}`} s={s} value={values?.[s.key]} disabled={dis} onSet={v => setOpt(s.key, v)} />)}</div>
         : <p className="small muted">{liveErr || (connected ? tr("Lecture des options dans UEFN…") : tr("Options disponibles quand UEFN est connecté."))}</p>}
     </section>}
+    {(a.type === 'device' || isVerse) && <Configs a={a} values={live?.values} isVerse={isVerse} canEdit={!dis} onApplied={() => setTick(t => t + 1)} />}
     {(a.type === 'device' || isVerse) && a.events.length > 0 && <section><div className="dsec" style={{ marginTop: 0 }}>{tr("Liens d’événements (qui déclenche quoi)")}</div>
       <div className="list">{a.events.map((e, i) => (
         <div key={i} className="li"><Link2 size={15} /><span style={{ flex: 1 }}><span className="mono small">{e.event}</span> → <b style={{ fontWeight: 500 }}>{all.find(x => x.id === e.target)?.name ?? e.target}</b>.<span className="mono small">{e.function}</span></span>
@@ -441,4 +442,30 @@ export function UefnLinkSettings() {
       <Journal st={st} task={task} setTask={setTask} tasks={tasks ?? []} act={act} reload={reload} />
     </section>
   </div>
+}
+
+/** Configurations d'appareils réutilisables (#89) : enregistrer les réglages de cet appareil, appliquer une
+ * configuration du même type, ou poser une copie déjà configurée. Journalisé et annulable. */
+function Configs({ a, values, isVerse, canEdit, onApplied }: { a: Actor; values?: Record<string, any>; isVerse: boolean; canEdit: boolean; onApplied: () => void }) {
+  const { map, studio, toast } = useApp()
+  const { data, reload } = useLoad<any[]>(studio ? `/api/studios/${studio.id}/device-configs` : null, [studio?.id])
+  const memes = (data ?? []).filter(c => c.class === a.class)
+  const enregistrer = async () => {
+    const name = prompt(tr("Nom de la configuration"), a.name)
+    if (!name) return
+    try {
+      await api.post(`/api/maps/${map!.id}/device-configs`, { actor_id: a.id, name, ...(values ? (isVerse ? { props: values } : { options: values }) : {}) })
+      toast(tr("Configuration « {0} » enregistrée", [name])); reload()
+    } catch (e: any) { toast(e.message, true) }
+  }
+  const agir = async (url: string, body: any, ok: string) => { try { await api.post(url, body); toast(ok); onApplied() } catch (e: any) { toast(e.message, true) } }
+  return <section><div className="dsec" style={{ marginTop: 0 }}>{tr("Configurations réutilisables")}</div>
+    {canEdit && <button className="btn" onClick={enregistrer}>{tr("Enregistrer la configuration")}</button>}
+    {memes.length > 0 && <div className="list" style={{ marginTop: 8 }}>{memes.map(c => (
+      <div key={c.id} className="li"><span style={{ flex: 1 }}><b style={{ fontWeight: 500 }}>{c.name}</b>{c.description && <span className="small muted"> · {c.description}</span>}<br /><span className="small muted">{tr("{0} réglage(s)", [Object.keys(c.options).length + Object.keys(c.props).length])}</span></span>
+        {canEdit && <><button className="btn" onClick={() => agir(`/api/maps/${map!.id}/device-configs/${c.id}/apply`, { ids: [a.id] }, tr("Configuration appliquée"))}>{tr("Appliquer")}</button>
+          <button className="btn" onClick={() => agir(`/api/maps/${map!.id}/device-configs/${c.id}/place`, { location: a.transform.location.map((v, i) => i === 0 ? v + 300 : v), folder: a.folder || undefined }, tr("Appareil configuré posé"))}>{tr("Poser une copie")}</button></>}
+      </div>))}</div>}
+    {memes.length === 0 && <p className="small muted">{tr("Aucune configuration de ce type dans la bibliothèque du studio.")}</p>}
+  </section>
 }
