@@ -44,6 +44,7 @@ mod mail;
 mod manage;
 mod mcp;
 mod mcp_sse;
+mod messages;
 mod model;
 mod money;
 mod oauth;
@@ -673,6 +674,14 @@ fn api() -> Router<AppState> {
         .route("/api/maps/{mid}/agents", get(agents::list))
         .route("/api/maps/{mid}/resumes", get(resume::route))
         .route("/api/maps/{mid}/agents/activity", get(agents::activite))
+        .route(
+            "/api/maps/{mid}/agents/messages",
+            post(messages::route_equipe),
+        )
+        .route(
+            "/api/maps/{mid}/agents/{aid}/messages",
+            get(messages::route_fil).post(messages::route_ecrire),
+        )
         .route(
             "/api/maps/{mid}/agents/{aid}/mode",
             post(agents::route_mode),

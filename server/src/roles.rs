@@ -34,6 +34,8 @@ const COMMUNS: &[&str] = &[
     "list_device_configs",
     "search_devices",
     "device_graph",
+    "read_messages",
+    "send_message",
 ];
 
 /// Ce qu'un agent fait de ses tâches : réserver, passer en cours ou fini, signaler un problème par une tâche.

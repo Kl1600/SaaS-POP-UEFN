@@ -1343,4 +1343,10 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 .aistep .aiurl-v{display:block;margin-top:8px;word-break:break-all}
 .aistep pre.report{margin:8px 0 0;font-size:12px}
 .aistep .aiwait{margin-top:8px}
+/* Discussion avec une IA dans Forge (#381). */
+.forge-fil{display:flex;flex-direction:column;gap:8px;border:1px solid var(--border);border-radius:12px;padding:10px}
+.forge-fil-liste{display:flex;flex-direction:column;gap:8px;max-height:320px;overflow:auto}
+.forge-bulle{align-self:flex-end;max-width:80%;padding:8px 12px;border-radius:12px;background:var(--text);color:var(--surface);white-space:pre-wrap;line-height:1.4}
+.forge-bulle .muted{color:inherit;opacity:.7}
+.forge-bulle.ia{align-self:flex-start;background:var(--hover);color:var(--text)}
 }
