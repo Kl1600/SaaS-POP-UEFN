@@ -31,11 +31,24 @@ const analyseItems = (): Item[] => [
   ['/analyse/a-faire', tr("Maps à faire"), Target],
 ]
 
+function useMq(q: string) {
+  const [m, setM] = useState(() => window.matchMedia(q).matches)
+  useEffect(() => { const mq = window.matchMedia(q); const h = () => setM(mq.matches); mq.addEventListener('change', h); return () => mq.removeEventListener('change', h) }, [q])
+  return m
+}
+
 export default function Layout() {
   const app = useApp()
   const loc = useLocation()
   const nav = useNav()
-  const [collapsed, setCollapsed] = useState(false)
+  // Téléphone et tablette (#360) : la barre reste à gauche, repliée en icônes ; sur téléphone elle s'ouvre par-dessus.
+  const phone = useMq('(max-width:760px)')
+  const tablet = useMq('(max-width:1024px)')
+  const [collapsed, setCollapsed] = useState(() => window.matchMedia('(max-width:1024px)').matches)
+  const [drawer, setDrawer] = useState(false)
+  useEffect(() => { setCollapsed(tablet) }, [tablet])
+  useEffect(() => { setDrawer(false) }, [loc.pathname, phone])
+  const rail = phone ? !drawer : collapsed
   const [acct, setAcct] = useState(false)
   const acctBox = useOutside(acct, () => setAcct(false))
   const [newTask, setNewTask] = useState(false)
@@ -82,7 +95,8 @@ export default function Layout() {
   const allMaps = app.me?.studios.flatMap(s => s.maps.map(m => ({ s, m }))) ?? []
 
   return (
-    <div className={'app' + (collapsed ? ' collapsed' : '') + (app.dark ? ' dark' : '')}>
+    <div className={'app' + (rail ? ' collapsed' : '') + (phone && drawer ? ' drawer-open' : '') + (app.dark ? ' dark' : '')}>
+      {phone && drawer && <div className="side-scrim" onClick={() => setDrawer(false)} aria-hidden="true" />}
       <a href="#contenu" className="skip">{tr("Aller au contenu")}</a>
       <aside className="side">
         <div className="brand"><img src="/logo.png" alt="POP" /></div>
@@ -128,7 +142,7 @@ export default function Layout() {
       </aside>
       <div className="main">
         <header className="top">
-          <button className="iconbtn" aria-label={tr("Replier la barre latérale")} onClick={() => setCollapsed(c => !c)}><PanelLeft size={20} strokeWidth={1.5} /></button>
+          <button className="iconbtn" aria-label={tr("Replier la barre latérale")} onClick={() => phone ? setDrawer(d => !d) : setCollapsed(c => !c)}><PanelLeft size={20} strokeWidth={1.5} /></button>
           <nav className="crumb" aria-label={tr("Fil d'Ariane")}><span>{group}</span><span>/</span>{title}</nav>
           <button className={'upill ' + uefn.status} onClick={() => nav('/parametres?onglet=uefn')} title={uefn.project ? tr("Projet {0}", [uefn.project]) : 'UEFN Link'}><span className="udot" />{STATUS_LABEL[uefn.status]}{uefn.stale ? ` · ${tr("périmé")}` : ''}{uefn.pending ? ` · ${uefn.pending}` : ''}</button>
           <AiPill />

@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-25 · #360 · barre latérale à gauche sur téléphone et tablette
+- Fait : ≤ 1024 px la barre est repliée en icônes par défaut (dépliable) ; ≤ 760 px elle reste à gauche en rail de 60 px (plus de barre en haut), le bouton « Replier » l'ouvre par-dessus la page avec un fond assombri, fermée en touchant à côté ou en changeant de page (useMq dans Layout.tsx). L'avatar du compte reste visible ≤ 900 px ; barre du haut sans retour à la ligne sur téléphone.
+- Vérifié : navigateur 390, 820 et 1440 px.
+
 ### 2026-11-24 · #316 · Analyse : salon « Maps à faire »
 - Fait : Analyse n'a plus qu'une entrée dans la barre (« Maps à faire », /analyse/a-faire) ; les pages détaillées restent joignables par un lien en bas du salon. Premier passage : 4 sources facultatives (YouTube, TikTok, X, Reddit) puis « Passer » (mémorisé par compte, localStorage) ; dans le salon, une ligne « Sources » toujours visible, chaque source connectable seule à tout moment (vert connecté, rouge erreur avec le message en info-bulle). Liste : rang, type de map, une phrase, concurrence, « Voir » (exemple qui marche). Reprise du début de travail d'une autre session.
 - Vérifié : navigateur 1440 et 390 px, connexions X et Reddit contre des serveurs simulés.
