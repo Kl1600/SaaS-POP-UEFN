@@ -344,7 +344,7 @@ pub async fn liste(
 ) -> ApiResult<Value> {
     map_ctx(&st, &u, mid).await?;
     let page = q.page.unwrap_or(1).max(1);
-    let rows: Vec<LigneRun> = sqlx::query_as(&format!(
+    let rows: Vec<LigneRun> = sqlx::query_as(crate::sql!(
         "SELECT {COLONNES} FROM ci_runs r LEFT JOIN tasks t ON t.id = r.task_id WHERE r.map_id = ?
            AND (? IS NULL OR r.branch = ?) AND (? IS NULL OR r.status = ? OR r.conclusion = ?)
          ORDER BY r.github_id DESC LIMIT 50 OFFSET ?"
@@ -371,7 +371,7 @@ pub async fn detail(
 ) -> ApiResult<Value> {
     map_ctx(&st, &u, mid).await?;
     let r: Option<LigneRun> =
-        sqlx::query_as(&format!("SELECT {COLONNES} FROM ci_runs r LEFT JOIN tasks t ON t.id = r.task_id WHERE r.id = ? AND r.map_id = ?"))
+        sqlx::query_as(crate::sql!("SELECT {COLONNES} FROM ci_runs r LEFT JOIN tasks t ON t.id = r.task_id WHERE r.id = ? AND r.map_id = ?"))
             .bind(id)
             .bind(mid)
             .fetch_optional(&st.db)
@@ -396,7 +396,7 @@ pub async fn de_la_tache(
     Path((mid, n)): Path<(i64, i64)>,
 ) -> ApiResult<Value> {
     map_ctx(&st, &u, mid).await?;
-    let r: Option<LigneRun> = sqlx::query_as(&format!(
+    let r: Option<LigneRun> = sqlx::query_as(crate::sql!(
         "SELECT {COLONNES} FROM ci_runs r JOIN tasks t ON t.id = r.task_id WHERE r.map_id = ? AND t.number = ? ORDER BY r.github_id DESC LIMIT 1"
     ))
     .bind(mid)
