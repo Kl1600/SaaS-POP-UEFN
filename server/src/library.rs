@@ -27,6 +27,33 @@ pub const CATEGORIES: &[&str] = &[
 ];
 const MAX_CONTENU: usize = 200_000;
 
+/// Modules de l'équipe POP (#87, #88) : visibles par tous les studios, en lecture seule, avec un identifiant négatif
+/// (-1, -2…) pour ne jamais se mêler aux modules d'un studio. Le code est dans `server/library/`.
+/// (nom, catégorie, notice, appareils requis, code)
+pub const POP: &[(&str, &str, &str, &[&str], &str)] = &[
+    ("Économie (POP)", "economie",
+     "Un solde de pièces par joueur. Un bouton fait gagner Gain pièces ; un autre achète un objet : s'il reste assez de pièces, Prix est retiré et le distributeur donne l'objet, sinon le message dit combien il manque. Depuis votre Verse : Ajouter(Joueur, 25), Solde(Joueur) et if (Depenser[Joueur, 50]). Les soldes repartent à zéro à chaque partie (sauvegarde : module Sauvegarde).",
+     &["button_device (gain, facultatif)", "button_device (achat, facultatif)", "item_granter_device (objet acheté)", "hud_message_device (solde à l'écran)"],
+     include_str!("../library/economie.verse")),
+    ("Équipes (POP)", "equipes",
+     "Chaque joueur qui arrive rejoint l'équipe la moins nombreuse ; au début de la partie, tous les joueurs présents sont répartis. Le nombre d'équipes se règle dans les Réglages de l'île. Option Actif : désactiver pour garder les équipes de l'île. Depuis votre Verse : NombreDans(Equipe) et Equilibrer().",
+     &[],
+     include_str!("../library/equipes.verse")),
+    ("Minuteur (POP)", "minuteur",
+     "Compte à rebours en mm:ss affiché à tous les joueurs, lancé par un bouton ou dès le début (DemarrerSeul). À zéro, il envoie FinEvent à votre Verse et, si TerminerLaPartie est coché, termine la partie. Depuis votre Verse : Lancer(), Arreter() et FinEvent.Await().",
+     &["button_device (départ, facultatif)", "hud_message_device (affichage)", "end_game_device (fin de partie, facultatif)"],
+     include_str!("../library/minuteur.verse")),
+];
+
+fn pop_fiche(i: usize, avec_code: bool) -> Value {
+    let (nom, cat, notice, appareils, code) = POP[i];
+    let mut v = json!({ "id": -(i as i64) - 1, "name": nom, "category": cat, "description": notice, "devices": appareils, "version": 1, "author": "Équipe POP", "official": true });
+    if avec_code {
+        v["content"] = json!(code);
+    }
+    v
+}
+
 #[derive(Deserialize, Default)]
 pub struct SearchQ {
     pub q: Option<String>,
@@ -44,14 +71,32 @@ pub async fn search(st: &AppState, studio_id: i64, q: &SearchQ) -> Result<Vec<Va
     )
     .bind(studio_id).bind(&texte).bind(&texte).bind(&cat).bind(&cat)
     .fetch_all(&st.db).await?;
-    Ok(rows
+    let texte = texte.trim_matches('%').to_string();
+    let mut out: Vec<Value> = (0..POP.len())
+        .filter(|&i| {
+            (cat.is_empty() || POP[i].1 == cat)
+                && (texte.is_empty()
+                    || POP[i].0.to_lowercase().contains(&texte)
+                    || POP[i].2.to_lowercase().contains(&texte))
+        })
+        .map(|i| pop_fiche(i, false))
+        .collect();
+    out.extend(rows
         .into_iter()
-        .map(|r| json!({ "id": r.0, "name": r.1, "category": r.2, "description": r.3, "devices": serde_json::from_str::<Value>(&r.4).unwrap_or(json!([])), "version": r.5, "author": r.6, "updated_at": r.7 }))
-        .collect())
+        .map(|r| json!({ "id": r.0, "name": r.1, "category": r.2, "description": r.3, "devices": serde_json::from_str::<Value>(&r.4).unwrap_or(json!([])), "version": r.5, "author": r.6, "updated_at": r.7 })));
+    Ok(out)
 }
 
 /// Un module complet (avec le code), s'il appartient au studio donné.
 pub async fn module(st: &AppState, studio_id: i64, id: i64) -> Result<Value, AppError> {
+    if id < 0 {
+        let i = (-id - 1) as usize;
+        return if i < POP.len() {
+            Ok(pop_fiche(i, true))
+        } else {
+            Err(AppError::NotFound)
+        };
+    }
     let r: Option<(i64, String, String, String, String, String, i64, Option<String>, String)> = sqlx::query_as(
         "SELECT v.id, v.name, v.category, v.description, v.content, v.devices, v.version, u.name, v.updated_at FROM verse_modules v LEFT JOIN users u ON u.id = v.author_id WHERE v.id = ? AND v.studio_id = ?",
     )
@@ -81,6 +126,9 @@ pub async fn list(
 }
 
 pub async fn get(State(st): State<AppState>, u: AuthUser, Path(id): Path<i64>) -> ApiResult<Value> {
+    if id < 0 {
+        return Ok(Json(module(&st, 0, id).await?));
+    }
     let sid = studio_of(&st, id).await?;
     studio_role(&st, &u, sid).await?;
     Ok(Json(module(&st, sid, id).await?))
@@ -261,7 +309,13 @@ mod tests {
         )
         .await
         .unwrap();
-        assert_eq!(l.as_array().unwrap().len(), 1);
+        let l: Vec<&Value> = l
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|m| m["official"] != true)
+            .collect();
+        assert_eq!(l.len(), 1, "module du studio (les modules POP sont à part)");
         assert!(
             l[0].get("content").is_none(),
             "la liste ne renvoie pas le code"
@@ -292,7 +346,13 @@ mod tests {
         )
         .await
         .unwrap();
-        assert_eq!(vide.as_array().unwrap().len(), 0);
+        assert!(
+            vide.as_array()
+                .unwrap()
+                .iter()
+                .all(|m| m["official"] == true),
+            "un autre studio ne voit que les modules de l'équipe POP"
+        );
 
         // Modification : la version monte ; nom en double refusé ; catégorie inconnue refusée.
         let Json(u) = update(
@@ -340,5 +400,46 @@ mod tests {
             .await
             .unwrap();
         assert!(get(State(st.clone()), m.clone(), Path(id)).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn modules_de_l_equipe_pop() {
+        let st = crate::test_state().await;
+        let sid: i64 = sqlx::query_scalar("INSERT INTO studios (name) VALUES ('S') RETURNING id")
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        let l = search(&st, sid, &SearchQ::default()).await.unwrap();
+        assert!(
+            l.len() >= 3
+                && l.iter()
+                    .take(3)
+                    .all(|m| m["official"] == true && m.get("content").is_none()),
+            "{l:?}"
+        );
+        let eco = search(
+            &st,
+            sid,
+            &SearchQ {
+                q: Some("pièces".into()),
+                category: None,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(eco[0]["name"], "Économie (POP)");
+        let m = module(&st, sid, -3).await.unwrap();
+        assert!(m["content"]
+            .as_str()
+            .unwrap()
+            .contains("minuteur_pop := class(creative_device)"));
+        assert!(module(&st, sid, -99).await.is_err());
+        for (_, _, notice, _, code) in POP {
+            assert!(
+                notice.len() > 80
+                    && code.contains("creative_device")
+                    && code.contains("using { /Fortnite.com/Devices }")
+            );
+        }
     }
 }
