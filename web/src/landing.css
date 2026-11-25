@@ -253,3 +253,19 @@
 @media (max-width:1100px){.lmega-cols{grid-template-columns:repeat(2,1fr)}}
 .lp .lfeat[id],.lp #ia{scroll-margin-top:90px}
 .lp[dir=rtl] .lmega-foot a svg{transform:scaleX(-1)}
+/* Version simple (#362) : fonctions en liste courte, comparatif replié. */
+.lsimple{max-width:760px;margin:0 auto;display:flex;flex-direction:column;border:1px solid var(--line);border-radius:20px;overflow:hidden;background:var(--bg2)}
+.lsimple-row{display:flex;gap:18px;align-items:flex-start;padding:22px 26px;border-top:1px solid var(--line)}
+.lsimple-row:first-child{border-top:0}
+.lsimple-row h3{margin:0 0 4px;font-size:18px;font-weight:600}
+.lsimple-row p{margin:0;color:var(--t2);line-height:1.55}
+.lsimple-ic{flex:none;width:42px;height:42px;border-radius:12px;display:grid;place-items:center;border:1px solid var(--line2);color:var(--t1)}
+.lsimple-row.ai .lsimple-ic{color:#ED753E;border-color:rgba(237,117,62,.4)}
+.ltable-wrap{max-width:900px;margin:28px auto 0}
+.ltable-wrap summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;color:var(--t2);font-size:15px;padding:10px}
+.ltable-wrap summary::-webkit-details-marker{display:none}
+.ltable-wrap[open] summary svg{transform:rotate(180deg)}
+.ltable-wrap .ltable{margin-top:12px}
+.lbtn.ghost{background:transparent;border-color:transparent;color:var(--t2)}
+.lbtn.ghost:hover{color:var(--t1)}
+@media (max-width:640px){.lsimple-row{padding:18px;gap:14px}}

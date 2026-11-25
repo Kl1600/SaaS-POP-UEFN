@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-25 · #362 · site vitrine simple et hiérarchisé
+- Fait : Landing.tsx : nav sans méga-menu ; hero avec un seul bouton principal (« Voir les fonctionnalités » en lien discret), sans ligne « micro » ; retirés : bandeau de logos, bloc avant/après, chiffres, grandes captures alternées et listes à puces ; fonctions en liste courte (icône, titre, première phrase seulement, fonction first()) avec l'IA en dernière ligne ; tarifs en 2 cartes, comparatif replié (<details>) ; FAQ toute repliée. Capture de l'app : menus actuels (fr, en). Les textes inutilisés restent dans les dictionnaires.
+- Vérifié : navigateur 1440 et 390 px.
+
 ### 2026-11-25 · #360 · barre latérale à gauche sur téléphone et tablette
 - Fait : ≤ 1024 px la barre est repliée en icônes par défaut (dépliable) ; ≤ 760 px elle reste à gauche en rail de 60 px (plus de barre en haut), le bouton « Replier » l'ouvre par-dessus la page avec un fond assombri, fermée en touchant à côté ou en changeant de page (useMq dans Layout.tsx). L'avatar du compte reste visible ≤ 900 px ; barre du haut sans retour à la ligne sur téléphone.
 - Vérifié : navigateur 390, 820 et 1440 px.
