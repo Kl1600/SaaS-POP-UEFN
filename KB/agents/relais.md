@@ -73,3 +73,11 @@ Fait : Forge sans Pro = relais (écrans Pro en carte), « Créer les maps et rel
 Reste : rien
 Bloque : rien
 ```
+
+```
+FAIT | #410 Forge : une console noire s'ouvre et se ferme toutes les 5 s (tasklist) | 26/11 19:30
+Owner : benybens | Sur la tâche : Claude Code, pour benybens
+Fait : pop_link::commande() = CREATE_NO_WINDOW (tasklist, lore_cmd) ; tasklist en CSV (nom coupé à 25 car.) ; 5 fenêtres → 0 mesuré sur le PC
+Reste : rien
+Bloque : rien
+```
