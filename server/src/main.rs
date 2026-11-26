@@ -328,6 +328,7 @@ fn api() -> Router<AppState> {
         .route("/api/maps/{mid}/search", get(account::search))
         .route("/api/billing", get(stripe::status))
         .route("/api/forge/download", get(billing::forge_download))
+        .route("/api/forge/latest", get(billing::forge_latest))
         .route("/api/billing/checkout", post(stripe::checkout))
         .route("/api/billing/portal", post(stripe::portal))
         .route(

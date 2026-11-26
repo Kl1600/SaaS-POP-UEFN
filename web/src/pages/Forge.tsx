@@ -118,6 +118,7 @@ export default function Forge() {
         <button className="iconbtn" aria-label={app.dark ? tr("Thème clair") : tr("Thème sombre")} onClick={app.toggleDark}>{app.dark ? <Sun size={20} strokeWidth={1.5} /> : <Moon size={20} strokeWidth={1.5} />}</button>
       </div>
       <main className="content" style={{ padding: '40px 28px', width: '100%', maxWidth: 920, margin: '0 auto', boxSizing: 'border-box' }}>
+        <MajForge invoke={invoke} />
         {app.map && section !== 'reglages' && !reserve && <Bandeau mapId={app.map.id} etat={etat} aller={setSection} />}
         {reserve ? <ForgePro />
           : section === 'accueil' ? <Accueil invoke={invoke} etat={etat} liaison={liaison} relie={relie} relire={lire} />
@@ -464,6 +465,30 @@ function ForgePro() {
       <button className="btn" onClick={() => app.reload()}>{tr("J’ai changé d’abonnement")}</button>
     </div>
     <p className="small muted" style={{ marginBottom: 0 }}>{tr("Ces écrans se débloquent tout seuls dès que l’abonnement est actif.")}</p>
+  </div>
+}
+
+/** Mise à jour de Forge (#79) : vérifiée au lancement puis toutes les 6 h ; installée en un clic, signature vérifiée
+ * par Forge. Une Forge d'avant #79 n'a pas la commande : rien ne s'affiche. */
+function MajForge({ invoke }: { invoke: Invoke }) {
+  const [maj, setMaj] = useState<{ version: string; notes?: string } | null>(null)
+  const [plusTard, setPlusTard] = useState(false)
+  const [occupe, setOccupe] = useState(false)
+  const [erreur, setErreur] = useState('')
+  useEffect(() => {
+    const verifier = () => invoke<{ version: string; notes?: string } | null>('maj_verifier').then(setMaj).catch(() => {})
+    verifier(); const t = setInterval(verifier, 6 * 3600 * 1000); return () => clearInterval(t)
+  }, [invoke])
+  if (!maj || plusTard) return null
+  const installer = async () => {
+    setOccupe(true); setErreur('')
+    try { await invoke('maj_installer') } catch (e: any) { setErreur(String(e)); setOccupe(false) }
+  }
+  return <div className="warn" role="status" style={{ marginBottom: 18, flexWrap: 'wrap' }}>
+    <RefreshCw size={18} strokeWidth={1.5} />
+    <span style={{ flex: 1 }}>{tr("Nouvelle version de Forge : {0}. Elle s’installe en un clic, puis Forge redémarre.", [maj.version])}{erreur && <span className="err small" style={{ display: 'block' }}>{erreur}</span>}</span>
+    <button className="btn pri" disabled={occupe} onClick={installer}>{occupe ? tr("Mise à jour…") : tr("Mettre à jour")}</button>
+    {!occupe && <button className="btn" onClick={() => setPlusTard(true)}>{tr("Plus tard")}</button>}
   </div>
 }
 
