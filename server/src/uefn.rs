@@ -772,7 +772,8 @@ pub struct Origin<'a> {
 fn role_for(action: &str) -> Role {
     match action {
         "actor_delete" | "delete_file" | "asset_delete" => Role::Member,
-        "refresh_actors" | "render_topview" | "session_output" | "island_settings" => Role::Viewer,
+        "refresh_actors" | "render_topview" | "session_output" | "island_settings"
+        | "actor_select" => Role::Viewer,
         _ => Role::Freelance,
     }
 }
@@ -1507,6 +1508,21 @@ async fn prepare(
         }
         "refresh_actors" => Ok(("Actualisation des acteurs".into(), Value::Null, None)),
         "render_topview" => Ok(("Rendu de la vue du dessus".into(), Value::Null, None)),
+        // « Voir dans l'Organiseur » (#97) : sélection dans UEFN, rien n'est modifié.
+        "actor_select" => {
+            let ids = args["ids"].as_array().map(|v| v.len()).unwrap_or(0);
+            if ids == 0
+                || ids > 50
+                || args["ids"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|x| !x.is_string())
+            {
+                return Err(bad("Acteurs à sélectionner manquants."));
+            }
+            Ok(("Sélection dans UEFN".into(), Value::Null, None))
+        }
         _ => Err(bad("Action inconnue.")),
     }
 }
@@ -1522,10 +1538,12 @@ pub async fn exec(
     let mid = o.ctx.map_id;
     let journal = !matches!(
         action,
-        "refresh_actors" | "render_topview" | "session_output" | "island_settings"
+        "refresh_actors" | "render_topview" | "session_output" | "island_settings" | "actor_select"
     );
     // La session de test ne se met pas en attente : sans UEFN, rien n'est envoyé (#82).
-    if matches!(action, "start_session" | "stop_session") && !ready(st, mid, action) {
+    if matches!(action, "start_session" | "stop_session" | "actor_select")
+        && !ready(st, mid, action)
+    {
         return Err(AppError::Conflict(
             "UEFN n’est pas connecté : ouvrez le projet dans UEFN et démarrez son serveur MCP, puis réessayez.".into(),
         ));

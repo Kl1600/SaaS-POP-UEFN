@@ -571,6 +571,22 @@ impl Mcp {
         Ok(serde_json::from_str(line.trim()).unwrap_or_default())
     }
 
+    /// Sélectionne des acteurs dans UEFN et place la caméra dessus (« Voir dans l'Organiseur », #97).
+    /// Ne modifie rien dans le niveau. Renvoie le nombre d'acteurs trouvés.
+    pub async fn select(&mut self, ids: &[String]) -> Result<usize> {
+        let code = format!("IDS = {}\n{}", serde_json::to_string(ids)?, PY_SELECT);
+        let out = self.python(&code).await?;
+        let n = out
+            .lines()
+            .rev()
+            .find_map(|l| l.trim().strip_prefix("SEL=").and_then(|x| x.parse().ok()))
+            .unwrap_or(0);
+        if n == 0 {
+            bail!("Acteur introuvable dans le niveau ouvert dans UEFN.");
+        }
+        Ok(n)
+    }
+
     /// Supprime des acteurs et renvoie leur sauvegarde (texte T3D, en base64) pour pouvoir les recréer.
     /// Une suppression faite par Python n'entre pas dans l'historique d'annulation d'UEFN : sans cette
     /// sauvegarde, elle serait définitive.
@@ -1330,6 +1346,23 @@ while reste:
     if len(apres) == len(reste): raise Exception('UEFN refuse de retirer : ' + ', '.join(reste[:5]))
     reste = apres
 print('DELETED')
+"#;
+
+const PY_SELECT: &str = r#"import unreal
+sub = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+targets = [a for a in sub.get_all_level_actors() if a.get_path_name() in IDS]
+sub.set_selected_level_actors(targets)
+if targets:
+    # Caméra placée devant le premier acteur, à une distance qui dépend de sa taille.
+    try:
+        origin, extent = targets[0].get_actor_bounds(False)
+        d = max(extent.x, extent.y, extent.z, 100.0) * 3.0
+        cam = origin + unreal.Vector(-d, -d * 0.5, d * 0.6)
+        rot = unreal.MathLibrary.find_look_at_rotation(cam, origin)
+        unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).set_level_viewport_camera_info(cam, rot)
+    except Exception:
+        pass
+print('SEL=%d' % len(targets))
 "#;
 
 const PY_DUP: &str = r#"import unreal, json
