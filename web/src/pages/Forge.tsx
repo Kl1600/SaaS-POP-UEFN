@@ -4,7 +4,7 @@
 // « Ouvrir POP » et « Voir dans POP » ouvrent le site dans le navigateur (Forge y renvoie toute page autre que /forge).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, Bot, Building2, Check, ChevronsUpDown, ExternalLink, Home, Library, Minus, Moon, RefreshCw, ShieldCheck, Square, Sun, User, Wrench, X } from 'lucide-react'
+import { Bell, Bot, Building2, Check, ChevronsUpDown, ExternalLink, Home, Library, Minus, Moon, RefreshCw, ShieldCheck, Grid3x3, Square, Sun, User, Wrench, X } from 'lucide-react'
 import LangPicker from '../components/LangPicker'
 import { ForgeAgents } from '../components/ForgeAgents'
 import { Selecteur } from '../components/Selecteur'
@@ -16,6 +16,7 @@ import { ForgeVerse } from '../components/ForgeVerse'
 import { ForgeVerifications } from '../components/ForgeVerifications'
 import { ForgeScenarios } from '../components/ForgeScenarios'
 import { ForgeAssistant } from '../components/ForgeAssistant'
+import Plan2D from './Plan2D'
 import { cssRect } from '../zoom'
 
 type Invoke = <T = any>(cmd: string, args?: Record<string, unknown>) => Promise<T>
@@ -24,12 +25,13 @@ const forgeInvoke = (): Invoke | null => {
   return w.__TAURI__?.core?.invoke ?? w.__TAURI_INTERNALS__?.invoke ?? null
 }
 type Liaison = { projet: string; map: string; serveur: string; liens?: { projet: string; map: string }[] } | null
-type Section = 'accueil' | 'agents' | 'verifier' | 'bibliotheque' | 'outils' | 'reglages'
+type Section = 'accueil' | 'agents' | 'verifier' | 'plan' | 'bibliotheque' | 'outils' | 'reglages'
 
 const SECTIONS: [Section, string, any][] = [
   ['accueil', tr("Accueil"), Home],
   ['agents', tr("Agents"), Bot],
   ['verifier', tr("Vérifications"), ShieldCheck],
+  ['plan', tr("Plan 2D"), Grid3x3],
   ['bibliotheque', tr("Bibliothèque"), Library],
   ['outils', tr("Outils"), Wrench],
 ]
@@ -122,6 +124,7 @@ export default function Forge() {
           : section === 'reglages' ? <Reglages />
           : section === 'agents' ? (app.map ? <ForgeAgents mapId={app.map.id} tache={app.map.id === lien.map ? lien.tache : null} invoke={invoke} /> : <p className="muted">{tr("Choisissez une map.")}</p>)
           : section === 'verifier' ? (app.map ? <div className="stack" style={{ gap: 18 }}><ForgeVerifications mapId={app.map.id} ouvrir={ouvrirPOP} /><ForgeScenarios mapId={app.map.id} capturer={() => captureJeu(invoke)} /></div> : <p className="muted">{tr("Choisissez une map.")}</p>)
+          : section === 'plan' ? (app.map ? <Plan2D /> : <p className="muted">{tr("Choisissez une map.")}</p>)
           : section === 'bibliotheque' ? <Bibliotheque mapId={app.map?.id ?? null} studioId={app.studio?.id ?? null} />
             : <AVenir section={section} titre={titre ?? ''} />}
       </main>

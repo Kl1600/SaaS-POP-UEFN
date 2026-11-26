@@ -2,7 +2,7 @@ import { OuvrirForge } from './OuvrirForge'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import { Target,
-  Home, FileText, PenTool, Grid3x3, CalendarDays, KanbanSquare, Rocket, Coins, Users, Settings, LifeBuoy, PanelLeft,
+  Home, FileText, PenTool, CalendarDays, KanbanSquare, Rocket, Coins, Users, Settings, LifeBuoy, PanelLeft,
   Search, Bell, Plus, ChevronDown, Hexagon, LogOut, ListTree, Bot, ChartNoAxesCombined, Layers, Lock, Sun, Moon } from 'lucide-react'
 import { useApp, studioName } from '../state'
 import { ago, api } from '../api'
@@ -23,7 +23,7 @@ type Item = [string, string, any]
 const mapGroups = (mid: number): [string, Item[]][] => [
   ['', [[`/map/${mid}`, tr("Dashboard"), Home]]],
   [tr("Organiser"), [[`/map/${mid}/planifier`, tr("Planifier"), CalendarDays], [`/map/${mid}/taches`, tr("Tâches"), KanbanSquare]]],
-  [tr("Créer"), [[`/map/${mid}/pages`, tr("Pages"), FileText], [`/map/${mid}/tableau`, tr("Tableau blanc"), PenTool], [`/map/${mid}/plan2d`, tr("Plan 2D"), Grid3x3]]],
+  [tr("Créer"), [[`/map/${mid}/pages`, tr("Pages"), FileText], [`/map/${mid}/tableau`, tr("Tableau blanc"), PenTool]]],
   [tr("Publier"), [[`/map/${mid}/lancer`, tr("Lancer et suivre"), Rocket], [`/map/${mid}/remunerer`, tr("Rémunérer"), Coins]]],
 ]
 /** Catégorie Analyse (plan du compte). */
