@@ -543,6 +543,19 @@ impl Link {
 /// « périmé » dans POP. 1 = relais d'avant #158, qui n'annonce rien.
 pub const PROTO: u32 = 2;
 
+/// Application qui fait tourner le relais, annoncée au serveur dans `hello` (#404) : « pop-link » par défaut,
+/// « forge » quand POP Forge l'a dit avec `set_app`. POP sait ainsi qu'un ancien pop-link.exe est encore utilisé.
+static APP: std::sync::OnceLock<&'static str> = std::sync::OnceLock::new();
+
+/// À appeler une fois, avant `start`, par l'application qui embarque le relais (POP Forge).
+pub fn set_app(name: &'static str) {
+    let _ = APP.set(name);
+}
+
+pub fn app_name() -> &'static str {
+    APP.get().copied().unwrap_or("pop-link")
+}
+
 /// Types de fichiers qu'on importe dans UEFN (#90).
 pub const IMPORT_EXT: &[&str] = &[
     "fbx", "obj", "png", "jpg", "jpeg", "tga", "wav", "ogg", "mp3",
@@ -787,7 +800,7 @@ async fn session(link: &mut Link) -> Result<()> {
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_default();
     // `proto` (#158) : le serveur sait si ce relais connaît ses actions, sinon POP affiche « relais périmé ».
-    tx.send(json!({ "t": "hello", "project": project_name, "uefn": if link.uefn { "connected" } else { "closed" }, "proto": PROTO }))?;
+    tx.send(json!({ "t": "hello", "project": project_name, "uefn": if link.uefn { "connected" } else { "closed" }, "proto": PROTO, "app": app_name() }))?;
     sync(link, &tx, true).await;
     let mut tick = tokio::time::interval(Duration::from_secs(2));
     let mut n: u64 = 0;
@@ -1060,7 +1073,35 @@ pub async fn auto_pair(emb: &Value) -> Result<()> {
         println!("  · {}", p.display())
     }
     let device = std::env::var("COMPUTERNAME").unwrap_or_else(|_| "PC UEFN".into());
-    let body = json!({ "code": code, "device": device, "projects": projects.iter().map(|p| json!({ "name": p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default() })).collect::<Vec<_>>() });
+    let links = pair_studio(&server, &code, &projects, &device).await?;
+    let n = links.len();
+    let first = links
+        .first()
+        .cloned()
+        .ok_or_else(|| anyhow!("aucun projet relié"))?;
+    save(&Config {
+        server,
+        token: first.token,
+        project: first.project,
+        map: first.map,
+        links,
+        ..Default::default()
+    })?;
+    println!("\nC'est relié : {n} projet(s) synchronisé(s) avec POP.\n");
+    Ok(())
+}
+
+/// Relie plusieurs projets d'un coup à un studio avec un code de studio (`/api/relay/pair-studio`) : POP crée la
+/// map de chaque projet qui n'en a pas (même nom) et rend un jeton par projet. Utilisé par `auto_pair` et par Forge
+/// (« Créer les maps et relier », #404).
+pub async fn pair_studio(
+    server: &str,
+    code: &str,
+    projects: &[PathBuf],
+    device: &str,
+) -> Result<Vec<ProjLink>> {
+    let server = server.trim_end_matches('/');
+    let body = json!({ "code": code.trim(), "device": device, "projects": projects.iter().map(|p| json!({ "name": p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default() })).collect::<Vec<_>>() });
     let r: Value = reqwest::Client::new()
         .post(format!("{server}/api/relay/pair-studio"))
         .json(&body)
@@ -1080,23 +1121,7 @@ pub async fn auto_pair(emb: &Value) -> Result<()> {
             token: l["token"].as_str().unwrap_or("").into(),
         });
     }
-    let first = links
-        .first()
-        .cloned()
-        .ok_or_else(|| anyhow!("aucun projet relié"))?;
-    save(&Config {
-        server,
-        token: first.token,
-        project: first.project,
-        map: first.map,
-        links,
-        ..Default::default()
-    })?;
-    println!(
-        "\nC'est relié : {} projet(s) synchronisé(s) avec POP.\n",
-        list.len()
-    );
-    Ok(())
+    Ok(links)
 }
 
 /// Premier lancement par double-clic : questions simples dans la console.

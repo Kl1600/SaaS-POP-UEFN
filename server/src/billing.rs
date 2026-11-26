@@ -85,8 +85,8 @@ pub async fn require_studio(st: &AppState, sid: i64) -> Result<(), AppError> {
     }
 }
 
-/// Forge (#102) : réservé à l'abonnement Pro (essai compris) et aux administrateurs de la plateforme. Les IA
-/// connectées par MCP au site n'en dépendent pas.
+/// Écrans de construction de Forge (#102) : réservés à l'abonnement Pro (essai compris) et aux administrateurs de
+/// la plateforme. Le relais de Forge et les IA connectées par MCP au site n'en dépendent pas (#404).
 pub async fn has_forge(st: &AppState, uid: i64) -> Result<bool, AppError> {
     Ok(user_analyse(st, uid).await? || crate::admin::is_admin(st, uid).await?)
 }
@@ -101,12 +101,11 @@ pub async fn require_forge(st: &AppState, uid: i64) -> Result<(), AppError> {
 }
 
 /// `GET /api/forge/download` (#80) : dernière version publiée de l'installateur de Forge (fichier construit par le
-/// workflow « relais Windows » dans web/public/downloads). Réservé à qui a Forge (#102).
+/// workflow « relais Windows » dans web/public/downloads). Ouvert à tout compte (#404) : sans Pro, Forge sert de
+/// relais UEFN ; ses écrans de construction restent réservés au Pro.
 pub async fn forge_download(
-    axum::extract::State(st): axum::extract::State<AppState>,
-    u: crate::auth::AuthUser,
+    _u: crate::auth::AuthUser,
 ) -> crate::error::ApiResult<serde_json::Value> {
-    require_forge(&st, u.id).await?;
     let dir = std::path::PathBuf::from(
         std::env::var("POP_WEB_DIR").unwrap_or_else(|_| "../web/dist".into()),
     )

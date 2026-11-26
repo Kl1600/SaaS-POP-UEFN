@@ -1,4 +1,4 @@
-//! Liaison UEFN simplifiée : POP fournit un pop-link.exe personnalisé (adresse + code intégrés).
+//! Liaison UEFN simplifiée : POP Forge relie tous les projets UEFN du PC avec un code de studio (#404).
 //! Au premier lancement, le relais envoie les projets UEFN trouvés sur le PC ; POP crée une map par projet.
 use crate::{
     access::{studio_role, Role},
@@ -8,64 +8,25 @@ use crate::{
 };
 use axum::{
     extract::{Path, State},
-    http::{header, HeaderMap},
-    response::{IntoResponse, Response},
     Json,
 };
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-fn origin(h: &HeaderMap) -> String {
-    if let Ok(u) = std::env::var("POP_PUBLIC_URL") {
-        return u.trim_end_matches('/').to_string();
-    }
-    let host = h
-        .get("x-forwarded-host")
-        .or(h.get("host"))
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("127.0.0.1:8080");
-    let proto = h
-        .get("x-forwarded-proto")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("http");
-    format!("{proto}://{host}")
-}
-
-/// pop-link.exe avec, à la fin du fichier, l'adresse de POP et un code d'appairage valable 24 h.
-pub async fn download(
+/// Code de studio valable 24 h (#404) : POP Forge l'utilise pour créer la map de chaque projet UEFN du PC et les
+/// relier d'un coup (`/api/relay/pair-studio`). Remplace le pop-link.exe « déjà configuré ».
+pub async fn code(
     State(st): State<AppState>,
     u: AuthUser,
     Path(sid): Path<i64>,
-    headers: HeaderMap,
-) -> Result<Response, AppError> {
+) -> ApiResult<Value> {
     if studio_role(&st, &u, sid).await? < Role::Member {
         return Err(AppError::Forbidden);
     }
-    let web = std::env::var("POP_WEB_DIR").unwrap_or_else(|_| "../web/dist".into());
-    let exe = std::fs::read(format!("{web}/downloads/pop-link.exe"))
-        .map_err(|_| AppError::Conflict("pop-link.exe introuvable sur le serveur.".into()))?;
     let code = random_token()[..24].to_string();
     sqlx::query("INSERT INTO studio_pairings (code_hash, studio_id, user_id, expires_at) VALUES (?, ?, ?, datetime('now', '+1 day'))")
         .bind(sha256_hex(&code)).bind(sid).bind(u.id).execute(&st.db).await?;
-    let mut out = exe;
-    out.extend_from_slice(
-        format!(
-            "\n#POPLINK#{}#END#",
-            json!({ "server": origin(&headers), "code": code })
-        )
-        .as_bytes(),
-    );
-    Ok((
-        [
-            (header::CONTENT_TYPE, "application/octet-stream".to_string()),
-            (
-                header::CONTENT_DISPOSITION,
-                "attachment; filename=\"pop-link.exe\"".to_string(),
-            ),
-        ],
-        out,
-    )
-        .into_response())
+    Ok(Json(json!({ "code": code })))
 }
 
 #[derive(Deserialize)]
@@ -86,8 +47,9 @@ pub async fn pair_studio(
     Json(b): Json<PairStudioIn>,
 ) -> ApiResult<Value> {
     let row: Option<(i64, i64)> = sqlx::query_as("SELECT studio_id, user_id FROM studio_pairings WHERE code_hash = ? AND expires_at > datetime('now')").bind(sha256_hex(b.code.trim())).fetch_optional(&st.db).await?;
-    let (sid, uid) =
-        row.ok_or_else(|| bad("Lien expiré : retéléchargez pop-link.exe depuis POP."))?;
+    let (sid, uid) = row.ok_or_else(|| {
+        bad("Code expiré : relancez « Créer les maps et relier » dans POP Forge.")
+    })?;
     if b.projects.is_empty() {
         return Err(bad(
             "Aucun projet UEFN trouvé sur ce PC (Documents\\Fortnite Projects).",

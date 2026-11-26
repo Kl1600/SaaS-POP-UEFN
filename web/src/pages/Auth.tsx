@@ -253,10 +253,10 @@ export function Welcome() {
         <p className="muted" style={{ margin: 0 }}>{tr("Reliez UEFN : POP importe vos projets (une map par projet), leurs fichiers Verse et leurs acteurs, et les garde synchronisés.")}</p>
         <ol className="welcome-steps">
           <li><b>{tr("Sur le PC où UEFN est installé")}</b>{tr(", ouvrez un projet puis : Projet → Paramètres du projet →")}{' '}<b>{tr("Enable Project Python Scripts")}</b>{tr(", et Édition → Préférences de l’éditeur → Model Context Protocol →")}{' '}<b>{tr("Start Server")}</b>.</li>
-          <li><a className="btn pri" href={`/api/studios/${studio.id}/relay/download`} onClick={() => setDl(true)} download>{tr("Télécharger UEFN Link (Windows)")}</a><div className="small muted" style={{ marginTop: 6 }}>{tr("Ce fichier est fait pour votre compte : rien à configurer. Valable 24 h. Ouvrez cette page sur le PC pour le télécharger directement dessus.")}</div></li>
-          <li><b>{tr("Double-cliquez sur pop-link.exe.")}</b>{' '}{tr("Si Windows affiche « Windows a protégé votre ordinateur » : Informations complémentaires → Exécuter quand même. Laissez la fenêtre ouverte.")}</li>
+          <li><a className="btn pri" href="/forge" target="_blank" rel="noreferrer" onClick={() => setDl(true)}>{tr("Télécharger POP Forge (Windows)")}</a><div className="small muted" style={{ marginTop: 6 }}>{tr("Gratuit comme relais UEFN. Ouvrez cette page sur le PC pour le télécharger directement dessus.")}</div></li>
+          <li><b>{tr("Installez et ouvrez POP Forge, puis connectez-vous.")}</b>{' '}{tr("Dans Forge, Accueil → « Créer les maps et relier » : une map par projet UEFN, synchronisée. Laissez Forge ouvert.")}</li>
         </ol>
-        <div className="b-callout small">{dl ? tr("En attente du PC… cette page s’ouvrira toute seule dès que vos projets seront importés.") : tr("Cette page se mettra à jour toute seule dès que vos projets seront importés.")}</div>
+        <div className="b-callout small">{dl ? tr("En attente de Forge… cette page s’ouvrira toute seule dès que vos projets seront importés.") : tr("Cette page se mettra à jour toute seule dès que vos projets seront importés.")}</div>
         <details>
           <summary className="small" style={{ cursor: 'pointer' }}>{tr("Commencer sans UEFN")}</summary>
           <form className="row" style={{ marginTop: 10 }} onSubmit={async e => { e.preventDefault(); try { await api.post(`/api/studios/${studio.id}/skip-uefn`, { name }); await reload() } catch (er: any) { setErr(er.message) } }}>

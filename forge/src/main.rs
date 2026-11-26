@@ -119,6 +119,7 @@ fn autoriser(app: &AppHandle, u: &Url) {
         .permission("allow-projets")
         .permission("allow-etat-relais")
         .permission("allow-relier")
+        .permission("allow-importer")
         .permission("allow-projet-ouvert")
         .permission("allow-liaison")
         .permission("allow-fenetre")
@@ -463,6 +464,52 @@ async fn relier(app: AppHandle, code: String, projet: String) -> Result<String, 
     Ok(relay::libelle(&app))
 }
 
+/// « Créer les maps et relier » (#404, remplace le pop-link.exe « déjà configuré ») : avec un code de studio du
+/// site, POP crée une map par projet choisi (même nom) et les relie tous. Les liaisons déjà faites sont gardées.
+#[tauri::command]
+async fn importer(app: AppHandle, code: String, projets: Vec<String>) -> Result<String, String> {
+    let server = load(&app)
+        .server
+        .ok_or("Indiquez d'abord l'adresse de POP.")?;
+    let dossiers: Vec<std::path::PathBuf> = projets
+        .iter()
+        .map(std::path::PathBuf::from)
+        .filter(|p| p.is_dir() && est_un_projet(p))
+        .collect();
+    if dossiers.is_empty() {
+        return Err("Aucun projet UEFN à relier.".into());
+    }
+    let device = std::env::var("COMPUTERNAME").unwrap_or_else(|_| "POP Forge".into());
+    let nouveaux = pop_link::pair_studio(&server, &code, &dossiers, &device)
+        .await
+        .map_err(|e| format!("Liaison refusée : {e:#}"))?;
+    let premier = nouveaux.first().cloned().ok_or("Aucun projet relié.")?;
+    let n = nouveaux.len();
+    let mut c = match pop_link::load() {
+        Ok(c) if c.server.trim_end_matches('/') == server.trim_end_matches('/') => c,
+        _ => pop_link::Config {
+            server: server.clone(),
+            token: premier.token.clone(),
+            project: premier.project.clone(),
+            map: premier.map.clone(),
+            ..Default::default()
+        },
+    };
+    let mut liens: Vec<pop_link::ProjLink> = liens_de(&c)
+        .into_iter()
+        .filter(|l| {
+            !nouveaux
+                .iter()
+                .any(|x| x.project == l.project || x.map == l.map)
+        })
+        .collect();
+    liens.extend(nouveaux);
+    c.links = liens;
+    pop_link::save(&c).map_err(|e| format!("Configuration non enregistrée : {e:#}"))?;
+    relay::demarrer(&app).await;
+    Ok(format!("{n} projet(s) relié(s)"))
+}
+
 /// Barre de titre propre à Forge (#78, retour de Kl1600 du 24/11) : la fenêtre n'a plus le cadre ni le menu de
 /// Windows ; la page dessine sa barre et appelle cette commande pour réduire, agrandir, fermer ou déplacer.
 /// Outils d'IA installés sur ce PC, lançables ou non depuis Forge (#95).
@@ -693,6 +740,7 @@ fn main() {
             projets,
             etat_relais,
             relier,
+            importer,
             projet_ouvert,
             liaison,
             fenetre,

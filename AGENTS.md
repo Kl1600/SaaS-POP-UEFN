@@ -20,7 +20,7 @@ de `main` vert après la fusion (le CI ne tourne plus sur les PR : décision du 
 POP est un SaaS en français pour les créateurs de maps Fortnite (UEFN) et leurs studios : documentation,
 tableau blanc, planning, tâches, éditeur Verse, organisation du niveau UEFN, lancement et partage des revenus.
 Serveur Rust (`server/`, Axum + SQLite), interface React + TypeScript (`web/`, `web/dist` versionné), relais
-Windows `pop-link.exe` (`link/`) qui pilote UEFN par son serveur MCP local. Détails : [README.md](README.md).
+(`link/`, embarqué dans l'application POP Forge, `forge/`) qui pilote UEFN par son serveur MCP local. Détails : [README.md](README.md).
 
 ## 2. Où est quoi
 
@@ -158,9 +158,10 @@ Une branche longue qui mélange plusieurs sujets ne se relit pas, ne se teste pa
   `server/migrations/`. On ne modifie jamais une migration existante (le CI le refuse).
 - **`web/dist` est versionné** : après un changement dans `web/`, reconstruisez (`npm run build`) et commitez
   `web/dist` (le CI vérifie qu'il est à jour).
-- **`pop-link.exe`** : après un changement dans `link/`, le workflow « relais Windows » (#358) le recompile sous
-  Windows et pousse sur la branche un commit avec `web/public/downloads/pop-link.exe` et `web/dist` à jour.
-  Attendez ce commit (`git pull --rebase` sur votre branche) avant `done`. À la main seulement s'il échoue.
+- **POP Forge** (qui embarque le relais `link/`, décision du 26/11) : après un changement dans `link/` ou `forge/`, le
+  workflow « relais Windows » (#358) reconstruit l'installateur sous Windows et pousse sur la branche un commit avec
+  `web/public/downloads/pop-forge-setup.exe` et `web/dist` à jour. Attendez ce commit (`git pull --rebase` sur votre
+  branche) avant `done`. À la main seulement s'il échoue. `pop-link.exe` n'est plus proposé au téléchargement.
 
 ### Vérifier avant `review`
 ```
@@ -168,7 +169,7 @@ cd server && cargo build && cargo test
 cd link && cargo test
 cd web && npx tsc -b && npx vite build
 ```
-Avec le vrai UEFN : `pop-link.exe diagnostic` (voir `KB/UEFN.md`). Jamais d'archivage Lore ni d'action
+Avec le vrai UEFN : Forge → Réglages → Diagnostic, ou `cargo run --release -- diagnostic` dans `link/` (voir `KB/UEFN.md`). Jamais d'archivage Lore ni d'action
 irréversible sur le projet d'un humain sans son accord explicite : testez sur une copie, remettez tout à l'origine.
 
 ## 6. Problème ou incohérence → prévenez votre humain

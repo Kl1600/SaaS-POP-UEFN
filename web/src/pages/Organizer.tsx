@@ -149,7 +149,9 @@ export default function Organizer() {
         <button className="btn" disabled={readOnly} title={tr("Envoie les modifications du niveau dans la session de test en cours")} onClick={() => act('push_session', {}, tr("Envoyé en session de test"))}><Play size={16} />{tr("Envoyer en session")}</button>
       </PageHead>
       {/* Relais plus ancien que le serveur (#158) : des actions répondraient « action inconnue ». */}
-      {st.stale && <div className="warn" role="alert"><AlertTriangle size={18} /><span style={{ flex: 1 }}>{tr("Relais périmé : votre UEFN Link est plus ancien que POP et ne connaît pas toutes les actions (session de test, poser un appareil, importer un fichier…). Téléchargez la nouvelle version, fermez l’ancienne fenêtre et lancez la nouvelle.")}</span><a className="btn pri" href={`/api/studios/${app.studio!.id}/relay/download`} download>{tr("Télécharger UEFN Link")}</a></div>}
+      {st.stale && <div className="warn" role="alert"><AlertTriangle size={18} /><span style={{ flex: 1 }}>{tr("Relais périmé : il est plus ancien que POP et ne connaît pas toutes les actions (session de test, poser un appareil, importer un fichier…). Installez la dernière version de POP Forge, fermez l’ancien relais et lancez Forge.")}</span><a className="btn pri" href="/forge" target="_blank" rel="noreferrer">{tr("Télécharger POP Forge")}</a></div>}
+      {/* Ancien pop-link.exe seul (#404) : il marche encore, mais POP Forge le remplace. */}
+      {!st.stale && st.legacy && <LegacyBanner />}
       {!['connected', 'unlinked'].includes(st.status) && <div className="warn"><AlertTriangle size={18} /><span>{tr("{0} : lecture seule sur le dernier état connu{1}. Vos modifications seront mises en attente et envoyées à l’ouverture.", [st.status === 'offline' ? tr("Relais hors ligne") : tr("UEFN fermé"), st.updated_at ? ` (${ago(st.updated_at)})` : ''])}</span></div>}
       {st.approvals.length > 0 && <div className="warn" style={{ flexWrap: 'wrap' }}><AlertTriangle size={18} /><div style={{ flex: 1 }}>{st.approvals.map((p: any) => (
         <div key={p.id} className="row" style={{ flexWrap: 'wrap', padding: '4px 0' }}><span style={{ flex: 1 }}>{p.summary}</span>
@@ -376,31 +378,27 @@ function Journal({ st, task, setTask, tasks, act, reload }: { st: any; task: num
   </div>
 }
 
+/** Relais connecté par un ancien pop-link.exe seul (#404) : il marche encore, POP Forge le remplace. */
+function LegacyBanner() {
+  return <div className="warn" role="status"><AlertTriangle size={18} /><span style={{ flex: 1 }}>{tr("UEFN Link (pop-link.exe) est remplacé par POP Forge, gratuit comme relais. Installez Forge, fermez pop-link.exe puis lancez Forge : vos projets déjà reliés sont repris.")}</span><a className="btn" href="/forge" target="_blank" rel="noreferrer">{tr("Télécharger POP Forge")}</a></div>
+}
+
 function Pairing({ status, tools, elsewhere }: { status: string; tools: any; elsewhere?: boolean }) {
-  const { map, studio, canEdit, toast } = useApp()
+  const { map, canEdit } = useApp()
   const { data: devices, reload } = useLoad<any[]>(map ? `/api/maps/${map.id}/relay` : null, [map?.id])
-  const [code, setCode] = useState<string | null>(null)
-  const local = ['localhost', '127.0.0.1', '::1'].includes(location.hostname)
   const roles = tools?.roles ?? {}
   return <section className="card">
-    <CardHead title={tr("Relier UEFN avec UEFN Link")} sub={tr("Le relais tourne sur le PC Windows où UEFN est ouvert. Il ne touche qu’au projet choisi et pilote UEFN par son serveur MCP officiel.")} />
+    <CardHead title={tr("Relier UEFN avec POP Forge")} sub={tr("POP Forge tourne sur le PC Windows où UEFN est ouvert. Il ne touche qu’aux projets reliés et pilote UEFN par son serveur MCP officiel. Gratuit comme relais.")} />
     {/* Map jamais reliée (#152) : le relais n'est pas en panne, il manque le projet ; l'appairage de cette map passe en premier. */}
     {status === 'unlinked' && <div className="b-callout" style={{ marginBottom: 12 }}>
       <b style={{ fontWeight: 500 }}>{elsewhere ? tr("Votre relais est connecté, mais aucun projet n’est relié à cette map.") : tr("Aucun projet UEFN n’est relié à cette map.")}</b>{' '}
-      {tr("Créez le projet dans UEFN, puis reliez-le avec un code d’appairage pour cette map (ci-dessous). Télécharger UEFN Link à nouveau importerait tous vos projets et pourrait créer une map en double.")}
+      {tr("Créez le projet dans UEFN, puis dans POP Forge : Accueil → cette map → « Relier ».")}
     </div>}
     <ol style={{ margin: 0, paddingLeft: 20, lineHeight: 1.9 }}>
       <li>{tr("Dans UEFN, projet ouvert :")}{' '}<b style={{ fontWeight: 500 }}>{tr("Projet → Paramètres du projet → Enable Project Python Scripts")}</b>{tr(", puis")}{' '}<b style={{ fontWeight: 500 }}>{tr("Édition → Préférences de l’éditeur → Model Context Protocol → Start Server")}</b>.</li>
-      <li><a className="btn pri" style={{ height: 34 }} href={`/api/studios/${studio!.id}/relay/download`} download>{tr("Télécharger UEFN Link")}</a> <span className="small muted">{tr("déjà configuré pour votre compte (valable 24 h) : rien à taper.")}</span></li>
-      <li>{tr("Double-cliquez sur")}{' '}<b style={{ fontWeight: 500 }}>pop-link.exe</b>{' '}{tr("sur le PC (Windows peut demander « Exécuter quand même »). Tous vos projets UEFN sont importés : une map par projet, synchronisée. Laissez la fenêtre ouverte.")}</li>
+      <li><a className="btn pri" style={{ height: 34 }} href="/forge" target="_blank" rel="noreferrer">{tr("Télécharger POP Forge")}</a> <span className="small muted">{tr("installez-le sur le PC, puis connectez-vous avec votre compte POP.")}</span></li>
+      <li>{tr("Dans Forge, Accueil : « Relier » sur chaque map, ou « Créer les maps et relier » pour les projets UEFN qui n’ont pas encore de map. Laissez Forge ouvert.")}</li>
     </ol>
-    <details style={{ marginTop: 10 }} open={status === 'unlinked'}>
-      <summary className="small" style={{ cursor: 'pointer' }}>{tr("Autre méthode : code d’appairage pour cette map seulement")}</summary>
-      <div style={{ marginTop: 8 }}>{canEdit && <button className="btn" style={{ height: 34 }} onClick={async () => { try { setCode((await api.post(`/api/maps/${map!.id}/relay/pair`)).code) } catch (e: any) { toast(e.message, true) } }}>{tr("Obtenir un code")}</button>}
-        {code && <span> → <b className="mono" style={{ fontSize: 18, letterSpacing: 2 }}>{code}</b> <span className="small muted">{tr("(10 minutes)")}</span></span>}
-        <p className="small muted">{tr("Puis sur le PC :")}{' '}<span className="mono">{tr("pop-link.exe pair {0} {1} \"C:\\Users\\vous\\Documents\\Fortnite Projects\\MonIle\"", [local ? 'http://<adresse-du-serveur>:8080' : location.origin, code ?? '<code>'])}</span>{tr(". En cas de souci :")}{' '}<span className="mono">{tr("pop-link.exe diagnostic")}</span>.</p>
-      </div>
-    </details>
     <div className="row small" style={{ flexWrap: 'wrap', marginTop: 12 }}>
       <span>{tr("État :")}{' '}<b style={{ fontWeight: 500 }}>{STATUS_LABEL[status]}</b></span>
       {tools?.url && <span className="muted">{tr("MCP : {0}", [tools.url])}</span>}
@@ -430,7 +428,8 @@ export function UefnLinkSettings() {
     } catch (e: any) { toast(e.message, true) }
   }
   return <div className="stack">
-    {st.stale && <div className="warn" role="alert"><AlertTriangle size={18} /><span>{tr("Relais périmé : téléchargez la dernière version d’UEFN Link ci-dessous.")}</span></div>}
+    {st.stale && <div className="warn" role="alert"><AlertTriangle size={18} /><span>{tr("Relais périmé : installez la dernière version de POP Forge (ci-dessous).")}</span></div>}
+    {!st.stale && st.legacy && <LegacyBanner />}
     {st.approvals.length > 0 && <section className="card">
       <CardHead title={tr("Suppressions à valider")} sub={tr("Demandées par une IA : rien n’est supprimé sans votre accord.")} />
       {st.approvals.map((p: any) => <div key={p.id} className="li" style={{ flexWrap: 'wrap' }}><span style={{ flex: 1 }}>{p.summary}</span>

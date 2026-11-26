@@ -377,7 +377,7 @@ fn api() -> Router<AppState> {
             patch(manage::rename_studio).delete(manage::delete_studio),
         )
         .route("/api/studios/{sid}/transfer", post(manage::transfer))
-        .route("/api/studios/{sid}/relay/download", get(link::download))
+        .route("/api/studios/{sid}/relay/code", post(link::code))
         .route("/api/studios/{sid}/link-status", get(link::studio_status))
         .route("/api/studios/{sid}/skip-uefn", post(link::skip))
         .route("/api/relay/pair-studio", post(link::pair_studio))

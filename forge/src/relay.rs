@@ -42,6 +42,8 @@ async fn reserver() -> Option<std::net::TcpListener> {
 
 /// (Re)démarre le relais d'après la configuration de pop-link.
 pub async fn demarrer(app: &AppHandle) {
+    // POP sait que ce relais est celui de Forge, pas un ancien pop-link.exe (#404).
+    pop_link::set_app("forge");
     let r = app.state::<Relay>();
     let ancien = r.handle.lock().unwrap().take();
     if let Some((h, page)) = ancien {
