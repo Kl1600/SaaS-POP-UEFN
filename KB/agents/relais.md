@@ -81,3 +81,11 @@ Fait : pop_link::commande() = CREATE_NO_WINDOW (tasklist, lore_cmd) ; tasklist e
 Reste : rien
 Bloque : rien
 ```
+
+```
+FAIT | #413 Forge : lancer Claude Code sur une tâche échoue (consigne lue comme --mcp-config) | 26/11 20:30
+Owner : benybens | Sur la tâche : Claude Code, pour benybens
+Fait : consigne avant --mcp-config (option à plusieurs valeurs) ; vrai Claude Code : ancien ordre = erreur, nouveau = list_maps OK
+Reste : rien
+Bloque : rien
+```

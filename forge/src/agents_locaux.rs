@@ -113,10 +113,11 @@ pub fn config_claude(serveur: &str) -> String {
 pub fn arguments(outil: &str, serveur: &str, config: &Path, consigne: &str) -> Option<Vec<String>> {
     let mcp = format!("{}/mcp", serveur.trim_end_matches('/'));
     match outil {
+        // La consigne d'abord (#413) : `--mcp-config` accepte plusieurs fichiers et prendrait la consigne pour l'un d'eux.
         "claude_code" => Some(vec![
+            consigne.into(),
             "--mcp-config".into(),
             config.to_string_lossy().into(),
-            consigne.into(),
         ]),
         // Codex lit `-c clé=valeur` ; une valeur qui n'est pas du TOML est prise telle quelle.
         "codex" => Some(vec![
@@ -176,5 +177,18 @@ mod tests {
         let a = arguments("codex", "https://pop-uefn.com", Path::new("x.json"), "go").unwrap();
         assert!(a.contains(&"mcp_servers.pop.bearer_token_env_var=POP_TOKEN".to_string()));
         assert!(arguments("cursor", "https://x", Path::new("x"), "go").is_none());
+    }
+
+    #[test]
+    fn consigne_avant_mcp_config() {
+        // #413 : après `--mcp-config`, Claude Code lisait la consigne comme un second fichier de configuration.
+        let a = arguments(
+            "claude_code",
+            "https://pop-uefn.com",
+            Path::new("pop.json"),
+            "go",
+        )
+        .unwrap();
+        assert_eq!(a, ["go", "--mcp-config", "pop.json"]);
     }
 }
