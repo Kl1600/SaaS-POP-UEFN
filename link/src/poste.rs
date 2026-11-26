@@ -95,8 +95,10 @@ pub fn demarrage_auto() -> Option<(PathBuf, bool)> {
 pub fn uefn_ouvert() -> bool {
     #[cfg(windows)]
     {
-        std::process::Command::new("tasklist")
-            .args(["/FI", &format!("IMAGENAME eq {EXE}"), "/NH"])
+        // CSV : en tableau, tasklist coupe les noms à 25 caractères (« UnrealEditorFortnite-Win6 »), et UEFN ouvert
+        // passait pour fermé (#410).
+        crate::commande("tasklist")
+            .args(["/FI", &format!("IMAGENAME eq {EXE}"), "/NH", "/FO", "CSV"])
             .output()
             .map(|o| String::from_utf8_lossy(&o.stdout).contains(EXE))
             .unwrap_or(false)

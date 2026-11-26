@@ -486,7 +486,7 @@ impl Link {
                         }
                     })
                     .collect();
-                let st = std::process::Command::new(&parts[0])
+                let st = commande(&parts[0])
                     .args(&parts[1..])
                     .current_dir(&self.cfg.project)
                     .output()?;
@@ -542,6 +542,20 @@ impl Link {
 /// `server/src/uefn.rs`, chaque fois que le relais apprend une action : un relais plus ancien est alors signalé
 /// « périmé » dans POP. 1 = relais d'avant #158, qui n'annonce rien.
 pub const PROTO: u32 = 2;
+
+/// Commande externe lancée sans fenêtre (#410) : depuis POP Forge (application fenêtrée), Windows ouvrirait sinon une
+/// console noire à chaque appel, ce qui ressemble à un virus.
+pub fn commande(prog: impl AsRef<std::ffi::OsStr>) -> std::process::Command {
+    #[allow(unused_mut)]
+    let mut c = std::process::Command::new(prog);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        c.creation_flags(CREATE_NO_WINDOW);
+    }
+    c
+}
 
 /// Application qui fait tourner le relais, annoncée au serveur dans `hello` (#404) : « pop-link » par défaut,
 /// « forge » quand POP Forge l'a dit avec `set_app`. POP sait ainsi qu'un ancien pop-link.exe est encore utilisé.
