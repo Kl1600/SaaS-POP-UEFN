@@ -52,6 +52,7 @@ mod orchestre;
 mod pages;
 mod ping;
 mod plan;
+mod plan2d;
 mod privstats;
 mod questions;
 mod resume;
@@ -694,6 +695,23 @@ fn api() -> Router<AppState> {
             post(agents::route_attribuer),
         )
         .route("/api/maps/{mid}/fil", get(fil::route))
+        .route(
+            "/api/maps/{mid}/plan2d",
+            get(plan2d::route_plan).post(plan2d::route_creer),
+        )
+        .route("/api/maps/{mid}/plan2d/level", get(plan2d::route_niveau))
+        .route(
+            "/api/maps/{mid}/plan2d/floors",
+            post(plan2d::route_creer_etage),
+        )
+        .route(
+            "/api/maps/{mid}/plan2d/floors/{id}",
+            patch(plan2d::route_modifier_etage).delete(plan2d::route_supprimer_etage),
+        )
+        .route(
+            "/api/maps/{mid}/plan2d/{id}",
+            patch(plan2d::route_modifier).delete(plan2d::route_supprimer),
+        )
         .route("/api/maps/{mid}/ping", post(ping::ping))
         .route("/api/maps/{mid}/questions", get(questions::route_liste))
         .route(

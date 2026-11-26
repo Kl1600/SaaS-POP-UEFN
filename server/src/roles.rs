@@ -28,6 +28,7 @@ const COMMUNS: &[&str] = &[
     "list_agents",
     "list_boards",
     "get_board",
+    "get_plan",
     "list_pages",
     "read_page",
     "list_milestones",
@@ -57,6 +58,7 @@ const CONCEPTION: &[&str] = &[
     "delete_board_objects",
     "write_page",
     "add_milestone",
+    "edit_plan",
 ];
 
 const SESSION: &[&str] = &[
