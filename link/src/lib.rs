@@ -354,6 +354,10 @@ impl Link {
                     .collect();
                 self.mcp.delete_assets(&paths).await?;
             }
+            "actor_select" => {
+                self.need_uefn()?;
+                out["selected"] = json!(self.mcp.select(&ids).await?);
+            }
             "actor_duplicate" => {
                 self.need_uefn()?;
                 out["created_ids"] = json!(self.mcp.duplicate(&ids).await?);
