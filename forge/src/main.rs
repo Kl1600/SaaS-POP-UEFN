@@ -135,7 +135,11 @@ fn autoriser(app: &AppHandle, u: &Url) {
         .permission("allow-outils-ia")
         .permission("allow-lancer-agent")
         // Ouvrir UEFN sur le projet d'une map (#402).
-        .permission("allow-ouvrir-uefn");
+        .permission("allow-ouvrir-uefn")
+        // « Lancer avec… → Mon IA » (#420).
+        .permission("allow-apps-ia")
+        .permission("allow-consigne-mon-ia")
+        .permission("allow-ouvrir-ia");
     let _ = app.add_capability(cap);
 }
 
@@ -531,6 +535,37 @@ async fn importer(app: AppHandle, code: String, projets: Vec<String>) -> Result<
 
 /// Barre de titre propre à Forge (#78, retour de Kl1600 du 24/11) : la fenêtre n'a plus le cadre ni le menu de
 /// Windows ; la page dessine sa barre et appelle cette commande pour réduire, agrandir, fermer ou déplacer.
+/// « Lancer avec… → Mon IA » (#420) : apps d'IA connues et leur présence sur ce PC.
+#[tauri::command]
+fn apps_ia() -> Vec<agents_locaux::AppIa> {
+    agents_locaux::apps_ia()
+}
+
+/// Consigne d'une tâche pour « Mon IA », à copier dans la conversation de l'IA de l'utilisateur (#420).
+#[tauri::command]
+fn consigne_mon_ia(map: String, map_id: i64, tache: i64, titre: String) -> String {
+    agents_locaux::consigne_mon_ia(&map, map_id, tache, &titre)
+}
+
+/// Ouvre l'IA choisie (#420) : son app si elle est installée, sinon son site dans le navigateur par défaut.
+#[tauri::command]
+fn ouvrir_ia(id: String) -> Result<(), String> {
+    let a = agents_locaux::apps_ia()
+        .into_iter()
+        .find(|a| a.id == id)
+        .ok_or("IA inconnue.")?;
+    if let Some(exe) = &a.app {
+        return std::process::Command::new(exe)
+            .spawn()
+            .map(|_| ())
+            .map_err(|e| format!("Ouverture de {} impossible : {e}", a.nom));
+    }
+    let site = a
+        .site
+        .ok_or_else(|| format!("{} n'est pas installé sur ce PC.", a.nom))?;
+    tauri_plugin_opener::open_url(site, None::<&str>).map_err(|e| e.to_string())
+}
+
 /// « Ouvrir dans UEFN » (#402) : lance UEFN sur le projet relié à une map, sans passer par le launcher Epic. Seul un
 /// projet déjà relié est accepté. Si UEFN est ouvert, rien n'est lancé ni fermé.
 #[tauri::command]
@@ -787,6 +822,9 @@ fn main() {
             outils_ia,
             lancer_agent,
             ouvrir_uefn,
+            apps_ia,
+            consigne_mon_ia,
+            ouvrir_ia,
             activer_mcp_auto,
             start,
             connect,

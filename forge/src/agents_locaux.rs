@@ -29,7 +29,7 @@ fn env_dir(var: &str, suite: &str) -> Option<PathBuf> {
     std::env::var_os(var).map(|v| PathBuf::from(v).join(suite))
 }
 
-/// Outils d'IA connus et leur état sur ce PC.
+/// Outils d'IA en ligne de commande et leur état sur ce PC (Cursor, l'app Claude et ChatGPT : « Mon IA », #420).
 pub fn outils() -> Vec<Outil> {
     let npm: Vec<PathBuf> = [env_dir("APPDATA", "npm")].into_iter().flatten().collect();
     let claude = trouver(
@@ -44,7 +44,6 @@ pub fn outils() -> Vec<Outil> {
         .concat(),
     );
     let codex = trouver(&["codex.exe", "codex.cmd"], &npm);
-    let cursor = env_dir("LOCALAPPDATA", "Programs/cursor/Cursor.exe").filter(|p| p.is_file());
     let absent = |n: &str| Some(format!("{n} n'est pas installé sur ce PC."));
     vec![
         Outil {
@@ -69,34 +68,75 @@ pub fn outils() -> Vec<Outil> {
             },
             chemin: codex.map(|p| p.to_string_lossy().into()),
         },
-        Outil {
-            id: "cursor",
-            nom: "Cursor",
-            lancable: false,
-            raison: Some(if cursor.is_some() {
-                "Cursor ne peut pas être lancé sur une tâche depuis Forge : un Cursor déjà ouvert ne recevrait pas la clé. Connectez-le une fois depuis POP → IA connectées.".into()
-            } else {
-                "Cursor n'est pas installé sur ce PC.".into()
-            }),
-            chemin: cursor.map(|p| p.to_string_lossy().into()),
-        },
     ]
 }
 
-/// Consigne de départ : seulement des lettres, chiffres et ponctuation simple (elle passe par la ligne de commande).
+/// Texte sûr pour la ligne de commande et le presse-papiers : lettres, chiffres et ponctuation simple, 120 au plus.
+fn propre(s: &str) -> String {
+    s.chars()
+        .filter(|c| c.is_alphanumeric() || " .,:;!?'()-#/".contains(*c))
+        .take(120)
+        .collect()
+}
+
+const ETAPES: &str = "lis-la avec get_task, passe-la en cours, avance en notant ta progression avec save_progress, puis termine-la. Reponds en francais.";
+
+/// Consigne de départ d'un agent lancé par Forge (elle passe par la ligne de commande).
 pub fn consigne(map: &str, tache: i64, titre: &str) -> String {
-    let propre = |s: &str| -> String {
-        s.chars()
-            .filter(|c| c.is_alphanumeric() || " .,:;!?'()-#/".contains(*c))
-            .take(120)
-            .collect()
-    };
     format!(
-        "Tu travailles sur POP, map {}. Prends la tache #{} ({}) : lis-la avec get_task, passe-la en cours, avance en notant ta progression avec save_progress, puis termine-la. Reponds en francais.",
+        "Tu travailles sur POP, map {}. Prends la tache #{tache} ({}) : {ETAPES}",
         propre(map),
-        tache,
         propre(titre)
     )
+}
+
+/// Consigne pour « Mon IA » (#420) : l'IA est déjà branchée à POP, peut-être sur une autre map ; elle choisit d'abord
+/// la map avec use_map.
+pub fn consigne_mon_ia(map: &str, map_id: i64, tache: i64, titre: &str) -> String {
+    format!(
+        "Dans POP, choisis la map {} avec use_map({map_id}) si ce n'est pas deja ta map de travail. Prends la tache #{tache} ({}) : {ETAPES}",
+        propre(map),
+        propre(titre)
+    )
+}
+
+/// IA que l'utilisateur a branchée à POP par MCP (#420) : Forge ouvre son app si elle est installée, sinon son site.
+#[derive(Serialize, Clone)]
+pub struct AppIa {
+    pub id: &'static str,
+    pub nom: &'static str,
+    pub app: Option<String>,
+    pub site: Option<&'static str>,
+}
+
+pub fn apps_ia() -> Vec<AppIa> {
+    let app = |chemins: &[Option<PathBuf>]| {
+        chemins
+            .iter()
+            .flatten()
+            .find(|p| p.is_file())
+            .map(|p| p.to_string_lossy().into())
+    };
+    vec![
+        AppIa {
+            id: "claude_desktop",
+            nom: "App Claude",
+            app: app(&[env_dir("LOCALAPPDATA", "AnthropicClaude/claude.exe")]),
+            site: Some("https://claude.ai/new"),
+        },
+        AppIa {
+            id: "chatgpt",
+            nom: "ChatGPT",
+            app: app(&[env_dir("LOCALAPPDATA", "Programs/ChatGPT/ChatGPT.exe")]),
+            site: Some("https://chatgpt.com/"),
+        },
+        AppIa {
+            id: "cursor",
+            nom: "Cursor",
+            app: app(&[env_dir("LOCALAPPDATA", "Programs/cursor/Cursor.exe")]),
+            site: None,
+        },
+    ]
 }
 
 /// Config MCP de Claude Code : l'en-tête lit la clé dans `POP_TOKEN` (aucune clé dans le fichier).
@@ -171,12 +211,29 @@ mod tests {
     }
 
     #[test]
+    fn consigne_pour_mon_ia() {
+        let c = consigne_mon_ia("VaultRush", 12, 3, "Ajouter le minuteur");
+        assert!(
+            c.starts_with("Dans POP, choisis la map VaultRush avec use_map(12)"),
+            "{c}"
+        );
+        assert!(
+            c.contains("Prends la tache #3 (Ajouter le minuteur)") && c.contains("get_task"),
+            "{c}"
+        );
+    }
+
+    #[test]
     fn aucune_cle_dans_la_config() {
         let c = config_claude("https://pop-uefn.com/");
         assert!(c.contains("https://pop-uefn.com/mcp") && c.contains("${POP_TOKEN}"));
         let a = arguments("codex", "https://pop-uefn.com", Path::new("x.json"), "go").unwrap();
         assert!(a.contains(&"mcp_servers.pop.bearer_token_env_var=POP_TOKEN".to_string()));
         assert!(arguments("cursor", "https://x", Path::new("x"), "go").is_none());
+        assert!(
+            outils().iter().all(|o| o.id != "cursor"),
+            "Cursor passe par « Mon IA »"
+        );
     }
 
     #[test]

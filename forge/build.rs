@@ -20,6 +20,9 @@ fn main() {
             "outils_ia",
             "lancer_agent",
             "ouvrir_uefn",
+            "apps_ia",
+            "consigne_mon_ia",
+            "ouvrir_ia",
         ]),
     ))
     .expect("échec de la préparation de POP Forge");

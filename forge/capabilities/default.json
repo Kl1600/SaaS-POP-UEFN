@@ -23,6 +23,9 @@
     "allow-activer-mcp-auto",
     "allow-outils-ia",
     "allow-lancer-agent",
-    "allow-ouvrir-uefn"
+    "allow-ouvrir-uefn",
+    "allow-apps-ia",
+    "allow-consigne-mon-ia",
+    "allow-ouvrir-ia"
   ]
 }
