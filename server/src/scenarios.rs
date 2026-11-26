@@ -144,8 +144,8 @@ pub async fn liste(st: &AppState, mid: i64) -> Result<Value, AppError> {
 /// Passages d'un scénario, du plus récent au plus ancien ; régression = étape réussie au passage précédent et
 /// échouée à celui-ci.
 pub async fn passages(st: &AppState, sid: i64) -> Result<Value, AppError> {
-    let runs: Vec<(i64, String, Option<String>, String, Option<String>)> = sqlx::query_as(
-        "SELECT r.id, r.version, u.name, r.created_at, r.finished_at FROM scenario_runs r LEFT JOIN users u ON u.id = r.tester_id WHERE r.scenario_id = ? ORDER BY r.id",
+    let runs: Vec<(i64, String, Option<String>, String, Option<String>, bool)> = sqlx::query_as(
+        "SELECT r.id, r.version, u.name, r.created_at, r.finished_at, r.listing_id IS NOT NULL FROM scenario_runs r LEFT JOIN users u ON u.id = r.tester_id WHERE r.scenario_id = ? ORDER BY r.id",
     )
     .bind(sid)
     .fetch_all(&st.db)
@@ -153,7 +153,7 @@ pub async fn passages(st: &AppState, sid: i64) -> Result<Value, AppError> {
     let s3 = S3::from_env();
     let mut prec: HashMap<i64, String> = HashMap::new();
     let mut out = vec![];
-    for (id, version, who, at, fin) in runs {
+    for (id, version, who, at, fin, playtest) in runs {
         let res: Vec<(i64, String, String, Option<String>, Option<i64>)> = sqlx::query_as(
             "SELECT r.step_id, r.verdict, r.comment, r.capture_key, t.number FROM scenario_results r LEFT JOIN tasks t ON t.id = r.task_id WHERE r.run_id = ?",
         )
@@ -184,7 +184,7 @@ pub async fn passages(st: &AppState, sid: i64) -> Result<Value, AppError> {
         for (step, v, ..) in &res {
             prec.insert(*step, v.clone());
         }
-        out.push(json!({ "id": id, "version": version, "tester": who, "created_at": at, "finished_at": fin, "counts": counts, "regressions": regressions, "results": results }));
+        out.push(json!({ "id": id, "version": version, "tester": who, "created_at": at, "finished_at": fin, "playtest": playtest, "counts": counts, "regressions": regressions, "results": results }));
     }
     out.reverse();
     Ok(json!({ "runs": out }))
@@ -213,6 +213,105 @@ async fn ctx_run(st: &AppState, u: &AuthUser, rid: i64) -> Result<(MapCtx, i64, 
             .ok_or(AppError::NotFound)?;
     let (ctx, ..) = ctx_scenario(st, u, sid).await?;
     Ok((ctx, sid, tester.unwrap_or(0)))
+}
+
+/// Accès à un passage pour la personne qui le joue (#349) : passage de l'équipe, il faut pouvoir modifier la map ;
+/// passage d'un playtesteur, le scénario doit faire partie de sa demande de test. Rend (map, scénario).
+async fn acces_passage(st: &AppState, u: &AuthUser, rid: i64) -> Result<(i64, i64), AppError> {
+    let (sid, tester, lid, mid): (i64, Option<i64>, Option<i64>, i64) = sqlx::query_as(
+        "SELECT r.scenario_id, r.tester_id, r.listing_id, s.map_id FROM scenario_runs r JOIN scenarios s ON s.id = r.scenario_id WHERE r.id = ?",
+    )
+    .bind(rid)
+    .fetch_optional(&st.db)
+    .await?
+    .ok_or(AppError::NotFound)?;
+    match lid {
+        None => map_ctx(st, u, mid).await?.can_edit()?,
+        Some(l) => {
+            let lie: Option<i64> = sqlx::query_scalar(
+                "SELECT 1 FROM playtest_scenarios WHERE listing_id = ? AND scenario_id = ?",
+            )
+            .bind(l)
+            .bind(sid)
+            .fetch_optional(&st.db)
+            .await?;
+            lie.ok_or(AppError::NotFound)?;
+        }
+    }
+    if tester != Some(u.id) {
+        return Err(bad(
+            "Seule la personne qui joue ce passage donne les verdicts.",
+        ));
+    }
+    Ok((mid, sid))
+}
+
+/// Scénarios d'une demande de test, avec leurs étapes : tout ce que le playtesteur en voit (#349).
+pub async fn pour_playtest(st: &AppState, lid: i64) -> Result<Vec<Value>, AppError> {
+    let sc: Vec<(i64, String)> = sqlx::query_as(
+        "SELECT s.id, s.title FROM playtest_scenarios p JOIN scenarios s ON s.id = p.scenario_id WHERE p.listing_id = ? AND s.status = 'ready' ORDER BY s.id",
+    )
+    .bind(lid)
+    .fetch_all(&st.db)
+    .await?;
+    let mut out = vec![];
+    for (id, title) in sc {
+        let steps: Vec<(i64, String, String)> = sqlx::query_as(
+            "SELECT id, action, expected FROM scenario_steps WHERE scenario_id = ? ORDER BY pos",
+        )
+        .bind(id)
+        .fetch_all(&st.db)
+        .await?;
+        out.push(json!({ "id": id, "title": title, "steps": steps.into_iter().map(|(i, a, e)| json!({ "id": i, "action": a, "expected": e })).collect::<Vec<_>>() }));
+    }
+    Ok(out)
+}
+
+/// `POST /api/playtests/{lid}/scenarios/{sid}/runs` : un playtesteur commence un scénario de la demande (#349).
+pub async fn route_jouer_playtest(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path((lid, sid)): Path<(i64, i64)>,
+) -> ApiResult<Value> {
+    let ok: Option<(i64, i64)> = sqlx::query_as(
+        "SELECT m.studio_id, l.slots FROM playtest_scenarios p JOIN playtest_listings l ON l.id = p.listing_id JOIN maps m ON m.id = l.map_id JOIN scenarios s ON s.id = p.scenario_id
+         WHERE p.listing_id = ? AND p.scenario_id = ? AND s.status = 'ready'",
+    )
+    .bind(lid)
+    .bind(sid)
+    .fetch_optional(&st.db)
+    .await?;
+    let (studio, places) = ok.ok_or(AppError::NotFound)?;
+    let membre: Option<i64> =
+        sqlx::query_scalar("SELECT 1 FROM memberships WHERE studio_id = ? AND user_id = ?")
+            .bind(studio)
+            .bind(u.id)
+            .fetch_optional(&st.db)
+            .await?;
+    if membre.is_some() {
+        return Err(bad(
+            "Vous ne pouvez pas tester une map de votre propre studio.",
+        ));
+    }
+    let deja: Option<i64> = sqlx::query_scalar(
+        "SELECT 1 FROM playtest_feedback WHERE listing_id = ? AND tester_id = ?",
+    )
+    .bind(lid)
+    .bind(u.id)
+    .fetch_optional(&st.db)
+    .await?;
+    if places <= 0 && deja.is_none() {
+        return Err(bad("Cette demande de test est terminée."));
+    }
+    let id: i64 = sqlx::query_scalar(
+        "INSERT INTO scenario_runs (scenario_id, version, tester_id, listing_id) VALUES (?, 'Playtest', ?, ?) RETURNING id",
+    )
+    .bind(sid)
+    .bind(u.id)
+    .bind(lid)
+    .fetch_one(&st.db)
+    .await?;
+    Ok(Json(json!({ "id": id })))
 }
 
 #[derive(Deserialize)]
@@ -383,13 +482,7 @@ pub async fn route_verdict(
     Path((rid, step)): Path<(i64, i64)>,
     Json(b): Json<ResultIn>,
 ) -> ApiResult<Value> {
-    let (ctx, sid, tester) = ctx_run(&st, &u, rid).await?;
-    ctx.can_edit()?;
-    if tester != u.id {
-        return Err(bad(
-            "Seule la personne qui joue ce passage donne les verdicts.",
-        ));
-    }
+    let (mid, sid) = acces_passage(&st, &u, rid).await?;
     let ok: Option<i64> =
         sqlx::query_scalar("SELECT id FROM scenario_steps WHERE id = ? AND scenario_id = ?")
             .bind(step)
@@ -402,7 +495,7 @@ pub async fn route_verdict(
     }
     let comment = b.comment.unwrap_or_default();
     check_len("Commentaire", &comment, 0, 1000)?;
-    let prefixe = format!("scenarios/{}/{rid}/{step}-", ctx.map_id);
+    let prefixe = format!("scenarios/{mid}/{rid}/{step}-");
     if b.capture_key
         .as_deref()
         .is_some_and(|k| !k.starts_with(&prefixe) || k.len() > 200)
@@ -429,10 +522,7 @@ pub async fn route_finir(
     u: AuthUser,
     Path(rid): Path<i64>,
 ) -> ApiResult<Value> {
-    let (ctx, sid, tester) = ctx_run(&st, &u, rid).await?;
-    if tester != u.id {
-        return Err(AppError::Forbidden);
-    }
+    let (mid, sid) = acces_passage(&st, &u, rid).await?;
     sqlx::query("UPDATE scenario_runs SET finished_at = datetime('now') WHERE id = ? AND finished_at IS NULL").bind(rid).execute(&st.db).await?;
     let p = passages(&st, sid).await?;
     let r = p["runs"]
@@ -453,18 +543,18 @@ pub async fn route_finir(
     );
     log_activity(
         &st,
-        ctx.map_id,
+        mid,
         Some(u.id),
         "scenario",
-        "Scénario joué",
+        if r["playtest"] == true {
+            "Scénario joué par un playtesteur"
+        } else {
+            "Scénario joué"
+        },
         &detail,
     )
     .await?;
-    notify(
-        &st,
-        ctx.map_id,
-        json!({ "t": "refresh", "what": "scenarios" }),
-    );
+    notify(&st, mid, json!({ "t": "refresh", "what": "scenarios" }));
     Ok(Json(r))
 }
 
@@ -480,16 +570,13 @@ pub async fn route_capture(
     Path(rid): Path<i64>,
     Json(b): Json<CaptureIn>,
 ) -> ApiResult<Value> {
-    let (ctx, _, tester) = ctx_run(&st, &u, rid).await?;
-    if tester != u.id {
-        return Err(AppError::Forbidden);
-    }
+    let (mid, _) = acces_passage(&st, &u, rid).await?;
     let s3 = S3::from_env().ok_or_else(|| {
         bad("Stockage objet non configuré sur ce serveur POP : pas de capture possible.")
     })?;
     let key = format!(
         "scenarios/{}/{rid}/{}-{}.png",
-        ctx.map_id,
+        mid,
         b.step,
         &random_token()[..16]
     );
@@ -593,6 +680,201 @@ mod tests {
             name: email.into(),
             sid: String::new(),
         }
+    }
+
+    /// #349 : un playtesteur joue les scénarios de la demande et rien d'autre ; le créateur voit ses verdicts.
+    #[tokio::test]
+    async fn joue_par_un_playtesteur() {
+        let st = crate::test_state().await;
+        let studio = |n: &'static str| {
+            let st = st.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>("INSERT INTO studios (name) VALUES (?) RETURNING id")
+                    .bind(n)
+                    .fetch_one(&st.db)
+                    .await
+                    .unwrap()
+            }
+        };
+        let (s1, s2) = (studio("A").await, studio("B").await);
+        let map = |s: i64| {
+            let st = st.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO maps (studio_id, name) VALUES (?, 'M') RETURNING id",
+                )
+                .bind(s)
+                .fetch_one(&st.db)
+                .await
+                .unwrap()
+            }
+        };
+        let (mid, mid_b) = (map(s1).await, map(s2).await);
+        let createur = compte(&st, s1, "createur@a.fr").await;
+        let testeur = compte(&st, s2, "testeur@b.fr").await;
+        sqlx::query("UPDATE users SET credits = 500")
+            .execute(&st.db)
+            .await
+            .unwrap();
+        let etat = || State(st.clone());
+        let nouveau = |titre: &str| {
+            Json(ScenarioIn {
+                title: titre.into(),
+                steps: json!([{ "action": "Ouvre la boutique", "expected": "La boutique s'affiche" }, { "action": "Achète l'arme", "expected": "L'arme est dans l'inventaire" }]),
+            })
+        };
+        let sid = route_creer(etat(), createur.clone(), Path(mid), nouveau("Boutique"))
+            .await
+            .unwrap()
+            .0["id"]
+            .as_i64()
+            .unwrap();
+        let autre = route_creer(etat(), createur.clone(), Path(mid), nouveau("Secret"))
+            .await
+            .unwrap()
+            .0["id"]
+            .as_i64()
+            .unwrap();
+        sqlx::query("INSERT INTO tasks (map_id, number, title) VALUES (?, 1, 'Tâche privée')")
+            .bind(mid)
+            .execute(&st.db)
+            .await
+            .unwrap();
+        // Demande de test avec le seul scénario « Boutique ».
+        let demande = |sc: Value| {
+            serde_json::from_value::<crate::launch::ListingIn>(
+                json!({ "slots": 2, "reward": 10, "minutes": 10, "scenarios": sc }),
+            )
+            .unwrap()
+        };
+        assert!(
+            crate::launch::create_listing(
+                etat(),
+                createur.clone(),
+                Path(mid),
+                Json(demande(json!([999])))
+            )
+            .await
+            .is_err(),
+            "scénario d'une autre map"
+        );
+        crate::launch::create_listing(
+            etat(),
+            createur.clone(),
+            Path(mid),
+            Json(demande(json!([sid]))),
+        )
+        .await
+        .unwrap();
+        let lid: i64 = sqlx::query_scalar("SELECT id FROM playtest_listings")
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        // Le playtesteur ne voit que « Boutique » et ses étapes.
+        let Json(ex) = crate::launch::exchange(etat(), testeur.clone(), Path(mid_b))
+            .await
+            .unwrap();
+        let sc = &ex["open"][0]["scenarios"];
+        assert_eq!(sc.as_array().unwrap().len(), 1);
+        assert_eq!(sc[0]["title"], "Boutique");
+        assert_eq!(sc[0]["steps"].as_array().unwrap().len(), 2);
+        assert!(!ex.to_string().contains("Secret") && !ex.to_string().contains("Tâche privée"));
+        // Ni les autres scénarios ni les tâches de la map.
+        assert!(route_liste(etat(), testeur.clone(), Path(mid))
+            .await
+            .is_err());
+        assert!(route_passages(etat(), testeur.clone(), Path(sid))
+            .await
+            .is_err());
+        assert!(
+            map_ctx(&st, &testeur, mid).await.is_err(),
+            "aucun accès aux tâches de la map"
+        );
+        assert!(
+            route_jouer_playtest(etat(), testeur.clone(), Path((lid, autre)))
+                .await
+                .is_err()
+        );
+        assert!(
+            route_jouer_playtest(etat(), createur.clone(), Path((lid, sid)))
+                .await
+                .is_err(),
+            "pas sa propre map"
+        );
+        // Il joue « Boutique » : un verdict par étape.
+        let rid = route_jouer_playtest(etat(), testeur.clone(), Path((lid, sid)))
+            .await
+            .unwrap()
+            .0["id"]
+            .as_i64()
+            .unwrap();
+        let steps: Vec<i64> =
+            sqlx::query_scalar("SELECT id FROM scenario_steps WHERE scenario_id = ? ORDER BY pos")
+                .bind(sid)
+                .fetch_all(&st.db)
+                .await
+                .unwrap();
+        let autre_etape: i64 =
+            sqlx::query_scalar("SELECT id FROM scenario_steps WHERE scenario_id = ?")
+                .bind(autre)
+                .fetch_one(&st.db)
+                .await
+                .unwrap();
+        let verdict = |v: &str, c: &str| {
+            Json(ResultIn {
+                verdict: v.into(),
+                comment: Some(c.into()),
+                capture_key: None,
+            })
+        };
+        route_verdict(
+            etat(),
+            testeur.clone(),
+            Path((rid, steps[0])),
+            verdict("pass", ""),
+        )
+        .await
+        .unwrap();
+        route_verdict(
+            etat(),
+            testeur.clone(),
+            Path((rid, steps[1])),
+            verdict("fail", "L'arme n'arrive pas"),
+        )
+        .await
+        .unwrap();
+        assert!(route_verdict(
+            etat(),
+            testeur.clone(),
+            Path((rid, autre_etape)),
+            verdict("pass", "")
+        )
+        .await
+        .is_err());
+        assert!(
+            route_verdict(
+                etat(),
+                createur.clone(),
+                Path((rid, steps[0])),
+                verdict("fail", "")
+            )
+            .await
+            .is_err(),
+            "seul le testeur donne ses verdicts"
+        );
+        route_finir(etat(), testeur.clone(), Path(rid))
+            .await
+            .unwrap();
+        // Le créateur voit le passage du playtesteur dans le même historique.
+        let p = passages(&st, sid).await.unwrap();
+        let r = &p["runs"][0];
+        assert_eq!(r["playtest"], true);
+        assert_eq!(r["tester"], "testeur@b.fr");
+        assert_eq!(r["results"][steps[1].to_string()]["verdict"], "fail");
+        assert_eq!(
+            r["results"][steps[1].to_string()]["comment"],
+            "L'arme n'arrive pas"
+        );
     }
 
     #[tokio::test]

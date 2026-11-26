@@ -1,3 +1,4 @@
+import { Passage } from '../components/Scenarios'
 import { useState } from 'react'
 import { CheckCircle2, AlertTriangle, Ban, Circle } from 'lucide-react'
 import { ago, api, frDate } from '../api'
@@ -55,7 +56,11 @@ function Swap() {
   const { map, canEdit, toast, reload: reloadMe } = useApp()
   const { data, reload } = useLoad<any>(map ? `/api/maps/${map.id}/playtests` : null, [map?.id])
   const [testing, setTesting] = useState<any>(null)
-  const [req, setReq] = useState({ slots: 5, reward: 20, minutes: 15, island_code: '' })
+  const [req, setReq] = useState({ slots: 5, reward: 20, minutes: 15, island_code: '', scenarios: [] as number[] })
+  // Scénarios validés de la map, à faire jouer aux playtesteurs (#349).
+  const { data: scen } = useLoad<any[]>(map ? `/api/maps/${map.id}/scenarios` : null, [map?.id])
+  const prets = (scen ?? []).filter(s => s.status === 'ready')
+  const basculer = (id: number) => setReq({ ...req, scenarios: req.scenarios.includes(id) ? req.scenarios.filter(x => x !== id) : [...req.scenarios, id].slice(0, 5) })
   if (!data) return null
   const order = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -75,7 +80,7 @@ function Swap() {
         {data.open.length === 0 && <p className="muted">{tr("Aucune map à tester pour le moment.")}</p>}
           <div className="list">{data.open.map((m: any) => (
             <div key={m.id} className="li" style={{ flexWrap: 'wrap' }}>
-              <div style={{ flex: '1 1 180px' }}><div style={{ fontWeight: 500 }}>{m.map}</div><div className="small muted">{tr("{0} · {1} min · {2}{3}", [m.genre, m.minutes, m.studio, m.island_code ? tr(" · code {0}", [m.island_code]) : ''])}</div></div>
+              <div style={{ flex: '1 1 180px' }}><div style={{ fontWeight: 500 }}>{m.map}</div><div className="small muted">{tr("{0} · {1} min · {2}{3}", [m.genre, m.minutes, m.studio, m.island_code ? tr(" · code {0}", [m.island_code]) : ''])}{m.scenarios?.length ? ' · ' + tr("{0} scénario(s) à jouer", [m.scenarios.length]) : ''}</div></div>
               <span className="badge">{tr("+{0} crédits", [m.reward])}</span>
               <button className="btn" disabled={m.done} onClick={() => setTesting(m)}>{m.done ? tr("Déjà testée") : tr("Tester")}</button>
             </div>
@@ -85,7 +90,7 @@ function Swap() {
           <div className="dsec" style={{ marginTop: 0 }}>{tr("Nos demandes · {0}", [map?.name])}</div>
           {data.mine.length === 0 && <p className="small muted">{tr("Aucune demande publiée.")}</p>}
           <div className="list">{data.mine.map((m: any) => <div key={m.id} className="li">
-            <div style={{ flex: 1 }}><div style={{ fontWeight: 500 }}>{tr("Demande du {0}", [frDate(m.created_at)])}</div><div className="small muted">{tr("{0} min · {1} crédits par test", [m.minutes, m.reward])}</div></div>
+            <div style={{ flex: 1 }}><div style={{ fontWeight: 500 }}>{tr("Demande du {0}", [frDate(m.created_at)])}</div><div className="small muted">{tr("{0} min · {1} crédits par test", [m.minutes, m.reward])}{m.scenarios?.length ? ' · ' + tr("scénarios : {0}", [m.scenarios.join(', ')]) : ''}</div></div>
             <span className="small muted">{tr("{0} retour(s)", [m.received])}</span>
             <span className={'badge ' + (m.slots > 0 ? 'b-o' : 'b-g')}>{m.slots > 0 ? tr("En cours · {0} place(s)", [m.slots]) : tr("Terminée")}</span>
           </div>)}</div>
@@ -97,6 +102,11 @@ function Swap() {
               <label className="label">{tr("Minutes")}<input className="field" type="number" min={5} max={60} value={req.minutes} onChange={e => setReq({ ...req, minutes: Number(e.target.value) })} /></label>
             </div>
             <label className="label">{tr("Code de l'île")}<input className="field mono" value={req.island_code} onChange={e => setReq({ ...req, island_code: e.target.value })} placeholder="1234-5678-9012" /></label>
+            {prets.length > 0 && <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
+              <legend className="label" style={{ marginBottom: 6 }}>{tr("Scénarios à faire jouer (facultatif, 5 au plus)")}</legend>
+              <div className="row" style={{ flexWrap: 'wrap', gap: 6 }}>{prets.map(s => <label key={s.id} className="chip"><input type="checkbox" checked={req.scenarios.includes(s.id)} onChange={() => basculer(s.id)} />{s.title}</label>)}</div>
+              <div className="small muted" style={{ marginTop: 4 }}>{tr("Les testeurs voient seulement ces scénarios et donnent un verdict par étape ; vous retrouvez leurs verdicts dans l'historique de chaque scénario.")}</div>
+            </fieldset>}
             <button className="btn pri" disabled={!canEdit || req.slots * req.reward > data.credits}>{tr("Publier · {0} crédits", [req.slots * req.reward])}</button>
           </form>
         </div>
@@ -115,7 +125,13 @@ function Swap() {
 
 function Questionnaire({ m, onClose, onDone }: { m: any; onClose: () => void; onDone: () => void }) {
   const { toast } = useApp()
+  // Scénarios de la demande (#349) : joués avant le questionnaire, un verdict par étape.
+  const [joue, setJoue] = useState<any>(null)
+  const [faits, setFaits] = useState<number[]>([])
   const [f, setF] = useState({ understood: 'Oui', left_minute: 10, reason: 'Fin de session', comeback: '', score: 4 })
+  if (joue) return <Modal onClose={() => setJoue(null)} label={tr("Jouer un scénario")}>
+    <Passage s={joue} playtest={m.id} onClose={() => { setFaits([...faits, joue.id]); setJoue(null) }} />
+  </Modal>
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     try { const r = await api.post(`/api/playtests/${m.id}/feedback`, f); toast(tr("+{0} crédits", [r.earned])); onDone() } catch (er: any) { toast(er.message, true) }
@@ -125,6 +141,13 @@ function Questionnaire({ m, onClose, onDone }: { m: any; onClose: () => void; on
       <form className="stack" onSubmit={submit}>
         <h2 style={{ margin: 0, fontWeight: 400 }}>{tr("Questionnaire · {0}", [m.map])}</h2>
         <p className="muted" style={{ margin: 0 }}>{tr("Jouez {0} minutes{1}, puis répondez.", [m.minutes, m.island_code ? ` (code ${m.island_code})` : ''])}</p>
+        {m.scenarios?.length > 0 && <div className="stack" style={{ gap: 6 }}>
+          <div style={{ fontWeight: 500 }}>{tr("Scénarios à jouer")}</div>
+          {m.scenarios.map((s: any) => <div key={s.id} className="row" style={{ gap: 8 }}>
+            <span style={{ flex: 1 }}>{s.title} <span className="small muted">· {tr("{0} étape(s)", [s.steps.length])}</span></span>
+            {faits.includes(s.id) ? <span className="badge b-g">{tr("Joué")}</span> : <button type="button" className="btn" onClick={() => setJoue(s)}>{tr("Jouer")}</button>}
+          </div>)}
+        </div>}
         <fieldset style={{ border: 0, padding: 0 }}><legend style={{ marginBottom: 8 }}>{tr("1. Avez-vous compris l'objectif en moins d'une minute ?")}</legend>
           <div className="row">{['Oui', 'En partie', 'Non'].map(x => <label key={x} className="chip"><input type="radio" name="u" checked={f.understood === x} onChange={() => setF({ ...f, understood: x })} />{tr(x)}</label>)}</div></fieldset>
         <label className="label">{tr("2. À quelle minute avez-vous eu envie d'arrêter ?")}<input className="field" type="number" min={0} max={180} value={f.left_minute} onChange={e => setF({ ...f, left_minute: Number(e.target.value) })} /></label>

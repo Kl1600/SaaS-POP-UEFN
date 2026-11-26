@@ -152,10 +152,24 @@ pub async fn exchange(
     .fetch_all(&st.db)
     .await?;
     let _ = ctx;
+    // Scénarios de chaque demande (#349) : le playtesteur ne voit que ceux de la demande, avec leurs étapes.
+    let mut open_json = vec![];
+    for (id, map, genre, studio, min, reward, slots, code, done) in open {
+        let sc = crate::scenarios::pour_playtest(&st, id).await?;
+        open_json.push(json!({"id": id, "map": map, "genre": genre, "studio": studio, "minutes": min, "reward": reward, "slots": slots, "island_code": code, "done": done == 1, "scenarios": sc}));
+    }
+    let mut mine_json = vec![];
+    for (id, min, reward, slots, at, received) in mine {
+        let sc: Vec<String> = sqlx::query_scalar("SELECT s.title FROM playtest_scenarios p JOIN scenarios s ON s.id = p.scenario_id WHERE p.listing_id = ? ORDER BY s.id")
+            .bind(id)
+            .fetch_all(&st.db)
+            .await?;
+        mine_json.push(json!({"id": id, "minutes": min, "reward": reward, "slots": slots, "created_at": at, "received": received, "scenarios": sc}));
+    }
     Ok(Json(json!({
         "credits": credits,
-        "open": open.into_iter().map(|(id, map, genre, studio, min, reward, slots, code, done)| json!({"id": id, "map": map, "genre": genre, "studio": studio, "minutes": min, "reward": reward, "slots": slots, "island_code": code, "done": done == 1})).collect::<Vec<_>>(),
-        "mine": mine.into_iter().map(|(id, min, reward, slots, at, received)| json!({"id": id, "minutes": min, "reward": reward, "slots": slots, "created_at": at, "received": received})).collect::<Vec<_>>(),
+        "open": open_json,
+        "mine": mine_json,
         "feedback": fb.into_iter().map(|(who, m, reason, und, cb, score, at)| json!({"who": who, "left_minute": m, "reason": reason, "understood": und, "comeback": cb, "score": score, "at": at})).collect::<Vec<_>>(),
     })))
 }
@@ -166,6 +180,8 @@ pub struct ListingIn {
     reward: i64,
     minutes: i64,
     island_code: Option<String>,
+    /// Scénarios validés de la map à faire jouer aux playtesteurs (#349), 5 au plus.
+    scenarios: Option<Vec<i64>>,
 }
 
 pub async fn create_listing(
@@ -181,6 +197,22 @@ pub async fn create_listing(
     {
         return Err(bad("Valeurs hors limites."));
     }
+    let scenarios = b.scenarios.unwrap_or_default();
+    if scenarios.len() > 5 {
+        return Err(bad("Cinq scénarios au plus par demande."));
+    }
+    for sid in &scenarios {
+        let ok: Option<i64> = sqlx::query_scalar(
+            "SELECT 1 FROM scenarios WHERE id = ? AND map_id = ? AND status = 'ready'",
+        )
+        .bind(sid)
+        .bind(mid)
+        .fetch_optional(&st.db)
+        .await?;
+        if ok.is_none() {
+            return Err(bad("Choisissez des scénarios validés de cette map."));
+        }
+    }
     let cost = b.slots * b.reward;
     let mut tx = st.db.begin().await?;
     let r = sqlx::query("UPDATE users SET credits = credits - ? WHERE id = ? AND credits >= ?")
@@ -192,9 +224,18 @@ pub async fn create_listing(
     if r.rows_affected() == 0 {
         return Err(bad(format!("Il faut {cost} crédits.")));
     }
-    sqlx::query("INSERT INTO playtest_listings (map_id, owner_id, minutes, reward, slots, island_code) VALUES (?, ?, ?, ?, ?, ?)")
+    let lid: i64 = sqlx::query_scalar("INSERT INTO playtest_listings (map_id, owner_id, minutes, reward, slots, island_code) VALUES (?, ?, ?, ?, ?, ?) RETURNING id")
         .bind(mid).bind(u.id).bind(b.minutes).bind(b.reward).bind(b.slots).bind(b.island_code.unwrap_or_default().chars().take(20).collect::<String>())
-        .execute(&mut *tx).await?;
+        .fetch_one(&mut *tx).await?;
+    for sid in &scenarios {
+        sqlx::query(
+            "INSERT OR IGNORE INTO playtest_scenarios (listing_id, scenario_id) VALUES (?, ?)",
+        )
+        .bind(lid)
+        .bind(sid)
+        .execute(&mut *tx)
+        .await?;
+    }
     tx.commit().await?;
     log_activity(
         &st,
