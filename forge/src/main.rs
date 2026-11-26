@@ -141,6 +141,16 @@ fn autoriser(app: &AppHandle, u: &Url) {
 
 /// Garde de navigation : Forge n'affiche que sa page locale et l'écran /forge du serveur POP choisi. Toute autre page
 /// (le site POP, un lien externe) s'ouvre dans le navigateur de l'utilisateur.
+/// Page de Forge sur le POP de Forge (`/forge`, `/api/`), qui s'ouvre dans la fenêtre ; le reste part au navigateur.
+fn page_pop(serveur: &str, url: &Url) -> bool {
+    let meme = normalize(serveur)
+        .map(|p| p.origin() == url.origin())
+        .unwrap_or(false);
+    meme && (url.path() == "/forge"
+        || url.path().starts_with("/forge/")
+        || url.path().starts_with("/api/"))
+}
+
 fn autorise(app: &AppHandle, url: &Url) -> bool {
     if url.scheme() == "tauri"
         || url.host_str() == Some("tauri.localhost")
@@ -148,13 +158,7 @@ fn autorise(app: &AppHandle, url: &Url) -> bool {
     {
         return true;
     }
-    let pop = load(app).server.and_then(|s| normalize(&s).ok());
-    let meme = pop.map(|p| p.origin() == url.origin()).unwrap_or(false);
-    if meme
-        && (url.path() == "/forge"
-            || url.path().starts_with("/forge/")
-            || url.path().starts_with("/api/"))
-    {
+    if page_pop(&serveur(app), url) {
         return true;
     }
     if matches!(url.scheme(), "http" | "https") {
@@ -214,6 +218,15 @@ fn ouvrir(app: &AppHandle, u: &Url) -> Result<(), String> {
 
 /// POP officiel : Forge s'y connecte sans rien demander quand aucune autre adresse n'est enregistrée (#412).
 const POP_DEFAUT: &str = "https://pop-uefn.com";
+
+/// Adresse de POP utilisée par Forge : l'adresse enregistrée, sinon le POP officiel (#412, #423).
+fn serveur(app: &AppHandle) -> String {
+    serveur_de(load(app).server)
+}
+
+fn serveur_de(enregistree: Option<String>) -> String {
+    enregistree.unwrap_or_else(|| POP_DEFAUT.to_string())
+}
 
 /// Résultat pour la page locale : adresse utilisée (ou à préremplir), erreur à afficher, et si c'est le POP officiel.
 #[derive(Serialize)]
@@ -428,9 +441,7 @@ fn etat_relais(app: AppHandle) -> String {
 /// Relie un projet UEFN à une map POP avec le code de l'Organiseur, puis redémarre le relais.
 #[tauri::command]
 async fn relier(app: AppHandle, code: String, projet: String) -> Result<String, String> {
-    let server = load(&app)
-        .server
-        .ok_or("Indiquez d'abord l'adresse de POP.")?;
+    let server = serveur(&app);
     let (code, projet) = (code.trim().to_string(), projet.trim().to_string());
     if code.is_empty() || projet.is_empty() {
         return Err("Indiquez le code et le projet UEFN.".into());
@@ -478,9 +489,7 @@ async fn relier(app: AppHandle, code: String, projet: String) -> Result<String, 
 /// site, POP crée une map par projet choisi (même nom) et les relie tous. Les liaisons déjà faites sont gardées.
 #[tauri::command]
 async fn importer(app: AppHandle, code: String, projets: Vec<String>) -> Result<String, String> {
-    let server = load(&app)
-        .server
-        .ok_or("Indiquez d'abord l'adresse de POP.")?;
+    let server = serveur(&app);
     let dossiers: Vec<std::path::PathBuf> = projets
         .iter()
         .map(std::path::PathBuf::from)
@@ -580,9 +589,7 @@ fn lancer_agent(
     {
         return Err("Clé d'agent invalide.".into());
     }
-    let serveur = load(&app)
-        .server
-        .ok_or("Forge n'est relié à aucun serveur POP.")?;
+    let serveur = serveur(&app);
     let o = agents_locaux::outils()
         .into_iter()
         .find(|o| o.id == outil)
@@ -747,8 +754,7 @@ fn on_menu(app: &AppHandle, id: &str) {
             }
         }
         "accueil" => {
-            let server = load(app).server.and_then(|s| normalize(&s).ok());
-            if let Some(u) = server {
+            if let Ok(u) = normalize(&serveur(app)) {
                 let _ = ouvrir(app, &u);
             }
         }
@@ -833,7 +839,30 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{check, cible_de, normalize};
+    use super::{check, cible_de, normalize, page_pop, serveur_de, POP_DEFAUT};
+
+    #[test]
+    fn forge_neuf_sur_pop_officiel() {
+        // #423 : sans adresse enregistrée, la page /forge de pop-uefn.com s'ouvre dans Forge.
+        let s = serveur_de(None);
+        assert_eq!(s, POP_DEFAUT);
+        assert!(page_pop(
+            &s,
+            &url::Url::parse("https://pop-uefn.com/forge?map=3").unwrap()
+        ));
+        assert!(!page_pop(
+            &s,
+            &url::Url::parse("https://pop-uefn.com/parametres").unwrap()
+        ));
+        assert!(!page_pop(
+            &s,
+            &url::Url::parse("https://autre.com/forge").unwrap()
+        ));
+        assert_eq!(
+            serveur_de(Some("http://localhost:8404".into())),
+            "http://localhost:8404"
+        );
+    }
 
     #[test]
     fn liens_pop_forge() {
