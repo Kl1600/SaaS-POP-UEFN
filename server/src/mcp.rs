@@ -1499,9 +1499,16 @@ mod tests {
             .await
             .unwrap();
         assert!(r.as_array().unwrap().iter().any(|m| m["id"] == id));
-        let r = call(&st, &u, mid, "search_library", json!({ "category": "hud" }))
-            .await
-            .unwrap();
+        // Catégorie sans aucun module (HUD a maintenant le module de POP, #88).
+        let r = call(
+            &st,
+            &u,
+            mid,
+            "search_library",
+            json!({ "category": "interface" }),
+        )
+        .await
+        .unwrap();
         assert_eq!(r.as_array().unwrap().len(), 0);
         let m = call(&st, &u, mid, "get_library_module", json!({ "id": id }))
             .await
