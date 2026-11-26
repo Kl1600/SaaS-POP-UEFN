@@ -13,6 +13,7 @@ import { useApp, studioName, useLive, useLoad } from '../state'
 import { ago, api } from '../api'
 import { tr } from '../i18n/t'
 import { ForgeBibliotheque } from '../components/ForgeBibliotheque'
+import { ForgeVerse } from '../components/ForgeVerse'
 import { cssRect } from '../zoom'
 
 type Invoke = <T = any>(cmd: string, args?: Record<string, unknown>) => Promise<T>
@@ -107,7 +108,7 @@ export default function Forge() {
         {section === 'accueil' ? <Accueil invoke={invoke} etat={etat} liaison={liaison} relie={relie} relire={lire} />
           : section === 'reglages' ? <Reglages />
           : section === 'agents' ? (app.map ? <ForgeAgents mapId={app.map.id} /> : <p className="muted">{tr("Choisissez une map.")}</p>)
-          : section === 'bibliotheque' ? <ForgeBibliotheque mapId={app.map?.id ?? null} studioId={app.studio?.id ?? null} />
+          : section === 'bibliotheque' ? <Bibliotheque mapId={app.map?.id ?? null} studioId={app.studio?.id ?? null} />
           : section === 'construire' ? (app.map ? <ForgeConstruire mapId={app.map.id} /> : <p className="muted">{tr("Choisissez une map.")}</p>)
             : <AVenir section={section} titre={titre ?? ''} />}
       </main>
@@ -498,5 +499,17 @@ function Telecharger() {
         <div><button className="btn" onClick={() => navigate('/')}>{tr("Retour à POP")}</button></div>
       </div>
     </div>
+  </div>
+}
+
+/** Bibliothèque de Forge : modules Verse (#86) et assets (#92, #382). */
+function Bibliotheque({ mapId, studioId }: { mapId: number | null; studioId: number | null }) {
+  const [vue, setVue] = useState<'verse' | 'assets'>('verse')
+  return <div className="stack" style={{ gap: 18 }}>
+    <div className="tabs" role="tablist" aria-label={tr("Bibliothèque")}>
+      <button role="tab" aria-selected={vue === 'verse'} className={vue === 'verse' ? 'on' : ''} onClick={() => setVue('verse')}>{tr("Modules Verse")}</button>
+      <button role="tab" aria-selected={vue === 'assets'} className={vue === 'assets' ? 'on' : ''} onClick={() => setVue('assets')}>{tr("Assets")}</button>
+    </div>
+    {vue === 'verse' ? <ForgeVerse mapId={mapId} studioId={studioId} /> : <ForgeBibliotheque mapId={mapId} studioId={studioId} />}
   </div>
 }
