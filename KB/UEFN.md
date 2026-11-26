@@ -193,3 +193,22 @@ compilé, le digest se met à jour à la compilation suivante (`BuildAll`).
 compilé, enregistré) **n'apparaît pas** comme `creative_prop_asset` dans le digest, donc `SpawnProp` ne peut pas
 l'utiliser. Pas d'outil `make_prop` : la voie Scene Graph ci-dessus suffit. Pour `SpawnProp` (ancienne API), il
 faut un prop de la galerie Fortnite (`creative_prop_asset` du digest Fortnite), pas un mesh importé.
+
+## Ouvrir UEFN sur un projet sans le launcher Epic (constat de benybens du 26/11/2026, UEFN 43.12, #402)
+
+- **Exécutable** : manifestes `C:\ProgramData\Epic\EpicGamesLauncher\Data\Manifests\*.item`, entrée
+  `AppName = Fortnite_Studio` (`InstallLocation` + `LaunchExecutable`, par exemple
+  `E:\Fortnite\FortniteGame\Binaries\Win64\UnrealEditorFortnite-Win64-Shipping.exe`). Lancé sans argument, il se
+  connecte seul au compte Epic quand le launcher tourne en fond.
+- **Projet présélectionné** : UEFN ignore le `.uefnproject` passé en argument et `LastProjectFileName`. Il
+  présélectionne le projet dont `LastOpenedTime` est le plus récent dans
+  `%LOCALAPPDATA%\UnrealEditorFortnite\Saved\Config\WindowsEditor\VK_Projects\<projectId>.ini`, section
+  `[/Script/ValkyrieEditor.ValkyriePerProjectUserConfig]`, heure UTC au format `2026.11.26-15.21.51`.
+  `<projectId>` = `bindings.projectId` du `.uefnproject`.
+- **Reste un clic** : UEFN reste sur l'écran de choix avec le bon projet présélectionné ; il faut cliquer « Lancer ».
+  `bStartupWithLastProject=True` n'y change rien ; le serveur MCP tourne déjà sur cet écran mais aucun toolset
+  n'ouvre un projet.
+- **Ce que fait Forge** (« Ouvrir dans UEFN », #402) : met `LastOpenedTime` à l'heure actuelle (seule ligne
+  modifiée, section créée si besoin), lance l'exécutable, puis dit de cliquer « Lancer ». Rien si UEFN est déjà
+  ouvert.
+- **Pas encore testé** : le lancement quand le launcher Epic est fermé (critère 6 de #402).

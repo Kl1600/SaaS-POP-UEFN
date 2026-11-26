@@ -133,7 +133,9 @@ fn autoriser(app: &AppHandle, u: &Url) {
         .permission("allow-activer-mcp-auto")
         // Lancer un agent IA local (#95).
         .permission("allow-outils-ia")
-        .permission("allow-lancer-agent");
+        .permission("allow-lancer-agent")
+        // Ouvrir UEFN sur le projet d'une map (#402).
+        .permission("allow-ouvrir-uefn");
     let _ = app.add_capability(cap);
 }
 
@@ -520,6 +522,42 @@ async fn importer(app: AppHandle, code: String, projets: Vec<String>) -> Result<
 
 /// Barre de titre propre à Forge (#78, retour de Kl1600 du 24/11) : la fenêtre n'a plus le cadre ni le menu de
 /// Windows ; la page dessine sa barre et appelle cette commande pour réduire, agrandir, fermer ou déplacer.
+/// « Ouvrir dans UEFN » (#402) : lance UEFN sur le projet relié à une map, sans passer par le launcher Epic. Seul un
+/// projet déjà relié est accepté. Si UEFN est ouvert, rien n'est lancé ni fermé.
+#[tauri::command]
+async fn ouvrir_uefn(projet: String) -> Result<String, String> {
+    let relie = pop_link::load()
+        .ok()
+        .map(|c| {
+            liens_de(&c)
+                .into_iter()
+                .any(|l| l.project.eq_ignore_ascii_case(&projet))
+        })
+        .unwrap_or(false);
+    if !relie {
+        return Err("Ce dossier n'est relié à aucune map.".into());
+    }
+    let p = PathBuf::from(&projet);
+    if let Some(ouvert) = pop_link::open_project(&tous_les_projets()).await {
+        let meme = ouvert.to_string_lossy().eq_ignore_ascii_case(&projet);
+        return if meme {
+            Ok("UEFN est déjà ouvert sur ce projet.".into())
+        } else {
+            Err(format!(
+                "UEFN est ouvert sur un autre projet ({}) : fermez-le d'abord. Rien n'a été fermé.",
+                ouvert
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_default()
+            ))
+        };
+    }
+    tokio::task::spawn_blocking(move || pop_link::poste::ouvrir_uefn(&p))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
 /// Outils d'IA installés sur ce PC, lançables ou non depuis Forge (#95).
 #[tauri::command]
 fn outils_ia() -> Vec<agents_locaux::Outil> {
@@ -742,6 +780,7 @@ fn main() {
             bilan_poste,
             outils_ia,
             lancer_agent,
+            ouvrir_uefn,
             activer_mcp_auto,
             start,
             connect,

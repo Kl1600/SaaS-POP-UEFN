@@ -151,6 +151,116 @@ pub fn activer_demarrage_auto() -> Result<PathBuf> {
     Ok(p)
 }
 
+/// Section des réglages d'un projet dans `VK_Projects\<projectId>.ini` (constaté avec UEFN 43.12, #402).
+const SECTION_PROJET: &str = "[/Script/ValkyrieEditor.ValkyriePerProjectUserConfig]";
+
+/// `bindings.projectId` du `.uefnproject` d'un dossier de projet UEFN.
+pub fn projet_id(projet: &Path) -> Option<String> {
+    std::fs::read_dir(projet)
+        .ok()?
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.extension().is_some_and(|x| x == "uefnproject"))
+        .find_map(|p| {
+            let v: Value = serde_json::from_str(&std::fs::read_to_string(p).ok()?).ok()?;
+            v["bindings"]["projectId"]
+                .as_str()
+                .filter(|s| !s.is_empty())
+                .map(str::to_string)
+        })
+}
+
+/// Date et heure UTC au format d'UEFN : `2026.11.26-15.21.51`.
+pub fn horodatage(secs: u64) -> String {
+    let (j, s) = ((secs / 86_400) as i64, secs % 86_400);
+    // Jours depuis 1970 → date civile (algorithme de Howard Hinnant).
+    let z = j + 719_468;
+    let ere = z.div_euclid(146_097);
+    let doe = z - ere * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let jour = doy - (153 * mp + 2) / 5 + 1;
+    let mois = if mp < 10 { mp + 3 } else { mp - 9 };
+    let an = yoe + ere * 400 + i64::from(mois <= 2);
+    format!(
+        "{an:04}.{mois:02}.{jour:02}-{:02}.{:02}.{:02}",
+        s / 3600,
+        s / 60 % 60,
+        s % 60
+    )
+}
+
+/// Met `LastOpenedTime` à `quand` dans la section du projet ; ajoute la ligne (ou la section) si elle manque.
+/// Aucune autre ligne n'est touchée.
+pub fn maj_dernier_lancement(ini: &str, quand: &str) -> String {
+    let fin = if ini.contains("\r\n") { "\r\n" } else { "\n" };
+    let mut lignes: Vec<String> = ini.lines().map(str::to_string).collect();
+    let debut = lignes
+        .iter()
+        .position(|l| l.trim().eq_ignore_ascii_case(SECTION_PROJET));
+    let nouvelle = format!("LastOpenedTime={quand}");
+    match debut {
+        None => {
+            if lignes.last().is_some_and(|l| !l.trim().is_empty()) {
+                lignes.push(String::new());
+            }
+            lignes.push(SECTION_PROJET.to_string());
+            lignes.push(nouvelle);
+        }
+        Some(d) => {
+            let fin_section = lignes[d + 1..]
+                .iter()
+                .position(|l| l.trim_start().starts_with('['))
+                .map_or(lignes.len(), |i| d + 1 + i);
+            match lignes[d + 1..fin_section]
+                .iter()
+                .position(|l| l.trim_start().starts_with("LastOpenedTime="))
+            {
+                Some(i) => lignes[d + 1 + i] = nouvelle,
+                None => lignes.insert(d + 1, nouvelle),
+            }
+        }
+    }
+    lignes.join(fin) + fin
+}
+
+/// Ouvre UEFN sur un projet sans passer par le launcher Epic (#402) : le projet est présélectionné dans l'écran de
+/// choix d'UEFN (il reste à cliquer « Lancer », aucun moyen de l'éviter n'est connu). Ne fait rien si UEFN est ouvert.
+pub fn ouvrir_uefn(projet: &Path) -> Result<String> {
+    if uefn_ouvert() {
+        bail!("UEFN est déjà ouvert : rien n'a été lancé.");
+    }
+    let Some(exe) = uefn_installe() else {
+        bail!(
+            "UEFN n'est pas installé sur ce PC (Epic Games Launcher → Unreal Editor for Fortnite)."
+        );
+    };
+    if !projet.is_dir() {
+        bail!("Dossier du projet introuvable : {}.", projet.display());
+    }
+    let Some(id) = projet_id(projet) else {
+        bail!("Ce dossier n'est pas un projet UEFN (aucun fichier .uefnproject avec son identifiant).");
+    };
+    if id.contains(['/', '\\', '.']) {
+        bail!("Identifiant de projet invalide.");
+    }
+    let dossier = PathBuf::from(std::env::var("LOCALAPPDATA").context("LOCALAPPDATA introuvable")?)
+        .join(r"UnrealEditorFortnite\Saved\Config\WindowsEditor\VK_Projects");
+    std::fs::create_dir_all(&dossier)?;
+    let ini = dossier.join(format!("{id}.ini"));
+    let avant = std::fs::read_to_string(&ini).unwrap_or_default();
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)?
+        .as_secs();
+    std::fs::write(&ini, maj_dernier_lancement(&avant, &horodatage(secs)))?;
+    std::process::Command::new(&exe)
+        .current_dir(exe.parent().unwrap_or(Path::new(".")))
+        .spawn()
+        .with_context(|| format!("lancement d'UEFN ({})", exe.display()))?;
+    Ok("UEFN démarre avec ce projet présélectionné : cliquez sur « Lancer » dans UEFN.".into())
+}
+
 /// Bilan pour l'assistant : chaque vérification avec son résultat (`null` : pas vérifiable maintenant).
 pub async fn bilan(projet: Option<&Path>, mcp_url: Option<&str>) -> Value {
     let uefn = uefn_installe();
@@ -218,5 +328,43 @@ mod tests {
             ligne_demarrage_auto("[/Script/ModelContextProtocol.Settings]\nAuto_Start=true\n"),
             Some((1, true))
         );
+    }
+
+    #[test]
+    fn horodatage_uefn() {
+        assert_eq!(horodatage(0), "1970.01.01-00.00.00");
+        // 26/11/2026 15:21:51 UTC (exemple de #402).
+        assert_eq!(horodatage(1_795_706_511), "2026.11.26-15.21.51");
+        assert_eq!(horodatage(951_782_400), "2000.02.29-00.00.00");
+    }
+
+    #[test]
+    fn dernier_lancement_sans_toucher_le_reste() {
+        let s = SECTION_PROJET;
+        let ini = format!("[Autre]\r\nX=1\r\n{s}\r\nLastOpenedTime=2026.01.01-00.00.00\r\nFavori=True\r\n[Suite]\r\nY=2\r\n");
+        let r = maj_dernier_lancement(&ini, "2026.11.26-15.21.51");
+        assert_eq!(r, ini.replace("2026.01.01-00.00.00", "2026.11.26-15.21.51"));
+        // Ligne absente : ajoutée en tête de la section, le reste intact.
+        let r = maj_dernier_lancement(&format!("{s}\nFavori=True\n"), "T");
+        assert_eq!(r, format!("{s}\nLastOpenedTime=T\nFavori=True\n"));
+        // Fichier vide (projet jamais ouvert) : la seule section.
+        assert_eq!(
+            maj_dernier_lancement("", "T"),
+            format!("{s}\nLastOpenedTime=T\n")
+        );
+    }
+
+    #[test]
+    fn identifiant_du_projet() {
+        let d = std::env::temp_dir().join(format!("pop-test-uefn-{}", std::process::id()));
+        std::fs::create_dir_all(&d).unwrap();
+        std::fs::write(
+            d.join("GrassCutter.uefnproject"),
+            r#"{"title":"GrassCutter","bindings":{"projectId":"a1b2c3d4e5"}}"#,
+        )
+        .unwrap();
+        assert_eq!(projet_id(&d).as_deref(), Some("a1b2c3d4e5"));
+        std::fs::remove_dir_all(&d).unwrap();
+        assert_eq!(projet_id(Path::new("/dossier/absent")), None);
     }
 }
