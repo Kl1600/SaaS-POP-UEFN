@@ -7,6 +7,7 @@
 mod digest;
 mod files;
 mod mcpdriver;
+pub mod poste;
 
 use anyhow::{anyhow, bail, Context, Result};
 use futures::{SinkExt, StreamExt};

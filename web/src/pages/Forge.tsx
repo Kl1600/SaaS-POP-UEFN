@@ -15,6 +15,7 @@ import { ForgeBibliotheque } from '../components/ForgeBibliotheque'
 import { ForgeVerse } from '../components/ForgeVerse'
 import { ForgeVerifications } from '../components/ForgeVerifications'
 import { ForgeScenarios } from '../components/ForgeScenarios'
+import { ForgeAssistant } from '../components/ForgeAssistant'
 import { cssRect } from '../zoom'
 
 type Invoke = <T = any>(cmd: string, args?: Record<string, unknown>) => Promise<T>
@@ -285,7 +286,7 @@ function Reglages() {
  * relier une map à un projet trouvé tout seul (Documents, projets récents d'UEFN, projet ouvert) ou choisi avec
  * « Parcourir… » ; plusieurs projets reliés à la fois. Forge ne crée pas de map : « Créer la map dans POP » ouvre le
  * site (critère 7 de #78). */
-function Accueil({ invoke, liaison, relire }: { invoke: Invoke; etat: string; liaison: Liaison; relie: boolean; relire: () => Promise<void> }) {
+function Accueil({ invoke, etat, liaison, relire }: { invoke: Invoke; etat: string; liaison: Liaison; relie: boolean; relire: () => Promise<void> }) {
   const app = useApp()
   const [ouvert, setOuvert] = useState<string | null>(null)
   const [projets, setProjets] = useState<string[]>([])
@@ -328,6 +329,7 @@ function Accueil({ invoke, liaison, relire }: { invoke: Invoke; etat: string; li
 
   return <div className="stack" style={{ gap: 32 }}>
     <h1 className="forge-h1">{tr("Bonjour")} {app.me?.user.name}</h1>
+    <ForgeAssistant invoke={invoke} liens={liens} etat={etat} />
 
     <section className="stack" style={{ gap: 10 }}>
       <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
