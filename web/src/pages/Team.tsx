@@ -261,6 +261,18 @@ function GitHub({ data, set }: { data: any; set: (k: string, e: boolean, c: any)
   </section>
 }
 
+/** Réglage « Les IA peuvent supprimer seules » dans UEFN (décision du 24/11, #165) : changé par un admin. */
+function IaSupprime({ studioId, admin }: { studioId: number; admin: boolean }) {
+  const { toast } = useApp()
+  const { data, reload } = useLoad<{ actif: boolean }>(`/api/studios/${studioId}/ia-supprime`, [studioId])
+  if (!data) return null
+  return <><div className="dsec">{tr("IA dans UEFN")}</div>
+    <label className="row" style={{ gap: 10, alignItems: 'flex-start', cursor: admin ? 'pointer' : 'default' }}>
+      <input type="checkbox" checked={data.actif} disabled={!admin} style={{ marginTop: 3 }} onChange={async e => { const actif = e.target.checked; try { await api.put(`/api/studios/${studioId}/ia-supprime`, { actif }); reload(); toast(actif ? tr("Les IA peuvent supprimer seules") : tr("Les suppressions des IA attendent une validation")) } catch (er: any) { toast(er.message, true) } }} />
+      <span><b>{tr("Les IA peuvent supprimer seules")}</b><br /><span className="small muted">{tr("Une suppression demandée par une IA dans UEFN est faite aussitôt, sans validation. Elle reste dans le journal et se restaure en un clic. Jamais sur un acteur ou un fichier verrouillé dans Lore par un autre.")}{!admin && ' ' + tr("Seul un admin du studio peut changer ce réglage.")}</span></span>
+    </label></>
+}
+
 function StudioSettings() {
   const { studio, me, isAdmin, reload: reloadMe, toast } = useApp()
   const owner = me?.studios.find(s => s.id === studio?.id)?.role === 'owner'
@@ -275,6 +287,7 @@ function StudioSettings() {
       <label className="label" style={{ flex: 1 }}>{tr("Nom du studio")}<input className="field" value={name} onChange={e => setName(e.target.value)} required maxLength={80} /></label>
       <button className="btn" style={{ alignSelf: 'flex-end' }}>{tr("Renommer")}</button>
     </form>}
+    <IaSupprime studioId={studio.id} admin={isAdmin} />
     {isAdmin && <><div className="dsec">{tr("Sauvegarde")}</div><p className="small muted" style={{ margin: 0 }}>{tr("Téléchargez tout le travail du studio (maps, tâches, pages, tableaux, Verse, gains) dans un fichier.")}</p>
       <a className="btn" style={{ marginTop: 8 }} href={`/api/studios/${studio.id}/export`} download>{tr("Exporter le studio")}</a></>}
     {owner && <><div className="dsec">{tr("Transférer la propriété")}</div>

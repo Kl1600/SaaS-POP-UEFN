@@ -6,5 +6,5 @@
 4. **Régler** : `update_actors` avec `options` (appareils classiques : une des valeurs autorisées) ou `props` (réglages `@editable` d'un appareil Verse ; une référence s'écrit `{ "refPath": "…" }`).
 5. **Ranger** : un dossier par zone ou par type, des noms clairs (`Bouton_Depart`, `Spawn_Rouge_1`).
 6. **Vérifier** : `check_level` après vos changements ; corrigez d'abord les problèmes « bloquant ».
-7. **Supprimer** : `delete_actors` crée une demande ; un humain valide dans l'Organiseur. Ne comptez pas sur une suppression immédiate.
+7. **Supprimer** : `delete_actors` supprime aussitôt si l'admin du studio a activé « Les IA peuvent supprimer seules » (journalisé, restaurable depuis le journal) ; sinon il crée une demande qu'un humain valide dans POP ou Forge : regardez la réponse (`pending_approval`) avant de compter sur la suppression.
 8. Un acteur ou un dossier verrouillé dans Lore par un autre membre est refusé : choisissez une autre tâche ou prévenez l'humain.
