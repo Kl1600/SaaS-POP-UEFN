@@ -55,6 +55,7 @@ mod plan;
 mod plan2d;
 mod privstats;
 mod questions;
+mod ranger;
 mod resume;
 mod roles;
 mod s3;
@@ -382,6 +383,13 @@ fn api() -> Router<AppState> {
             "/api/studios/{sid}/ia-supprime",
             get(manage::ia_supprime).put(manage::changer_ia_supprime),
         )
+        .route(
+            "/api/studios/{sid}/creator-space",
+            get(ranger::espace_studio).put(ranger::changer_espace_studio),
+        )
+        .route("/api/me/a-ranger", get(ranger::liste))
+        .route("/api/me/a-ranger/solo", post(ranger::laisser_solo))
+        .route("/api/me/creator-space", put(ranger::mon_espace))
         .route("/api/studios/{sid}/transfer", post(manage::transfer))
         .route("/api/studios/{sid}/relay/code", post(link::code))
         .route("/api/studios/{sid}/link-status", get(link::studio_status))

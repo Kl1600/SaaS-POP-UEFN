@@ -170,6 +170,33 @@ pub fn projet_id(projet: &Path) -> Option<String> {
         })
 }
 
+/// Espace Creator propriétaire du projet (#143) : début de `bindings.projectVersePath` du `.uefnproject`
+/// (`/klmaps@fortnite.com/VaultRush` → `klmaps@fortnite.com`) ; `None` pour un projet jamais publié.
+pub fn espace_creator(projet: &Path) -> Option<String> {
+    std::fs::read_dir(projet)
+        .ok()?
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.extension().is_some_and(|x| x == "uefnproject"))
+        .find_map(|p| {
+            let v: Value = serde_json::from_str(&std::fs::read_to_string(p).ok()?).ok()?;
+            let chemin = v["bindings"]["projectVersePath"].as_str()?;
+            chemin
+                .trim_start_matches('/')
+                .split('/')
+                .next()
+                .filter(|e| e.contains('@'))
+                .map(str::to_lowercase)
+        })
+}
+
+/// Identifiant Lore du projet (`.lore/id`), s'il est suivi par Lore (#143).
+pub fn lore_id(projet: &Path) -> Option<String> {
+    let id = std::fs::read_to_string(projet.join(".lore").join("id")).ok()?;
+    let id = id.trim();
+    (!id.is_empty() && id.len() <= 100).then(|| id.to_string())
+}
+
 /// Date et heure UTC au format d'UEFN : `2026.11.26-15.21.51`.
 pub fn horodatage(secs: u64) -> String {
     let (j, s) = ((secs / 86_400) as i64, secs % 86_400);
@@ -328,6 +355,30 @@ mod tests {
             ligne_demarrage_auto("[/Script/ModelContextProtocol.Settings]\nAuto_Start=true\n"),
             Some((1, true))
         );
+    }
+
+    #[test]
+    fn espace_et_lore_du_projet() {
+        let d = std::env::temp_dir().join(format!("pop-espace-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(d.join(".lore")).unwrap();
+        assert_eq!(espace_creator(&d), None, "pas de .uefnproject");
+        std::fs::write(
+            d.join("V.uefnproject"),
+            r#"{"bindings":{"projectId":"x","projectVersePath":"/KLmaps@fortnite.com/VaultRush"}}"#,
+        )
+        .unwrap();
+        assert_eq!(espace_creator(&d).as_deref(), Some("klmaps@fortnite.com"));
+        std::fs::write(
+            d.join("V.uefnproject"),
+            r#"{"bindings":{"projectVersePath":""}}"#,
+        )
+        .unwrap();
+        assert_eq!(espace_creator(&d), None, "jamais publié");
+        assert_eq!(lore_id(&d), None);
+        std::fs::write(d.join(".lore").join("id"), "abc-123\n").unwrap();
+        assert_eq!(lore_id(&d).as_deref(), Some("abc-123"));
+        let _ = std::fs::remove_dir_all(&d);
     }
 
     #[test]
