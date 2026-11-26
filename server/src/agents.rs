@@ -40,10 +40,20 @@ pub async fn list(
             Some(tid) => etape(&st, r.0, tid).await?,
             None => None,
         };
+        // Tâches attribuées et pas encore prises (#95) : l'agent les reçoit avec next_task.
+        let attribuees: Vec<(i64, String)> = sqlx::query_as(
+            "SELECT number, title FROM tasks WHERE map_id = ? AND agent_id = ? AND status <> 'done' AND id IS NOT ? ORDER BY number LIMIT 10",
+        )
+        .bind(mid)
+        .bind(r.0)
+        .bind(r.12)
+        .fetch_all(&st.db)
+        .await?;
         out.push(json!({
             "id": r.0, "name": r.1, "kind": r.2, "owner": r.3, "scope": r.4, "last_used": r.5, "calls": r.6,
             "task": r.7.map(|n| json!({ "number": n, "title": r.8, "status": r.9, "since": r.10, "step": step })),
             "last_action": r.11, "role": r.13, "orchestrator": Some(r.0) == orch, "last_tool": r.14,
+            "attribuees": attribuees.into_iter().map(|(n, ti)| json!({ "number": n, "title": ti })).collect::<Vec<_>>(),
         }));
     }
     Ok(Json(json!(out)))

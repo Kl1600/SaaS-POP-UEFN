@@ -26,6 +26,9 @@ pub struct TokenIn {
     scope: Option<String>,
     /// Rôle de l'agent (#111), facultatif.
     role: Option<String>,
+    /// Map de travail dès la création (agent lancé depuis Forge, #95) : il apparaît tout de suite dans les agents
+    /// de la map. Le compte doit pouvoir la modifier.
+    map: Option<i64>,
 }
 
 const KINDS: &[&str] = &[
@@ -60,7 +63,10 @@ pub async fn create_token(
         "write"
     };
     let role = role_valide(b.role.as_deref())?;
-    let id: i64 = sqlx::query_scalar("INSERT INTO api_tokens (user_id, name, token_hash, kind, scope, role) VALUES (?, ?, ?, ?, ?, ?) RETURNING id").bind(u.id).bind(b.name.trim()).bind(sha256_hex(&token)).bind(&kind).bind(scope).bind(role).fetch_one(&st.db).await?;
+    if let Some(mid) = b.map {
+        crate::access::map_ctx(&st, &u, mid).await?.can_edit()?;
+    }
+    let id: i64 = sqlx::query_scalar("INSERT INTO api_tokens (user_id, name, token_hash, kind, scope, role, map_id) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id").bind(u.id).bind(b.name.trim()).bind(sha256_hex(&token)).bind(&kind).bind(scope).bind(role).bind(b.map).fetch_one(&st.db).await?;
     Ok(Json(json!({ "token": token, "id": id })))
 }
 
@@ -2343,6 +2349,42 @@ mod tests_compte {
         assert!(ecrire().await.is_ok(), "Pro");
     }
 
+    /// #95 : un agent lancé depuis Forge reçoit sa map dès la création, seulement si le compte peut la modifier.
+    #[tokio::test]
+    async fn jeton_avec_sa_map() {
+        let m = monde().await;
+        let u = AuthUser {
+            id: m.uid,
+            email: "ia@a.fr".into(),
+            name: "Yanis".into(),
+            sid: String::new(),
+        };
+        let nouveau = |map: i64| {
+            Json(TokenIn {
+                name: "Claude Code · Forge".into(),
+                kind: Some("claude_code".into()),
+                scope: None,
+                role: None,
+                map: Some(map),
+            })
+        };
+        let Json(r) = create_token(State(m.st.clone()), u.clone(), nouveau(m.equipe))
+            .await
+            .unwrap();
+        let map: Option<i64> = sqlx::query_scalar("SELECT map_id FROM api_tokens WHERE id = ?")
+            .bind(r["id"].as_i64().unwrap())
+            .fetch_one(&m.st.db)
+            .await
+            .unwrap();
+        assert_eq!(map, Some(m.equipe));
+        assert!(
+            create_token(State(m.st.clone()), u, nouveau(m.autre))
+                .await
+                .is_err(),
+            "map d'un studio dont il n'est pas membre"
+        );
+    }
+
     #[tokio::test]
     async fn creer_un_jeton_de_compte() {
         let m = monde().await;
@@ -2360,6 +2402,7 @@ mod tests_compte {
                 kind: Some("claude_code".into()),
                 scope: None,
                 role: Some("testeur".into()),
+                map: None,
             }),
         )
         .await

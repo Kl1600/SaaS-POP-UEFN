@@ -9,6 +9,7 @@
 //! « UEFN Link » relie un projet UEFN et ouvre la page d'état du relais.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod agents_locaux;
 mod relay;
 
 use serde::{Deserialize, Serialize};
@@ -127,7 +128,10 @@ fn autoriser(app: &AppHandle, u: &Url) {
         .permission("allow-capture-jeu")
         // Assistant de premier lancement (#299).
         .permission("allow-bilan-poste")
-        .permission("allow-activer-mcp-auto");
+        .permission("allow-activer-mcp-auto")
+        // Lancer un agent IA local (#95).
+        .permission("allow-outils-ia")
+        .permission("allow-lancer-agent");
     let _ = app.add_capability(cap);
 }
 
@@ -461,6 +465,64 @@ async fn relier(app: AppHandle, code: String, projet: String) -> Result<String, 
 
 /// Barre de titre propre à Forge (#78, retour de Kl1600 du 24/11) : la fenêtre n'a plus le cadre ni le menu de
 /// Windows ; la page dessine sa barre et appelle cette commande pour réduire, agrandir, fermer ou déplacer.
+/// Outils d'IA installés sur ce PC, lançables ou non depuis Forge (#95).
+#[tauri::command]
+fn outils_ia() -> Vec<agents_locaux::Outil> {
+    agents_locaux::outils()
+}
+
+/// Lance l'IA de l'utilisateur sur une tâche POP (#95), avec la clé de l'agent dans `POP_TOKEN` seulement.
+#[tauri::command]
+fn lancer_agent(
+    app: AppHandle,
+    outil: String,
+    token: String,
+    map: String,
+    tache: i64,
+    titre: String,
+) -> Result<(), String> {
+    if !token.starts_with("pop_")
+        || token.len() > 200
+        || !token[4..].bytes().all(|b| b.is_ascii_alphanumeric())
+    {
+        return Err("Clé d'agent invalide.".into());
+    }
+    let serveur = load(&app)
+        .server
+        .ok_or("Forge n'est relié à aucun serveur POP.")?;
+    let o = agents_locaux::outils()
+        .into_iter()
+        .find(|o| o.id == outil)
+        .ok_or("Outil inconnu.")?;
+    if !o.lancable {
+        return Err(o.raison.unwrap_or_else(|| "Outil indisponible.".into()));
+    }
+    let exe = PathBuf::from(o.chemin.ok_or("Outil introuvable.")?);
+    // Config MCP sans clé (l'en-tête lit POP_TOKEN), gardée avec les données de Forge.
+    let dossier_forge = dirs::data_local_dir()
+        .ok_or("Dossier de données introuvable.")?
+        .join("POP Forge");
+    std::fs::create_dir_all(&dossier_forge).map_err(|e| e.to_string())?;
+    let config = dossier_forge.join("mcp-pop.json");
+    std::fs::write(&config, agents_locaux::config_claude(&serveur)).map_err(|e| e.to_string())?;
+    // Dossier de travail : le projet UEFN relié à cette map, sinon le dossier de l'utilisateur.
+    let dossier = pop_link::load()
+        .ok()
+        .and_then(|c| {
+            liens_de(&c)
+                .into_iter()
+                .find(|l| l.map.eq_ignore_ascii_case(&map))
+                .map(|l| PathBuf::from(l.project))
+        })
+        .filter(|p| p.is_dir())
+        .or_else(dirs::home_dir)
+        .ok_or("Dossier de travail introuvable.")?;
+    let consigne = agents_locaux::consigne(&map, tache, &titre);
+    let args = agents_locaux::arguments(&outil, &serveur, &config, &consigne)
+        .ok_or("Outil non pris en charge.")?;
+    agents_locaux::lancer(&exe, &args, &dossier, &token)
+}
+
 /// Assistant de premier lancement (#299) : vérifications du poste (UEFN, serveur MCP, toolsets, Python, démarrage
 /// automatique) pour le projet ouvert dans UEFN, sinon le premier projet relié.
 #[tauri::command]
@@ -623,6 +685,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             capture_jeu,
             bilan_poste,
+            outils_ia,
+            lancer_agent,
             activer_mcp_auto,
             start,
             connect,
