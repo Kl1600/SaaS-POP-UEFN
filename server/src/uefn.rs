@@ -48,50 +48,86 @@ pub const RELAY_PROTO: u32 = 2;
 /// Message montré quand le relais ne connaît pas une action ou annonce un protocole plus ancien.
 pub const STALE_MSG: &str = "Relais périmé : il ne connaît pas cette action. Installez la dernière version de POP Forge (POP → Télécharger POP Forge), fermez l’ancien relais (pop-link.exe) s’il est ouvert, puis lancez Forge.";
 
+/// Relais connectés, par map (#439) : plusieurs PC ou personnes peuvent relier la même map. On garde tous leurs
+/// relais ; celui qui a UEFN connecté (le plus récent s'il y en a plusieurs) représente la map.
 #[derive(Default)]
 pub struct RelayHub {
-    conns: Mutex<HashMap<i64, RelayConn>>,
+    conns: Mutex<HashMap<i64, Vec<RelayConn>>>,
     next: std::sync::atomic::AtomicU64,
 }
 
+/// Le relais qui représente la map : UEFN connecté d'abord, puis le plus récent.
+fn choisi(v: &[RelayConn]) -> Option<&RelayConn> {
+    v.iter().max_by_key(|c| (c.uefn == "connected", c.conn_id))
+}
+
 impl RelayHub {
+    fn lire<T>(&self, map_id: i64, f: impl FnOnce(&RelayConn) -> T) -> Option<T> {
+        self.conns
+            .lock()
+            .unwrap()
+            .get(&map_id)
+            .and_then(|v| choisi(v))
+            .map(f)
+    }
+    /// `conn_id` du relais qui représente la map.
+    fn choisi_id(&self, map_id: i64) -> Option<u64> {
+        self.lire(map_id, |c| c.conn_id)
+    }
     pub fn status(&self, map_id: i64) -> &'static str {
-        match self.conns.lock().unwrap().get(&map_id) {
+        match self.lire(map_id, |c| c.uefn == "connected") {
             None => "offline",
-            Some(c) if c.uefn == "connected" => "connected",
-            Some(_) => "closed",
+            Some(true) => "connected",
+            Some(false) => "closed",
         }
     }
     /// Le relais relié est plus ancien que le serveur (#158).
     pub fn stale(&self, map_id: i64) -> bool {
-        self.conns
-            .lock()
-            .unwrap()
-            .get(&map_id)
-            .is_some_and(|c| c.proto != 0 && c.proto < RELAY_PROTO)
+        self.lire(map_id, |c| c.proto != 0 && c.proto < RELAY_PROTO)
+            .unwrap_or(false)
     }
     /// Le relais relié est un pop-link.exe seul, remplacé par POP Forge (#404).
     pub fn legacy(&self, map_id: i64) -> bool {
-        self.conns
-            .lock()
-            .unwrap()
-            .get(&map_id)
-            .is_some_and(|c| c.proto != 0 && c.app != "forge")
+        self.lire(map_id, |c| c.proto != 0 && c.app != "forge")
+            .unwrap_or(false)
     }
     fn tools(&self, map_id: i64) -> Value {
-        self.conns
-            .lock()
-            .unwrap()
-            .get(&map_id)
-            .map(|c| c.tools.clone())
+        self.lire(map_id, |c| c.tools.clone())
             .unwrap_or(Value::Null)
     }
     fn project(&self, map_id: i64) -> Option<String> {
+        self.lire(map_id, |c| c.project.clone())
+    }
+    /// Modifie le relais `conn_id` de la map, s'il est encore connecté.
+    fn modifier<T>(
+        &self,
+        map_id: i64,
+        conn_id: u64,
+        f: impl FnOnce(&mut RelayConn) -> T,
+    ) -> Option<T> {
         self.conns
             .lock()
             .unwrap()
-            .get(&map_id)
-            .map(|c| c.project.clone())
+            .get_mut(&map_id)
+            .and_then(|v| v.iter_mut().find(|c| c.conn_id == conn_id))
+            .map(f)
+    }
+    fn ajouter(&self, map_id: i64, c: RelayConn) {
+        self.conns
+            .lock()
+            .unwrap()
+            .entry(map_id)
+            .or_default()
+            .push(c);
+    }
+    fn retirer(&self, map_id: i64, conn_id: u64) {
+        let mut conns = self.conns.lock().unwrap();
+        if let Some(v) = conns.get_mut(&map_id) {
+            v.retain(|c| c.conn_id != conn_id);
+            if v.is_empty() {
+                conns.remove(&map_id);
+            }
+        }
     }
 }
 
@@ -125,6 +161,7 @@ pub(crate) async fn relay_call(
         let conns = st.relays.conns.lock().unwrap();
         let c = conns
             .get(&map_id)
+            .and_then(|v| choisi(v))
             .ok_or_else(|| AppError::Conflict("Relais hors ligne.".into()))?;
         c.pending.lock().unwrap().insert(id.clone(), tx);
         let _ =
@@ -271,7 +308,7 @@ async fn relay_run(st: AppState, dev: i64, mid: i64, socket: WebSocket) {
         .relays
         .next
         .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    st.relays.conns.lock().unwrap().insert(
+    st.relays.ajouter(
         mid,
         RelayConn {
             tx,
@@ -301,17 +338,12 @@ async fn relay_run(st: AppState, dev: i64, mid: i64, socket: WebSocket) {
         let Ok(v) = serde_json::from_str::<Value>(&t) else {
             continue;
         };
-        if let Err(e) = on_relay_msg(&st, mid, &pending, v).await {
+        if let Err(e) = on_relay_msg(&st, mid, conn_id, &pending, v).await {
             tracing::warn!("message du relais ignoré : {e:?}");
         }
     }
     writer.abort();
-    {
-        let mut conns = st.relays.conns.lock().unwrap();
-        if conns.get(&mid).map(|c| c.conn_id) == Some(conn_id) {
-            conns.remove(&mid);
-        }
-    }
+    st.relays.retirer(mid, conn_id);
     broadcast_status(&st, mid);
 }
 
@@ -334,11 +366,20 @@ async fn ensure_state(st: &AppState, mid: i64) -> Result<(), AppError> {
 async fn on_relay_msg(
     st: &AppState,
     mid: i64,
+    conn_id: u64,
     pending: &Arc<Mutex<HashMap<String, oneshot::Sender<Value>>>>,
     v: Value,
 ) -> Result<(), AppError> {
     ensure_state(st, mid).await?;
-    match v["t"].as_str().unwrap_or("") {
+    let t = v["t"].as_str().unwrap_or("");
+    // Fichiers et état du niveau : seulement depuis le relais qui représente la map (#439), pour qu'un PC sans UEFN
+    // n'écrase pas celui qui l'a.
+    if !matches!(t, "result" | "tools" | "hello" | "status")
+        && st.relays.choisi_id(mid) != Some(conn_id)
+    {
+        return Ok(());
+    }
+    match t {
         "result" => {
             if let Some(tx) = pending
                 .lock()
@@ -351,9 +392,9 @@ async fn on_relay_msg(
         "tools" => {
             // Outils réellement exposés par le serveur MCP d'UEFN (affichés dans l'Organiseur).
             let tools: Vec<Value> = v["tools"].as_array().cloned().unwrap_or_default().into_iter().take(400).map(|t| json!({ "name": t["name"].as_str().unwrap_or("").chars().take(120).collect::<String>(), "description": t["description"].as_str().unwrap_or("").chars().take(300).collect::<String>() })).collect();
-            if let Some(c) = st.relays.conns.lock().unwrap().get_mut(&mid) {
+            st.relays.modifier(mid, conn_id, |c| {
                 c.tools = json!({ "url": v["url"].as_str().unwrap_or("").chars().take(200).collect::<String>(), "list": tools, "roles": v["roles"].clone() });
-            }
+            });
             broadcast_status(st, mid);
         }
         "hello" | "status" => {
@@ -362,13 +403,8 @@ async fn on_relay_msg(
             } else {
                 "closed"
             };
-            let was;
-            {
-                let mut conns = st.relays.conns.lock().unwrap();
-                let Some(c) = conns.get_mut(&mid) else {
-                    return Ok(());
-                };
-                was = c.uefn.clone();
+            let was = st.relays.status(mid);
+            let present = st.relays.modifier(mid, conn_id, |c| {
                 c.uefn = uefn.into();
                 if let Some(p) = v["project"].as_str() {
                     c.project = p.chars().take(120).collect();
@@ -384,8 +420,16 @@ async fn on_relay_msg(
                         .take(20)
                         .collect();
                 }
+            });
+            if present.is_none() {
+                return Ok(());
             }
-            if let Some(p) = v["project"].as_str() {
+            let uefn = st.relays.status(mid);
+            // Le projet de la map est celui du relais qui la représente.
+            if let (Some(p), true) = (
+                v["project"].as_str(),
+                st.relays.choisi_id(mid) == Some(conn_id),
+            ) {
                 sqlx::query("UPDATE uefn_state SET project = ? WHERE map_id = ?")
                     .bind(p)
                     .bind(mid)
@@ -2355,19 +2399,75 @@ mod tests_statut {
     /// Relais connecté (comme après `relay_ws`) pour la map `mid`, avec l'état d'UEFN donné.
     fn connecter(st: &AppState, mid: i64, uefn: &str) {
         let (tx, _rx) = mpsc::unbounded_channel();
-        st.relays.conns.lock().unwrap().insert(
+        let conn_id = st
+            .relays
+            .next
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        st.relays.ajouter(
             mid,
             RelayConn {
                 tx,
                 pending: Default::default(),
                 uefn: uefn.into(),
                 project: "P".into(),
-                conn_id: 1,
+                conn_id,
                 tools: Value::Null,
                 proto: RELAY_PROTO,
                 app: "forge".into(),
             },
         );
+    }
+
+    /// #439 : deux PC reliés à la même map ; celui qui a UEFN la représente, même si l'autre s'est connecté après.
+    #[tokio::test]
+    async fn plusieurs_relais() {
+        let st = crate::test_state().await;
+        let (tx_a, mut rx_a) = mpsc::unbounded_channel();
+        let id = |st: &AppState| {
+            st.relays
+                .next
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        };
+        let conn = |tx, uefn: &str, conn_id| RelayConn {
+            tx,
+            pending: Default::default(),
+            uefn: uefn.into(),
+            project: String::new(),
+            conn_id,
+            tools: Value::Null,
+            proto: RELAY_PROTO,
+            app: "forge".into(),
+        };
+        let a = id(&st);
+        st.relays.ajouter(7, conn(tx_a, "connected", a));
+        let (tx_b, mut rx_b) = mpsc::unbounded_channel();
+        let b = id(&st);
+        st.relays.ajouter(7, conn(tx_b, "closed", b));
+        assert_eq!(
+            st.relays.status(7),
+            "connected",
+            "le PC sans UEFN ne cache pas l'autre"
+        );
+        let pb = crate::aide_forge::diagnostic(&st, 7, 1).await.unwrap();
+        assert!(
+            !pb.to_string().contains("mcp-arrete"),
+            "pas de « UEFN est fermé » : {pb}"
+        );
+        // Une action part vers le relais qui a UEFN.
+        let st2 = st.clone();
+        let h =
+            tokio::spawn(async move { relay_call(&st2, 7, "list_actors", &json!({}), 1).await });
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert!(
+            rx_a.try_recv().is_ok(),
+            "commande reçue par le relais qui a UEFN"
+        );
+        assert!(rx_b.try_recv().is_err(), "rien pour le relais sans UEFN");
+        let _ = h.await;
+        st.relays.retirer(7, a);
+        assert_eq!(st.relays.status(7), "closed");
+        st.relays.retirer(7, b);
+        assert_eq!(st.relays.status(7), "offline");
     }
 
     /// #404 : un relais qui ne se dit pas « forge » (pop-link.exe seul, ou d'avant #404) est signalé comme remplacé
@@ -2377,9 +2477,9 @@ mod tests_statut {
         let st = crate::test_state().await;
         connecter(&st, 7, "connected");
         assert!(!st.relays.legacy(7), "relais de Forge");
-        st.relays.conns.lock().unwrap().get_mut(&7).unwrap().app = "pop-link".into();
+        st.relays.conns.lock().unwrap().get_mut(&7).unwrap()[0].app = "pop-link".into();
         assert!(st.relays.legacy(7), "pop-link.exe seul");
-        st.relays.conns.lock().unwrap().get_mut(&7).unwrap().proto = 0;
+        st.relays.conns.lock().unwrap().get_mut(&7).unwrap()[0].proto = 0;
         assert!(!st.relays.legacy(7), "pas encore présenté");
         assert!(!st.relays.legacy(8), "aucun relais");
     }
