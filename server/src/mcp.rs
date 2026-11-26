@@ -189,6 +189,7 @@ fn tools() -> Value {
         tool("delete_actors", "Demande la suppression d'acteurs. Un humain doit valider dans POP avant l'exécution.", json!({ "ids": ids }), &["ids"]),
         tool("check_level", "Vérifie le niveau sur le dernier état connu : références d'appareils vers un acteur absent (bloquant), réglages non reliés, options réglées sans effet, tags Verse inutilisés. Chaque problème a sa gravité, l'acteur et une explication.", json!({}), &[]),
         tool("list_verse_files", "Liste les fichiers .verse du projet.", json!({}), &[]),
+        tool("read_other_map", "Lit une AUTRE map de l'utilisateur comme contexte, en lecture seule (ex. reprendre une idée ou un module d'une map précédente) ; la map de travail ne change pas. map : identifiant (list_maps). what : pages | page | tasks | task | verse_files | verse_file | modules | module ; selon what : path (page ou fichier Verse), number (tâche), id (module), query (recherche dans les modules). Aucun outil d'écriture n'agit sur l'autre map.", json!({ "map": { "type": "integer" }, "what": { "type": "string", "enum": ["pages", "page", "tasks", "task", "verse_files", "verse_file", "modules", "module"] }, "path": { "type": "string" }, "number": { "type": "integer" }, "id": { "type": "integer" }, "query": { "type": "string" } }), &["map", "what"]),
         tool("read_verse_file", "Lit un fichier .verse.", json!({ "path": { "type": "string" } }), &["path"]),
         tool("write_verse_file", "Écrit un fichier .verse dans le projet (crée ou remplace).", json!({ "path": { "type": "string" }, "content": { "type": "string" }, "task": task }), &["path", "content"]),
         tool("create_widget", "Crée une interface de jeu (HUD ou menu) : un appareil Verse prêt à poser dans le niveau, écrit dans Content/POP_UI/pop_ui_<name>.verse. kind : texte (affiché à tous), compteur (libellé + nombre par joueur, +1 à chaque activation d'un déclencheur ; Ajouter/Definir depuis le Verse), bouton (s'ouvre par un déclencheur, un clic active un appareil Cible). position : haut, centre ou bas. Ensuite : compile_verse, puis place_device ou poser l'appareil à la main. Annulable tant qu'aucun acteur ne l'utilise.", json!({ "kind": { "type": "string", "enum": ["texte", "compteur", "bouton"] }, "name": { "type": "string", "description": "minuscules, chiffres, _ (ex. score)" }, "text": { "type": "string" }, "position": { "type": "string", "enum": ["haut", "centre", "bas"] }, "task": task }), &["kind", "name", "text"]),
@@ -266,6 +267,7 @@ pub(crate) fn tool_names() -> Vec<String> {
 
 const READ_TOOLS: &[&str] = &[
     "list_maps",
+    "read_other_map",
     "use_map",
     "uefn_status",
     "check_level",
@@ -937,6 +939,32 @@ async fn call_as(
             .ok_or_else(|| crate::error::bad(&format!("Tâche #{n} introuvable dans cette map.")))
     };
     match name {
+        // Autre map de l'utilisateur, en lecture seule (#353) : mêmes droits que sur le site, même refus qu'une map qui
+        // n'existe pas, et l'appel est aussi noté dans le fil de l'autre map.
+        "read_other_map" => {
+            let autre = a["map"].as_i64().ok_or_else(|| crate::error::bad("Map manquante (identifiant donné par list_maps)."))?;
+            if autre == mid {
+                return Err(crate::error::bad("C'est déjà votre map de travail : utilisez les outils habituels."));
+            }
+            map_ctx(st, user, autre).await.map_err(|_| AppError::NotFound)?;
+            let outil = match a["what"].as_str().unwrap_or("") {
+                "pages" => "list_pages",
+                "page" => "read_page",
+                "tasks" => "list_tasks",
+                "task" => "get_task",
+                "verse_files" => "list_verse_files",
+                "verse_file" => "read_verse_file",
+                "modules" => "search_library",
+                "module" => "get_library_module",
+                _ => return Err(crate::error::bad("what : pages, page, tasks, task, verse_files, verse_file, modules ou module.")),
+            };
+            debug_assert!(READ_TOOLS.contains(&outil));
+            let r = Box::pin(call_as(st, user, autre, None, outil, a.clone())).await;
+            if let Some(ag) = agent {
+                crate::agents::noter_appel(st, ag, autre, "read_other_map", &a, r.as_ref().map_err(|_| ())).await;
+            }
+            Ok(json!({ "map": autre, "what": a["what"], "result": r? }))
+        }
         "check_level" => crate::checks::rapport(st, mid).await,
         "search_library" => {
             let q = crate::library::SearchQ {
@@ -2153,6 +2181,106 @@ mod tests_compte {
             .await
             .unwrap();
         t
+    }
+
+    /// #353 : lire une autre map de l'utilisateur (lecture seule), refus identique pour une map interdite ou absente,
+    /// aucun outil d'écriture sur l'autre map, appel noté dans le fil des deux maps.
+    #[tokio::test]
+    async fn lire_une_autre_map() {
+        let m = monde().await;
+        sqlx::query("INSERT INTO verse_files (map_id, path, content, sha) VALUES (?, 'Jeu/economie.verse', 'banque := class:', 'x')")
+            .bind(m.perso)
+            .execute(&m.st.db)
+            .await
+            .unwrap();
+        let t = jeton(&m, Some(m.equipe), "write").await;
+        let (err, txt) = mcp_call(
+            &m.st,
+            &t,
+            "read_other_map",
+            json!({ "map": m.perso, "what": "verse_file", "path": "Jeu/economie.verse" }),
+        )
+        .await;
+        assert!(!err && txt.contains("banque := class:"), "{txt}");
+        let (err, txt) = mcp_call(
+            &m.st,
+            &t,
+            "read_other_map",
+            json!({ "map": m.perso, "what": "verse_files" }),
+        )
+        .await;
+        assert!(!err && txt.contains("Jeu/economie.verse"), "{txt}");
+        // Studio dont il n'est pas membre et map inexistante : même réponse.
+        let interdite = mcp_call(
+            &m.st,
+            &t,
+            "read_other_map",
+            json!({ "map": m.autre, "what": "tasks" }),
+        )
+        .await;
+        let absente = mcp_call(
+            &m.st,
+            &t,
+            "read_other_map",
+            json!({ "map": 999_999, "what": "tasks" }),
+        )
+        .await;
+        assert!(interdite.0 && absente.0);
+        assert_eq!(interdite.1, absente.1);
+        assert!(
+            mcp_call(
+                &m.st,
+                &t,
+                "read_other_map",
+                json!({ "map": m.perso, "what": "write_page" })
+            )
+            .await
+            .0
+        );
+        // Écriture : les outils ignorent la map donnée et n'agissent que sur la map de travail.
+        let perso = format!("SELECT COUNT(*) FROM tasks WHERE map_id = {}", m.perso);
+        let equipe = format!("SELECT COUNT(*) FROM tasks WHERE map_id = {}", m.equipe);
+        let (avant_perso, avant_equipe) = (q(&m.st, &perso).await, q(&m.st, &equipe).await);
+        let (err, _) = mcp_call(
+            &m.st,
+            &t,
+            "create_task",
+            json!({ "title": "Essai", "map": m.perso }),
+        )
+        .await;
+        assert!(!err);
+        assert_eq!(q(&m.st, &perso).await, avant_perso);
+        assert_eq!(q(&m.st, &equipe).await, avant_equipe + 1);
+        assert!(
+            !tools()
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|x| x["name"] != "read_other_map"
+                    && x["name"] != "use_map"
+                    && x["inputSchema"]["properties"].get("map").is_some()),
+            "aucun outil d'écriture ne prend de map (use_map change seulement la map de travail)"
+        );
+        // Journal : l'appel figure dans le fil des deux maps.
+        let fil = |map: i64| {
+            format!(
+                "SELECT COUNT(*) FROM agent_calls WHERE map_id = {map} AND tool = 'read_other_map'"
+            )
+        };
+        assert!(q(&m.st, &fil(m.equipe)).await >= 2);
+        assert!(q(&m.st, &fil(m.perso)).await >= 2);
+        // Une IA en lecture seule peut aussi s'en servir.
+        let lecture = jeton(&m, Some(m.equipe), "read").await;
+        assert!(
+            !mcp_call(
+                &m.st,
+                &lecture,
+                "read_other_map",
+                json!({ "map": m.perso, "what": "pages" })
+            )
+            .await
+            .0
+        );
     }
 
     /// Écran Agents de Forge (#94) : couper, lecture seule, attribuer une tâche visible par next_task.

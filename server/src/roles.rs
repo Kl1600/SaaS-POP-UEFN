@@ -5,6 +5,7 @@
 /// Outils de tous les rôles : choisir sa map, lire, et suivre les tâches.
 const COMMUNS: &[&str] = &[
     "list_maps",
+    "read_other_map",
     "use_map",
     "ask_user",
     "get_answer",
