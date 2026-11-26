@@ -21,6 +21,9 @@ use axum::{
 use serde::Deserialize;
 use serde_json::{json, Value};
 
+/// Visibilités d'un asset (#382).
+pub const VISIBILITES: &[&str] = &["private", "studio", "public"];
+
 pub const TYPES: &[&str] = &[
     "fbx", "obj", "png", "jpg", "jpeg", "tga", "wav", "ogg", "mp3",
 ];
@@ -58,7 +61,7 @@ pub async fn list(
     studio_role(&st, &u, sid).await?;
     let rows: Vec<(i64, Option<i64>, String, String, i64, String, Option<String>, String)> = sqlx::query_as(
         "SELECT a.id, a.studio_id, a.name, a.kind, a.size, a.origin, u.name, a.created_at FROM assets a LEFT JOIN users u ON u.id = a.author_id
-         WHERE a.status = 'ready' AND (a.studio_id = ? OR a.studio_id IS NULL) ORDER BY a.origin, a.name",
+         WHERE a.status = 'ready' AND ((a.studio_id = ? AND a.visibility <> 'private') OR a.studio_id IS NULL) ORDER BY a.origin, a.name",
     )
     .bind(sid)
     .fetch_all(&st.db)
@@ -84,6 +87,8 @@ pub struct NewAsset {
     /// true : asset de l'équipe POP, visible par tous (administrateurs du serveur seulement).
     #[serde(default)]
     pop: bool,
+    /// private (par défaut, #382), studio ou public.
+    visibility: Option<String>,
 }
 
 /// Prépare l'envoi : contrôles (type, taille, quota, droits), fiche « en cours », lien signé d'envoi (PUT, 15 min).
@@ -98,6 +103,10 @@ pub async fn create(
     }
     if b.pop && !est_admin(&st, &u).await? {
         return Err(AppError::Forbidden);
+    }
+    let vis = b.visibility.clone().unwrap_or_else(|| "private".into());
+    if !VISIBILITES.contains(&vis.as_str()) {
+        return Err(bad("Visibilité : private, studio ou public."));
     }
     check_len("Nom", &b.name, 1, 120)?;
     check_len("Déclaration de droits", &b.rights, 3, 300)?;
@@ -147,9 +156,9 @@ pub async fn create(
         &random_token()[..20],
         nom.replace(' ', "_")
     );
-    let id: i64 = sqlx::query_scalar("INSERT INTO assets (studio_id, name, kind, size, object_key, origin, rights, author_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id")
+    let id: i64 = sqlx::query_scalar("INSERT INTO assets (studio_id, name, kind, size, object_key, origin, rights, author_id, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id")
         .bind(if b.pop { None } else { Some(sid) }).bind(&nom).bind(&kind).bind(b.size).bind(&key)
-        .bind(if b.pop { "pop" } else { "studio" }).bind(b.rights.trim()).bind(u.id)
+        .bind(if b.pop { "pop" } else { "studio" }).bind(b.rights.trim()).bind(u.id).bind(if b.pop { "public" } else { vis.as_str() })
         .fetch_one(&st.db).await?;
     Ok(Json(
         json!({ "id": id, "upload_url": s3.presign("PUT", &key, 900, chrono::Utc::now()) }),
@@ -163,12 +172,25 @@ async fn fiche(
     id: i64,
     min: Role,
 ) -> Result<(Option<i64>, String, String, String, i64), AppError> {
-    let r: (Option<i64>, String, String, String, i64) =
-        sqlx::query_as("SELECT studio_id, object_key, name, status, size FROM assets WHERE id = ?")
-            .bind(id)
-            .fetch_optional(&st.db)
-            .await?
-            .ok_or(AppError::NotFound)?;
+    let (r, vis, auteur): ((Option<i64>, String, String, String, i64), String, Option<i64>) = sqlx::query_as::<_, (Option<i64>, String, String, String, i64, String, Option<i64>)>(
+        "SELECT studio_id, object_key, name, status, size, visibility, author_id FROM assets WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_optional(&st.db)
+    .await?
+    .map(|x| ((x.0, x.1, x.2, x.3, x.4), x.5, x.6))
+    .ok_or(AppError::NotFound)?;
+    // Bibliothèque personnelle (#382) : l'auteur fait tout sur ses assets ; un asset privé n'existe pour personne
+    // d'autre ; un asset public se lit par tous.
+    if auteur == Some(u.id) && r.0.is_some() {
+        return Ok(r);
+    }
+    if vis == "private" && r.0.is_some() {
+        return Err(AppError::NotFound);
+    }
+    if vis == "public" && min <= Role::Viewer {
+        return Ok(r);
+    }
     match r.0 {
         Some(sid) => {
             if studio_role(st, u, sid).await? < min {
@@ -310,6 +332,93 @@ mod tests {
         )
     }
 
+    /// #382 : privé par défaut, public au choix de l'auteur, réutilisable par l'auteur partout.
+    #[tokio::test]
+    async fn bibliotheque_personnelle() {
+        std::env::set_var("POP_S3_ENDPOINT", "https://compte.r2.cloudflarestorage.com");
+        std::env::set_var("POP_S3_BUCKET", "pop-assets");
+        std::env::set_var("POP_S3_KEY_ID", "cle");
+        std::env::set_var("POP_S3_SECRET", "secret");
+        let (st, s1, m, v, o) = monde().await;
+        let Json(r) = create(
+            State(st.clone()),
+            m.clone(),
+            Path(s1),
+            envoi("arbre.fbx", 1000, "Créé par moi"),
+        )
+        .await
+        .unwrap();
+        let id = r["id"].as_i64().unwrap();
+        sqlx::query("UPDATE assets SET status = 'ready' WHERE id = ?")
+            .bind(id)
+            .execute(&st.db)
+            .await
+            .unwrap();
+        let vis: String = sqlx::query_scalar("SELECT visibility FROM assets WHERE id = ?")
+            .bind(id)
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        assert_eq!(vis, "private");
+        // Privé : un membre du même studio ne le voit pas, l'auteur le retrouve dans « Mes assets ».
+        let Json(l) = list(State(st.clone()), v.clone(), Path(s1)).await.unwrap();
+        assert!(l["assets"].as_array().unwrap().is_empty());
+        assert!(lien_import(&st, &v, id).await.is_err());
+        let q = |tab: &str| {
+            axum::extract::Query(std::collections::HashMap::from([(
+                "tab".to_string(),
+                tab.to_string(),
+            )]))
+        };
+        let Json(mien) = miens(State(st.clone()), m.clone(), q("mine"))
+            .await
+            .unwrap();
+        assert_eq!(mien["assets"][0]["id"], id);
+        assert!(lien_import(&st, &m, id)
+            .await
+            .unwrap()
+            .0
+            .contains("/api/assets/import/"));
+        // Seul l'auteur change la visibilité ; public : tout compte, même d'un autre studio, le lit.
+        let vis_in = |x: &str| {
+            Json(VisIn {
+                visibility: x.into(),
+            })
+        };
+        assert!(
+            visibilite(State(st.clone()), o.clone(), Path(id), vis_in("public"))
+                .await
+                .is_err()
+        );
+        visibilite(State(st.clone()), m.clone(), Path(id), vis_in("public"))
+            .await
+            .unwrap();
+        let Json(pubs) = miens(State(st.clone()), o.clone(), q("public"))
+            .await
+            .unwrap();
+        assert!(pubs["assets"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|a| a["id"] == id));
+        assert!(lien_import(&st, &o, id).await.is_ok());
+        assert!(
+            super::delete(State(st.clone()), o.clone(), Path(id))
+                .await
+                .is_err(),
+            "public ne veut pas dire modifiable"
+        );
+        visibilite(State(st.clone()), m.clone(), Path(id), vis_in("private"))
+            .await
+            .unwrap();
+        assert!(lien_import(&st, &o, id).await.is_err());
+        assert!(
+            visibilite(State(st.clone()), m.clone(), Path(id), vis_in("tous"))
+                .await
+                .is_err()
+        );
+    }
+
     #[tokio::test]
     async fn controles_et_droits() {
         std::env::set_var("POP_S3_ENDPOINT", "https://compte.r2.cloudflarestorage.com");
@@ -360,7 +469,10 @@ mod tests {
             State(st.clone()),
             m.clone(),
             Path(s1),
-            envoi("arbre.fbx", 9 * mb, "Créé par notre équipe"),
+            Json(
+                serde_json::from_value(json!({ "name": "arbre.fbx", "size": 9 * mb, "rights": "Créé par notre équipe", "visibility": "studio" }))
+                    .unwrap(),
+            ),
         )
         .await
         .unwrap();
@@ -412,4 +524,96 @@ mod tests {
             .unwrap();
         assert_eq!(rep.status(), axum::http::StatusCode::TEMPORARY_REDIRECT);
     }
+}
+
+#[derive(Deserialize)]
+pub struct VisIn {
+    visibility: String,
+}
+
+/// `POST /api/assets/{id}/visibility` (#382) : l'auteur rend son asset privé, visible par son studio ou public.
+pub async fn visibilite(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(id): Path<i64>,
+    Json(b): Json<VisIn>,
+) -> ApiResult<Value> {
+    if !VISIBILITES.contains(&b.visibility.as_str()) {
+        return Err(bad("Visibilité : private, studio ou public."));
+    }
+    let n = sqlx::query(
+        "UPDATE assets SET visibility = ? WHERE id = ? AND author_id = ? AND studio_id IS NOT NULL",
+    )
+    .bind(&b.visibility)
+    .bind(id)
+    .bind(u.id)
+    .execute(&st.db)
+    .await?
+    .rows_affected();
+    if n == 0 {
+        return Err(AppError::NotFound);
+    }
+    Ok(Json(json!({ "ok": true, "visibility": b.visibility })))
+}
+
+/// `GET /api/me/assets?tab=mine|public` (#382) : mes assets (toutes mes maps et studios), ou les assets publics.
+pub async fn miens(
+    State(st): State<AppState>,
+    u: AuthUser,
+    axum::extract::Query(q): axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> ApiResult<Value> {
+    let publics = q.get("tab").map(String::as_str) == Some("public");
+    let rows: Vec<(i64, Option<i64>, String, String, i64, String, Option<String>, String, String, Option<i64>)> = sqlx::query_as(
+        "SELECT a.id, a.studio_id, a.name, a.kind, a.size, a.origin, us.name, a.created_at, a.visibility, a.author_id FROM assets a LEFT JOIN users us ON us.id = a.author_id
+         WHERE a.status = 'ready' AND (CASE WHEN ? THEN (a.visibility = 'public' OR a.studio_id IS NULL) ELSE a.author_id = ? END) ORDER BY a.id DESC LIMIT 500",
+    )
+    .bind(publics)
+    .bind(u.id)
+    .fetch_all(&st.db)
+    .await?;
+    Ok(Json(json!({
+        "assets": rows.into_iter().map(|r| json!({ "id": r.0, "pop": r.1.is_none(), "name": r.2, "kind": r.3, "size": r.4, "origin": r.5, "author": r.6, "created_at": r.7, "visibility": r.8, "mine": r.9 == Some(u.id) })).collect::<Vec<_>>(),
+        "configure": S3::from_env().is_some(),
+    })))
+}
+
+/// Lien d'import (15 min) d'un asset que le compte peut lire, pour l'importer dans un projet UEFN (#382, #90) :
+/// une adresse du serveur POP (le relais n'importe que depuis POP), qui redirige vers le stockage.
+pub async fn lien_import(
+    st: &AppState,
+    u: &AuthUser,
+    id: i64,
+) -> Result<(String, String), AppError> {
+    let (_, _, name, status, _) = fiche(st, u, id, Role::Viewer).await?;
+    if status != "ready" {
+        return Err(AppError::NotFound);
+    }
+    let token = random_token();
+    sqlx::query("INSERT INTO asset_import_links (token, asset_id, expires_at) VALUES (?, ?, datetime('now', '+15 minutes'))")
+        .bind(&token)
+        .bind(id)
+        .execute(&st.db)
+        .await?;
+    Ok((
+        format!(
+            "{}/api/assets/import/{token}",
+            crate::mail::public_url().trim_end_matches('/')
+        ),
+        name,
+    ))
+}
+
+/// `GET /api/assets/import/{token}` : sans compte (le relais n'en a pas), lien valable 15 min.
+pub async fn par_lien(
+    State(st): State<AppState>,
+    Path(token): Path<String>,
+) -> Result<Response, AppError> {
+    let key: Option<String> = sqlx::query_scalar(
+        "SELECT a.object_key FROM asset_import_links l JOIN assets a ON a.id = l.asset_id WHERE l.token = ? AND l.expires_at > datetime('now') AND a.status = 'ready'",
+    )
+    .bind(&token)
+    .fetch_optional(&st.db)
+    .await?;
+    let key = key.ok_or(AppError::NotFound)?;
+    Ok(Redirect::temporary(&s3()?.presign("GET", &key, 300, chrono::Utc::now())).into_response())
 }
