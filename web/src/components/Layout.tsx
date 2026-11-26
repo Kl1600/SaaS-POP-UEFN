@@ -1,3 +1,4 @@
+import { OuvrirForge } from './OuvrirForge'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import { Target,
@@ -147,6 +148,7 @@ export default function Layout() {
           <button className={'upill ' + uefn.status} onClick={() => nav('/parametres?onglet=uefn')} title={uefn.project ? tr("Projet {0}", [uefn.project]) : 'UEFN Link'}><span className="udot" />{STATUS_LABEL[uefn.status]}{uefn.stale ? ` · ${tr("périmé")}` : ''}{uefn.pending ? ` · ${uefn.pending}` : ''}</button>
           <AiPill />
           <span className="top-spacer" />
+          {app.map && <OuvrirForge mapId={app.map.id} compact />}
           <GlobalSearch />
           <Notifications />
           <button className="iconbtn" aria-label={app.dark ? tr("Passer en mode clair") : tr("Passer en mode sombre")} data-tip={app.dark ? tr("Mode clair") : tr("Mode sombre")} onClick={app.toggleDark}>{app.dark ? <Sun size={20} strokeWidth={1.5} /> : <Moon size={20} strokeWidth={1.5} />}</button>

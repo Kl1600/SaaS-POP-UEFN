@@ -32,5 +32,14 @@
         ]
       }
     }
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": [
+          "pop-forge"
+        ]
+      }
+    }
   }
 }

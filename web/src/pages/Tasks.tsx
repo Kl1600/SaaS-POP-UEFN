@@ -1,3 +1,4 @@
+import { OuvrirForge } from '../components/OuvrirForge'
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { ArrowRight, X , AlertTriangle } from 'lucide-react'
@@ -112,7 +113,7 @@ export default function Tasks() {
 
 /** Panneau de détail d'une tâche ; aussi ouvert depuis Planifier (#396). */
 export function TaskDrawer({ id, onClose, members, tasks, onOpen }: { id: number; onClose: () => void; members: any[]; tasks: Task[]; onOpen?: (id: number) => void }) {
-  const { canEdit, isAdmin, me, toast } = useApp()
+  const { canEdit, isAdmin, me, toast, map } = useApp()
   const { data, reload } = useLoad<any>(`/api/tasks/${id}`, [id])
   const [comment, setComment] = useState('')
   const [sub, setSub] = useState('')
@@ -127,7 +128,7 @@ export function TaskDrawer({ id, onClose, members, tasks, onOpen }: { id: number
   const origin = t.origin?.startsWith('board:') ? `/tableau/${t.origin.split(':')[1]}` : null
   return (<>
     <Drawer wide onClose={onClose} label={tr("Tâche #{0}", [t.number])}>
-      <div className="row" style={{ justifyContent: 'space-between' }}><span className="small muted mono">#{t.number} · {t.lot || tr("sans lot")}</span><button className="iconbtn" aria-label={tr("Fermer")} onClick={onClose}><X size={18} /></button></div>
+      <div className="row" style={{ justifyContent: 'space-between' }}><span className="small muted mono">#{t.number} · {t.lot || tr("sans lot")}</span><span className="row" style={{ gap: 6 }}>{map && <OuvrirForge mapId={map.id} tache={t.number} />}<button className="iconbtn" aria-label={tr("Fermer")} onClick={onClose}><X size={18} /></button></span></div>
       <input className="ptitle" style={{ fontSize: 22, margin: '8px 0 16px' }} defaultValue={t.title} disabled={!canEdit} onBlur={e => e.target.value !== t.title && patch({ title: e.target.value })} aria-label={tr("Titre")} />
       <div className="tgrid">
       <div className="tmain">

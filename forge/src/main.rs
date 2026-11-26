@@ -155,10 +155,52 @@ fn autorise(app: &AppHandle, url: &Url) -> bool {
     false
 }
 
-/// Ouvre l'interface de Forge servie par POP (`/forge`).
+/// Lien d'ouverture reçu avant que la page de Forge soit chargée (#297) : requête `map=…&tache=…`.
+#[derive(Default)]
+struct Cible(Mutex<Option<String>>);
+
+/// `pop-forge://map/12` ou `pop-forge://map/12/tache/3` → `map=12` ou `map=12&tache=3`. Rien d'autre n'est accepté.
+fn cible_de(lien: &str) -> Option<String> {
+    let reste = lien.strip_prefix("pop-forge://")?.trim_end_matches('/');
+    let parts: Vec<&str> = reste.split('/').collect();
+    let num = |s: &str| {
+        (!s.is_empty() && s.len() <= 12 && s.bytes().all(|b| b.is_ascii_digit()))
+            .then(|| s.to_string())
+    };
+    match parts.as_slice() {
+        ["map", m] => Some(format!("map={}", num(m)?)),
+        ["map", m, "tache", n] => Some(format!("map={}&tache={}", num(m)?, num(n)?)),
+        _ => None,
+    }
+}
+
+/// Un lien `pop-forge://` arrive (lancement ou Forge déjà ouvert) : on montre la fenêtre et on va sur la map.
+fn recevoir_lien(app: &AppHandle, lien: &str) {
+    let Some(q) = cible_de(lien) else { return };
+    if let Ok(w) = main_window(app) {
+        let _ = w.unminimize();
+        let _ = w.show();
+        let _ = w.set_focus();
+        // Page de POP déjà chargée : on y va directement ; sinon `ouvrir` s'en servira.
+        if let Ok(mut u) = w.url() {
+            if u.path() == "/forge" || u.path().starts_with("/forge/") {
+                u.set_path("/forge");
+                u.set_query(Some(&q));
+                let _ = w.navigate(u);
+                return;
+            }
+        }
+    }
+    *app.state::<Cible>().0.lock().unwrap() = Some(q);
+}
+
+/// Ouvre l'interface de Forge servie par POP (`/forge`), sur la map d'un lien reçu s'il y en a un.
 fn ouvrir(app: &AppHandle, u: &Url) -> Result<(), String> {
     autoriser(app, u);
-    let forge = u.join("forge").map_err(|e| e.to_string())?;
+    let mut forge = u.join("forge").map_err(|e| e.to_string())?;
+    if let Some(q) = app.state::<Cible>().0.lock().unwrap().take() {
+        forge.set_query(Some(&q));
+    }
     main_window(app)?.navigate(forge).map_err(|e| e.to_string())
 }
 
@@ -564,10 +606,20 @@ fn on_menu(app: &AppHandle, id: &str) {
 
 fn main() {
     tauri::Builder::default()
+        // En premier : un second lancement (clic sur un lien pop-forge://) passe son lien à la fenêtre ouverte.
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            if let Ok(w) = main_window(app) {
+                let _ = w.unminimize();
+                let _ = w.show();
+                let _ = w.set_focus();
+            }
+        }))
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(Home(Mutex::new(None)))
         .manage(relay::Relay::default())
+        .manage(Cible::default())
         .invoke_handler(tauri::generate_handler![
             capture_jeu,
             bilan_poste,
@@ -594,6 +646,23 @@ fn main() {
                 .on_navigation(move |u| autorise(&h, u))
                 .build()?;
             *app.state::<Home>().0.lock().unwrap() = w.url().ok();
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                // L'installateur enregistre pop-forge:// ; on le refait au lancement (copie portable, mise à jour).
+                #[cfg(windows)]
+                let _ = app.deep_link().register_all();
+                if let Ok(Some(liens)) = app.deep_link().get_current() {
+                    if let Some(l) = liens.first() {
+                        recevoir_lien(app.handle(), l.as_str());
+                    }
+                }
+                let h = app.handle().clone();
+                app.deep_link().on_open_url(move |e| {
+                    if let Some(l) = e.urls().first() {
+                        recevoir_lien(&h, l.as_str());
+                    }
+                });
+            }
             let h = app.handle().clone();
             tauri::async_runtime::spawn(async move { relay::demarrer(&h).await });
             relay::suivre(app.handle().clone());
@@ -605,7 +674,20 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{check, normalize};
+    use super::{check, cible_de, normalize};
+
+    #[test]
+    fn liens_pop_forge() {
+        assert_eq!(cible_de("pop-forge://map/12").as_deref(), Some("map=12"));
+        assert_eq!(
+            cible_de("pop-forge://map/12/tache/3/").as_deref(),
+            Some("map=12&tache=3")
+        );
+        assert_eq!(cible_de("pop-forge://map/12&x=1"), None);
+        assert_eq!(cible_de("pop-forge://map/../reglages"), None);
+        assert_eq!(cible_de("https://map/12"), None);
+    }
+
     use std::io::{Read, Write};
 
     /// Petit serveur d'une seule réponse sur un port libre ; rend son adresse.
