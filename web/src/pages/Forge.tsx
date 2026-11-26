@@ -333,6 +333,16 @@ function Accueil({ invoke, etat, liaison, relire }: { invoke: Invoke; etat: stri
       setOuverte(null); await relire()
     } catch (e: any) { setMsg({ ok: false, texte: e?.message ?? String(e) }) } finally { setOccupe(null) }
   }
+  // « Ouvrir dans UEFN » (#402) : Forge lance UEFN sur le projet relié, sans le launcher Epic ; on revérifie ensuite
+  // le projet ouvert pour que le relais se relie tout seul.
+  const ouvrirUefn = async (mapId: number, projet: string) => {
+    setOccupe('uefn' + mapId); setMsg(null)
+    try { setMsg({ ok: true, texte: await invoke<string>('ouvrir_uefn', { projet }) }) }
+    catch (e: any) { setMsg({ ok: false, texte: e?.message ?? String(e) }) }
+    finally { setOccupe(null) }
+    let n = 0
+    const t = setInterval(() => { chercher(); if (++n >= 24) clearInterval(t) }, 5000)
+  }
   // « Créer les maps et relier » (#404, remplace le pop-link.exe « déjà configuré ») : POP crée dans le studio choisi
   // une map par projet trouvé sans map, et Forge les relie toutes d'un coup.
   const studioCible = studios.find(s => s.id === app.studio?.id) ?? studios[0]
@@ -376,6 +386,8 @@ function Accueil({ invoke, etat, liaison, relire }: { invoke: Invoke; etat: stri
                 <span>{m.nom} <span className="small muted">· {m.studio}</span></span>
                 <span className="small muted">{p ? tr("Reliée à {0}", [nomDossier(p)]) : tr("Pas encore reliée à un projet UEFN")}</span>
               </span>
+              {p && ouvert?.toLowerCase() !== p.toLowerCase() && <button className="btn pri" disabled={occupe === 'uefn' + m.id} onClick={() => ouvrirUefn(m.id, p)}>{occupe === 'uefn' + m.id ? tr("Ouverture…") : tr("Ouvrir dans UEFN")}</button>}
+              {p && ouvert?.toLowerCase() === p.toLowerCase() && <span className="small muted">{tr("Ouvert dans UEFN")}</span>}
               <button className={'btn' + (p ? '' : ' pri')} onClick={() => setOuverte(ouverte === m.id ? null : m.id)}>{p ? tr("Changer de projet") : tr("Relier")}</button>
             </div>
             {ouverte === m.id && <div className="forge-ligne">

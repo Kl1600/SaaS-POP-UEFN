@@ -19,6 +19,7 @@ fn main() {
             "activer_mcp_auto",
             "outils_ia",
             "lancer_agent",
+            "ouvrir_uefn",
         ]),
     ))
     .expect("échec de la préparation de POP Forge");

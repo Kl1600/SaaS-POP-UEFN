@@ -22,6 +22,7 @@
     "allow-bilan-poste",
     "allow-activer-mcp-auto",
     "allow-outils-ia",
-    "allow-lancer-agent"
+    "allow-lancer-agent",
+    "allow-ouvrir-uefn"
   ]
 }
