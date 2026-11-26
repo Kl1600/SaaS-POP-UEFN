@@ -117,6 +117,7 @@ export default function Forge() {
         <Cloche />
         <button className="iconbtn" aria-label={app.dark ? tr("Thème clair") : tr("Thème sombre")} onClick={app.toggleDark}>{app.dark ? <Sun size={20} strokeWidth={1.5} /> : <Moon size={20} strokeWidth={1.5} />}</button>
       </div>
+      <div className="scroll" id="contenu" tabIndex={-1}>
       <main className="content" style={{ padding: '40px 28px', width: '100%', maxWidth: 920, margin: '0 auto', boxSizing: 'border-box' }}>
         <MajForge invoke={invoke} />
         {app.map && section !== 'reglages' && !reserve && <Bandeau mapId={app.map.id} etat={etat} aller={setSection} />}
@@ -129,6 +130,7 @@ export default function Forge() {
           : section === 'bibliotheque' ? <Bibliotheque mapId={app.map?.id ?? null} studioId={app.studio?.id ?? null} />
             : <AVenir section={section} titre={titre ?? ''} />}
       </main>
+      </div>
     </div>
   </div>
   </div>
