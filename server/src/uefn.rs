@@ -37,13 +37,16 @@ struct RelayConn {
     tools: Value,
     /// Protocole annoncé par le relais (#158) : 0 tant qu'il ne s'est pas présenté, 1 pour un relais d'avant #158.
     proto: u32,
+    /// Application du relais annoncée dans `hello` (#404) : « forge », ou « pop-link » (aussi pour un relais qui ne
+    /// dit rien, d'avant #404).
+    app: String,
 }
 
 /// Protocole attendu du relais (#158), égal à `PROTO` dans `link/src/lib.rs` (vérifié par un test).
 pub const RELAY_PROTO: u32 = 2;
 
 /// Message montré quand le relais ne connaît pas une action ou annonce un protocole plus ancien.
-pub const STALE_MSG: &str = "Relais périmé : votre UEFN Link ne connaît pas cette action. Téléchargez la nouvelle version depuis l’Organiseur (UEFN Link → Télécharger UEFN Link), puis relancez-le.";
+pub const STALE_MSG: &str = "Relais périmé : il ne connaît pas cette action. Installez la dernière version de POP Forge (POP → Télécharger POP Forge), fermez l’ancien relais (pop-link.exe) s’il est ouvert, puis lancez Forge.";
 
 #[derive(Default)]
 pub struct RelayHub {
@@ -66,6 +69,14 @@ impl RelayHub {
             .unwrap()
             .get(&map_id)
             .is_some_and(|c| c.proto != 0 && c.proto < RELAY_PROTO)
+    }
+    /// Le relais relié est un pop-link.exe seul, remplacé par POP Forge (#404).
+    pub fn legacy(&self, map_id: i64) -> bool {
+        self.conns
+            .lock()
+            .unwrap()
+            .get(&map_id)
+            .is_some_and(|c| c.proto != 0 && c.app != "forge")
     }
     fn tools(&self, map_id: i64) -> Value {
         self.conns
@@ -270,6 +281,7 @@ async fn relay_run(st: AppState, dev: i64, mid: i64, socket: WebSocket) {
             conn_id,
             tools: Value::Null,
             proto: 0,
+            app: String::new(),
         },
     );
     let _ = sqlx::query("UPDATE relay_devices SET last_seen = datetime('now') WHERE id = ?")
@@ -307,7 +319,7 @@ fn broadcast_status(st: &AppState, mid: i64) {
     notify(
         st,
         mid,
-        json!({ "t": "uefn", "what": "status", "status": st.relays.status(mid), "project": st.relays.project(mid), "stale": st.relays.stale(mid) }),
+        json!({ "t": "uefn", "what": "status", "status": st.relays.status(mid), "project": st.relays.project(mid), "stale": st.relays.stale(mid), "legacy": st.relays.legacy(mid) }),
     );
 }
 
@@ -365,6 +377,12 @@ async fn on_relay_msg(
                     c.proto = v["proto"]
                         .as_u64()
                         .map_or(1, |n| n.min(u32::MAX as u64) as u32);
+                    c.app = v["app"]
+                        .as_str()
+                        .unwrap_or("pop-link")
+                        .chars()
+                        .take(20)
+                        .collect();
                 }
             }
             if let Some(p) = v["project"].as_str() {
@@ -733,7 +751,7 @@ pub async fn state(
     let status = statut(&st, mid).await?;
     Ok(Json(json!({
         // Jamais reliée : pas de « dernier état connu » (sa date serait celle de la création de la map).
-        "status": status, "stale": st.relays.stale(mid), "project": project,
+        "status": status, "stale": st.relays.stale(mid), "legacy": st.relays.legacy(mid), "project": project,
         "updated_at": if status == "unlinked" { Value::Null } else { json!(updated) }, "tools": st.relays.tools(mid),
         "relay_elsewhere": status == "unlinked" && relais_ailleurs(&st, mid).await?,
         "actors": actors, "tags": serde_json::from_str::<Value>(&tags).unwrap_or(json!([])),
@@ -2347,8 +2365,23 @@ mod tests_statut {
                 conn_id: 1,
                 tools: Value::Null,
                 proto: RELAY_PROTO,
+                app: "forge".into(),
             },
         );
+    }
+
+    /// #404 : un relais qui ne se dit pas « forge » (pop-link.exe seul, ou d'avant #404) est signalé comme remplacé
+    /// par Forge ; tant qu'il ne s'est pas présenté, rien n'est signalé.
+    #[tokio::test]
+    async fn ancien_pop_link() {
+        let st = crate::test_state().await;
+        connecter(&st, 7, "connected");
+        assert!(!st.relays.legacy(7), "relais de Forge");
+        st.relays.conns.lock().unwrap().get_mut(&7).unwrap().app = "pop-link".into();
+        assert!(st.relays.legacy(7), "pop-link.exe seul");
+        st.relays.conns.lock().unwrap().get_mut(&7).unwrap().proto = 0;
+        assert!(!st.relays.legacy(7), "pas encore présenté");
+        assert!(!st.relays.legacy(8), "aucun relais");
     }
 
     /// #152 : jamais reliée → « unlinked » ; reliée hors ligne → « offline » ; reliée connectée → « connected ».

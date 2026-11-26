@@ -993,8 +993,8 @@ pub async fn ask(
             ),
             "offline" => ls(
                 en,
-                "Le relais UEFN est hors ligne : lancez pop-link.exe sur le PC où UEFN est ouvert.",
-                "The UEFN relay is offline: run pop-link.exe on the PC where UEFN is open.",
+                "Le relais UEFN est hors ligne : lancez POP Forge sur le PC où UEFN est ouvert.",
+                "The UEFN relay is offline: run POP Forge on the PC where UEFN is open.",
             ),
             "unlinked" => ls(
                 en,

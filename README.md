@@ -4,7 +4,7 @@ L'espace de travail des créateurs de maps Fortnite (UEFN) : pages, tableau blan
 
 - `server/` : serveur Rust (Axum + SQLite). API, sessions, temps réel (WebSocket).
 - `web/` : interface React + TypeScript (Vite).
-- `link/` : relais Windows `pop-link.exe` entre UEFN et POP.
+- `link/` : relais entre UEFN et POP, embarqué dans POP Forge (`forge/`, application Windows ; gratuite comme relais).
 - `forge/` : POP Forge, application de bureau Windows (Tauri 2) qui affiche POP ; installateur construit par le CI (artefact « pop-forge-installateur »).
 
 ## Travailler sur POP (humains et agents IA)
@@ -38,8 +38,8 @@ Les données sont dans `server/pop-data.db` (une sauvegarde = copier ce fichier,
 1. Sur le PC, ouvrir le projet dans UEFN, puis :
    - Projet → Paramètres du projet → **Enable Project Python Scripts** ;
    - Édition → Préférences de l'éditeur → **Agentic Workflows → Model Context Protocol → Start Server** (port 8000).
-2. Dans POP (depuis le PC, à l'adresse affichée par `./start.sh --reseau`) : Paramètres → **UEFN Link** → télécharger `pop-link.exe`, puis « Obtenir un code ».
-3. Double-cliquer sur `pop-link.exe` : il demande l'adresse de POP, le code et propose les projets trouvés dans `Documents\Fortnite Projects`. Laisser la fenêtre ouverte. Page d'état : http://127.0.0.1:47800.
+2. Dans POP (depuis le PC, à l'adresse affichée par `./start.sh --reseau`) : Paramètres → **UEFN Link** → **Télécharger POP Forge**, puis l'installer.
+3. Ouvrir Forge, donner l'adresse de POP et se connecter ; Accueil → « Relier » sur la map, ou « Créer les maps et relier » pour les projets trouvés dans `Documents\Fortnite Projects`. Laisser Forge ouvert. Page d'état du relais : http://127.0.0.1:47800.
 4. Dans POP, la pastille passe à « UEFN connecté » : les IA connectées lisent les acteurs du niveau ouvert et les fichiers `.verse` du projet ; le journal des actions et les validations de suppression sont dans Paramètres → UEFN Link.
 
 Le serveur MCP d'UEFN n'expose que trois outils (`list_toolsets`, `describe_toolset`, `call_tool`) : les vrais outils sont rangés dans des toolsets, que le relais découvre au démarrage et appelle par `call_tool`. Il utilise :
@@ -52,7 +52,7 @@ Le serveur MCP d'UEFN n'expose que trois outils (`list_toolsets`, `describe_tool
 | Options des appareils | `DeviceToolset` : `ListClassicDeviceOptions` / `SetClassicDeviceOption`, et `ListDeviceProperties` / `GetDeviceProperties` / `SetDeviceProperty` pour les réglages `@editable` |
 | Archivage Lore | `ValkyrieRevisionControl.CheckIn` (enregistre tout puis archive) |
 
-Si quelque chose ne marche pas : dans un terminal sur le PC, `pop-link.exe diagnostic` affiche l'adresse MCP trouvée, les toolsets et outils qu'UEFN expose, les rôles retenus, et teste Python. Si un rôle est « introuvable » (Epic a renommé un outil), on peut imposer le nom dans `%APPDATA%\pop-link\config.json` (nom court ou complet) :
+Si quelque chose ne marche pas : Forge → Réglages → Diagnostic, ou dans un terminal sur le PC `cargo run --release -- diagnostic` dans `link/`, affiche l'adresse MCP trouvée, les toolsets et outils qu'UEFN expose, les rôles retenus, et teste Python. Si un rôle est « introuvable » (Epic a renommé un outil), on peut imposer le nom dans `%APPDATA%\pop-link\config.json` (nom court ou complet) :
 ```json
 "tools": { "python": "execute_python", "compile": "BuildAll", "push": "PushChanges", "checkin": "CheckIn" }
 ```
@@ -60,7 +60,7 @@ Archivage Lore par une commande plutôt que par UEFN : ajouter `"lore_cmd": "<co
 
 Le serveur MCP d'UEFN refuse les requêtes venant d'un site web (seules les origines `localhost` / `127.0.0.1` sont acceptées) : une page POP en ligne ne peut pas piloter UEFN directement, d'où le relais local.
 
-Recompiler le relais : `cd link && cargo build --release` (sur Windows) ; l'exécutable fourni est dans `web/public/downloads/pop-link.exe`.
+Recompiler le relais en ligne de commande : `cd link && cargo build --release` (sur Windows, pour le développement). L'application proposée aux créateurs est l'installateur de POP Forge, `web/public/downloads/pop-forge-setup.exe`.
 
 ## Mettre POP en ligne
 

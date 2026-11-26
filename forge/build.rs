@@ -8,6 +8,7 @@ fn main() {
             "projets",
             "etat_relais",
             "relier",
+            "importer",
             "projet_ouvert",
             "liaison",
             "fenetre",

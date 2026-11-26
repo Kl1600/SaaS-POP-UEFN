@@ -77,7 +77,9 @@ export default function Forge() {
   // Ouverte dans un navigateur : page de téléchargement de Forge (#80).
   if (!invoke) return <Telecharger />
 
-  if (app.me && app.me.forge === false) return <ForgePro />
+  // Sans Pro (#404) : Forge reste le relais UEFN (Accueil, Réglages) ; les écrans de construction montrent l'offre Pro.
+  const pro = app.me?.forge !== false
+  const reserve = !pro && section !== 'accueil' && section !== 'reglages'
 
   const relie = !!liaison && memeServeur(liaison.serveur, location.origin) && etat !== 'UEFN non relié'
   const projetCourant = (liaison?.liens ?? []).find(l => app.map && l.map.toLowerCase() === app.map.name.toLowerCase())?.projet
@@ -96,6 +98,7 @@ export default function Forge() {
         {SECTIONS.map(([k, label, Icon]) =>
           <a key={k} href="#" className={section === k ? 'on' : ''} aria-current={section === k ? 'page' : undefined} onClick={e => { e.preventDefault(); setSection(k) }}>
             <Icon size={20} strokeWidth={1.5} /><span className="lbl">{label}</span>
+            {!pro && k !== 'accueil' && <span className="small" style={{ marginLeft: 'auto', color: 'rgb(163,163,163)' }}>Pro</span>}
           </a>)}
       </nav>
       <div style={{ flex: 1 }} />
@@ -113,8 +116,9 @@ export default function Forge() {
         <button className="iconbtn" aria-label={app.dark ? tr("Thème clair") : tr("Thème sombre")} onClick={app.toggleDark}>{app.dark ? <Sun size={20} strokeWidth={1.5} /> : <Moon size={20} strokeWidth={1.5} />}</button>
       </div>
       <main className="content" style={{ padding: '40px 28px', width: '100%', maxWidth: 920, margin: '0 auto', boxSizing: 'border-box' }}>
-        {app.map && section !== 'reglages' && <Bandeau mapId={app.map.id} etat={etat} aller={setSection} />}
-        {section === 'accueil' ? <Accueil invoke={invoke} etat={etat} liaison={liaison} relie={relie} relire={lire} />
+        {app.map && section !== 'reglages' && !reserve && <Bandeau mapId={app.map.id} etat={etat} aller={setSection} />}
+        {reserve ? <ForgePro />
+          : section === 'accueil' ? <Accueil invoke={invoke} etat={etat} liaison={liaison} relie={relie} relire={lire} />
           : section === 'reglages' ? <Reglages />
           : section === 'agents' ? (app.map ? <ForgeAgents mapId={app.map.id} tache={app.map.id === lien.map ? lien.tache : null} invoke={invoke} /> : <p className="muted">{tr("Choisissez une map.")}</p>)
           : section === 'verifier' ? (app.map ? <div className="stack" style={{ gap: 18 }}><ForgeVerifications mapId={app.map.id} ouvrir={ouvrirPOP} /><ForgeScenarios mapId={app.map.id} capturer={() => captureJeu(invoke)} /></div> : <p className="muted">{tr("Choisissez une map.")}</p>)
@@ -329,6 +333,19 @@ function Accueil({ invoke, etat, liaison, relire }: { invoke: Invoke; etat: stri
       setOuverte(null); await relire()
     } catch (e: any) { setMsg({ ok: false, texte: e?.message ?? String(e) }) } finally { setOccupe(null) }
   }
+  // « Créer les maps et relier » (#404, remplace le pop-link.exe « déjà configuré ») : POP crée dans le studio choisi
+  // une map par projet trouvé sans map, et Forge les relie toutes d'un coup.
+  const studioCible = studios.find(s => s.id === app.studio?.id) ?? studios[0]
+  const importer = async () => {
+    if (!studioCible) return
+    setOccupe('importer'); setMsg(null)
+    try {
+      const { code } = await api.post<{ code: string }>(`/api/studios/${studioCible.id}/relay/code`)
+      const e = await invoke<string>('importer', { code, projets: orphelins })
+      setMsg({ ok: true, texte: tr(e) })
+      await app.reload(); await relire(); await chercher()
+    } catch (e: any) { setMsg({ ok: false, texte: e?.message ?? String(e) }) } finally { setOccupe(null) }
+  }
   const parcourir = async (mapId: number) => {
     const d = await invoke<string | null>('choisir_dossier').catch(() => null)
     if (d) setChoix(c => ({ ...c, [mapId]: d }))
@@ -372,7 +389,10 @@ function Accueil({ invoke, etat, liaison, relire }: { invoke: Invoke; etat: stri
         })}
       </div>
       {orphelins.length > 0 && <div className="stack" style={{ gap: 6 }}>
-        <span className="small muted">{tr("Projets UEFN trouvés sur ce PC sans map POP : créez leur map dans POP, puis reliez-la ici.")}</span>
+        <div className="row" style={{ gap: 8, flexWrap: 'wrap', justifyContent: 'space-between' }}>
+          <span className="small muted">{tr("Projets UEFN trouvés sur ce PC sans map POP.")}</span>
+          {studioCible && <button className="btn pri" disabled={occupe !== null} onClick={importer}>{occupe === 'importer' ? tr("Liaison…") : tr("Créer les maps et relier ({0}) dans {1}", [orphelins.length, studioName(studioCible)])}</button>}
+        </div>
         {orphelins.map(o => <div key={o} className="forge-map-ligne row" style={{ gap: 12, flexWrap: 'wrap' }}>
           <span style={{ flex: 1, minWidth: 0 }}>{nomDossier(o)}{ouvert === o && <span className="small muted"> · {tr("ouvert dans UEFN")}</span>}</span>
           <button className="btn" title={tr("S'ouvre dans le navigateur")} onClick={() => ouvrirPOP('/')}><ExternalLink size={16} strokeWidth={1.5} />{tr("Créer la map dans POP")}</button>
@@ -416,22 +436,19 @@ function EnCeMoment({ mapId }: { mapId: number }) {
   </section>
 }
 
-/** Forge réservé à l'abonnement Pro, essai compris (#102) : se débloque sans redémarrer dès que l'abonnement est actif. */
+/** Écrans de construction réservés à l'abonnement Pro, essai compris (#102). Sans Pro, Forge reste le relais UEFN
+ * (#404) ; l'écran se débloque sans redémarrer dès que l'abonnement est actif. */
 function ForgePro() {
   const app = useApp()
   useEffect(() => { const t = setInterval(() => app.reload(), 10000); return () => clearInterval(t) }, [])
-  return <div className={'app forge' + (app.dark ? ' dark' : '')}>
-    <div className="main" style={{ margin: 12, padding: 32, display: 'grid', placeItems: 'center' }}>
-      <div className="card" style={{ maxWidth: 560, padding: 28 }}>
-        <h1 className="forge-h1">{tr("Forge est inclus dans l’abonnement Pro")}</h1>
-        <p className="muted">{tr("POP Forge construit votre map dans UEFN avec vos IA : agents, liaison au projet, outils. Il est réservé à l’abonnement Pro, essai gratuit compris. Vos IA connectées au site continuent de marcher sans Pro.")}</p>
-        <div className="forge-ligne">
-          <button className="btn pri" onClick={() => ouvrirPOP('/parametres')}>{tr("Voir l’abonnement Pro")}</button>
-          <button className="btn" onClick={() => app.reload()}>{tr("J’ai changé d’abonnement")}</button>
-        </div>
-        <p className="small muted" style={{ marginBottom: 0 }}>{tr("Forge se débloque tout seul dès que l’abonnement est actif.")}</p>
-      </div>
+  return <div className="card" style={{ maxWidth: 560, padding: 28, margin: '0 auto' }}>
+    <h1 className="forge-h1">{tr("Inclus dans l’abonnement Pro")}</h1>
+    <p className="muted">{tr("Les agents, les vérifications, la bibliothèque et les outils de Forge construisent votre map dans UEFN avec vos IA. Ils sont inclus dans l’abonnement Pro, essai gratuit compris. Sans Pro, Forge reste votre relais UEFN : il relie vos projets et pilote UEFN pour le site et vos IA connectées.")}</p>
+    <div className="forge-ligne">
+      <button className="btn pri" onClick={() => ouvrirPOP('/parametres')}>{tr("Voir l’abonnement Pro")}</button>
+      <button className="btn" onClick={() => app.reload()}>{tr("J’ai changé d’abonnement")}</button>
     </div>
+    <p className="small muted" style={{ marginBottom: 0 }}>{tr("Ces écrans se débloquent tout seuls dès que l’abonnement est actif.")}</p>
   </div>
 }
 
@@ -475,12 +492,9 @@ function Telecharger() {
     <div className="main" style={{ margin: 12, padding: 32, overflow: 'auto' }}>
       <div className="stack" style={{ maxWidth: 680, margin: '0 auto', gap: 18 }}>
         <h1 style={{ margin: 0, fontWeight: 500 }}>{tr("Télécharger POP Forge")}</h1>
-        <p className="muted" style={{ margin: 0 }}>{tr("L’application Windows de POP : vos IA construisent la map dans UEFN, vous suivez et pilotez tout au même endroit.")}</p>
+        <p className="muted" style={{ margin: 0 }}>{tr("L’application Windows de POP : elle relie vos projets UEFN à POP (gratuit), et avec Pro vos IA y construisent la map pendant que vous suivez tout au même endroit.")}</p>
         <section className="card" style={{ padding: 20 }}>
-          {refus ? <>
-            <p style={{ marginTop: 0 }}>{refus}</p>
-            <button className="btn pri" onClick={() => navigate('/parametres')}>{tr("Voir l’abonnement Pro")}</button>
-          </> : !info ? <p className="muted" style={{ margin: 0 }}>{tr("Chargement…")}</p> : !info.available ? <p style={{ margin: 0 }}>{tr("Aucune version publiée pour l’instant : revenez bientôt.")}</p> : <>
+          {refus ? <p style={{ margin: 0 }}>{refus}</p> : !info ? <p className="muted" style={{ margin: 0 }}>{tr("Chargement…")}</p> : !info.available ? <p style={{ margin: 0 }}>{tr("Aucune version publiée pour l’instant : revenez bientôt.")}</p> : <>
             <div className="forge-ligne" style={{ justifyContent: 'space-between' }}>
               <div><b>{tr("POP Forge {0}", [info.version ?? ''])}</b><div className="small muted">{tr("Windows 10 ou 11, 64 bits · {0} Mo · publiée le {1}", [Math.max(1, Math.round(info.size / 1e6)), info.date ?? '—'])}</div></div>
               <a className="btn pri" href={info.url} download>{tr("Télécharger l’installateur")}</a>
@@ -492,7 +506,7 @@ function Telecharger() {
           <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>
             <li>{tr("Windows 10 ou 11, 64 bits.")}</li>
             <li>{tr("Unreal Editor for Fortnite (UEFN) installé, avec son serveur MCP pour piloter le projet.")}</li>
-            <li>{tr("Un compte POP avec l’abonnement Pro (essai gratuit compris).")}</li>
+            <li>{tr("Un compte POP : Forge est gratuit comme relais UEFN ; ses agents, vérifications, bibliothèque et outils sont inclus dans l’abonnement Pro (essai gratuit compris).")}</li>
           </ul>
         </section>
         <section className="card" style={{ padding: 20 }}>
@@ -505,7 +519,7 @@ function Telecharger() {
             <li>{tr("Au premier lancement, entrez l’adresse de POP : pop-uefn.com, puis connectez-vous.")}</li>
           </ol>
         </section>
-        <p className="small muted" style={{ margin: 0 }}>{tr("Sans Forge, vous pouvez toujours relier UEFN avec le relais seul : POP → IA connectées → pop-link.exe.")}</p>
+        <p className="small muted" style={{ margin: 0 }}>{tr("POP Forge remplace UEFN Link (pop-link.exe) : fermez l’ancien relais avant de lancer Forge, vos projets déjà reliés sont repris.")}</p>
         <div><button className="btn" onClick={() => navigate('/')}>{tr("Retour à POP")}</button></div>
       </div>
     </div>

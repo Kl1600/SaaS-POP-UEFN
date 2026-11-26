@@ -77,9 +77,10 @@ jobs:
           out() { if touche "$2"; then echo "$1=1"; else echo "$1=0"; fi >> "$GITHUB_OUTPUT"; }
           out serveur '^server/'
           out relais '^link/'
-          # Relais téléchargeable (#158) : le code du relais et l'exécutable proposé dans POP changent ensemble.
-          out relais_src '^link/(src/|Cargo\.(toml|lock)$|build\.rs$)'
-          out relais_exe '^web/public/downloads/pop-link\.exe$'
+          # Relais téléchargeable (#158) : POP Forge embarque le relais (#404) ; son code et l'installateur proposé dans
+          # POP changent ensemble.
+          out relais_src '^(link/(src/|Cargo\.(toml|lock)$|build\.rs$)|forge/(src/|ui/|capabilities/|Cargo\.(toml|lock)$|build\.rs$|tauri\.conf\.json$))'
+          out relais_exe '^web/public/downloads/pop-forge-setup\.exe$'
           # Forge embarque le relais (#77) : il se reconstruit aussi quand link/ change.
           out forge '^(forge|link)/'
           out web '^web/'
@@ -122,10 +123,10 @@ jobs:
           EXE: ${{ needs.changements.outputs.relais_exe }}
         run: |
           if [ "$EXE" != 1 ]; then
-            echo "::error::link/ a changé mais pas web/public/downloads/pop-link.exe. Attendez le commit du workflow « relais Windows » sur la branche (#358), ou recompilez sous Windows (cd link && cargo build --release), copiez link/target/release/pop-link.exe dans web/public/downloads/, reconstruisez le web (cd web && npm run build) et commitez."
+            echo "::error::link/ ou forge/ a changé mais pas web/public/downloads/pop-forge-setup.exe. Attendez le commit du workflow « relais Windows » sur la branche (#358), ou construisez l'installateur sous Windows (cd forge && npx @tauri-apps/cli@2 build --bundles nsis), copiez-le dans web/public/downloads/pop-forge-setup.exe, reconstruisez le web (cd web && npm run build) et commitez."
             exit 1
           fi
-          echo "pop-link.exe mis à jour avec le code du relais."
+          echo "Installateur de POP Forge mis à jour avec le code du relais."
 
   relais:
     name: relais pop-link (build + tests)

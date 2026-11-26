@@ -65,3 +65,11 @@ Fait : exe recompilé (url 2.5.9), PROTO=2 = RELAY_PROTO serveur, « relais pér
 Reste : rien
 Bloque : rien
 ```
+
+```
+FAIT | #404 Forge remplace UEFN Link : une seule application, gratuite en mode relais | 26/11 18:30
+Owner : benybens | Sur la tâche : Claude Code, pour benybens
+Fait : Forge sans Pro = relais (écrans Pro en carte), « Créer les maps et relier », hello.app → bandeau ancien pop-link ; pop-link.exe retiré ; testé avec le vrai UEFN
+Reste : rien
+Bloque : rien
+```
