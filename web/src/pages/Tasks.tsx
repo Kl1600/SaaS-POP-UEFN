@@ -1,4 +1,3 @@
-import { AiPlanButton } from '../components/AiPlan'
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { ArrowRight, X , AlertTriangle } from 'lucide-react'
@@ -61,7 +60,7 @@ export default function Tasks() {
 
   return (
     <main className="content">
-      <PageHead title={tr("Tâches")} help={tr("Des tâches d'une heure. Chaque changement de statut est tracé.")}><AiPlanButton /></PageHead>
+      <PageHead title={tr("Tâches")} help={tr("Des tâches d'une heure. Chaque changement de statut est tracé.")} />
       <Tabs value={tab} onChange={setTab} items={[['kanban', tr("Kanban")], ['graph', tr("Dépendances")]]} />
 
       {(tab === 'kanban' || tab === 'graph') && <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>

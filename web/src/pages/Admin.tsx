@@ -368,7 +368,7 @@ export default function Admin() {
   // Modérateur (#65) : seulement la liste d'attente et les utilisateurs.
   const staff = !!(me?.admin || me?.moderator)
   const mod = staff && !me?.admin
-  const [tab, setTab] = useState<'overview' | 'waitlist' | 'create' | 'users' | 'ia' | 'audit' | 'journal' | 'money' | 'legal' | 'announce'>(mod || me?.admin_pending ? 'waitlist' : 'overview')
+  const [tab, setTab] = useState<'overview' | 'waitlist' | 'create' | 'users' | 'ia' | 'audit' | 'journal' | 'legal' | 'announce'>(mod || me?.admin_pending ? 'waitlist' : 'overview')
   const [gate, setGate] = useState<{ code: string; msg: string } | null | 'ok'>(null)
   const check = () => api.get(mod ? '/api/admin/waitlist?status=pending' : '/api/admin/overview').then(() => setGate('ok')).catch((e: any) => setGate({ code: e.code ?? 'forbidden', msg: e.message }))
   useEffect(() => { if (staff) check() }, [staff])
@@ -379,7 +379,7 @@ export default function Admin() {
     </PageHead>
     {gate === null ? null : gate !== 'ok' ? <Gate code={gate.code} msg={gate.msg} onOk={() => { setGate(null); check() }} /> : <>
       <div className="tabs" role="tablist" style={{ alignSelf: 'flex-start' }}>
-        {([['overview', tr("Vue générale")], ['waitlist', tr("Liste d’attente{0}", [me.admin_pending ? ` (${me.admin_pending})` : ''])], ['create', tr("Créer un compte")], ['users', tr("Utilisateurs")], ['ia', tr("Apprentissage de l’IA")], ['audit', tr("Sécurité")], ['journal', tr("Journal")], ['money', tr("Paiements et IA")], ['legal', tr("Infos légales")], ['announce', tr("Annonce")]] as const).filter(([k]) => !mod || k === 'waitlist' || k === 'users').map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}
+        {([['overview', tr("Vue générale")], ['waitlist', tr("Liste d’attente{0}", [me.admin_pending ? ` (${me.admin_pending})` : ''])], ['create', tr("Créer un compte")], ['users', tr("Utilisateurs")], ['ia', tr("Apprentissage de l’IA")], ['audit', tr("Sécurité")], ['journal', tr("Journal")], ['legal', tr("Infos légales")], ['announce', tr("Annonce")]] as const).filter(([k]) => !mod || k === 'waitlist' || k === 'users').map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}
       </div>
       {tab === 'overview' && <Overview />}
       {tab === 'waitlist' && <Waitlist />}
@@ -388,7 +388,6 @@ export default function Admin() {
       {tab === 'ia' && <Learning />}
       {tab === 'audit' && <Audit />}
       {tab === 'journal' && <Journal />}
-      {tab === 'money' && <Money />}
       {tab === 'legal' && <LegalInfo />}
       {tab === 'announce' && <AnnounceAdmin />}
     </>}
@@ -456,38 +455,6 @@ function AnnounceAdmin() {
       <div><button className="btn pri">{tr("Publier")}</button></div>
     </form>
   </section>
-}
-
-/** Paiements et crédits IA : ce qui a été vendu, ce que Claude a coûté, la marge, et les crédits encore dus. */
-function Money() {
-  const { toast } = useApp()
-  const { data } = useLoad<any>('/api/admin/ai')
-  const { data: users } = useLoad<any[]>('/api/admin/users')
-  const [uid, setUid] = useState(''); const [cr, setCr] = useState('')
-  if (!data) return null
-  const eur = (v: number) => v.toLocaleString(LOCALE, { style: 'currency', currency: 'EUR' })
-  const Block = ({ t, r }: { t: string; r: any }) => <div className="privcell"><span className="small muted">{t}</span>
-    <b>{eur(r.margin_eur)}</b><span className="small muted">{tr("Ventes {0} · coût Claude {1}", [eur(r.revenue_eur), eur(r.claude_cost_eur)])}</span>
-    <span className="small muted">{tr("{0} crédits vendus · {1} utilisés", [n(r.credits_sold), n(r.credits_used)])}</span></div>
-  return <>
-    <section className="card">
-      <CardHead title={tr("Crédits IA")} sub={data.configured ? tr("Modèle : {0}. Les crédits sont payés avant d’être utilisés : la marge ne peut pas être négative.", [data.model]) : tr("Clé Anthropic absente : l’IA de POP est désactivée.")} />
-      <div className="privgrid">
-        <Block t={tr("Marge ce mois-ci")} r={data.month} />
-        <Block t={tr("Marge depuis le début")} r={data.all} />
-        <div className="privcell"><span className="small muted">{tr("Crédits pas encore utilisés")}</span><b>{n(data.outstanding_credits)}</b><span className="small muted">{tr("Coût Claude maximum : {0}", [eur(data.outstanding_max_cost_eur)])}</span></div>
-      </div>
-      <p className="small muted" style={{ marginBottom: 0 }}>{tr("Réglages : {0} crédits par dollar, plafond {1} crédits par jour et par personne, {2} $ par jour pour tout POP.", [data.settings.credits_per_usd, n(data.settings.user_daily), data.settings.global_daily_usd])}</p>
-    </section>
-    <section className="card">
-      <CardHead title={tr("Offrir ou retirer des crédits")} sub={tr("Geste commercial ou correction. C’est noté dans l’historique.")} />
-      <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-        <select className="field" style={{ width: 220 }} aria-label={tr("Compte")} value={uid} onChange={e => setUid(e.target.value)}><option value="">{tr("Choisir un compte")}</option>{(users ?? []).map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}</select>
-        <input className="field" style={{ width: 210 }} inputMode="numeric" placeholder={tr("Crédits (ex. 100 ou -50)")} aria-label={tr("Crédits")} value={cr} onChange={e => setCr(e.target.value)} />
-        <button className="btn pri" disabled={!+uid || !+cr} onClick={async () => { try { await api.post(`/api/admin/users/${+uid}/credits`, { credits: +cr }); toast(tr("Crédits mis à jour")); setCr('') } catch (e: any) { toast(e.message, true) } }}>{tr("Appliquer")}</button>
-      </div>
-    </section>
-  </>
 }
 
 const pct = (v?: number | null) => v == null ? '—' : `${Math.round(v * 100)} %`

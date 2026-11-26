@@ -1,10 +1,8 @@
-//! Paiements Stripe : abonnements Starter / Pro, packs de crédits IA, portail client, webhook.
+//! Paiements Stripe : abonnements Starter / Pro, portail client, webhook (crédits IA retirés le 25/11, #384).
 //!
 //! Variables d'environnement :
 //! - `STRIPE_SECRET_KEY` (sk_live_… ou sk_test_…), `STRIPE_WEBHOOK_SECRET` (whsec_…)
 //! - `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_PRO` : identifiants des prix mensuels (price_…)
-//! - `POP_CREDIT_PACKS` : packs de crédits « crédits:prix_affiché:price_id », séparés par des points-virgules,
-//!   par exemple `500:4,99 €:price_A;1500:12,99 €:price_B;5000:39,99 €:price_C`
 //!
 //! Tant que Stripe n'est pas configuré, rien n'est bloqué (bêta).
 //! Accès : un compte « manual » (créé par l'administrateur) n'est jamais bloqué ; un compte en essai l'est
@@ -25,21 +23,6 @@ fn env(k: &str) -> Option<String> {
 }
 pub fn configured() -> bool {
     env("STRIPE_SECRET_KEY").is_some()
-}
-
-/// Packs de crédits : (crédits, prix affiché, price_id).
-pub fn packs() -> Vec<(i64, String, String)> {
-    env("POP_CREDIT_PACKS")
-        .unwrap_or_default()
-        .split(';')
-        .filter_map(|p| {
-            let mut it = p.trim().splitn(3, ':');
-            let n = it.next()?.trim().parse::<i64>().ok()?;
-            let label = it.next()?.trim().to_string();
-            let price = it.next()?.trim().to_string();
-            (n > 0 && price.starts_with("price_")).then_some((n, label, price))
-        })
-        .collect()
 }
 
 fn plan_of_price(price: &str) -> Option<&'static str> {
@@ -110,13 +93,11 @@ pub fn allowed_when_expired(path: &str) -> bool {
 }
 
 pub async fn status(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
-    let (plan, source, trial, sub, end, credits, customer): (String, String, Option<String>, Option<String>, Option<String>, i64, Option<String>) = sqlx::query_as(
-        "SELECT plan, plan_source, CASE WHEN trial_until > datetime('now') THEN trial_until END, sub_status, sub_end, ai_credits, stripe_customer FROM users WHERE id = ?").bind(u.id).fetch_one(&st.db).await?;
+    let (plan, source, trial, sub, end, customer): (String, String, Option<String>, Option<String>, Option<String>, Option<String>) = sqlx::query_as(
+        "SELECT plan, plan_source, CASE WHEN trial_until > datetime('now') THEN trial_until END, sub_status, sub_end, stripe_customer FROM users WHERE id = ?").bind(u.id).fetch_one(&st.db).await?;
     Ok(Json(json!({
         "configured": configured(), "state": access_state(&st, u.id).await?,
         "plan": plan, "source": source, "trial_until": trial, "sub_status": sub, "sub_end": end, "has_customer": customer.is_some(),
-        "ai_credits": credits, "ai_ready": crate::aipop::configured(),
-        "packs": packs().into_iter().enumerate().map(|(i, p)| json!({ "id": i, "credits": p.0, "price": p.1 })).collect::<Vec<_>>(),
         "prices": { "starter": "12,99 €", "pro": "24,99 €" },
     })))
 }
@@ -155,10 +136,9 @@ async fn customer(st: &AppState, u: &AuthUser) -> Result<String, AppError> {
 #[derive(Deserialize)]
 pub struct CheckoutIn {
     kind: String,
-    pack: Option<usize>,
 }
 
-/// Page de paiement Stripe (abonnement ou pack de crédits).
+/// Page de paiement Stripe (abonnement).
 pub async fn checkout(
     State(st): State<AppState>,
     u: AuthUser,
@@ -208,26 +188,6 @@ pub async fn checkout(
                 (
                     "cancel_url".into(),
                     format!("{site}/parametres?paiement=annule"),
-                ),
-            ]);
-        }
-        "credits" => {
-            let p = packs()
-                .into_iter()
-                .nth(b.pack.unwrap_or(usize::MAX))
-                .ok_or_else(|| bad("Pack inconnu."))?;
-            form.extend([
-                ("mode".into(), "payment".into()),
-                ("line_items[0][price]".into(), p.2),
-                ("metadata[credits]".into(), p.0.to_string()),
-                ("invoice_creation[enabled]".into(), "true".into()),
-                (
-                    "success_url".into(),
-                    format!("{site}/parametres?credits=ok"),
-                ),
-                (
-                    "cancel_url".into(),
-                    format!("{site}/parametres?credits=annule"),
                 ),
             ]);
         }
@@ -353,25 +313,6 @@ pub async fn webhook(
                 .bind(uid)
                 .execute(&st.db)
                 .await?;
-            }
-            // Crédits : seulement une fois l'argent encaissé.
-            if obj["mode"] == "payment" && obj["payment_status"] == "paid" {
-                let n = obj["metadata"]["credits"]
-                    .as_str()
-                    .and_then(|s| s.parse::<i64>().ok())
-                    .unwrap_or(0);
-                if n > 0 {
-                    let mut tx = st.db.begin().await?;
-                    sqlx::query("UPDATE users SET ai_credits = ai_credits + ? WHERE id = ?")
-                        .bind(n)
-                        .bind(uid)
-                        .execute(&mut *tx)
-                        .await?;
-                    sqlx::query("INSERT INTO ai_ledger (user_id, delta, reason, ref, amount_cents) VALUES (?, ?, 'achat', ?, ?)")
-                        .bind(uid).bind(n).bind(obj["id"].as_str()).bind(obj["amount_total"].as_i64()).execute(&mut *tx).await?;
-                    tx.commit().await?;
-                    let _ = sqlx::query("INSERT INTO notifications (user_id, map_id, text, link) VALUES (?, NULL, ?, '/parametres')").bind(uid).bind(format!("{n} crédits IA ajoutés à votre compte.")).execute(&st.db).await;
-                }
             }
         }
         "customer.subscription.created"
