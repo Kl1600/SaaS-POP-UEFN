@@ -238,6 +238,12 @@ fn tools() -> Value {
         tool("read_messages", "Messages que votre humain vous a écrits dans POP Forge (#381), à vous ou à toute l'équipe : à lire entre deux actions (next_task signale les non lus). Répondez avec send_message.", json!({}), &[]),
         tool("send_message", "Répond à votre humain dans votre fil de POP Forge (#381) : body, texte court en français.", json!({ "body": { "type": "string" } }), &["body"]),
         tool("forge_help", "Pages d'aide de POP Forge (#300) : UEFN fermé, serveur MCP arrêté, relais à mettre à jour, compilation en échec, agent qui ne répond plus, liaison, abonnement. query : la question (vide = toutes les pages).", json!({ "query": { "type": "string" } }), &[]),
+        tool("get_plan", "Plan 2D de la map, étage par étage (#162) : étages (z_min et z_max en cm) et objets (zone, cercle, polygone, chemin, mur, appareil) avec position x, y, taille w, h, rotation et points, en centimètres comme le panneau Détails d'UEFN (X vers l'avant, Y vers la droite). Avec level: true, ajoute les acteurs du niveau UEFN vus de dessus pour comparer.", json!({ "level": { "type": "boolean" } }), &[]),
+        tool("edit_plan", "Modifie le plan 2D : add (objets à créer : floor_id facultatif, kind, name, device, x, y, w, h, rotation, points [[x, y]…], en cm), update (objets avec id et champs à changer), delete (ids). Le plan s'affiche aussitôt dans POP.", json!({
+            "add": { "type": "array", "items": { "type": "object" } },
+            "update": { "type": "array", "items": { "type": "object" } },
+            "delete": { "type": "array", "items": { "type": "integer" } }
+        }), &[]),
         tool("list_milestones", "Jalons et objectifs du planning de la map (date, heure, type, détail).", json!({}), &[]),
         tool("add_milestone", "Ajoute un jalon au planning : title, date AAAA-MM-JJ ; facultatifs : time HH:MM, detail, kind (jalon par défaut).", json!({ "title": { "type": "string" }, "date": { "type": "string" }, "time": { "type": "string" }, "detail": { "type": "string" }, "kind": { "type": "string" } }), &["title", "date"]),
         tool("list_agents", "Agents IA de la map : identifiant, nom, rôle, tâche en cours, actif ou non, et lequel est l'Orchestrateur.", json!({}), &[]),
@@ -298,6 +304,7 @@ const READ_TOOLS: &[&str] = &[
     "read_messages",
     "send_message",
     "forge_help",
+    "get_plan",
 ];
 
 fn rpc_ok(id: Value, result: Value) -> Response {
@@ -1023,6 +1030,32 @@ async fn call_as(
         "place_configured_device" => crate::device_configs::poser(st, &ctx, "mcp", agent, a["config_id"].as_i64().ok_or_else(|| bad("config_id attendu."))?, &a).await,
         "search_devices" => crate::devices::chercher(st, mid, a["query"].as_str().unwrap_or("")).await,
         "device_graph" => crate::devices::graphe_de_la_map(st, mid).await,
+        "get_plan" => {
+            let mut p = crate::plan2d::plan(st, mid).await?;
+            if a["level"].as_bool() == Some(true) {
+                p["level"] = crate::plan2d::niveau(st, mid).await?["actors"].clone();
+            }
+            Ok(p)
+        }
+        "edit_plan" => {
+            let (mut crees, mut modifies, mut supprimes) = (vec![], 0, 0);
+            for o in a["add"].as_array().cloned().unwrap_or_default() {
+                let o: crate::plan2d::Objet = serde_json::from_value(o).map_err(|e| bad(format!("Objet illisible : {e}")))?;
+                crees.push(crate::plan2d::creer(st, &ctx, &o).await?);
+            }
+            for o in a["update"].as_array().cloned().unwrap_or_default() {
+                let id = o["id"].as_i64().ok_or_else(|| bad("update : chaque objet a son id."))?;
+                let o: crate::plan2d::Objet = serde_json::from_value(o).map_err(|e| bad(format!("Objet illisible : {e}")))?;
+                crate::plan2d::modifier(st, &ctx, id, &o).await?;
+                modifies += 1;
+            }
+            for id in a["delete"].as_array().cloned().unwrap_or_default().iter().filter_map(|v| v.as_i64()) {
+                ctx.can_edit()?;
+                supprimes += sqlx::query("DELETE FROM plan_objects WHERE id = ? AND map_id = ?").bind(id).bind(mid).execute(&st.db).await?.rows_affected();
+            }
+            notify(st, mid, json!({ "t": "refresh", "what": "plan2d" }));
+            Ok(json!({ "created": crees, "updated": modifies, "deleted": supprimes }))
+        }
         "get_feasibility" => crate::faisabilite::avis_de_la_map(st, mid).await,
         "list_scenarios" => crate::scenarios::liste(st, mid).await,
         "propose_scenario" => {

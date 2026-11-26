@@ -1207,6 +1207,12 @@ for a in sub.get_all_level_actors():
         except Exception:
             pass
     tags = [str(x) for x in a.tags]
+    # Bornes vues de dessus pour le plan 2D (#162) : centre et demi-tailles en cm.
+    try:
+        bo, be = a.get_actor_bounds(False)
+        bounds = {'center': [bo.x, bo.y, bo.z], 'extent': [be.x, be.y, be.z]}
+    except Exception:
+        bounds = None
     try:
         for comp in a.get_components_by_class(unreal.ActorComponent):
             if 'TagMarkup' in comp.get_class().get_name():
@@ -1216,7 +1222,7 @@ for a in sub.get_all_level_actors():
     except Exception:
         pass
     out.append({'id': a.get_path_name(), 'name': a.get_actor_label(), 'type': kind, 'class': cls, 'verse_class': vcls, 'folder': str(a.get_folder_path()),
-                'hidden': bool(a.is_temporarily_hidden_in_editor()), 'tags': tags,
+                'hidden': bool(a.is_temporarily_hidden_in_editor()), 'tags': tags, 'bounds': bounds,
                 'transform': {'location': [l.x, l.y, l.z], 'rotation': [r.pitch, r.yaw, r.roll], 'scale': [s.x, s.y, s.z]},
                 'options': {}, 'props': {}, 'events': []})
 print(json.dumps(out))

@@ -1383,3 +1383,28 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 .forge-bulle .muted{color:inherit;opacity:.7}
 .forge-bulle.ia{align-self:flex-start;background:var(--hover);color:var(--text)}
 }
+
+/* Plan 2D (#162) */
+.p2-etages,.p2-outils{gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.p2-outils .iconbtn.on{background:var(--text);color:var(--surface)}
+.p2-zone{position:relative;display:flex;gap:12px}
+.p2-svg{flex:1;height:min(62vh,640px);min-height:360px;border:1px solid var(--border);border-radius:12px;background:var(--surface);cursor:crosshair;touch-action:none;user-select:none}
+.p2-grille{stroke:var(--border);stroke-width:.6}
+.p2-grille.fort{stroke:var(--text3);stroke-width:.8}
+.p2-axe{stroke:#ED753E;stroke-width:1}
+.p2-obj{fill:color-mix(in srgb,var(--text) 10%,transparent);stroke:var(--text);stroke-width:1.4;cursor:pointer}
+.p2-obj.k-chemin,.p2-obj.k-mur{fill:none}
+.p2-obj.k-mur{stroke-width:4}
+.p2-obj.k-chemin{stroke-dasharray:6 4;stroke:#ED753E}
+.p2-obj.k-appareil rect{fill:var(--text);stroke:none}
+.p2-obj.sel{stroke:#ED753E;stroke-width:2.2}
+.p2-obj.sel.k-appareil rect{fill:#ED753E}
+.p2-obj.fantome{opacity:.22;pointer-events:none}
+.p2-nom{font-size:11px;fill:var(--text);text-anchor:middle;dominant-baseline:middle;pointer-events:none;paint-order:stroke;stroke:var(--surface);stroke-width:3px}
+.p2-apercu{fill:color-mix(in srgb,#ED753E 12%,transparent);stroke:#ED753E;stroke-width:1.4;stroke-dasharray:4 3}
+.p2-acteur rect{fill:none;stroke:var(--text3);stroke-width:1;stroke-dasharray:3 2}
+.p2-regle line{stroke:#ED753E;stroke-width:2}
+.p2-regle circle{fill:#ED753E}
+.p2-mesure{color:#ED753E;font-weight:600}
+.p2-panneau{width:240px;display:flex;flex-direction:column;gap:8px}
+@media (max-width:800px){.p2-zone{flex-direction:column}.p2-panneau{width:auto}}
