@@ -1,19 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { Hammer, X } from 'lucide-react'
-import { useApp } from '../state'
 import { tr } from '../i18n/t'
 
 // « Ouvrir dans Forge » (#297) : lien pop-forge://map/{id}[/tache/{n}], que Forge déclare à l'installation. Si la
 // page garde la main quelques secondes (aucun logiciel n'a pris le lien), une bulle propose de télécharger Forge.
-// Sans Pro, le bouton est remplacé par le lien vers l'abonnement (#102).
+// Pour tous les comptes : Forge est gratuit en mode relais, ses écrans de construction restent Pro (#404, #416).
 export function OuvrirForge({ mapId, tache, compact }: { mapId: number; tache?: number; compact?: boolean }) {
-  const app = useApp()
   const [bulle, setBulle] = useState(false)
   const minuteur = useRef<number>()
   useEffect(() => () => window.clearTimeout(minuteur.current), [])
-  if (!app.me?.forge) return <Link className={compact ? 'iconbtn' : 'btn'} to="/parametres" title={tr("Forge est inclus dans l’abonnement Pro")} aria-label={tr("Forge est inclus dans l’abonnement Pro")}>
-    <Hammer size={compact ? 20 : 16} strokeWidth={1.5} />{!compact && tr("Forge (Pro)")}</Link>
 
   const ouvrir = () => {
     let parti = false
