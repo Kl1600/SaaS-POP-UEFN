@@ -16,6 +16,8 @@ fn main() {
             "capture_jeu",
             "bilan_poste",
             "activer_mcp_auto",
+            "outils_ia",
+            "lancer_agent",
         ]),
     ))
     .expect("échec de la préparation de POP Forge");

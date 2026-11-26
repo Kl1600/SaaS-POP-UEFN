@@ -19,6 +19,8 @@
     "allow-choisir-dossier",
     "allow-capture-jeu",
     "allow-bilan-poste",
-    "allow-activer-mcp-auto"
+    "allow-activer-mcp-auto",
+    "allow-outils-ia",
+    "allow-lancer-agent"
   ]
 }

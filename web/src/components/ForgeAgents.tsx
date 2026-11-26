@@ -11,7 +11,7 @@ const MODES: [string, string][] = [['write', tr("Agit")], ['read', tr("Lecture s
 const ROLES: Record<string, string> = { orchestrateur: tr("Orchestrateur"), codeur_verse: tr("Codeur Verse"), level_designer: tr("Level designer"), ui: tr("Interface"), testeur: tr("Testeur"), relecteur: tr("Relecteur"), analyste: tr("Analyste") }
 const actif = (d?: string | null) => !!d && Date.now() - new Date(d.replace(' ', 'T') + 'Z').getTime() < 5 * 60 * 1000
 
-export function ForgeAgents({ mapId, tache }: { mapId: number; tache?: number | null }) {
+export function ForgeAgents({ mapId, tache, invoke }: { mapId: number; tache?: number | null; invoke?: (cmd: string, args?: Record<string, unknown>) => Promise<any> }) {
   const app = useApp()
   const { data, reload } = useLoad<any[]>(`/api/maps/${mapId}/agents`, [mapId])
   const { data: res, reload: relireRes } = useLoad<any>(`/api/maps/${mapId}/resumes`, [mapId])
@@ -28,7 +28,7 @@ export function ForgeAgents({ mapId, tache }: { mapId: number; tache?: number | 
   const agir = async (f: () => Promise<any>, ok: string) => { try { const r = await f(); app.toast(r?.message ?? ok); reload(); relireTaches() } catch (e: any) { app.toast(e.message, true) } }
   // Tâche ouverte depuis le site (« Ouvrir dans Forge », #297) : montrée par l'agent qui l'a prise, s'il y en a un.
   const cible = tache ? liste.find(t => t.number === tache) : null
-  const porteur = cible ? data?.find(a => a.task?.number === tache) : null
+  const porteur = cible ? data?.find(a => a.task?.number === tache) ?? data?.find(a => a.attribuees?.some((x: any) => x.number === tache)) : null
   useEffect(() => { if (porteur) document.getElementById(`agent-${porteur.id}`)?.scrollIntoView({ block: 'center' }) }, [porteur?.id])
   if (!data) return null
   return <div className="stack" style={{ gap: 18 }}>
@@ -40,6 +40,7 @@ export function ForgeAgents({ mapId, tache }: { mapId: number; tache?: number | 
         : cible.status === 'done' ? tr("Cette tâche est terminée.") : tr("Aucun agent ne l'a prise : attribuez-la à un agent ci-dessous.")}</div>
     </div>}
     {res?.equipe?.phrase && <p style={{ margin: 0 }}>{res.equipe.phrase}</p>}
+    {invoke && app.canEdit && <Lancer mapId={mapId} invoke={invoke} ouvertes={ouvertes.filter(t => !data.some(a => a.task?.number === t.number || a.attribuees?.some((x: any) => x.number === t.number)))} fini={() => { reload(); relireTaches() }} />}
     {data.length > 1 && <Equipe mapId={mapId} />}
     {!data.length && <p className="muted">{tr("Aucune IA connectée à cette map. Connectez votre IA (Claude Code, Codex, Cursor…) depuis POP : IA connectées.")}</p>}
     {data.map(a => {
@@ -56,7 +57,8 @@ export function ForgeAgents({ mapId, tache }: { mapId: number; tache?: number | 
               onClick={() => mode !== k && (k !== 'off' || confirm(tr("Couper « {0} » ? Il ne pourra plus rien faire tant qu’un humain ne l’aura pas réactivé.", [a.name]))) && agir(() => api.post(`/api/maps/${mapId}/agents/${a.id}/mode`, { mode: k }), tr("Mode changé"))}>{l}</button>)}
           </div>
         </div>
-        <div>{a.task ? <>#{a.task.number} {a.task.title}{a.task.step ? <span className="badge" style={{ marginLeft: 8 }}>{ETAPES[a.task.step] ?? a.task.step}</span> : null}</> : <span className="muted">{tr("Pas de tâche réservée")}</span>}</div>
+        <div>{a.task ? <>#{a.task.number} {a.task.title}{a.task.step ? <span className="badge" style={{ marginLeft: 8 }}>{ETAPES[a.task.step] ?? a.task.step}</span> : null}</> : <span className="muted">{tr("Pas de tâche réservée")}</span>}
+          {a.attribuees?.length > 0 && <small className="muted" style={{ display: 'block' }}>{tr("Attribuée(s), pas encore prise(s) : {0}", [a.attribuees.map((x: any) => `#${x.number} ${x.title}`).join(', ')])}</small>}</div>
         {(phrase || a.last_action) && <div className="small muted">{phrase ?? a.last_action}</div>}
         <div className="forge-ligne">
           {app.canEdit && <Selecteur label={tr("Attribuer une tâche à {0}", [a.name])} placeholder={tr("Attribuer une tâche…")}
@@ -130,4 +132,49 @@ function Equipe({ mapId }: { mapId: number }) {
     <input className="field" style={{ flex: 1 }} value={texte} maxLength={4000} placeholder={tr("Écrire à toute l’équipe…")} aria-label={tr("Message à toute l’équipe")} onChange={e => setTexte(e.target.value)} />
     <button className="btn" disabled={!texte.trim()}>{tr("Envoyer à toutes")}</button>
   </form>
+}
+
+/** Lancer l'IA de l'utilisateur sur une tâche (#95) : clé d'agent créée pour cette map, tâche attribuée, puis Forge
+ * démarre l'outil installé avec la clé dans une variable d'environnement. POP n'appelle aucune IA. */
+function Lancer({ mapId, invoke, ouvertes, fini }: { mapId: number; invoke: (cmd: string, args?: Record<string, unknown>) => Promise<any>; ouvertes: any[]; fini: () => void }) {
+  const app = useApp()
+  const [outils, setOutils] = useState<any[] | null>(null)
+  const [outil, setOutil] = useState('')
+  const [num, setNum] = useState('')
+  const [occupe, setOccupe] = useState(false)
+  useEffect(() => { invoke('outils_ia').then((o: any[]) => { setOutils(o); setOutil(o.find(x => x.lancable)?.id ?? '') }).catch(() => setOutils([])) }, [])
+  if (!outils) return null
+  const libres = ouvertes
+  const lancer = async () => {
+    const o = outils.find(x => x.id === outil); const t = libres.find(x => String(x.number) === num)
+    if (!o || !t) return
+    setOccupe(true)
+    let cle: { id: number; token: string } | null = null
+    try {
+      cle = await api.post('/api/me/tokens', { name: `${o.nom} · Forge`, kind: o.id, scope: 'write', map: mapId })
+      await api.post(`/api/maps/${mapId}/agents/${cle!.id}/assign`, { number: t.number })
+      await invoke('lancer_agent', { outil: o.id, token: cle!.token, map: app.map?.name ?? '', tache: t.number, titre: t.title })
+      app.toast(tr("{0} démarre sur la tâche #{1} dans une nouvelle fenêtre.", [o.nom, t.number])); setNum(''); fini()
+    } catch (e: any) {
+      // Lancement raté : la clé créée pour lui est révoquée tout de suite.
+      if (cle) await api.del(`/api/tokens/${cle.id}`).catch(() => {})
+      app.toast(e?.message ?? String(e), true); fini()
+    }
+    setOccupe(false)
+  }
+  return <section className="card stack" style={{ padding: 16, gap: 10 }} aria-label={tr("Lancer un agent")}>
+    <b style={{ fontWeight: 500 }}>{tr("Lancer un agent sur une tâche")}</b>
+    <div className="forge-outils" role="radiogroup" aria-label={tr("Outil d'IA")}>
+      {outils.map(o => <label key={o.id} className={'forge-outil' + (o.lancable ? '' : ' off') + (outil === o.id ? ' on' : '')} title={o.raison ?? o.chemin ?? ''}>
+        <input type="radio" name="outil-ia" value={o.id} checked={outil === o.id} disabled={!o.lancable} onChange={() => setOutil(o.id)} />
+        <span><b style={{ fontWeight: 500 }}>{o.nom}</b>{!o.lancable && <small className="muted" style={{ display: 'block' }}>{o.raison}</small>}</span>
+      </label>)}
+    </div>
+    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+      <Selecteur label={tr("Tâche à faire")} placeholder={libres.length ? tr("Choisir une tâche…") : tr("Aucune tâche libre")} value={num} disabled={!libres.length}
+        options={libres.map(t => ({ value: String(t.number), label: `#${t.number} · ${t.title}` }))} onChange={setNum} />
+      <button className="btn pri" disabled={!outil || !num || occupe} onClick={lancer}>{occupe ? tr("Lancement…") : tr("Lancer")}</button>
+    </div>
+    <small className="muted">{tr("L'outil tourne sur votre PC avec votre abonnement. Sa clé POP lui est passée en mémoire, jamais écrite dans un fichier.")}</small>
+  </section>
 }

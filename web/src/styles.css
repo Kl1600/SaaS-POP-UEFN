@@ -1340,6 +1340,11 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 .ouvrir-forge-bulle>span{flex:1 1 200px}
 .ouvrir-forge-bulle .iconbtn{position:absolute;top:6px;right:6px}
 .card.forge-cible{border-color:var(--text);box-shadow:0 0 0 1px var(--text)}
+.forge-outils{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px}
+.forge-outil{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--border);border-radius:10px;cursor:pointer}
+.forge-outil.on{border-color:var(--text)}
+.forge-outil.off{opacity:.6;cursor:default}
+.forge-outil input{margin-top:3px;accent-color:var(--text)}
 .assistant-etapes li>svg{flex:none;margin-top:1px}
 .verif-erreurs{margin:8px 0 0;padding-left:18px;font-size:13.5px;color:var(--red)}
 .verif-erreurs code{color:var(--text);font-size:12.5px}

@@ -116,7 +116,7 @@ export default function Forge() {
         {app.map && section !== 'reglages' && <Bandeau mapId={app.map.id} etat={etat} aller={setSection} />}
         {section === 'accueil' ? <Accueil invoke={invoke} etat={etat} liaison={liaison} relie={relie} relire={lire} />
           : section === 'reglages' ? <Reglages />
-          : section === 'agents' ? (app.map ? <ForgeAgents mapId={app.map.id} tache={app.map.id === lien.map ? lien.tache : null} /> : <p className="muted">{tr("Choisissez une map.")}</p>)
+          : section === 'agents' ? (app.map ? <ForgeAgents mapId={app.map.id} tache={app.map.id === lien.map ? lien.tache : null} invoke={invoke} /> : <p className="muted">{tr("Choisissez une map.")}</p>)
           : section === 'verifier' ? (app.map ? <div className="stack" style={{ gap: 18 }}><ForgeVerifications mapId={app.map.id} ouvrir={ouvrirPOP} /><ForgeScenarios mapId={app.map.id} capturer={() => captureJeu(invoke)} /></div> : <p className="muted">{tr("Choisissez une map.")}</p>)
           : section === 'bibliotheque' ? <Bibliotheque mapId={app.map?.id ?? null} studioId={app.studio?.id ?? null} />
             : <AVenir section={section} titre={titre ?? ''} />}
