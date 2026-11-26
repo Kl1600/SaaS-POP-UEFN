@@ -91,14 +91,18 @@ function Runner({ s, onClose }: { s: any; onClose: () => void }) {
 
 /** Un passage de scénario : verdict, commentaire et capture par étape. Forge (#350) le joue à côté de la session de
  * test, avec `capturer` qui photographie l'écran du jeu ; le site joint une image choisie. */
-export function Passage({ s, onClose, capturer }: { s: any; onClose: () => void; capturer?: () => Promise<Blob> }) {
+export function Passage({ s, onClose, capturer, playtest }: { s: any; onClose: () => void; capturer?: () => Promise<Blob>; playtest?: number }) {
   const { toast } = useApp()
   const [prise, setPrise] = useState<number | null>(null)
   const [version, setVersion] = useState('')
   const [run, setRun] = useState<number | null>(null)
   const [res, setRes] = useState<Record<number, { verdict?: string; comment: string; capture?: string }>>({})
   const [fin, setFin] = useState<any>(null)
-  const start = async (e: React.FormEvent) => { e.preventDefault(); try { setRun((await api.post(`/api/scenarios/${s.id}/runs`, { version })).id) } catch (er: any) { toast(er.message, true) } }
+  // Playtesteur d'une demande de test (#349) : passage rattaché à la demande, sans version.
+  const start = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try { setRun((await api.post(playtest ? `/api/playtests/${playtest}/scenarios/${s.id}/runs` : `/api/scenarios/${s.id}/runs`, playtest ? {} : { version })).id) } catch (er: any) { toast(er.message, true) }
+  }
   const send = async (step: number, patch: { verdict?: string; comment?: string; capture?: string }) => {
     const cur = { ...(res[step] ?? { comment: '' }), ...patch } as { verdict?: string; comment: string; capture?: string }
     setRes({ ...res, [step]: cur })
@@ -123,7 +127,7 @@ export function Passage({ s, onClose, capturer }: { s: any; onClose: () => void;
       <div className="stack">
         <h2 style={{ margin: 0, fontWeight: 400 }}>{s.title}</h2>
         {!run && <form className="row" style={{ gap: 6 }} onSubmit={start}>
-          <input className="field" style={{ flex: 1 }} value={version} maxLength={60} onChange={e => setVersion(e.target.value)} placeholder={tr("Version jouée (ex. 1.4)")} aria-label={tr("Version")} />
+          {!playtest && <input className="field" style={{ flex: 1 }} value={version} maxLength={60} onChange={e => setVersion(e.target.value)} placeholder={tr("Version jouée (ex. 1.4)")} aria-label={tr("Version")} />}
           <button className="btn pri"><Play size={14} /> {tr("Commencer")}</button>
         </form>}
         {run && !fin && <>
@@ -167,7 +171,7 @@ function Historique({ s, onClose }: { s: any; onClose: () => void }) {
         {data?.runs.map((r: any) => (
           <div key={r.id} className="card" style={{ padding: 12 }}>
             <div className="row" style={{ justifyContent: 'space-between' }}>
-              <b>{r.version ? `v${r.version}` : tr("Sans version")} · {r.tester ?? '—'} · {ago(r.created_at)}</b>
+              <b>{r.playtest ? tr("Playtest") : r.version ? `v${r.version}` : tr("Sans version")} · {r.tester ?? '—'} · {ago(r.created_at)}</b>{r.playtest && <span className="badge" style={{ marginLeft: 6 }}>{tr("playtesteur")}</span>}
               {r.regressions.length > 0 && <span className="badge b-r">{tr("{0} régression(s)", [r.regressions.length])}</span>}
             </div>
             {s.steps.map((x: Step, i: number) => {

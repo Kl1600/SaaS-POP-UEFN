@@ -580,6 +580,10 @@ fn api() -> Router<AppState> {
             get(launch::exchange).post(launch::create_listing),
         )
         .route("/api/playtests/{lid}/feedback", post(launch::give_feedback))
+        .route(
+            "/api/playtests/{lid}/scenarios/{sid}/runs",
+            post(scenarios::route_jouer_playtest),
+        )
         .route("/api/maps/{mid}/churn", get(launch::churn))
         .route(
             "/api/maps/{mid}/scenarios",
