@@ -7,8 +7,7 @@ import { addDays, api, frDate, ymd } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { Modal } from '../components/ui'
 import { tr } from '../i18n/t'
-import { useNav } from '../routes'
-import { useMembers } from './Tasks'
+import { TaskDrawer, useMembers } from './Tasks'
 
 type Tag = 'objective' | 'release' | 'task' | 'aim' | 'avoid' | 'money'
 type Ev = { key: string; date: string; title: string; tag: Tag; id?: number; number?: number; status?: string; who?: string; time?: string | null; detail?: string }
@@ -36,7 +35,6 @@ const read = <T,>(k: string, def: T): T => { try { const v = localStorage.getIte
 
 export default function PlanCalendar() {
   const { map, canEdit, toast } = useApp()
-  const nav = useNav()
   const { data: tl, reload } = useLoad<any>(map ? `/api/maps/${map.id}/plan/timeline` : null, [map?.id])
   const { data: seasons } = useLoad<any[]>(map ? `/api/maps/${map.id}/seasons` : null, [map?.id])
   useLive(['tasks', 'plan'], reload)
@@ -45,6 +43,9 @@ export default function PlanCalendar() {
   const [anchor, setAnchor] = useState(today)
   const [mini, setMini] = useState(today)
   const [open, setOpen] = useState<Ev | null>(null)
+  // Détail d'une tâche ouvert sur place (#396), avec la liste des tâches pour ses dépendances.
+  const [taskId, setTaskId] = useState<number | null>(null)
+  const { data: allTasks, reload: reloadTasks } = useLoad<any[]>(map && taskId ? `/api/maps/${map.id}/tasks` : null, [map?.id, !!taskId])
   const [hidden, setHidden] = useState<Set<Tag>>(() => new Set(read<Tag[]>(FKEY, [])))
   const [hideDone, setHideDone] = useState<boolean>(() => read(DKEY, true))
   const [over, setOver] = useState<string | null>(null)
@@ -205,12 +206,13 @@ export default function PlanCalendar() {
         {open.tag === 'task' && canEdit && <label className="stack" style={{ gap: 4 }}><span className="small muted">{tr("Jour prévu")}</span>
           <input className="field" type="date" defaultValue={open.date} onChange={e => { if (e.target.value) { plan(open.id!, e.target.value); setOpen(null) } }} /></label>}
         <div className="row" style={{ justifyContent: 'flex-end' }}>
-          {open.tag === 'task' && <button className="btn pri" onClick={() => nav(`/taches?q=%23${open.number}`)}>{tr("Ouvrir la tâche")}</button>}
+          {open.tag === 'task' && <button className="btn pri" onClick={() => { setTaskId(open.id!); setOpen(null) }}>{tr("Ouvrir la tâche")}</button>}
           {open.tag === 'objective' && canEdit && <button className="btn" onClick={() => { setDraft({ kind: 'objective', id: open.id, title: open.title, date: open.date, time: open.time ?? '', detail: open.detail ?? '', who: '' }); setOpen(null) }}>{tr("Modifier")}</button>}
           {open.tag === 'objective' && canEdit && <button className="btn" style={{ color: 'var(--tr)' }} onClick={async () => { if (!confirm(tr("Supprimer l’objectif « {0} » ?", [open.title]))) return; try { await api.del(`/api/milestones/${open.id}`); setOpen(null); reload() } catch (er: any) { toast(er.message, true) } }}><Trash2 size={16} />{tr("Supprimer")}</button>}
         </div>
       </div>
     </Modal>}
+    {taskId && <TaskDrawer key={taskId} id={taskId} onClose={() => { setTaskId(null); reload(); reloadTasks() }} members={team?.members ?? []} tasks={allTasks ?? []} onOpen={setTaskId} />}
     {draft && <Modal onClose={() => setDraft(null)} label={draft.id ? tr("Modifier l’objectif") : tr("Nouvel événement")}>
       <form className="stack" onSubmit={e => { e.preventDefault(); if (draft.title.trim()) saveDraft(draft) }}>
         <div className="row" style={{ justifyContent: 'space-between' }}>
