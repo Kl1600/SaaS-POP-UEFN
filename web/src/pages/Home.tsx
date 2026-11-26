@@ -2,6 +2,7 @@
 // Glisser une map d'un bloc à l'autre la déplace (solo ↔ studio), toujours après confirmation.
 // En dessous, « Mes IA » : les IA connectées au compte et la connexion d'une nouvelle IA (#134).
 import { useState } from 'react'
+import { api } from '../api'
 import { useNavigate } from 'react-router-dom'
 import { Building2, Plus, Settings2, User, Users, ArrowRight } from 'lucide-react'
 import { euros, frDate } from '../api'
@@ -11,6 +12,57 @@ import { openCreate } from '../components/MapSwitcher'
 import { ConfirmMove, isAdmin, previewMove, type Drag, type Pending } from '../components/MoveMap'
 import { tr } from '../i18n/t'
 import { AiSection } from '../components/ConnectAI'
+
+type Groupe = { space: string; label: string; studio_id: number | null; maps: { id: number; name: string }[] }
+
+/** Maps perso d'une autre équipe Creator, à passer dans un studio (#143) : jamais rangées en silence. */
+function ARanger() {
+  const { me, reload: reloadMe, toast } = useApp()
+  const { data, reload } = useLoad<{ groups: Groupe[] }>('/api/me/a-ranger', [me?.studios.reduce((n, s) => n + s.maps.length, 0)])
+  if (!data?.groups.length) return null
+  return <div className="stack" style={{ gap: 10, marginBottom: 14 }}>{data.groups.map(g => <Groupe key={g.space} g={g} fini={async () => { await reloadMe(); reload() }} toast={toast} studios={(me?.studios ?? []).filter(s => !s.personal && (s.role === 'owner' || s.role === 'admin'))} />)}</div>
+}
+
+function Groupe({ g, fini, toast, studios }: { g: Groupe; fini: () => Promise<void>; toast: (m: string, e?: boolean) => void; studios: Studio[] }) {
+  const [mode, setMode] = useState<'' | 'creer' | 'existant'>('')
+  const [nom, setNom] = useState(g.label)
+  const [vers, setVers] = useState(String(g.studio_id ?? studios[0]?.id ?? ''))
+  const [busy, setBusy] = useState(false)
+  const passer = async (cible: { new_studio?: string; studio_id?: number }) => {
+    setBusy(true)
+    try {
+      let sid = cible.studio_id
+      for (const m of g.maps) {
+        const r = await api.post(`/api/maps/${m.id}/move`, sid ? { studio_id: sid } : cible)
+        sid = r.studio_id
+      }
+      await api.put(`/api/studios/${sid}/creator-space`, { space: g.space })
+      toast(tr("{0} map(s) passée(s) dans le studio", [g.maps.length]))
+      await fini()
+    } catch (er: any) { toast(er.message, true) } finally { setBusy(false) }
+  }
+  return <div className="card" style={{ padding: '14px 16px' }} role="group" aria-label={tr("À ranger · équipe {0}", [g.label])}>
+    <div className="row" style={{ alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+      <b>{tr("À ranger · équipe {0}", [g.label])}</b>
+      <span className="small muted">{tr("{0} map(s) de l'espace Creator {1} : {2}", [g.maps.length, g.space, g.maps.map(m => m.name).join(', ')])}</span>
+    </div>
+    {mode === '' && <div className="row" style={{ marginTop: 10, flexWrap: 'wrap', gap: 8 }}>
+      <button className="btn pri" onClick={() => setMode('creer')}>{tr("Créer le studio et y passer ces maps")}</button>
+      {studios.length > 0 && <button className="btn" onClick={() => setMode('existant')}>{tr("Les passer dans un studio existant")}</button>}
+      <button className="btn" onClick={async () => { try { await api.post('/api/me/a-ranger/solo', { space: g.space }); await fini() } catch (er: any) { toast(er.message, true) } }}>{tr("Laisser en solo")}</button>
+    </div>}
+    {mode === 'creer' && <form className="row" style={{ marginTop: 10, gap: 8 }} onSubmit={e => { e.preventDefault(); passer({ new_studio: nom.trim() }) }}>
+      <label className="label" style={{ flex: 1 }}>{tr("Nom du studio")}<input className="field" value={nom} onChange={e => setNom(e.target.value)} required maxLength={60} autoFocus /></label>
+      <button className="btn pri" style={{ alignSelf: 'flex-end' }} disabled={busy}>{busy ? tr("Déplacement…") : tr("Créer et passer")}</button>
+      <button type="button" className="btn" style={{ alignSelf: 'flex-end' }} onClick={() => setMode('')}>{tr("Annuler")}</button>
+    </form>}
+    {mode === 'existant' && <form className="row" style={{ marginTop: 10, gap: 8 }} onSubmit={e => { e.preventDefault(); passer({ studio_id: Number(vers) }) }}>
+      <label className="label" style={{ flex: 1 }}>{tr("Studio")}<select className="field" value={vers} onChange={e => setVers(e.target.value)}>{studios.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+      <button className="btn pri" style={{ alignSelf: 'flex-end' }} disabled={busy || !vers}>{busy ? tr("Déplacement…") : tr("Passer les maps")}</button>
+      <button type="button" className="btn" style={{ alignSelf: 'flex-end' }} onClick={() => setMode('')}>{tr("Annuler")}</button>
+    </form>}
+  </div>
+}
 
 type DnD = { drag: Drag | null; setDrag: (d: Drag | null) => void; over: number | null; setOver: (id: number | null) => void; drop: (to: number) => void }
 
@@ -33,6 +85,7 @@ function StudioBlock({ s, dnd }: { s: Studio; dnd: DnD }) {
       </div>
       <button className="btn" onClick={() => nav(`/studio/${s.id}/${s.personal ? 'maps' : 'equipe'}`)}><Settings2 size={16} />{s.personal ? tr("Mes outils") : tr("Gérer le studio")}</button>
     </div>
+    {s.personal && <ARanger />}
     <div className="home-grid">
       {list.map((m: any) => <div key={m.id} role="button" tabIndex={0}
         className={`home-map${admin ? ' draggable' : ''}${dnd.drag?.id === m.id ? ' dragging' : ''}`}

@@ -27,6 +27,7 @@ export default function Team({ tab }: { tab: 'members' | 'integ' | 'maps' | 'set
       <Tabs value={tab} onChange={t => nav(`/studio/${studio.id}/${sub[t as keyof typeof sub]}`)} items={items} />
       {tab === 'members' && <Members />}
       {tab === 'integ' && <Integrations />}
+      {tab === 'maps' && studio.personal && <EspaceCreator studioId={studio.id} perso admin />}
       {tab === 'maps' && <Maps />}
       {tab === 'settings' && <StudioSettings />}
     </main>
@@ -261,6 +262,25 @@ function GitHub({ data, set }: { data: any; set: (k: string, e: boolean, c: any)
   </section>
 }
 
+/** Espace Creator (#143) : le sien (espace perso) ou celui de l'équipe Creator reliée au studio. Les projets UEFN de
+ * cet espace vont directement au bon endroit quand on relie UEFN. */
+function EspaceCreator({ studioId, perso, admin }: { studioId: number; perso: boolean; admin: boolean }) {
+  const { toast } = useApp()
+  const url = perso ? '/api/me/a-ranger' : `/api/studios/${studioId}/creator-space`
+  const { data, reload } = useLoad<any>(url, [studioId])
+  const actuel: string = (perso ? data?.mine : data?.space) ?? ''
+  const [v, setV] = useState<string | null>(null)
+  if (!data) return null
+  const val = v ?? actuel
+  const form = <form className="row" onSubmit={async e => { e.preventDefault(); try { await api.put(perso ? '/api/me/creator-space' : `/api/studios/${studioId}/creator-space`, { space: val }); setV(null); reload(); toast(tr("Espace Creator enregistré")) } catch (er: any) { toast(er.message, true) } }}>
+    <label className="label" style={{ flex: 1 }}>{perso ? tr("Mon espace Creator") : tr("Équipe Creator reliée")}<input className="field" value={val} disabled={!admin} onChange={e => setV(e.target.value)} placeholder={tr("ex. klmaps@fortnite.com")} maxLength={120} /></label>
+    {admin && <button className="btn" style={{ alignSelf: 'flex-end' }} disabled={val === actuel}>{tr("Enregistrer")}</button>}
+  </form>
+  const aide = <p className="small muted" style={{ margin: '4px 0 0' }}>{perso ? tr("Vos projets UEFN de cet espace restent en solo quand vous reliez UEFN ; ceux d'une autre équipe Creator vous sont proposés « à ranger ».") : tr("Quand un admin relie UEFN, les projets de cette équipe Creator arrivent directement dans ce studio.")}</p>
+  return perso ? <section className="card"><CardHead title={tr("Espace Creator")} sub={tr("À qui appartiennent vos projets UEFN")} />{form}{aide}</section>
+    : <><div className="dsec">{tr("Équipe Creator")}</div>{form}{aide}</>
+}
+
 /** Réglage « Les IA peuvent supprimer seules » dans UEFN (décision du 24/11, #165) : changé par un admin. */
 function IaSupprime({ studioId, admin }: { studioId: number; admin: boolean }) {
   const { toast } = useApp()
@@ -287,6 +307,7 @@ function StudioSettings() {
       <label className="label" style={{ flex: 1 }}>{tr("Nom du studio")}<input className="field" value={name} onChange={e => setName(e.target.value)} required maxLength={80} /></label>
       <button className="btn" style={{ alignSelf: 'flex-end' }}>{tr("Renommer")}</button>
     </form>}
+    <EspaceCreator studioId={studio.id} perso={false} admin={isAdmin} />
     <IaSupprime studioId={studio.id} admin={isAdmin} />
     {isAdmin && <><div className="dsec">{tr("Sauvegarde")}</div><p className="small muted" style={{ margin: 0 }}>{tr("Téléchargez tout le travail du studio (maps, tâches, pages, tableaux, Verse, gains) dans un fichier.")}</p>
       <a className="btn" style={{ marginTop: 8 }} href={`/api/studios/${studio.id}/export`} download>{tr("Exporter le studio")}</a></>}

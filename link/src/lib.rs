@@ -1115,7 +1115,7 @@ pub async fn pair_studio(
     device: &str,
 ) -> Result<Vec<ProjLink>> {
     let server = server.trim_end_matches('/');
-    let body = json!({ "code": code.trim(), "device": device, "projects": projects.iter().map(|p| json!({ "name": p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default() })).collect::<Vec<_>>() });
+    let body = json!({ "code": code.trim(), "device": device, "projects": projects.iter().map(|p| json!({ "name": p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default(), "creator_space": poste::espace_creator(p), "lore_id": poste::lore_id(p) })).collect::<Vec<_>>() });
     let r: Value = reqwest::Client::new()
         .post(format!("{server}/api/relay/pair-studio"))
         .json(&body)
