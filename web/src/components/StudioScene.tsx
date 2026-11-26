@@ -17,7 +17,7 @@ export function activiteHumaine(page?: string): Activite {
     case 'verse': return 'code'
     case 'pages': return 'code'
     case 'taches': case 'planifier': return 'planifie'
-    case 'tableau': case 'plan2d': return 'dessine'
+    case 'tableau': return 'dessine'
     case 'uefn': case 'organiseur': return 'construit'
     case 'lancer': case 'remunerer': return 'pilote'
     default: return 'studio'

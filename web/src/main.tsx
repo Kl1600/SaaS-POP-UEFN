@@ -17,7 +17,6 @@ import Overview from './pages/Overview'
 import Home from './pages/Home'
 import { MapScope, StudioScope, Legacy } from './components/Scopes'
 import Pages from './pages/Pages'
-import Plan2D from './pages/Plan2D'
 import Board from './pages/Board'
 import Plan from './pages/Plan'
 import Tasks from './pages/Tasks'
@@ -71,7 +70,8 @@ function Gate() {
           <Route index element={<Overview />} />
           <Route path="pages" element={<Pages />} />
           <Route path="pages/:pid" element={<Pages />} />
-          <Route path="plan2d" element={<Plan2D />} />
+          {/* Le Plan 2D est dans POP Forge (#430). */}
+          <Route path="plan2d" element={<Navigate to=".." replace />} />
           <Route path="tableau" element={<Board />} />
           <Route path="tableau/:bid" element={<Board />} />
           <Route path="planifier" element={<Plan />} />

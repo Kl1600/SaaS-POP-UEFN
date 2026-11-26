@@ -5,7 +5,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Circle, Hexagon, Layers, MousePointer2, Plus, Route, Ruler, Square, Trash2, Minus as Wall, MapPin } from 'lucide-react'
 import { api } from '../api'
 import { useApp, useLive, useLoad } from '../state'
-import { PageHead } from '../components/ui'
 import { tr } from '../i18n/t'
 
 type Floor = { id: number; name: string; z_min: number; z_max: number; position: number }
@@ -25,6 +24,7 @@ const m = (cm: number) => Math.round(cm) / 100
 /** Distance en cm → mètres à deux décimales, au format de la langue (« 20,00 » en français). */
 const metres = (cm: number) => new Intl.NumberFormat(document.documentElement.lang || 'fr', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(cm / 100)
 
+/** Plan 2D, affiché dans POP Forge (#430) : section « Plan 2D », sur la map courante. */
 export default function Plan2D() {
   const { map, toast } = useApp()
   const mid = map?.id
@@ -134,8 +134,9 @@ export default function Plan2D() {
 
   if (!mid) return null
   return (
-    <main className="content">
-      <PageHead title={tr("Plan 2D")} help={tr("Le plan de la map à l'échelle, étage par étage. 1 case = 1 m de près ; positions en cm comme le panneau Détails d'UEFN (X vers l'avant, Y vers la droite).")} />
+    <div className="stack" style={{ gap: 14 }}>
+      <h1 className="forge-h1">{tr("Plan 2D")}</h1>
+      <p className="muted" style={{ margin: 0 }}>{tr("Le plan de la map à l'échelle, étage par étage. 1 case = 1 m de près ; positions en cm comme le panneau Détails d'UEFN (X vers l'avant, Y vers la droite).")}</p>
       <section className="card p2">
         <div className="row p2-etages" role="tablist">
           {data?.floors.map(f => <button key={f.id} role="tab" aria-selected={f.id === etage} className={'btn' + (f.id === etage ? ' pri' : '')} onClick={() => { setEtage(f.id); setSel(null) }}>{f.name} <span className="small">{m(f.z_min)}–{m(f.z_max)} m</span></button>)}
@@ -183,6 +184,6 @@ export default function Plan2D() {
         </div>
         {niveauOn && niveau && niveau.actors.length === 0 && <p className="small muted" style={{ margin: '8px 0 0' }}>{tr("Aucun acteur reçu du niveau UEFN : reliez le projet et lancez une synchronisation.")}</p>}
       </section>
-    </main>
+    </div>
   )
 }
