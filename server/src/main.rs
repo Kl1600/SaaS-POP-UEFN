@@ -226,7 +226,7 @@ async fn csrf(req: Request<Body>, next: Next) -> Response {
     );
     h.insert("cross-origin-opener-policy", "same-origin".parse().unwrap());
     // Politique de contenu : scripts uniquement de POP, aucune intégration de POP dans un autre site.
-    h.insert("content-security-policy", "default-src 'self'; script-src 'self' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' ws: wss:; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'".parse().unwrap());
+    h.insert("content-security-policy", csp().parse().unwrap());
     if https_mode() {
         h.insert(
             "strict-transport-security",
@@ -1000,4 +1000,19 @@ mod routeur {
     fn routes_sans_doublon() {
         let _ = super::api();
     }
+}
+
+/// Politique de contenu. Le navigateur envoie les assets et les captures directement au stockage (#92, #348) :
+/// l'adresse du stockage (`POP_S3_ENDPOINT`) est donc permise en `connect-src`.
+fn csp() -> &'static str {
+    static CSP: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    CSP.get_or_init(|| {
+        let stockage = std::env::var("POP_S3_ENDPOINT")
+            .ok()
+            .map(|e| e.trim().trim_end_matches('/').to_string())
+            .filter(|e| e.starts_with("https://") && !e.contains([' ', ';', ',', '\'', '"']))
+            .map(|e| format!(" {e}"))
+            .unwrap_or_default();
+        "default-src 'self'; script-src 'self' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' ws: wss:; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'".replace("connect-src 'self' ws: wss:;", &format!("connect-src 'self' ws: wss:{stockage};"))
+    })
 }
