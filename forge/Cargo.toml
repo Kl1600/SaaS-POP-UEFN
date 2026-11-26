@@ -22,3 +22,8 @@ pop-link = { path = "../link" }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 # Vrai dossier Documents de Windows, même déplacé (projets UEFN).
 dirs = "7"
+# Capture de l'écran du jeu pendant un scénario de test (#350), envoyée à POP en base64.
+base64 = "0.22"
+
+[target.'cfg(windows)'.dependencies]
+xcap = "0.9"

@@ -15,6 +15,7 @@ import { tr } from '../i18n/t'
 import { ForgeBibliotheque } from '../components/ForgeBibliotheque'
 import { ForgeVerse } from '../components/ForgeVerse'
 import { ForgeVerifications } from '../components/ForgeVerifications'
+import { ForgeScenarios } from '../components/ForgeScenarios'
 import { cssRect } from '../zoom'
 
 type Invoke = <T = any>(cmd: string, args?: Record<string, unknown>) => Promise<T>
@@ -112,7 +113,7 @@ export default function Forge() {
           : section === 'agents' ? (app.map ? <ForgeAgents mapId={app.map.id} /> : <p className="muted">{tr("Choisissez une map.")}</p>)
           : section === 'verifier' ? (app.map ? <ForgeVerifications mapId={app.map.id} ouvrir={ouvrirPOP} /> : <p className="muted">{tr("Choisissez une map.")}</p>)
           : section === 'bibliotheque' ? <Bibliotheque mapId={app.map?.id ?? null} studioId={app.studio?.id ?? null} />
-          : section === 'construire' ? (app.map ? <ForgeConstruire mapId={app.map.id} /> : <p className="muted">{tr("Choisissez une map.")}</p>)
+          : section === 'construire' ? (app.map ? <div className="stack" style={{ gap: 18 }}><ForgeConstruire mapId={app.map.id} /><ForgeScenarios mapId={app.map.id} capturer={() => captureJeu(invoke)} /></div> : <p className="muted">{tr("Choisissez une map.")}</p>)
             : <AVenir section={section} titre={titre ?? ''} />}
       </main>
     </div>
@@ -515,4 +516,13 @@ function Bibliotheque({ mapId, studioId }: { mapId: number | null; studioId: num
     </div>
     {vue === 'verse' ? <ForgeVerse mapId={mapId} studioId={studioId} /> : <ForgeBibliotheque mapId={mapId} studioId={studioId} />}
   </div>
+}
+
+/** Photo de l'écran du jeu par Forge (#350) : PNG en base64 → Blob prêt à envoyer au stockage. */
+async function captureJeu(invoke: Invoke): Promise<Blob> {
+  const b64 = await invoke('capture_jeu') as string
+  const bin = atob(b64)
+  const o = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) o[i] = bin.charCodeAt(i)
+  return new Blob([o], { type: 'image/png' })
 }

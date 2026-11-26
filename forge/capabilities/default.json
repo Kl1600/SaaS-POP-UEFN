@@ -16,6 +16,7 @@
     "allow-liaison",
     "allow-fenetre",
     "allow-action-forge",
-    "allow-choisir-dossier"
+    "allow-choisir-dossier",
+    "allow-capture-jeu"
   ]
 }

@@ -122,7 +122,9 @@ fn autoriser(app: &AppHandle, u: &Url) {
         .permission("allow-liaison")
         .permission("allow-fenetre")
         .permission("allow-choisir-dossier")
-        .permission("allow-action-forge");
+        .permission("allow-action-forge")
+        // Capture de l'écran du jeu pour les scénarios de test (#350).
+        .permission("allow-capture-jeu");
     let _ = app.add_capability(cap);
 }
 
@@ -414,6 +416,57 @@ async fn relier(app: AppHandle, code: String, projet: String) -> Result<String, 
 
 /// Barre de titre propre à Forge (#78, retour de Kl1600 du 24/11) : la fenêtre n'a plus le cadre ni le menu de
 /// Windows ; la page dessine sa barre et appelle cette commande pour réduire, agrandir, fermer ou déplacer.
+/// Photo de l'écran du jeu pour un scénario de test (#350) : la fenêtre du client Fortnite (session de test) si elle
+/// est ouverte, sinon l'écran principal. Rend une image PNG en base64.
+#[tauri::command]
+async fn capture_jeu() -> Result<String, String> {
+    tokio::task::spawn_blocking(capture_png)
+        .await
+        .map_err(|e| e.to_string())?
+        .map(|png| {
+            use base64::Engine;
+            base64::engine::general_purpose::STANDARD.encode(png)
+        })
+}
+
+#[cfg(windows)]
+fn capture_png() -> Result<Vec<u8>, String> {
+    use xcap::{Monitor, Window};
+    let jeu = Window::all().ok().and_then(|ws| {
+        ws.into_iter().find(|w| {
+            let app = w.app_name().unwrap_or_default().to_lowercase();
+            let titre = w.title().unwrap_or_default().to_lowercase();
+            // Le client de jeu, pas l'éditeur (« Unreal Editor for Fortnite »).
+            (app.contains("fortniteclient") || titre == "fortnite")
+                && !titre.contains("unreal editor")
+                && !w.is_minimized().unwrap_or(true)
+        })
+    });
+    let img = match jeu {
+        Some(w) => w
+            .capture_image()
+            .map_err(|e| format!("capture de la fenêtre du jeu : {e}"))?,
+        None => {
+            let m = Monitor::all()
+                .map_err(|e| e.to_string())?
+                .into_iter()
+                .find(|m| m.is_primary().unwrap_or(false))
+                .ok_or("écran principal introuvable")?;
+            m.capture_image()
+                .map_err(|e| format!("capture de l'écran : {e}"))?
+        }
+    };
+    let mut png = std::io::Cursor::new(Vec::new());
+    img.write_to(&mut png, xcap::image::ImageFormat::Png)
+        .map_err(|e| e.to_string())?;
+    Ok(png.into_inner())
+}
+
+#[cfg(not(windows))]
+fn capture_png() -> Result<Vec<u8>, String> {
+    Err("La capture de l'écran du jeu n'est disponible que sous Windows.".into())
+}
+
 #[tauri::command]
 fn fenetre(window: WebviewWindow, action: String) -> Result<(), String> {
     match action.as_str() {
@@ -487,6 +540,7 @@ fn main() {
         .manage(Home(Mutex::new(None)))
         .manage(relay::Relay::default())
         .invoke_handler(tauri::generate_handler![
+            capture_jeu,
             start,
             connect,
             projets,
