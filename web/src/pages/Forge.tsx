@@ -12,6 +12,7 @@ import { Selecteur } from '../components/Selecteur'
 import { useApp, studioName, useLive, useLoad } from '../state'
 import { ago, api } from '../api'
 import { tr } from '../i18n/t'
+import { ForgeBibliotheque } from '../components/ForgeBibliotheque'
 import { cssRect } from '../zoom'
 
 type Invoke = <T = any>(cmd: string, args?: Record<string, unknown>) => Promise<T>
@@ -31,7 +32,7 @@ const SECTIONS: [Section, string, any][] = [
 ]
 // Écrans encore vides : ce qu'ils feront et les issues qui les rempliront (critère 7 de #78).
 const A_VENIR: Partial<Record<Section, [string, string]>> = {
-  bibliotheque: [tr("Tout ce que le studio réutilise : modules Verse, 3D, images et sons, installés en un clic."), '#86, #92'],
+  bibliotheque: [tr("Tout ce que le studio réutilise : modules Verse, 3D, images et sons, installés en un clic."), '#86, #92, #382'],
   outils: [tr("Assets inutilisés, ambiances lumineuses, renommer et supprimer sans risque."), tr("issues à créer après les écrans principaux")],
 }
 
@@ -106,6 +107,7 @@ export default function Forge() {
         {section === 'accueil' ? <Accueil invoke={invoke} etat={etat} liaison={liaison} relie={relie} relire={lire} />
           : section === 'reglages' ? <Reglages />
           : section === 'agents' ? (app.map ? <ForgeAgents mapId={app.map.id} /> : <p className="muted">{tr("Choisissez une map.")}</p>)
+          : section === 'bibliotheque' ? <ForgeBibliotheque mapId={app.map?.id ?? null} studioId={app.studio?.id ?? null} />
           : section === 'construire' ? (app.map ? <ForgeConstruire mapId={app.map.id} /> : <p className="muted">{tr("Choisissez une map.")}</p>)
             : <AVenir section={section} titre={titre ?? ''} />}
       </main>

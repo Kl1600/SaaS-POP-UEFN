@@ -735,6 +735,9 @@ fn api() -> Router<AppState> {
             get(assets::list).post(assets::create),
         )
         .route("/api/assets/{id}/confirm", post(assets::confirm))
+        .route("/api/assets/{id}/visibility", post(assets::visibilite))
+        .route("/api/me/assets", get(assets::miens))
+        .route("/api/assets/import/{token}", get(assets::par_lien))
         .route("/api/assets/{id}/download", get(assets::download))
         .route("/api/assets/{id}", delete(assets::delete))
         .route(

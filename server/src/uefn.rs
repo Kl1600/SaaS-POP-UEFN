@@ -1322,6 +1322,12 @@ async fn prepare(
             const EXT: &[&str] = &[
                 "fbx", "obj", "png", "jpg", "jpeg", "tga", "wav", "ogg", "mp3",
             ];
+            // Asset de la bibliothèque (#382) : lien d'import de 15 min, si le compte peut le lire.
+            if let Some(aid) = args["asset_id"].as_i64() {
+                let (url, nom) = crate::assets::lien_import(st, &o.ctx.user, aid).await?;
+                args["url"] = json!(url);
+                args["filename"] = json!(nom);
+            }
             let src = args["local_path"]
                 .as_str()
                 .filter(|s| !s.is_empty())
