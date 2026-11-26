@@ -4,10 +4,9 @@
 // « Ouvrir POP » et « Voir dans POP » ouvrent le site dans le navigateur (Forge y renvoie toute page autre que /forge).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, Bot, Building2, Check, ChevronsUpDown, ExternalLink, Hammer, Home, Library, Minus, Moon, RefreshCw, ShieldCheck, Square, Sun, User, Wrench, X } from 'lucide-react'
+import { Bell, Bot, Building2, Check, ChevronsUpDown, ExternalLink, Home, Library, Minus, Moon, RefreshCw, ShieldCheck, Square, Sun, User, Wrench, X } from 'lucide-react'
 import LangPicker from '../components/LangPicker'
 import { ForgeAgents } from '../components/ForgeAgents'
-import { ForgeConstruire } from '../components/ForgeConstruire'
 import { Selecteur } from '../components/Selecteur'
 import { useApp, studioName, useLive, useLoad } from '../state'
 import { ago, api } from '../api'
@@ -24,12 +23,11 @@ const forgeInvoke = (): Invoke | null => {
   return w.__TAURI__?.core?.invoke ?? w.__TAURI_INTERNALS__?.invoke ?? null
 }
 type Liaison = { projet: string; map: string; serveur: string; liens?: { projet: string; map: string }[] } | null
-type Section = 'accueil' | 'agents' | 'construire' | 'verifier' | 'bibliotheque' | 'outils' | 'reglages'
+type Section = 'accueil' | 'agents' | 'verifier' | 'bibliotheque' | 'outils' | 'reglages'
 
 const SECTIONS: [Section, string, any][] = [
   ['accueil', tr("Accueil"), Home],
   ['agents', tr("Agents"), Bot],
-  ['construire', tr("Construire"), Hammer],
   ['verifier', tr("Vérifications"), ShieldCheck],
   ['bibliotheque', tr("Bibliothèque"), Library],
   ['outils', tr("Outils"), Wrench],
@@ -113,7 +111,6 @@ export default function Forge() {
           : section === 'agents' ? (app.map ? <ForgeAgents mapId={app.map.id} /> : <p className="muted">{tr("Choisissez une map.")}</p>)
           : section === 'verifier' ? (app.map ? <div className="stack" style={{ gap: 18 }}><ForgeVerifications mapId={app.map.id} ouvrir={ouvrirPOP} /><ForgeScenarios mapId={app.map.id} capturer={() => captureJeu(invoke)} /></div> : <p className="muted">{tr("Choisissez une map.")}</p>)
           : section === 'bibliotheque' ? <Bibliotheque mapId={app.map?.id ?? null} studioId={app.studio?.id ?? null} />
-          : section === 'construire' ? (app.map ? <ForgeConstruire mapId={app.map.id} /> : <p className="muted">{tr("Choisissez une map.")}</p>)
             : <AVenir section={section} titre={titre ?? ''} />}
       </main>
     </div>
@@ -440,7 +437,7 @@ function Bandeau({ mapId, etat, aller }: { mapId: number; etat: string; aller: (
   if (!pbs.length) return null
   const agir = (p: any) => {
     if (p.action === 'accueil') aller('accueil')
-    else if (p.action === 'construire') aller('construire')
+    else if (p.action === 'verifier' || p.action === 'construire') aller('verifier')
     else if (p.action === 'agents') aller('agents')
     else if (p.action === 'reessayer') reload()
     else setAide(aide === p.code ? null : p.code)
