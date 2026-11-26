@@ -124,7 +124,10 @@ fn autoriser(app: &AppHandle, u: &Url) {
         .permission("allow-choisir-dossier")
         .permission("allow-action-forge")
         // Capture de l'écran du jeu pour les scénarios de test (#350).
-        .permission("allow-capture-jeu");
+        .permission("allow-capture-jeu")
+        // Assistant de premier lancement (#299).
+        .permission("allow-bilan-poste")
+        .permission("allow-activer-mcp-auto");
     let _ = app.add_capability(cap);
 }
 
@@ -416,6 +419,32 @@ async fn relier(app: AppHandle, code: String, projet: String) -> Result<String, 
 
 /// Barre de titre propre à Forge (#78, retour de Kl1600 du 24/11) : la fenêtre n'a plus le cadre ni le menu de
 /// Windows ; la page dessine sa barre et appelle cette commande pour réduire, agrandir, fermer ou déplacer.
+/// Assistant de premier lancement (#299) : vérifications du poste (UEFN, serveur MCP, toolsets, Python, démarrage
+/// automatique) pour le projet ouvert dans UEFN, sinon le premier projet relié.
+#[tauri::command]
+async fn bilan_poste() -> serde_json::Value {
+    let cfg = pop_link::load().ok();
+    let ouvert = pop_link::open_project(&tous_les_projets()).await;
+    let projet = ouvert
+        .clone()
+        .or_else(|| cfg.as_ref().map(|c| PathBuf::from(&c.project)));
+    let mut b = pop_link::poste::bilan(
+        projet.as_deref(),
+        cfg.as_ref().and_then(|c| c.uefn_mcp_url.as_deref()),
+    )
+    .await;
+    b["projet_ouvert"] = serde_json::json!(ouvert.map(|p| p.to_string_lossy().to_string()));
+    b
+}
+
+/// Active le démarrage automatique du serveur MCP d'UEFN, avec l'accord de l'utilisateur (#299).
+#[tauri::command]
+fn activer_mcp_auto() -> Result<String, String> {
+    pop_link::poste::activer_demarrage_auto()
+        .map(|p| p.to_string_lossy().to_string())
+        .map_err(|e| e.to_string())
+}
+
 /// Photo de l'écran du jeu pour un scénario de test (#350) : la fenêtre du client Fortnite (session de test) si elle
 /// est ouverte, sinon l'écran principal. Rend une image PNG en base64.
 #[tauri::command]
@@ -541,6 +570,8 @@ fn main() {
         .manage(relay::Relay::default())
         .invoke_handler(tauri::generate_handler![
             capture_jeu,
+            bilan_poste,
+            activer_mcp_auto,
             start,
             connect,
             projets,

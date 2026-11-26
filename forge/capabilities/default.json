@@ -17,6 +17,8 @@
     "allow-fenetre",
     "allow-action-forge",
     "allow-choisir-dossier",
-    "allow-capture-jeu"
+    "allow-capture-jeu",
+    "allow-bilan-poste",
+    "allow-activer-mcp-auto"
   ]
 }
