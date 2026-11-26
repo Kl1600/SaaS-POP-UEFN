@@ -28,6 +28,7 @@
   button:hover { opacity:.88; }
   button:disabled { opacity:.5; cursor:default; }
   .lien { margin-top:8px; background:var(--carte); color:var(--texte); border-color:var(--bord); box-shadow:none; }
+  .discret { all:unset; display:block; margin:14px auto 0; font-size:13px; color:var(--doux, rgb(140,140,140)); text-decoration:underline; cursor:pointer; }
   .erreur { color:var(--err); font-size:14px; margin:12px 0 0; min-height:1em; }
   .petit { font-size:12px; margin:16px 0 0; }
   /* Barre de titre propre à Forge : la fenêtre n'a plus le cadre de Windows (#78). */
@@ -52,10 +53,16 @@
   <img class="logo" src="logo.png" alt="POP">
   <h1>POP Forge</h1>
   <p id="intro">Connexion à POP…</p>
+  <div id="injoignable" hidden>
+    <div class="erreur" id="detail" role="alert"></div>
+    <button id="reessayer" type="button">Réessayer</button>
+    <button id="autre-serveur" class="discret" type="button">Autre serveur POP…</button>
+  </div>
   <form id="f" hidden>
     <label for="adresse">Adresse de POP</label>
-    <input id="adresse" autocomplete="url" spellcheck="false" placeholder="pop.mon-studio.fr ou http://192.168.1.20:8080">
+    <input id="adresse" autocomplete="url" spellcheck="false" placeholder="pop-uefn.com">
     <button id="ok" type="submit">Se connecter</button>
+    <button id="officiel" class="lien" type="button">Utiliser pop-uefn.com</button>
     <div class="erreur" id="erreur" role="alert"></div>
     <p class="petit">L'adresse est retenue. Pour la changer plus tard : menu du profil (en bas à gauche) → Changer l'adresse de POP.</p>
   </form>

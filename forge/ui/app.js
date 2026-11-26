@@ -1,4 +1,5 @@
-// Page locale de POP Forge : demande l'adresse de POP, la fait vérifier par Forge, puis Forge ouvre POP.
+// Page locale de POP Forge. Forge ouvre lui-même pop-uefn.com (ou l'adresse enregistrée) ; cette page ne se voit que
+// si POP est injoignable (#412), pour changer l'adresse (menu du profil) ou pour relier un projet UEFN.
 const invoke = window.__TAURI__.core.invoke;
 // Barre de titre (#78) : glisser déplace la fenêtre, double-clic l'agrandit, boutons à droite.
 (() => {
@@ -11,14 +12,45 @@ const invoke = window.__TAURI__.core.invoke;
 const $ = (id) => document.getElementById(id);
 
 function montrer(adresse, erreur) {
+  $('injoignable').hidden = true;
   $('intro').textContent = erreur
     ? 'POP ne s’est pas ouvert. Corrigez l’adresse ou réessayez.'
-    : 'Indiquez l’adresse de votre POP. Vous vous connecterez ensuite avec votre compte habituel.';
+    : 'Adresse du serveur POP (pop-uefn.com, ou un POP installé ailleurs). Vous vous connecterez ensuite avec votre compte habituel.';
   $('adresse').value = adresse || '';
   $('erreur').textContent = erreur || '';
   $('f').hidden = false;
   $('adresse').focus();
 }
+
+// POP ne répond pas : pas de champ d'adresse, seulement « Réessayer » (et un nouvel essai toutes les 10 s).
+let essai = null;
+function injoignable(adresse, erreur) {
+  $('f').hidden = true;
+  $('intro').textContent = 'POP est injoignable. Vérifiez votre connexion à Internet.';
+  $('detail').textContent = adresse + ' : ' + erreur;
+  $('injoignable').hidden = false;
+  clearInterval(essai);
+  essai = setInterval(() => lancer(false, true), 10000);
+}
+
+async function lancer(changer, silencieux) {
+  if (!silencieux) { $('reessayer').disabled = true; $('reessayer').textContent = 'Connexion…'; }
+  try {
+    const r = await invoke('start', { change: changer });
+    if (changer) return montrer(r.address, null);
+    // POP répond : Forge l'a ouvert, cette page disparaît.
+    if (!r.error) { clearInterval(essai); return; }
+    injoignable(r.address, r.error);
+  } catch (err) {
+    injoignable('POP', String(err));
+  } finally {
+    $('reessayer').disabled = false; $('reessayer').textContent = 'Réessayer';
+  }
+}
+
+$('reessayer').addEventListener('click', () => lancer(false, false));
+$('autre-serveur').addEventListener('click', () => { clearInterval(essai); lancer(true, false); });
+$('officiel').addEventListener('click', () => { $('adresse').value = 'pop-uefn.com'; $('f').requestSubmit(); });
 
 $('f').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -74,13 +106,5 @@ $('retour').addEventListener('click', async () => {
 
 (async () => {
   if (new URLSearchParams(location.search).has('relier')) return relierEcran();
-  const changer = new URLSearchParams(location.search).has('changer');
-  try {
-    const r = await invoke('start', { change: changer });
-    // Adresse enregistrée qui répond : Forge ouvre POP, cette page disparaît.
-    if (r.address && !r.error && !changer) return;
-    montrer(r.address, r.error);
-  } catch (err) {
-    montrer('', String(err));
-  }
+  lancer(new URLSearchParams(location.search).has('changer'), true);
 })();

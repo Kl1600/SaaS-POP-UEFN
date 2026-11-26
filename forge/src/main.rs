@@ -1,8 +1,9 @@
 //! POP Forge : application de bureau Windows de POP (jalon M4).
 //!
 //! Une fenêtre qui affiche l'interface POP du serveur choisi, comme un navigateur : connexion par le formulaire
-//! habituel, session gardée par WebView2 d'un lancement à l'autre. Au premier lancement (ou si POP ne répond pas),
-//! la page locale `ui/index.html` demande l'adresse. L'interface POP n'a aucun accès aux commandes de Forge
+//! habituel, session gardée par WebView2 d'un lancement à l'autre. Sans adresse enregistrée, Forge va sur
+//! pop-uefn.com (#412) ; la page locale `ui/index.html` dit « POP est injoignable » s'il ne répond pas, et ne demande
+//! l'adresse que par « Changer l'adresse de POP ». L'interface POP n'a aucun accès aux commandes de Forge
 //! (`capabilities/default.json` : page locale seulement).
 //!
 //! UEFN Link tourne dans Forge (`relay.rs`) : son état s'affiche dans le titre de la fenêtre, le menu
@@ -209,26 +210,29 @@ fn ouvrir(app: &AppHandle, u: &Url) -> Result<(), String> {
     main_window(app)?.navigate(forge).map_err(|e| e.to_string())
 }
 
-/// Résultat pour la page locale : adresse à préremplir et erreur à afficher.
+/// POP officiel : Forge s'y connecte sans rien demander quand aucune autre adresse n'est enregistrée (#412).
+const POP_DEFAUT: &str = "https://pop-uefn.com";
+
+/// Résultat pour la page locale : adresse utilisée (ou à préremplir), erreur à afficher, et si c'est le POP officiel.
 #[derive(Serialize)]
 struct Start {
     address: String,
     error: Option<String>,
+    defaut: bool,
 }
 
-/// Au chargement de la page locale : ouvre POP si l'adresse enregistrée répond, sinon rend l'erreur.
+/// Au chargement de la page locale : ouvre POP (l'adresse enregistrée, sinon pop-uefn.com) s'il répond, sinon rend
+/// l'erreur pour l'écran « POP est injoignable ». `change` : on veut seulement l'adresse pour la modifier.
 #[tauri::command]
 async fn start(app: AppHandle, change: bool) -> Result<Start, String> {
-    let Some(server) = load(&app).server else {
-        return Ok(Start {
-            address: String::new(),
-            error: None,
-        });
-    };
+    let enregistree = load(&app).server;
+    let defaut = enregistree.is_none();
+    let server = enregistree.unwrap_or_else(|| POP_DEFAUT.to_string());
     if change {
         return Ok(Start {
             address: server,
             error: None,
+            defaut,
         });
     }
     let u = normalize(&server)?;
@@ -238,11 +242,13 @@ async fn start(app: AppHandle, change: bool) -> Result<Start, String> {
             Ok(Start {
                 address: server,
                 error: None,
+                defaut,
             })
         }
         Err(e) => Ok(Start {
             address: server,
             error: Some(e),
+            defaut,
         }),
     }
 }
@@ -253,7 +259,9 @@ async fn connect(app: AppHandle, address: String) -> Result<(), String> {
     let u = normalize(&address)?;
     check(&u).await?;
     let s = u.as_str().trim_end_matches('/').to_string();
-    save(&app, &Settings { server: Some(s) })?;
+    // Revenir à pop-uefn.com efface l'adresse enregistrée : Forge suit de nouveau le POP officiel (#412).
+    let server = (s != POP_DEFAUT).then_some(s);
+    save(&app, &Settings { server })?;
     ouvrir(&app, &u)
 }
 
