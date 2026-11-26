@@ -43,6 +43,14 @@ pub const POP: &[(&str, &str, &str, &[&str], &str)] = &[
      "Compte à rebours en mm:ss affiché à tous les joueurs, lancé par un bouton ou dès le début (DemarrerSeul). À zéro, il envoie FinEvent à votre Verse et, si TerminerLaPartie est coché, termine la partie. Depuis votre Verse : Lancer(), Arreter() et FinEvent.Await().",
      &["button_device (départ, facultatif)", "hud_message_device (affichage)", "end_game_device (fin de partie, facultatif)"],
      include_str!("../library/minuteur.verse")),
+    ("HUD (POP)", "hud",
+     "Un panneau à l'écran de chaque joueur : un titre et des lignes nommées (par défaut « Score » et « Pièces »), sur un fond sombre. Réglez le titre, les lignes et la position dans les options de l'appareil. Depuis votre Verse : Definir(Joueur, \"Score\", \"120\"), DefinirNombre(Joueur, \"Pièces\", 35), Montrer(Joueur) et Cacher(Joueur). Avec le module Économie : appelez DefinirNombre après chaque achat ou gain.",
+     &[],
+     include_str!("../library/hud.verse")),
+    ("Sauvegarde (POP)", "sauvegarde",
+     "Garde les données de chaque joueur d'une partie à l'autre (données persistantes de Verse) : pièces, score, niveau, record, nombre de parties et des compteurs libres par nom. Un joueur qui revient peut voir « Bon retour ! » avec son niveau et son record. Depuis votre Verse : Donnees(Joueur).Pieces, AjouterPieces(Joueur, 10), AjouterScore, DefinirNiveau(Joueur, 3), ProposerRecord(Joueur, 1200), Compteur(Joueur, \"coffres\"), AjouterAuCompteur(Joueur, \"coffres\", 1) et Effacer(Joueur). Les données ne se gardent que sur une île publiée ou en session de test ; ne retirez jamais un champ d'une île publiée.",
+     &["hud_message_device (message « Bon retour », facultatif)"],
+     include_str!("../library/sauvegarde.verse")),
 ];
 
 fn pop_fiche(i: usize, avec_code: bool) -> Value {
@@ -390,7 +398,7 @@ mod tests {
             Path(s1),
             Query(SearchQ {
                 q: None,
-                category: Some("hud".into()),
+                category: Some("interface".into()),
             }),
         )
         .await
@@ -428,6 +436,29 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(eco[0]["name"], "Économie (POP)");
+        // Lot 2 (#88) : HUD et Sauvegarde, chacun dans sa catégorie, avec sa notice et son code.
+        for (cat, nom, classe) in [
+            ("hud", "HUD (POP)", "hud_pop := class"),
+            ("sauvegarde", "Sauvegarde (POP)", "sauvegarde_pop := class"),
+        ] {
+            let l = search(
+                &st,
+                sid,
+                &SearchQ {
+                    q: None,
+                    category: Some(cat.into()),
+                },
+            )
+            .await
+            .unwrap();
+            assert_eq!(l[0]["name"], nom);
+            assert!(l[0]["description"].as_str().unwrap().len() > 100);
+            let id = l[0]["id"].as_i64().unwrap();
+            assert!(module(&st, sid, id).await.unwrap()["content"]
+                .as_str()
+                .unwrap()
+                .contains(classe));
+        }
         let m = module(&st, sid, -3).await.unwrap();
         assert!(m["content"]
             .as_str()
