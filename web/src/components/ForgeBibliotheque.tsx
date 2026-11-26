@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Download, Lock, Users, Globe, PackagePlus } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { Download, Lock, Users, Globe, PackagePlus, Upload, Box, Music, Image as ImageIcon } from 'lucide-react'
 import { api } from '../api'
 import { useApp, useLoad } from '../state'
 import { tr } from '../i18n/t'
@@ -7,6 +7,7 @@ import { Selecteur } from './Selecteur'
 
 // Bibliothèque de Forge (#382) : vos assets (privés par défaut), ceux du studio et les publics ; vous choisissez
 // qui voit les vôtres et vous les ajoutez au projet UEFN de n'importe laquelle de vos maps.
+// #92 : aperçus (image affichée, son écoutable, 3D : nom et taille) et envoi avec déclaration de droits.
 type Onglet = 'mine' | 'studio' | 'public'
 const VIS: Record<string, [string, typeof Lock]> = {
   private: [tr("Privé"), Lock],
@@ -16,6 +17,53 @@ const VIS: Record<string, [string, typeof Lock]> = {
 
 function taille(o: number) {
   return o >= 1048576 ? `${(o / 1048576).toFixed(1)} Mo` : `${Math.max(1, Math.round(o / 1024))} Ko`
+}
+
+const IMAGES = ['png', 'jpg', 'jpeg']
+const SONS = ['wav', 'ogg', 'mp3']
+
+/** Aperçu d'un asset : l'image elle-même, un lecteur pour un son ; la 3D (et le TGA, que le navigateur n'affiche pas) a une icône. */
+function Apercu({ a }: { a: any }) {
+  const k = String(a.kind).toLowerCase()
+  if (IMAGES.includes(k)) return <img className="asset-img" src={`/api/assets/${a.id}/download`} alt={a.name} loading="lazy" />
+  const Icone = SONS.includes(k) ? Music : k === 'tga' ? ImageIcon : Box
+  return <div className="asset-img asset-ico" aria-hidden="true"><Icone size={26} strokeWidth={1.25} /></div>
+}
+
+/** Envoi d'un asset (#92) : refusé sans déclaration de droits ; privé par défaut (#382). */
+function Envoi({ studioId, fini }: { studioId: number; fini: () => void }) {
+  const app = useApp()
+  const fichier = useRef<HTMLInputElement>(null)
+  const [f, setF] = useState<File | null>(null)
+  const [droits, setDroits] = useState('')
+  const [vis, setVis] = useState('private')
+  const [occupe, setOccupe] = useState(false)
+  const envoyer = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!f) return
+    if (!droits.trim()) { app.toast(tr("Déclarez d'où vient ce fichier et vos droits dessus."), true); return }
+    setOccupe(true)
+    try {
+      const r = await api.post(`/api/studios/${studioId}/assets`, { name: f.name, size: f.size, rights: droits.trim(), visibility: vis })
+      const put = await fetch(r.upload_url, { method: 'PUT', body: f })
+      if (!put.ok) throw new Error(tr("Envoi refusé par le stockage ({0})", [put.status]))
+      await api.post(`/api/assets/${r.id}/confirm`)
+      app.toast(tr("{0} est dans votre bibliothèque", [f.name])); setF(null); setDroits(''); if (fichier.current) fichier.current.value = ''; fini()
+    } catch (er: any) { app.toast(er.message, true) }
+    setOccupe(false)
+  }
+  return <form className="card stack" style={{ padding: 16, gap: 10 }} onSubmit={envoyer}>
+    <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+      <input ref={fichier} type="file" hidden accept=".fbx,.obj,.png,.jpg,.jpeg,.tga,.wav,.ogg,.mp3" onChange={e => setF(e.target.files?.[0] ?? null)} aria-label={tr("Fichier")} />
+      <button type="button" className="btn" onClick={() => fichier.current?.click()}><Upload size={16} strokeWidth={1.5} />{tr("Choisir un fichier")}</button>
+      <span className={f ? '' : 'muted'} style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f ? f.name : tr("FBX, OBJ, PNG, JPG, TGA, WAV, OGG ou MP3")}</span>
+      <div className="sel-compact"><Selecteur label={tr("Visibilité")} placeholder={tr("Visibilité")} value={vis}
+        options={Object.entries(VIS).map(([k, [l]]) => ({ value: k, label: l }))} onChange={setVis} /></div>
+    </div>
+    <input className="field" style={{ height: 36 }} value={droits} maxLength={300} onChange={e => setDroits(e.target.value)}
+      placeholder={tr("Droits : ex. « Créé par moi », « Acheté sur Fab, licence standard »")} aria-label={tr("Déclaration de droits")} />
+    <div><button className="btn pri" disabled={!f || occupe}>{occupe ? tr("Envoi…") : tr("Envoyer")}</button></div>
+  </form>
 }
 
 export function ForgeBibliotheque({ mapId, studioId }: { mapId: number | null; studioId: number | null }) {
@@ -48,6 +96,7 @@ export function ForgeBibliotheque({ mapId, studioId }: { mapId: number | null; s
       <div style={{ flex: 1 }} />
       <input className="field" style={{ width: 240, height: 36 }} placeholder={tr("Rechercher")} value={q} onChange={e => setQ(e.target.value)} aria-label={tr("Rechercher")} />
     </div>
+    {onglet === 'mine' && studioId && <Envoi studioId={studioId} fini={reload} />}
     {onglet === 'mine' && <p className="muted" style={{ margin: 0 }}>{tr("Ce que vous envoyez est privé : vous seul le voyez et le réutilisez dans toutes vos maps. Rendez-le visible au studio ou à tous quand vous voulez.")}</p>}
     {onglet === 'studio' && !studioId && <p className="muted">{tr("Choisissez une map.")}</p>}
     {data && liste.length === 0 && <div className="card muted" style={{ padding: 24, textAlign: 'center' }}>
@@ -57,11 +106,12 @@ export function ForgeBibliotheque({ mapId, studioId }: { mapId: number | null; s
       {liste.map(a => {
         const v = a.visibility && VIS[a.visibility]
         const Icone = v ? v[1] : Users
-        return <div key={a.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px' }}>
-          <Icone size={18} strokeWidth={1.5} aria-hidden="true" />
+        return <div key={a.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px 10px 10px' }}>
+          <Apercu a={a} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</div>
+            <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', gap: 6, alignItems: 'center' }}><Icone size={14} strokeWidth={1.5} aria-hidden="true" />{a.name}</div>
             <small className="muted">{[a.kind, taille(a.size), a.pop ? 'POP' : a.author].filter(Boolean).join(' · ')}</small>
+            {SONS.includes(String(a.kind).toLowerCase()) && <audio controls preload="none" src={`/api/assets/${a.id}/download`} style={{ display: 'block', height: 32, marginTop: 6, maxWidth: '100%' }} />}
           </div>
           {a.mine && <div className="sel-compact">
             <Selecteur label={tr("Visibilité")} placeholder={tr("Visibilité")} value={a.visibility}
