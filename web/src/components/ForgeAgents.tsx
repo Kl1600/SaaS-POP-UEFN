@@ -11,7 +11,7 @@ const MODES: [string, string][] = [['write', tr("Agit")], ['read', tr("Lecture s
 const ROLES: Record<string, string> = { orchestrateur: tr("Orchestrateur"), codeur_verse: tr("Codeur Verse"), level_designer: tr("Level designer"), ui: tr("Interface"), testeur: tr("Testeur"), relecteur: tr("Relecteur"), analyste: tr("Analyste") }
 const actif = (d?: string | null) => !!d && Date.now() - new Date(d.replace(' ', 'T') + 'Z').getTime() < 5 * 60 * 1000
 
-export function ForgeAgents({ mapId }: { mapId: number }) {
+export function ForgeAgents({ mapId, tache }: { mapId: number; tache?: number | null }) {
   const app = useApp()
   const { data, reload } = useLoad<any[]>(`/api/maps/${mapId}/agents`, [mapId])
   const { data: res, reload: relireRes } = useLoad<any>(`/api/maps/${mapId}/resumes`, [mapId])
@@ -26,16 +26,26 @@ export function ForgeAgents({ mapId }: { mapId: number }) {
   const liste: any[] = Array.isArray(taches) ? taches : taches?.tasks ?? []
   const ouvertes = liste.filter(t => t.status !== 'done')
   const agir = async (f: () => Promise<any>, ok: string) => { try { const r = await f(); app.toast(r?.message ?? ok); reload(); relireTaches() } catch (e: any) { app.toast(e.message, true) } }
+  // Tâche ouverte depuis le site (« Ouvrir dans Forge », #297) : montrée par l'agent qui l'a prise, s'il y en a un.
+  const cible = tache ? liste.find(t => t.number === tache) : null
+  const porteur = cible ? data?.find(a => a.task?.number === tache) : null
+  useEffect(() => { if (porteur) document.getElementById(`agent-${porteur.id}`)?.scrollIntoView({ block: 'center' }) }, [porteur?.id])
   if (!data) return null
   return <div className="stack" style={{ gap: 18 }}>
     <h1 className="forge-h1">{tr("Agents")}</h1>
+    {tache && <div className="card forge-tache" role="status">
+      <b style={{ fontWeight: 500 }}>{tr("Tâche #{0}", [tache])}{cible ? ' · ' + cible.title : ''}</b>
+      <div className="muted" style={{ fontSize: 13.5 }}>{!cible ? (taches ? tr("Tâche introuvable sur cette map.") : tr("Chargement…"))
+        : porteur ? tr("Prise par {0} : son activité est ci-dessous.", [porteur.name])
+        : cible.status === 'done' ? tr("Cette tâche est terminée.") : tr("Aucun agent ne l'a prise : attribuez-la à un agent ci-dessous.")}</div>
+    </div>}
     {res?.equipe?.phrase && <p style={{ margin: 0 }}>{res.equipe.phrase}</p>}
     {data.length > 1 && <Equipe mapId={mapId} />}
     {!data.length && <p className="muted">{tr("Aucune IA connectée à cette map. Connectez votre IA (Claude Code, Codex, Cursor…) depuis POP : IA connectées.")}</p>}
     {data.map(a => {
       const phrase = res?.agents?.find((x: any) => x.id === a.id)?.phrase
       const mode = a.scope === 'off' ? 'off' : a.scope === 'read' ? 'read' : 'write'
-      return <div key={a.id} className="card" style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      return <div key={a.id} id={`agent-${a.id}`} className={'card' + (porteur?.id === a.id ? ' forge-cible' : '')} style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div className="forge-ligne">
           <span className="forge-point" style={{ background: mode === 'off' ? 'var(--red)' : actif(a.last_used) ? 'var(--tg)' : 'var(--text3)' }} aria-hidden="true" />
           <b>{a.name}</b>

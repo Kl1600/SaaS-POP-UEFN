@@ -49,7 +49,14 @@ export default function Forge() {
   const app = useApp()
   const navigate = useNavigate()
   const invoke = forgeInvoke()
-  const [section, setSection] = useState<Section>('accueil')
+  // Lien « Ouvrir dans Forge » du site (#297) : Forge arrive sur /forge?map=…&tache=….
+  const [lien] = useState(() => { const q = new URLSearchParams(location.search); return { map: Number(q.get('map')) || null, tache: Number(q.get('tache')) || null } })
+  const [section, setSection] = useState<Section>(lien.map ? 'agents' : 'accueil')
+  useEffect(() => {
+    if (!lien.map) return
+    app.setMapId(lien.map)
+    history.replaceState(null, '', '/forge')
+  }, [])
   const [etat, setEtat] = useState('…')
   const [liaison, setLiaison] = useState<Liaison>(null)
 
@@ -109,7 +116,7 @@ export default function Forge() {
         {app.map && section !== 'reglages' && <Bandeau mapId={app.map.id} etat={etat} aller={setSection} />}
         {section === 'accueil' ? <Accueil invoke={invoke} etat={etat} liaison={liaison} relie={relie} relire={lire} />
           : section === 'reglages' ? <Reglages />
-          : section === 'agents' ? (app.map ? <ForgeAgents mapId={app.map.id} /> : <p className="muted">{tr("Choisissez une map.")}</p>)
+          : section === 'agents' ? (app.map ? <ForgeAgents mapId={app.map.id} tache={app.map.id === lien.map ? lien.tache : null} /> : <p className="muted">{tr("Choisissez une map.")}</p>)
           : section === 'verifier' ? (app.map ? <div className="stack" style={{ gap: 18 }}><ForgeVerifications mapId={app.map.id} ouvrir={ouvrirPOP} /><ForgeScenarios mapId={app.map.id} capturer={() => captureJeu(invoke)} /></div> : <p className="muted">{tr("Choisissez une map.")}</p>)
           : section === 'bibliotheque' ? <Bibliotheque mapId={app.map?.id ?? null} studioId={app.studio?.id ?? null} />
             : <AVenir section={section} titre={titre ?? ''} />}
