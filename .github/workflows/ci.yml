@@ -127,6 +127,30 @@ jobs:
             exit 1
           fi
           echo "Installateur de POP Forge mis à jour avec le code du relais."
+      # Mises à jour automatiques (#79) : Forge ne propose une mise à jour que si sa version augmente. Tout changement de
+      # forge/ ou link/ change donc la version de forge/tauri.conf.json, et l'installateur publié est de cette version.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: version de Forge
+        env:
+          BASE: ${{ needs.changements.outputs.base }}
+        run: |
+          lire() { python3 -c "import json,sys; print(json.load(sys.stdin)['version'])"; }
+          v=$(lire < forge/tauri.conf.json)
+          p=$(lire < web/public/downloads/pop-forge.json)
+          if [ "$v" != "$p" ]; then
+            echo "::error::forge/tauri.conf.json est en version $v mais l'installateur publié (web/public/downloads/pop-forge.json) en $p : attendez le commit du workflow « relais Windows »."
+            exit 1
+          fi
+          if [ -n "$BASE" ] && git cat-file -e "$BASE^{commit}" 2>/dev/null && git cat-file -e "$BASE:forge/tauri.conf.json" 2>/dev/null; then
+            vb=$(git show "$BASE:forge/tauri.conf.json" | lire)
+            if [ "$v" = "$vb" ]; then
+              echo "::error::forge/ ou link/ a changé mais Forge est toujours en version $v : augmentez « version » dans forge/tauri.conf.json, sinon la mise à jour ne sera pas proposée (#79)."
+              exit 1
+            fi
+          fi
+          echo "Forge en version $v."
 
   relais:
     name: relais pop-link (build + tests)

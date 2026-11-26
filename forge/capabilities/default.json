@@ -13,6 +13,8 @@
     "allow-etat-relais",
     "allow-relier",
     "allow-importer",
+    "allow-maj-verifier",
+    "allow-maj-installer",
     "allow-projet-ouvert",
     "allow-liaison",
     "allow-fenetre",

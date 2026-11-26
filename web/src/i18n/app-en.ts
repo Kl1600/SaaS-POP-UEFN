@@ -1,6 +1,9 @@
 // Traduction anglaise de l'application. Clé = texte français de l'interface (ou du serveur), valeur = anglais.
 // Généré à partir des textes enveloppés dans tr(...) ; à compléter quand on ajoute des textes.
 const EN: Record<string, string> = {
+ "Plus tard": "Later",
+ "Nouvelle version de Forge : {0}. Elle s’installe en un clic, puis Forge redémarre.": "New Forge version: {0}. It installs in one click, then Forge restarts.",
+ "Mise à jour…": "Updating…",
  "Accueil de Forge : « Relier » sur chaque map, ou « Créer les maps et relier » pour vos projets UEFN.": "Forge home: “Link” on each map, or “Create the maps and link” for your UEFN projects.",
  "Ces écrans se débloquent tout seuls dès que l’abonnement est actif.": "These screens unlock on their own as soon as the plan is active.",
  "Créer les maps et relier ({0}) dans {1}": "Create the maps and link ({0}) in {1}",

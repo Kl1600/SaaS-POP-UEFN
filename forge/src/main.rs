@@ -11,6 +11,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod agents_locaux;
+mod maj;
 mod relay;
 
 use serde::{Deserialize, Serialize};
@@ -120,6 +121,8 @@ fn autoriser(app: &AppHandle, u: &Url) {
         .permission("allow-projets")
         .permission("allow-etat-relais")
         .permission("allow-relier")
+        .permission("allow-maj-verifier")
+        .permission("allow-maj-installer")
         .permission("allow-importer")
         .permission("allow-projet-ouvert")
         .permission("allow-liaison")
@@ -813,6 +816,7 @@ fn main() {
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Home(Mutex::new(None)))
         .manage(relay::Relay::default())
         .manage(Cible::default())
@@ -836,7 +840,9 @@ fn main() {
             liaison,
             fenetre,
             action_forge,
-            choisir_dossier
+            choisir_dossier,
+            maj::maj_verifier,
+            maj::maj_installer
         ])
         .setup(|app| {
             let h = app.handle().clone();

@@ -9,6 +9,8 @@ fn main() {
             "etat_relais",
             "relier",
             "importer",
+            "maj_verifier",
+            "maj_installer",
             "projet_ouvert",
             "liaison",
             "fenetre",

@@ -162,6 +162,8 @@ Une branche longue qui mélange plusieurs sujets ne se relit pas, ne se teste pa
   workflow « relais Windows » (#358) reconstruit l'installateur sous Windows et pousse sur la branche un commit avec
   `web/public/downloads/pop-forge-setup.exe` et `web/dist` à jour. Attendez ce commit (`git pull --rebase` sur votre
   branche) avant `done`. À la main seulement s'il échoue. `pop-link.exe` n'est plus proposé au téléchargement.
+  Augmentez aussi `version` dans `forge/tauri.conf.json` : c'est elle qui déclenche la mise à jour automatique de Forge
+  chez les utilisateurs (#79), et le CI refuse un changement de `forge/` ou `link/` sans nouvelle version.
 
 ### Vérifier avant `review`
 ```

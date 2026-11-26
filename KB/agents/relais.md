@@ -89,3 +89,11 @@ Fait : consigne avant --mcp-config (option à plusieurs valeurs) ; vrai Claude C
 Reste : rien
 Bloque : rien
 ```
+
+```
+FAIT | #79 Forge F5 · Mises à jour automatiques de Forge | 26/11 22:00
+Owner : benybens | Sur la tâche : Claude Code, pour benybens
+Fait : module updater Tauri (https seulement), /api/forge/latest, bandeau ; signé avec secrets ; CI : version de Forge à augmenter ; testé 0.2.90→0.2.91 et signature fausse refusée
+Reste : signature Authenticode (#422)
+Bloque : rien
+```
