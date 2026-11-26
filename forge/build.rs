@@ -13,6 +13,7 @@ fn main() {
             "fenetre",
             "action_forge",
             "choisir_dossier",
+            "capture_jeu",
         ]),
     ))
     .expect("échec de la préparation de POP Forge");

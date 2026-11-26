@@ -86,7 +86,14 @@ function Editor({ s, onClose, onDone }: { s: any; onClose: () => void; onDone: (
 }
 
 function Runner({ s, onClose }: { s: any; onClose: () => void }) {
+  return <Modal onClose={onClose} label={tr("Jouer un scénario")}><Passage s={s} onClose={onClose} /></Modal>
+}
+
+/** Un passage de scénario : verdict, commentaire et capture par étape. Forge (#350) le joue à côté de la session de
+ * test, avec `capturer` qui photographie l'écran du jeu ; le site joint une image choisie. */
+export function Passage({ s, onClose, capturer }: { s: any; onClose: () => void; capturer?: () => Promise<Blob> }) {
   const { toast } = useApp()
+  const [prise, setPrise] = useState<number | null>(null)
   const [version, setVersion] = useState('')
   const [run, setRun] = useState<number | null>(null)
   const [res, setRes] = useState<Record<number, { verdict?: string; comment: string; capture?: string }>>({})
@@ -98,19 +105,21 @@ function Runner({ s, onClose }: { s: any; onClose: () => void }) {
     if (!cur.verdict) return
     try { await api.put(`/api/scenario-runs/${run}/results/${step}`, { verdict: cur.verdict, comment: cur.comment, capture_key: patch.capture }) } catch (er: any) { toast(er.message, true) }
   }
-  const capture = async (step: number, f: File | undefined) => {
+  const capture = async (step: number, f: Blob | undefined | (() => Promise<Blob>)) => {
     if (!f) return
     if (!res[step]?.verdict) { toast(tr("Donnez d’abord le verdict de l’étape."), true); return }
+    setPrise(step)
     try {
+      const img = typeof f === 'function' ? await f() : f
       const { url, key } = await api.post(`/api/scenario-runs/${run}/capture`, { step })
-      const r = await fetch(url, { method: 'PUT', body: f, headers: { 'content-type': f.type || 'image/png' } })
+      const r = await fetch(url, { method: 'PUT', body: img, headers: { 'content-type': img.type || 'image/png' } })
       if (!r.ok) throw new Error(tr("Envoi de la capture refusé par le stockage ({0})", [r.status]))
       await send(step, { capture: key }); toast(tr("Capture jointe"))
-    } catch (er: any) { toast(er.message, true) }
+    } catch (er: any) { toast(er.message ?? String(er), true) }
+    setPrise(null)
   }
   const finish = async () => { try { setFin(await api.post(`/api/scenario-runs/${run}/finish`)) } catch (er: any) { toast(er.message, true) } }
   return (
-    <Modal onClose={onClose} label={tr("Jouer un scénario")}>
       <div className="stack">
         <h2 style={{ margin: 0, fontWeight: 400 }}>{s.title}</h2>
         {!run && <form className="row" style={{ gap: 6 }} onSubmit={start}>
@@ -126,7 +135,9 @@ function Runner({ s, onClose }: { s: any; onClose: () => void }) {
                 {Object.entries(V).map(([k, [l]]) => <button key={k} type="button" className={'chip' + (res[x.id!]?.verdict === k ? ' on' : '')} onClick={() => send(x.id!, { verdict: k })}>{l}</button>)}
                 <input className="field" style={{ flex: 1, minWidth: 160 }} placeholder={tr("Commentaire")} maxLength={1000} value={res[x.id!]?.comment ?? ''}
                   onChange={e => setRes({ ...res, [x.id!]: { ...res[x.id!], comment: e.target.value } })} onBlur={e => send(x.id!, { comment: e.target.value })} aria-label={tr("Commentaire de l’étape {0}", [i + 1])} />
-                <label className="btn">{res[x.id!]?.capture ? tr("Capture jointe") : tr("Capture")}<input type="file" accept="image/*" hidden onChange={e => capture(x.id!, e.target.files?.[0])} /></label>
+                {capturer
+                  ? <button type="button" className="btn" disabled={prise === x.id} onClick={() => capture(x.id!, capturer)} title={tr("Photographie l’écran du jeu")}>{prise === x.id ? tr("Capture…") : res[x.id!]?.capture ? tr("Capture jointe") : tr("Capture")}</button>
+                  : <label className="btn">{res[x.id!]?.capture ? tr("Capture jointe") : tr("Capture")}<input type="file" accept="image/*" hidden onChange={e => capture(x.id!, e.target.files?.[0])} /></label>}
               </div>
             </div>
           ))}
@@ -139,7 +150,6 @@ function Runner({ s, onClose }: { s: any; onClose: () => void }) {
           <div className="row" style={{ justifyContent: 'flex-end' }}><button className="btn pri" onClick={onClose}>{tr("Fermer")}</button></div>
         </>}
       </div>
-    </Modal>
   )
 }
 
