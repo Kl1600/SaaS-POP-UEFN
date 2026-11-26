@@ -10,34 +10,47 @@ const EXE: &str = "UnrealEditorFortnite-Win64-Shipping.exe";
 /// À afficher quand POP ne trouve pas le réglage dans les fichiers d'UEFN.
 pub const REGLAGE_MANUEL: &str = "dans UEFN : Édition → Préférences de l'éditeur → Agentic Workflows → Model Context Protocol, cochez le démarrage automatique (Auto Start Server)";
 
-/// Exécutable d'UEFN, d'après les manifestes de l'Epic Games Launcher (installation de Fortnite), sinon le dossier
-/// d'installation par défaut.
+/// Exécutable d'UEFN, d'après les manifestes de l'Epic Games Launcher, sinon le dossier d'installation par défaut.
+/// UEFN y est déclaré sous `Fortnite_Studio` (constaté avec UEFN 43.12, #402, #415) ; `Fortnite` reste en secours.
 pub fn uefn_installe() -> Option<PathBuf> {
     let manifestes =
         PathBuf::from(std::env::var("PROGRAMDATA").unwrap_or_else(|_| r"C:\ProgramData".into()))
             .join(r"Epic\EpicGamesLauncher\Data\Manifests");
-    let mut dossiers: Vec<PathBuf> = std::fs::read_dir(&manifestes)
+    let mut candidats: Vec<(u8, PathBuf)> = std::fs::read_dir(&manifestes)
         .into_iter()
         .flatten()
         .flatten()
         .filter(|e| e.path().extension().is_some_and(|x| x == "item"))
         .filter_map(|e| std::fs::read_to_string(e.path()).ok())
-        .filter_map(|t| installation_fortnite(&t))
+        .filter_map(|t| exe_du_manifeste(&t))
         .collect();
-    dossiers.push(PathBuf::from(r"C:\Program Files\Epic Games\Fortnite"));
-    dossiers
+    candidats.sort_by_key(|c| c.0);
+    candidats
         .into_iter()
-        .map(|d| d.join(r"FortniteGame\Binaries\Win64").join(EXE))
+        .map(|c| c.1)
+        .chain(std::iter::once(
+            PathBuf::from(r"C:\Program Files\Epic Games\Fortnite\FortniteGame\Binaries\Win64")
+                .join(EXE),
+        ))
         .find(|p| p.is_file())
 }
 
-/// Dossier d'installation de Fortnite dans un manifeste `.item` du launcher.
-fn installation_fortnite(manifeste: &str) -> Option<PathBuf> {
+/// Exécutable d'UEFN d'après un manifeste `.item` du launcher, avec sa priorité (0 : `Fortnite_Studio`).
+fn exe_du_manifeste(manifeste: &str) -> Option<(u8, PathBuf)> {
     let v: Value = serde_json::from_str(manifeste).ok()?;
-    if v["AppName"].as_str() != Some("Fortnite") {
-        return None;
-    }
-    v["InstallLocation"].as_str().map(PathBuf::from)
+    let rang = match v["AppName"].as_str()? {
+        "Fortnite_Studio" => 0,
+        "Fortnite" => 1,
+        _ => return None,
+    };
+    let dossier = PathBuf::from(v["InstallLocation"].as_str()?);
+    let exe = match v["LaunchExecutable"].as_str() {
+        Some(l) if rang == 0 && l.contains("UnrealEditorFortnite") => {
+            dossier.join(l.replace('/', "\\"))
+        }
+        _ => dossier.join(r"FortniteGame\Binaries\Win64").join(EXE),
+    };
+    Some((rang, exe))
 }
 
 fn dossier_config() -> Option<PathBuf> {
@@ -172,14 +185,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn manifeste_fortnite() {
-        let m = r#"{"AppName":"Fortnite","InstallLocation":"D:\\Jeux\\Fortnite"}"#;
-        assert_eq!(
-            installation_fortnite(m),
-            Some(PathBuf::from(r"D:\Jeux\Fortnite"))
+    fn manifeste_uefn() {
+        // UEFN 43.12 (#402, #415) : entrée Fortnite_Studio avec LaunchExecutable.
+        let studio = r#"{"AppName":"Fortnite_Studio","InstallLocation":"E:\\Fortnite","LaunchExecutable":"FortniteGame/Binaries/Win64/UnrealEditorFortnite-Win64-Shipping.exe"}"#;
+        let (rang, exe) = exe_du_manifeste(studio).unwrap();
+        assert_eq!(rang, 0);
+        assert!(exe.to_string_lossy().starts_with(r"E:\Fortnite"));
+        assert!(exe.to_string_lossy().ends_with(EXE));
+        let jeu = r#"{"AppName":"Fortnite","InstallLocation":"D:\\Jeux\\Fortnite","LaunchExecutable":"FortniteGame/Binaries/Win64/FortniteLauncher.exe"}"#;
+        let (rang, exe) = exe_du_manifeste(jeu).unwrap();
+        assert_eq!(rang, 1);
+        assert!(
+            exe.to_string_lossy().ends_with(EXE),
+            "le lanceur du jeu n'est pas UEFN : {exe:?}"
         );
         assert_eq!(
-            installation_fortnite(r#"{"AppName":"Rocket","InstallLocation":"D:\\R"}"#),
+            exe_du_manifeste(r#"{"AppName":"Rocket","InstallLocation":"D:\\R"}"#),
             None
         );
     }
