@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-26 · #396 · Planifier : détail de la tâche sur place
+- Fait : PlanCalendar.tsx : « Ouvrir la tâche » ouvre TaskDrawer (exporté de Tasks.tsx) au lieu d'aller dans Tâches ; la liste des tâches n'est chargée qu'à l'ouverture (dépendances) ; à la fermeture, le calendrier se recharge.
+- Vérifié : navigateur 1440 px.
+
 ### 2026-11-25 · #384 · crédits IA retirés de l'interface
 - Fait : carte « Crédits IA » et packs retirés de Paramètres → Abonnement (Billing.tsx) ; bouton du plan de production par l'IA retiré de Tâches (AiPlan.tsx supprimé) ; onglet admin « Paiements et IA » retiré ; ligne « Crédits » retirée des CGV.
 - Vérifié : navigateur 1440 px (Abonnement, Tâches, Administration, CGV).

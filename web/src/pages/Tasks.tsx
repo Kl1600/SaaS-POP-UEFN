@@ -110,7 +110,8 @@ export default function Tasks() {
   )
 }
 
-function TaskDrawer({ id, onClose, members, tasks, onOpen }: { id: number; onClose: () => void; members: any[]; tasks: Task[]; onOpen?: (id: number) => void }) {
+/** Panneau de détail d'une tâche ; aussi ouvert depuis Planifier (#396). */
+export function TaskDrawer({ id, onClose, members, tasks, onOpen }: { id: number; onClose: () => void; members: any[]; tasks: Task[]; onOpen?: (id: number) => void }) {
   const { canEdit, isAdmin, me, toast } = useApp()
   const { data, reload } = useLoad<any>(`/api/tasks/${id}`, [id])
   const [comment, setComment] = useState('')
