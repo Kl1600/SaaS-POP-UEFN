@@ -16,8 +16,6 @@ export function ForgeAgents({ mapId, tache, invoke }: { mapId: number; tache?: n
   const { data, reload } = useLoad<any[]>(`/api/maps/${mapId}/agents`, [mapId])
   const { data: res, reload: relireRes } = useLoad<any>(`/api/maps/${mapId}/resumes`, [mapId])
   const { data: taches, reload: relireTaches } = useLoad<any>(`/api/maps/${mapId}/tasks`, [mapId])
-  const [journal, setJournal] = useState<number | null>(null)
-  const [fil, setFil] = useState<number | null>(null)
   const tout = () => { reload(); relireRes() }
   useLive(['ai', 'agents', 'fil'], tout)
   useLive(['tasks'], () => { reload(); relireTaches() })
@@ -46,78 +44,73 @@ export function ForgeAgents({ mapId, tache, invoke }: { mapId: number; tache?: n
     {data.map(a => {
       const phrase = res?.agents?.find((x: any) => x.id === a.id)?.phrase
       const mode = a.scope === 'off' ? 'off' : a.scope === 'read' ? 'read' : 'write'
-      return <div key={a.id} id={`agent-${a.id}`} className={'card' + (porteur?.id === a.id ? ' forge-cible' : '')} style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <div className="forge-ligne">
-          <span className="forge-point" style={{ background: mode === 'off' ? 'var(--red)' : actif(a.last_used) ? 'var(--tg)' : 'var(--text3)' }} aria-hidden="true" />
+      return <div key={a.id} id={`agent-${a.id}`} className={'term' + (porteur?.id === a.id ? ' forge-cible' : '')}>
+        <div className="term-barre">
+          <span className="forge-point" style={{ background: mode === 'off' ? 'var(--red)' : actif(a.last_used) ? 'var(--tg)' : '#6b6b6b' }} aria-hidden="true" />
           <b>{a.name}</b>
-          <span className="small muted">{[a.role ? ROLES[a.role] ?? a.role : null, a.owner].filter(Boolean).join(' · ')}{a.last_used ? ' · ' + tr("dernier appel {0}", [ago(a.last_used)]) : ''}</span>
+          <span className="term-doux">{[a.role ? ROLES[a.role] ?? a.role : null, a.owner].filter(Boolean).join(' · ')}{a.last_used ? ' · ' + tr("dernier appel {0}", [ago(a.last_used)]) : ''}</span>
           <div style={{ flex: 1 }} />
-          <div className="row" role="group" aria-label={tr("Mode de l’agent {0}", [a.name])} style={{ gap: 4 }}>
-            {MODES.map(([k, l]) => <button key={k} className={'chip' + (mode === k ? ' on' : '')} disabled={!app.canEdit}
+          <div className="term-modes" role="group" aria-label={tr("Mode de l’agent {0}", [a.name])}>
+            {MODES.map(([k, l]) => <button key={k} className={mode === k ? 'on' : ''} disabled={!app.canEdit}
               onClick={() => mode !== k && (k !== 'off' || confirm(tr("Couper « {0} » ? Il ne pourra plus rien faire tant qu’un humain ne l’aura pas réactivé.", [a.name]))) && agir(() => api.post(`/api/maps/${mapId}/agents/${a.id}/mode`, { mode: k }), tr("Mode changé"))}>{l}</button>)}
           </div>
         </div>
-        <div>{a.task ? <>#{a.task.number} {a.task.title}{a.task.step ? <span className="badge" style={{ marginLeft: 8 }}>{ETAPES[a.task.step] ?? a.task.step}</span> : null}</> : <span className="muted">{tr("Pas de tâche réservée")}</span>}
-          {a.attribuees?.length > 0 && <small className="muted" style={{ display: 'block' }}>{tr("Attribuée(s), pas encore prise(s) : {0}", [a.attribuees.map((x: any) => `#${x.number} ${x.title}`).join(', ')])}</small>}</div>
-        {(phrase || a.last_action) && <div className="small muted">{phrase ?? a.last_action}</div>}
-        <div className="forge-ligne">
-          {app.canEdit && <Selecteur label={tr("Attribuer une tâche à {0}", [a.name])} placeholder={tr("Attribuer une tâche…")}
+        <Terminal mapId={mapId} a={a} phrase={phrase} />
+        {app.canEdit && <div className="term-pied">
+          <Selecteur label={tr("Attribuer une tâche à {0}", [a.name])} placeholder={tr("Attribuer une tâche…")}
             options={ouvertes.map(t => ({ value: String(t.number), label: `#${t.number} ${t.title}` }))}
-            onChange={v => agir(() => api.post(`/api/maps/${mapId}/agents/${a.id}/assign`, { number: Number(v) }), tr("Tâche attribuée"))} />}
-          <button className="btn" onClick={() => setFil(fil === a.id ? null : a.id)}>{fil === a.id ? tr("Fermer la discussion") : tr("Écrire")}</button>
-          <button className="linkbtn" onClick={() => setJournal(journal === a.id ? null : a.id)}>{journal === a.id ? tr("Masquer le journal") : tr("Journal")}</button>
-        </div>
-        {fil === a.id && <Fil mapId={mapId} agent={a.id} nom={a.name} />}
-        {journal === a.id && <Journal mapId={mapId} agent={a.id} />}
+            onChange={v => agir(() => api.post(`/api/maps/${mapId}/agents/${a.id}/assign`, { number: Number(v) }), tr("Tâche attribuée"))} />
+        </div>}
       </div>
     })}
   </div>
 }
 
-function Journal({ mapId, agent }: { mapId: number; agent: number }) {
+/** Mini-terminal d'un agent (#432), au style de Claude Code : sa tâche, ses appels d'outils (⏺ outil, ⎿ détail) et
+ * la discussion (#381), en direct ; l'invite « › » écrit à l'agent, qui lit avec read_messages et répond avec
+ * send_message. */
+function Terminal({ mapId, a, phrase }: { mapId: number; a: any; phrase?: string }) {
   const app = useApp()
-  const { data, reload } = useLoad<any[]>(`/api/maps/${mapId}/agents/activity?agent=${agent}`, [mapId, agent])
-  useEffect(() => app.subscribe(m => { if (m?.t === 'agent') reload() }), [mapId, agent])
-  if (!data) return null
-  if (!data.length) return <p className="small muted" style={{ margin: 0 }}>{tr("Aucun appel pour l’instant.")}</p>
-  return <div className="forge-maps" role="log" aria-label={tr("Journal de l’agent")}>
-    {data.slice(0, 20).map(c => <div key={c.id} className="forge-map-ligne" style={{ flexDirection: 'row', alignItems: 'center', padding: '6px 12px', gap: 10 }}>
-      <span className="forge-point" style={{ background: c.ok ? 'var(--tg)' : 'var(--red)' }} aria-label={c.ok ? tr("réussi") : tr("en erreur")} />
-      <code style={{ flex: 1 }}>{c.tool}</code>
-      {c.task && <span className="small muted">#{c.task}</span>}
-      <span className="small muted">{ago(c.at)}</span>
-    </div>)}
-  </div>
-}
-
-/** Fil de discussion avec une IA (#381) : l'IA lit avec read_messages et répond avec send_message. */
-function Fil({ mapId, agent, nom }: { mapId: number; agent: number; nom: string }) {
-  const app = useApp()
-  const { data, reload } = useLoad<any[]>(`/api/maps/${mapId}/agents/${agent}/messages`, [mapId, agent])
-  useLive(['messages'], reload)
+  const { data: appels, reload: relireAppels } = useLoad<any[]>(`/api/maps/${mapId}/agents/activity?agent=${a.id}`, [mapId, a.id])
+  const { data: msgs, reload: relireMsgs } = useLoad<any[]>(`/api/maps/${mapId}/agents/${a.id}/messages`, [mapId, a.id])
+  useEffect(() => app.subscribe(m => { if (m?.t === 'agent') relireAppels() }), [mapId, a.id])
+  useLive(['messages'], relireMsgs)
   const [texte, setTexte] = useState('')
-  const bas = useRef<HTMLDivElement>(null)
-  useEffect(() => { bas.current?.scrollIntoView({ block: 'nearest' }) }, [data?.length])
+  const corps = useRef<HTMLDivElement>(null)
+  // Une seule chronologie, du plus ancien au plus récent : appels et messages.
+  const lignes: { at: string; k: string; appel?: any; msg?: any }[] = [
+    // L'activité arrive du plus récent au plus ancien : on la remet dans l'ordre d'un terminal.
+    ...(appels ?? []).slice(0, 30).reverse().map(c => ({ at: c.at, k: 'c' + c.id, appel: c })),
+    ...(msgs ?? []).slice(-30).map(m => ({ at: m.at, k: 'm' + m.id, msg: m })),
+  ].map((l, i) => ({ ...l, i })).sort((x, y) => String(x.at).localeCompare(String(y.at)) || x.i - y.i)
+  useEffect(() => { const c = corps.current; if (c) c.scrollTop = c.scrollHeight }, [lignes.length])
   const envoyer = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!texte.trim()) return
-    try { await api.post(`/api/maps/${mapId}/agents/${agent}/messages`, { body: texte }); setTexte(''); reload() } catch (er: any) { app.toast(er.message, true) }
+    try { await api.post(`/api/maps/${mapId}/agents/${a.id}/messages`, { body: texte }); setTexte(''); relireMsgs() } catch (er: any) { app.toast(er.message, true) }
   }
-  return <div className="forge-fil">
-    <div className="forge-fil-liste" role="log" aria-label={tr("Discussion avec {0}", [nom])}>
-      {!data?.length && <p className="small muted" style={{ margin: 0 }}>{tr("Écrivez à {0} : il lira votre message entre deux actions et vous répondra ici.", [nom])}</p>}
-      {data?.map(m => <div key={m.id} className={'forge-bulle' + (m.from === 'ia' ? ' ia' : '')}>
-        <div>{m.body}</div>
-        <div className="small muted">{m.from === 'ia' ? nom : tr("Vous")}{m.team ? ' · ' + tr("à toute l’équipe") : ''} · {ago(m.at)}{m.from !== 'ia' ? ' · ' + (m.read ? tr("lu") : tr("pas encore lu")) : ''}</div>
-      </div>)}
-      <div ref={bas} />
+  return <>
+    <div className="term-corps" ref={corps} role="log" aria-label={tr("Terminal de {0}", [a.name])}>
+      <div className="term-l"><span className="term-etoile">✻</span> {a.task
+        ? <>{tr("Tâche #{0}", [a.task.number])} · {a.task.title}{a.task.step ? <span className="term-doux"> · {ETAPES[a.task.step] ?? a.task.step}</span> : null}</>
+        : <span className="term-doux">{tr("Pas de tâche réservée")}</span>}</div>
+      {a.attribuees?.length > 0 && <div className="term-l term-doux">  {tr("Attribuée(s), pas encore prise(s) : {0}", [a.attribuees.map((x: any) => `#${x.number} ${x.title}`).join(', ')])}</div>}
+      {phrase && <div className="term-l term-doux">  {phrase}</div>}
+      {appels && msgs && lignes.length === 0 && <div className="term-l term-doux">{tr("Aucune activité pour l’instant. Écrivez-lui ci-dessous.")}</div>}
+      {lignes.map(l => l.appel
+        ? <div key={l.k} className="term-l">
+            <span className={l.appel.ok ? 'term-ok' : 'term-ko'} aria-label={l.appel.ok ? tr("réussi") : tr("en erreur")}>⏺</span> <b>{l.appel.tool}</b>{l.appel.task ? <span className="term-doux"> #{l.appel.task}</span> : null}<span className="term-doux"> · {ago(l.appel.at)}</span>
+            {l.appel.detail && <div className="term-l term-doux">  ⎿  {l.appel.detail}</div>}
+          </div>
+        : l.msg.from === 'ia'
+          ? <div key={l.k} className="term-l"><span className="term-ia">⏺</span> {l.msg.body}<span className="term-doux"> · {ago(l.msg.at)}</span></div>
+          : <div key={l.k} className="term-l term-moi">› {l.msg.body}<span className="term-doux"> · {l.msg.team ? tr("à toute l’équipe") + ' · ' : ''}{l.msg.read ? tr("lu") : tr("pas encore lu")}</span></div>)}
     </div>
-    <form className="forge-ligne" onSubmit={envoyer}>
-      <textarea className="field" style={{ flex: 1, minHeight: 44, padding: 10, resize: 'vertical' }} value={texte} maxLength={4000} placeholder={tr("Votre message à {0}…", [nom])} aria-label={tr("Message à {0}", [nom])}
-        onChange={e => setTexte(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); envoyer(e as any) } }} />
-      <button className="btn pri" disabled={!texte.trim()}>{tr("Envoyer")}</button>
+    <form className="term-invite" onSubmit={envoyer}>
+      <span aria-hidden="true">›</span>
+      <input value={texte} maxLength={4000} onChange={e => setTexte(e.target.value)} placeholder={tr("Écrire à {0}…", [a.name])} aria-label={tr("Message à {0}", [a.name])} disabled={!app.canEdit} />
     </form>
-  </div>
+  </>
 }
 
 /** Message à toutes ses IA de la map (#381). */

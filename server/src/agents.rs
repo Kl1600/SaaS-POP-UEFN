@@ -211,8 +211,8 @@ pub async fn activite(
     axum::extract::Query(q): axum::extract::Query<std::collections::HashMap<String, i64>>,
 ) -> ApiResult<Value> {
     map_ctx(&st, &u, mid).await?;
-    let rows: Vec<(i64, String, Option<String>, String, bool, String, Option<i64>)> = sqlx::query_as(
-        "SELECT c.id, a.name, a.role, c.tool, c.ok, c.at, t.number FROM agent_calls c JOIN api_tokens a ON a.id = c.agent_id
+    let rows: Vec<(i64, String, Option<String>, String, bool, String, Option<i64>, Option<String>)> = sqlx::query_as(
+        "SELECT c.id, a.name, a.role, c.tool, c.ok, c.at, t.number, c.detail FROM agent_calls c JOIN api_tokens a ON a.id = c.agent_id
          LEFT JOIN tasks t ON t.id = c.task_id WHERE c.map_id = ? AND a.user_id = ? AND c.id > ? AND (? = 0 OR c.agent_id = ?) ORDER BY c.id DESC LIMIT 50",
     )
     .bind(mid)
@@ -224,7 +224,7 @@ pub async fn activite(
     .await?;
     Ok(Json(json!(rows
         .into_iter()
-        .map(|(id, nom, role, tool, ok, at, n)| json!({ "id": id, "agent": nom, "role": role, "tool": tool, "ok": ok, "at": at, "task": n }))
+        .map(|(id, nom, role, tool, ok, at, n, detail)| json!({ "id": id, "agent": nom, "role": role, "tool": tool, "ok": ok, "at": at, "task": n, "detail": detail }))
         .collect::<Vec<_>>())))
 }
 
