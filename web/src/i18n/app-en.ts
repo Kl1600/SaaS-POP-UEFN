@@ -1785,6 +1785,8 @@ const EN: Record<string, string> = {
  "Ctrl/Cmd+clic : ajouter · Maj+clic : plage · Ctrl+Z : annuler": "Ctrl/Cmd+click: add · Shift+click: range · Ctrl+Z: undo",
  "Détails": "Details",
  "Vue du dessus": "Top view",
+ "Aucune compilation connue : demandez à votre IA de compiler.": "No known build: ask your AI to compile.",
+ "Compilé par {0}, {1}": "Compiled by {0}, {1}",
  "Photographie l’écran du jeu": "Takes a picture of the game screen",
  "Capture…": "Capturing…",
  "Aucun scénario validé pour cette map. Écrivez-en un sur le site : Lancer et suivre, onglet Test.": "No approved scenario for this map. Write one on the website: Launch and track, Test tab.",

@@ -41,7 +41,7 @@ export function ForgeVerifications({ mapId, ouvrir }: { mapId: number; ouvrir: (
   const compile = !c || c.status === 'queued' || c.status === 'running' ? null : c.status === 'done' ? erreurs : Math.max(1, erreurs)
   const auto: [string, boolean, string][] = [
     [tr("Compilation sans erreur"), compile === 0,
-      compile === null ? tr("Aucune compilation connue : compilez depuis Construire.") : compile > 0 ? tr("{0} erreur(s) à la dernière compilation.", [compile]) : tr("Dernière compilation propre.")],
+      compile === null ? tr("Aucune compilation connue : demandez à votre IA de compiler.") : compile > 0 ? tr("{0} erreur(s) à la dernière compilation.", [compile]) : tr("Dernière compilation propre.")],
     [tr("Aucun problème bloquant"), rap.bloquants === 0,
       rap.bloquants > 0 ? tr("{0} problème(s) bloquant(s) ci-dessous.", [rap.bloquants]) : tr("Aucun problème bloquant dans le niveau.")],
   ]
@@ -83,9 +83,16 @@ export function ForgeVerifications({ mapId, ouvrir }: { mapId: number; ouvrir: (
     <section className="stack" style={{ gap: 10 }}>
       <h3 style={{ margin: 0, fontWeight: 500, fontSize: 16 }}>{tr("Checklist de publication")}</h3>
       <div className="card" style={{ padding: 0 }}>
-        {auto.map(([titre, ok, detail]) => <div key={titre} className="verif-ligne">
+        {auto.map(([titre, ok, detail], i) => <div key={titre} className="verif-ligne">
           {ok ? <CircleCheck size={20} strokeWidth={1.5} className="verif-ok" aria-label={tr("Fait")} /> : <Circle size={20} strokeWidth={1.5} className="muted" aria-label={tr("À faire")} />}
-          <div style={{ flex: 1 }}><div>{titre} <span className="badge">{tr("auto")}</span></div><small className="muted">{detail}</small></div>
+          <div style={{ flex: 1, minWidth: 0 }}><div>{titre} <span className="badge">{tr("auto")}</span></div><small className="muted">{detail}</small>
+            {/* Erreurs de la dernière compilation, qu'elle vienne d'une IA ou de vous (#395). */}
+            {i === 0 && (compile ?? 0) > 0 && <ul className="verif-erreurs">
+              {c?.error && !diags.length && <li>{c.error}</li>}
+              {diags.filter(d => d.severity === 'error').slice(0, 30).map((d, k) => <li key={k}><code>{d.path}:{d.line}</code> {d.message}</li>)}
+            </ul>}
+            {i === 0 && c?.by && <small className="muted" style={{ display: 'block' }}>{tr("Compilé par {0}, {1}", [c.by, ago(c.at)])}</small>}
+          </div>
         </div>)}
         {liste.map(c => <label key={c.key} className="verif-ligne" style={{ cursor: 'pointer' }}>
           <input type="checkbox" checked={c.status === 'ok'} onChange={e => cocher(c.key, e.target.checked)} />

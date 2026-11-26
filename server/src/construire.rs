@@ -1,4 +1,4 @@
-//! Écran Construire de Forge (#83) : dernière compilation (erreurs avec fichier et ligne), dernières actions de
+//! Compilation et session de test d'une map (#83), lues par l'écran Vérifications de Forge (#395) : dernière compilation (erreurs avec fichier et ligne), dernières actions de
 //! session (démarrer, arrêter, envoyer), qu'elles viennent d'une IA ou d'un humain. Les boutons passent par
 //! `POST /api/maps/{mid}/uefn/action` (journalisé comme toute action UEFN).
 use crate::{access::map_ctx, auth::AuthUser, error::ApiResult, AppState};
