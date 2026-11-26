@@ -1,5 +1,5 @@
 //! Serveur MCP de POP : expose à l'IA connectée du créateur les mêmes actions que l'Organiseur et l'éditeur Verse.
-//! Tout est journalisé ; une suppression attend la validation d'un humain.
+//! Tout est journalisé ; une suppression attend la validation d'un humain, sauf si l'admin du studio laisse les IA supprimer seules (#165).
 //! Un jeton est lié au compte (#145) : l'IA choisit sa map de travail par `list_maps` puis `use_map`.
 use crate::{
     access::{map_ctx, notify, Role},
@@ -186,7 +186,7 @@ fn tools() -> Value {
         tool("set_island_settings", "Change des réglages de l'île, ex. settings {\"MaxPlayers\": \"16\"}. Chaque nom et chaque valeur sont vérifiés avant l'envoi (get_island_settings donne les valeurs permises). Journalisé et annulable (l'annulation remet les anciennes valeurs).", json!({ "settings": { "type": "object" }, "task": task }), &["settings"]),
         tool("import_asset", "Importe un fichier (FBX, OBJ, PNG, JPG, TGA, WAV, OGG, MP3 ; 200 Mo au plus) dans le projet UEFN ouvert. local_path : chemin du fichier sur le PC d'UEFN ; ou asset_id : un asset de la bibliothèque POP (#382) que vous pouvez lire ; ou url : adresse sur le serveur POP. folder : dossier du Content Browser (facultatif, sinon /<projet>/POP). Journalisé ; l'annulation retire l'asset s'il n'est pas utilisé (demandée par une IA, elle attend un humain).", json!({ "asset_id": { "type": "integer" }, "local_path": { "type": "string" }, "url": { "type": "string" }, "filename": { "type": "string" }, "folder": { "type": "string" }, "task": task }), &[]),
         tool("duplicate_actors", "Duplique des acteurs.", json!({ "ids": ids }), &["ids"]),
-        tool("delete_actors", "Demande la suppression d'acteurs. Un humain doit valider dans POP avant l'exécution.", json!({ "ids": ids }), &["ids"]),
+        tool("delete_actors", "Supprime des acteurs. Si l'admin du studio a activé « Les IA peuvent supprimer seules », la suppression est faite aussitôt (journalisée, restaurable depuis le journal) ; sinon un humain doit la valider dans POP ou Forge.", json!({ "ids": ids }), &["ids"]),
         tool("check_level", "Vérifie le niveau sur le dernier état connu : références d'appareils vers un acteur absent (bloquant), réglages non reliés, options réglées sans effet, tags Verse inutilisés. Chaque problème a sa gravité, l'acteur et une explication.", json!({}), &[]),
         tool("list_verse_files", "Liste les fichiers .verse du projet.", json!({}), &[]),
         tool("read_other_map", "Lit une AUTRE map de l'utilisateur comme contexte, en lecture seule (ex. reprendre une idée ou un module d'une map précédente) ; la map de travail ne change pas. map : identifiant (list_maps). what : pages | page | tasks | task | verse_files | verse_file | modules | module ; selon what : path (page ou fichier Verse), number (tâche), id (module), query (recherche dans les modules). Aucun outil d'écriture n'agit sur l'autre map.", json!({ "map": { "type": "integer" }, "what": { "type": "string", "enum": ["pages", "page", "tasks", "task", "verse_files", "verse_file", "modules", "module"] }, "path": { "type": "string" }, "number": { "type": "integer" }, "id": { "type": "integer" }, "query": { "type": "string" } }), &["map", "what"]),
@@ -255,7 +255,7 @@ fn tools() -> Value {
         tool("get_library_module", "Lit un module de la bibliothèque Verse du studio : code complet, appareils requis, version.", json!({ "id": { "type": "integer" } }), &["id"]),
         tool("list_skills", "Liste les compétences : méthodes de POP (Verse, appareils, session de test, Lore, rangement) et règles écrites par le studio. Lisez celles qui concernent votre tâche avant de commencer.", json!({}), &[]),
         tool("get_skill", "Lit une compétence par son nom (voir list_skills).", json!({ "name": { "type": "string" } }), &["name"]),
-        tool("undo_action", "Annule une action du journal par son identifiant.", json!({ "id": { "type": "integer" } }), &["id"]),
+        tool("undo_action", "Annule une action du journal par son identifiant. Une annulation qui retire des acteurs ou des assets attend un humain, sauf si le studio laisse les IA supprimer seules.", json!({ "id": { "type": "integer" } }), &["id"]),
     ])
 }
 
@@ -1329,6 +1329,10 @@ async fn call_as(
             if ids.is_empty() {
                 return Err(bad("Aucun acteur."));
             }
+            // Réglage du studio (décision du 24/11) : suppression immédiate, journalisée et restaurable.
+            if ia_supprime_seule(st, mid).await? {
+                return exec(st, o(), "actor_delete", json!({ "ids": ids })).await;
+            }
             let names: Vec<String> = ids
                 .iter()
                 .map(|i| {
@@ -1430,7 +1434,7 @@ async fn call_as(
         "lore_checkin" => exec(st, o(), "lore_checkin", json!({ "message": a["message"] })).await,
         "undo_action" => {
             let id = a["id"].as_i64().ok_or_else(|| bad("id manquant"))?;
-            // Annuler une pose, une duplication ou un import supprime des acteurs ou des assets : demandé par une IA, cela attend un humain.
+            // Annuler une pose, une duplication ou un import supprime des acteurs ou des assets : demandé par une IA, cela attend un humain, sauf réglage du studio (#165).
             let u: Option<(i64, Option<String>, String)> = sqlx::query_as(
                 "SELECT map_id, undo, summary FROM uefn_actions WHERE id = ? AND status = 'done'",
             )
@@ -1444,7 +1448,7 @@ async fn call_as(
                     Some("asset_delete") => Some("retrait des assets importés"),
                     _ => None,
                 };
-                if let Some(quoi) = quoi {
+                if let (Some(quoi), false) = (quoi, ia_supprime_seule(st, m).await?) {
                     let summary = format!("L’IA de {} demande d’annuler « {resume} » ({quoi})", user.name);
                     let aid: i64 = sqlx::query_scalar("INSERT INTO approvals (map_id, user_id, action, args, summary) VALUES (?, ?, ?, ?, ?) RETURNING id")
                         .bind(m).bind(user.id).bind(undo["action"].as_str()).bind(undo["args"].to_string()).bind(&summary).fetch_one(&st.db).await?;
@@ -1459,6 +1463,17 @@ async fn call_as(
         }
         _ => Err(bad("Outil inconnu.")),
     }
+}
+
+/// Le studio de la map laisse les IA supprimer seules dans UEFN (réglage d'un admin, décision du 24/11, #165).
+async fn ia_supprime_seule(st: &AppState, mid: i64) -> Result<bool, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT s.ia_supprime FROM studios s JOIN maps m ON m.studio_id = s.id WHERE m.id = ?",
+    )
+    .bind(mid)
+    .fetch_optional(&st.db)
+    .await?
+    .unwrap_or(false))
 }
 
 /// Ajoute aux erreurs de compilation la fiche d'aide du moteur local (corrections par règles), quand elle existe.
@@ -1666,6 +1681,81 @@ mod tests_pose {
             .await
             .unwrap();
         assert_eq!(statut, "done", "rien n'est supprimé avant la validation");
+
+        // #165 : l'admin active « Les IA peuvent supprimer seules » : plus de validation, tout est journalisé.
+        sqlx::query("UPDATE studios SET ia_supprime = 1 WHERE id = ?")
+            .bind(sid)
+            .execute(&st.db)
+            .await
+            .unwrap();
+        sqlx::query("UPDATE uefn_state SET actors = ? WHERE map_id = ?")
+            .bind(json!([{ "id": "L.Bouton", "name": "Bouton départ", "class": "BP_Bouton", "location": [0, 100, 0] }, { "id": "L.Prop1", "name": "Prop 1", "class": "StaticMeshActor", "location": [0, 0, 0] }, { "id": "L.Verrou", "name": "Verrou", "class": "StaticMeshActor", "location": [0, 0, 0] }, { "id": "L.Prop2", "name": "Prop 2", "class": "StaticMeshActor", "location": [10, 0, 0] }]).to_string())
+            .bind(mid)
+            .execute(&st.db)
+            .await
+            .unwrap();
+        let r = call(&st, &u, mid, "undo_action", json!({ "id": id }))
+            .await
+            .unwrap();
+        assert!(
+            r.get("pending_approval").is_none(),
+            "annulation immédiate : {r}"
+        );
+        let retrait: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM uefn_actions WHERE map_id = ? AND action = 'actor_delete' AND args LIKE '%L.Bouton%'",
+        )
+        .bind(mid)
+        .fetch_one(&st.db)
+        .await
+        .unwrap();
+        assert_eq!(retrait, 1, "l'appareil posé est retiré aussitôt");
+        let r = call(
+            &st,
+            &u,
+            mid,
+            "delete_actors",
+            json!({ "ids": ["L.Prop1", "L.Prop2"] }),
+        )
+        .await
+        .unwrap();
+        assert!(
+            r.get("pending_approval").is_none(),
+            "suppression immédiate : {r}"
+        );
+        let (resume, undo): (String, String) = sqlx::query_as(
+            "SELECT summary, undo FROM uefn_actions WHERE map_id = ? AND action = 'actor_delete' AND source = 'mcp' ORDER BY id DESC LIMIT 1",
+        )
+        .bind(mid)
+        .fetch_one(&st.db)
+        .await
+        .unwrap();
+        assert_eq!(resume, "Suppression : Prop 1, Prop 2");
+        assert!(
+            undo.contains("actor_restore") && undo.contains("Prop 2"),
+            "restaurable : {undo}"
+        );
+        let attente: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM approvals WHERE map_id = ?")
+            .bind(mid)
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        assert_eq!(attente, 1, "aucune nouvelle demande de validation");
+        // Un acteur verrouillé dans Lore par un autre membre reste refusé.
+        sqlx::query("UPDATE uefn_state SET locks = ? WHERE map_id = ?")
+            .bind(json!([{ "target": "L.Verrou", "by": "autre@a.fr" }]).to_string())
+            .bind(mid)
+            .execute(&st.db)
+            .await
+            .unwrap();
+        assert!(call(
+            &st,
+            &u,
+            mid,
+            "delete_actors",
+            json!({ "ids": ["L.Verrou"] })
+        )
+        .await
+        .is_err());
     }
 }
 

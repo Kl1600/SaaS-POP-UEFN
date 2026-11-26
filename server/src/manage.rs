@@ -44,6 +44,43 @@ pub async fn rename_studio(
 }
 
 #[derive(Deserialize)]
+pub struct IaSupprimeIn {
+    actif: bool,
+}
+
+/// Réglage « Les IA peuvent supprimer seules » du studio (décision du 24/11, #165) : lu par tout membre.
+pub async fn ia_supprime(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(sid): Path<i64>,
+) -> ApiResult<Value> {
+    studio_role(&st, &u, sid).await?;
+    let actif: bool = sqlx::query_scalar("SELECT ia_supprime FROM studios WHERE id = ?")
+        .bind(sid)
+        .fetch_one(&st.db)
+        .await?;
+    Ok(Json(json!({ "actif": actif })))
+}
+
+/// Changé seulement par un admin du studio.
+pub async fn changer_ia_supprime(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(sid): Path<i64>,
+    Json(b): Json<IaSupprimeIn>,
+) -> ApiResult<Value> {
+    if studio_role(&st, &u, sid).await? < Role::Admin {
+        return Err(AppError::Forbidden);
+    }
+    sqlx::query("UPDATE studios SET ia_supprime = ? WHERE id = ?")
+        .bind(b.actif)
+        .bind(sid)
+        .execute(&st.db)
+        .await?;
+    Ok(Json(json!({ "actif": b.actif })))
+}
+
+#[derive(Deserialize)]
 pub struct ConfirmIn {
     confirm: String,
 }
