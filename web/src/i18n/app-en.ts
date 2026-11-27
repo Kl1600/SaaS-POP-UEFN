@@ -1828,6 +1828,7 @@ const EN: Record<string, string> = {
  "Ctrl/Cmd+clic : ajouter · Maj+clic : plage · Ctrl+Z : annuler": "Ctrl/Cmd+click: add · Shift+click: range · Ctrl+Z: undo",
  "Détails": "Details",
  "Vue du dessus": "Top view",
+ "Aucune IA connectée à POP. Connectez Claude ou Codex (POP → IA connectées), puis revenez ici.": "No AI connected to POP. Connect Claude or Codex (POP → Connected AIs), then come back here.",
  "Je vous écoute… relâchez pour terminer": "Listening… release to finish",
  "Fermer ce terminal arrête {0}. Continuer ?": "Closing this terminal stops {0}. Continue?",
  "en direct": "live",
