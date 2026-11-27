@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom'
 import { Bell, Bot, Building2, Check, ChevronsUpDown, ExternalLink, Home, Library, Minus, Moon, RefreshCw, ShieldCheck, Grid3x3, Square, Sun, User, Wrench, X } from 'lucide-react'
 import LangPicker from '../components/LangPicker'
 import { ForgeAgents } from '../components/ForgeAgents'
-import { ForgeMiniature } from '../components/ForgeMiniature'
+import { ForgeOutils } from '../components/ForgeMiniature'
 import { ForgeDictee, RACCOURCIS, raccourci, choisirRaccourci, type Raccourci } from '../components/ForgeDictee'
 import { Selecteur } from '../components/Selecteur'
 import { useApp, studioName, useLive, useLoad } from '../state'
@@ -150,7 +150,7 @@ export default function Forge() {
           : section === 'verifier' ? (app.map ? <div className="stack" style={{ gap: 18 }}><ForgeVerifications mapId={app.map.id} ouvrir={ouvrirPOP} /><ForgeScenarios mapId={app.map.id} capturer={() => captureJeu(invoke)} /></div> : <p className="muted">{tr("Choisissez une map.")}</p>)
           : section === 'plan' ? (app.map ? <Plan2D /> : <p className="muted">{tr("Choisissez une map.")}</p>)
           : section === 'bibliotheque' ? <Bibliotheque mapId={app.map?.id ?? null} studioId={app.studio?.id ?? null} />
-          : section === 'outils' ? <div className="stack" style={{ gap: 18 }}><h1 className="forge-h1">{tr("Outils")}</h1>{app.map ? <ForgeMiniature mapId={app.map.id} /> : <p className="muted">{tr("Choisissez une map.")}</p>}</div>
+          : section === 'outils' ? (app.map ? <ForgeOutils mapId={app.map.id} allerAgents={() => setSection('agents')} /> : <p className="muted">{tr("Choisissez une map.")}</p>)
             : <AVenir section={section} titre={titre ?? ''} />}
       </main>
       </div>

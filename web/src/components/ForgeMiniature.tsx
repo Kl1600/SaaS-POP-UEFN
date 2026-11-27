@@ -2,31 +2,30 @@
 // (#306), s'inspire de la bibliothèque et fait dessiner la miniature par POP (#307), puis la rend (submit_thumbnail).
 // Forge montre la miniature, « Conforme Discover », et « Utiliser », « Refaire », « Modifier ». Le site montre les
 // versions choisies (`versions`).
-import { useState } from 'react'
-import { Check, Download, ImagePlus, RefreshCw, Pencil } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Check, Download, ImagePlus, RefreshCw, Pencil, Paperclip, X } from 'lucide-react'
 import { ago, api } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { tr } from '../i18n/t'
 
 type Mini = { id: number; title: string; url?: string; logo?: string; bytes: number; submitted_at: string; used_at?: string | null; created_at: string }
-type Liste = { miniatures: Mini[]; en_cours: { task: number; status: string; idea: string }[] }
+type Liste = { ia: { id: number; name: string } | null; miniatures: Mini[]; en_cours: { task: number; status: string; idea: string }[] }
 
-export function ForgeMiniature({ mapId, versions }: { mapId: number; versions?: boolean }) {
+export function ForgeMiniature({ mapId, versions, retour, allerAgents }: { mapId: number; versions?: boolean; retour?: () => void; allerAgents?: () => void }) {
   const app = useApp()
   const { data, reload } = useLoad<Liste>(`/api/maps/${mapId}/miniatures`, [mapId])
   useLive(['miniatures', 'tasks'], reload)
-  const [idee, setIdee] = useState('')
   const [modif, setModif] = useState<string | null>(null)
   const [occupe, setOccupe] = useState(false)
   if (!data) return null
-  const demander = async (base?: number, phrase?: string) => {
+  const demander = async (base: number | undefined, idee: string, exemples: string[] = []): Promise<boolean> => {
     setOccupe(true)
     try {
-      const r = await api.post(`/api/maps/${mapId}/miniatures/demandes`, { idee: phrase ?? idee, base })
-      app.toast(r.agent ? tr("{0} fait la miniature (tâche #{1}).", [r.agent, r.task]) : tr("Tâche #{0} créée : votre IA la prendra avec next_task.", [r.task]))
-      setIdee(''); setModif(null); reload()
+      const r = await api.post(`/api/maps/${mapId}/miniatures/demandes`, { idee, base, exemples })
+      app.toast(tr("{0} fait la miniature (tâche #{1}).", [r.agent, r.task]))
+      setModif(null); reload(); setOccupe(false); return true
     } catch (e: any) { app.toast(e.message, true) }
-    setOccupe(false)
+    setOccupe(false); return false
   }
   const utiliser = async (m: Mini) => {
     try { await api.post(`/api/maps/${mapId}/miniatures/${m.id}/utiliser`); app.toast(tr("Miniature choisie pour la map")); reload() } catch (e: any) { app.toast(e.message, true) }
@@ -42,15 +41,22 @@ export function ForgeMiniature({ mapId, versions }: { mapId: number; versions?: 
         <span className="small muted">{tr("choisie {0}", [ago(m.used_at!)])}</span>
       </div>)}</div>}
   </section>
-  return <section className="card stack" style={{ padding: 20, gap: 14 }} aria-label={tr("Miniature")}>
-    <div className="row" style={{ gap: 10, alignItems: 'baseline', flexWrap: 'wrap' }}>
-      <h2 className="forge-h2" style={{ margin: 0 }}>{tr("Miniature")}</h2>
-      <span className="small muted">{tr("Votre IA prend des photos de l'île et POP dessine une miniature conforme aux règles d'Epic.")}</span>
+  const ia = data.ia
+  return <section className="stack" style={{ gap: 14 }} aria-label={tr("Miniature")}>
+    <div className="row" style={{ gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+      {retour && <button className="btn" onClick={retour}>{tr("← Outils")}</button>}
+      <h1 className="forge-h1" style={{ margin: 0 }}>{tr("Miniature")}</h1>
+      <span className="small muted">{ia ? tr("Vous parlez à {0}. Il s'aide des compétences et de la bibliothèque miniature de POP.", [ia.name]) : ''}</span>
     </div>
-    <form className="row" style={{ gap: 8, flexWrap: 'wrap' }} onSubmit={e => { e.preventDefault(); demander() }}>
-      <input className="field" style={{ flex: 1, minWidth: 240 }} value={idee} maxLength={300} onChange={e => setIdee(e.target.value)} placeholder={tr("Une idée en plus ? (ex. ambiance fun, gros chiffres)")} aria-label={tr("Une idée en plus ?")} disabled={!app.canEdit} />
-      <button className="btn pri" disabled={occupe || !app.canEdit}><ImagePlus size={16} strokeWidth={1.6} />{tr("Générer une miniature")}</button>
-    </form>
+    {!ia ? <div className="card stack" style={{ padding: 20, gap: 10 }} role="status">
+      <b>{tr("Aucune IA connectée à cette map")}</b>
+      <span className="muted">{tr("Cet outil parle à votre IA : lancez-en une depuis Agents → + Terminal, ou connectez la vôtre (POP → IA connectées), puis revenez ici.")}</span>
+      {allerAgents && <div><button className="btn pri" onClick={allerAgents}>{tr("Aller aux Agents")}</button></div>}
+    </div> : <>
+      <Discussion mapId={mapId} aid={ia.id} nom={ia.name} />
+      <Composer occupe={occupe} base={modif !== null ? derniere : undefined} annulerBase={() => setModif(null)}
+        envoyer={(texte, exemples) => demander(modif !== null && derniere ? derniere.id : undefined, texte, exemples)} />
+    </>}
     {data.en_cours.length > 0 && <p className="small" role="status" style={{ margin: 0 }}>{tr("En cours : tâche #{0}{1}. La miniature s'affichera ici dès que votre IA l'aura rendue.", [data.en_cours[0].task, data.en_cours[0].idea ? ` (« ${data.en_cours[0].idea} »)` : ''])}</p>}
     {derniere && <div className="stack" style={{ gap: 10 }}>
       {derniere.url && <img src={derniere.url} alt={derniere.title} style={{ width: '100%', maxWidth: 960, aspectRatio: '16 / 9', objectFit: 'cover', borderRadius: 12, border: '1px solid var(--border)' }} />}
@@ -59,13 +65,9 @@ export function ForgeMiniature({ mapId, versions }: { mapId: number; versions?: 
         <span className="small muted">{derniere.title} · {ago(derniere.submitted_at)}{derniere.used_at ? ' · ' + tr("utilisée") : ''}</span>
         <div style={{ flex: 1 }} />
         <button className="btn pri" disabled={!!derniere.used_at || !app.canEdit} onClick={() => utiliser(derniere)}>{derniere.used_at ? tr("Utilisée") : tr("Utiliser cette miniature")}</button>
-        <button className="btn" disabled={occupe || !app.canEdit} onClick={() => demander()}><RefreshCw size={15} strokeWidth={1.6} />{tr("Refaire")}</button>
-        <button className="btn" disabled={!app.canEdit} onClick={() => setModif(m => m === null ? '' : null)}><Pencil size={15} strokeWidth={1.6} />{tr("Modifier")}</button>
+        <button className="btn" disabled={occupe || !app.canEdit || !ia} onClick={() => demander(undefined, tr("Refais une autre miniature."))}><RefreshCw size={15} strokeWidth={1.6} />{tr("Refaire")}</button>
+        <button className="btn" disabled={!app.canEdit || !ia} onClick={() => setModif(m => m === null ? '' : null)}><Pencil size={15} strokeWidth={1.6} />{tr("Modifier")}</button>
       </div>
-      {modif !== null && <form className="row" style={{ gap: 8 }} onSubmit={e => { e.preventDefault(); if (modif.trim()) demander(derniere.id, modif) }}>
-        <input className="field" style={{ flex: 1 }} autoFocus value={modif} maxLength={300} onChange={e => setModif(e.target.value)} placeholder={tr("Ce qu'il faut changer (ex. titre plus gros)")} aria-label={tr("Ce qu'il faut changer")} />
-        <button className="btn pri" disabled={occupe || !modif.trim()}>{tr("Envoyer à mon IA")}</button>
-      </form>}
       {derniere.used_at && <div className="row" style={{ gap: 8 }}>
         {derniere.url && <a className="btn" href={derniere.url} download><Download size={15} strokeWidth={1.6} />{tr("Image 1920 × 1080")}</a>}
         {derniere.logo && <a className="btn" href={derniere.logo} download><Download size={15} strokeWidth={1.6} />{tr("Logo 1440 × 608")}</a>}
@@ -73,4 +75,75 @@ export function ForgeMiniature({ mapId, versions }: { mapId: number; versions?: 
       </div>}
     </div>}
   </section>
+}
+
+/** Discussion avec l'IA (#468) : les messages échangés dans POP Forge, les plus récents en bas. */
+function Discussion({ mapId, aid, nom }: { mapId: number; aid: number; nom: string }) {
+  const { data, reload } = useLoad<any[]>(`/api/maps/${mapId}/agents/${aid}/messages`, [mapId, aid])
+  useLive(['messages'], reload)
+  const fin = useRef<HTMLDivElement>(null)
+  useEffect(() => { fin.current?.scrollIntoView({ block: 'nearest' }) }, [data?.length])
+  const l = (data ?? []).slice(-12)
+  return <div className="card mini-discussion" role="log" aria-label={tr("Discussion avec {0}", [nom])}>
+    {!l.length && <p className="muted small" style={{ margin: 0 }}>{tr("Expliquez la miniature que vous voulez : l'ambiance, le titre, ce qu'on doit voir. Joignez des exemples si vous en avez.")}</p>}
+    {l.map(m => <div key={m.id} className={'mini-bulle' + (m.from === 'ia' ? ' ia' : '')}>
+      <span className="small muted">{m.from === 'ia' ? nom : tr("Vous")} · {ago(m.at)}{m.from !== 'ia' && !m.read ? ' · ' + tr("pas encore lu") : ''}</span>
+      <span style={{ whiteSpace: 'pre-wrap' }}>{m.body}</span>
+    </div>)}
+    <div ref={fin} />
+  </div>
+}
+
+/** Zone d'envoi (#468) : texte et jusqu'à 4 images d'exemple ; « Modifier » ajoute la miniature de départ. */
+function Composer({ occupe, base, annulerBase, envoyer }: { occupe: boolean; base?: Mini; annulerBase: () => void; envoyer: (texte: string, exemples: string[]) => Promise<boolean> }) {
+  const app = useApp()
+  const [texte, setTexte] = useState('')
+  const [images, setImages] = useState<{ nom: string; data: string }[]>([])
+  const fichier = useRef<HTMLInputElement>(null)
+  const ajouter = async (l: FileList | null) => {
+    const f = Array.from(l ?? []).filter(x => /^image\/(png|jpeg)$/.test(x.type))
+    const lus = await Promise.all(f.map(x => new Promise<{ nom: string; data: string }>((ok, ko) => { const r = new FileReader(); r.onload = () => ok({ nom: x.name, data: String(r.result) }); r.onerror = ko; r.readAsDataURL(x) })))
+    setImages(i => [...i, ...lus].slice(0, 4))
+  }
+  const go = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!texte.trim() && !images.length) return
+    if (await envoyer(texte.trim(), images.map(i => i.data))) { setTexte(''); setImages([]) }
+  }
+  return <form className="card stack" style={{ padding: 12, gap: 8 }} onSubmit={go}>
+    {base && <div className="row small" style={{ gap: 8, alignItems: 'center' }}>
+      <span>{tr("Modifier « {0} » :", [base.title])}</span>
+      <button type="button" className="linkbtn small" onClick={annulerBase}>{tr("Annuler")}</button>
+    </div>}
+    <textarea className="field" rows={3} value={texte} maxLength={300} disabled={!app.canEdit}
+      onChange={e => setTexte(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); go(e as any) } }}
+      placeholder={base ? tr("Ce qu'il faut changer (ex. titre plus gros)") : tr("Décrivez la miniature : ambiance, titre, ce qu'on doit voir… (ex. ambiance fun, gros chiffres)")}
+      aria-label={tr("Message à votre IA")} />
+    {images.length > 0 && <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>{images.map((i, k) => <div key={k} className="mini-pj">
+      <img src={i.data} alt={i.nom} />
+      <button type="button" className="iconbtn" aria-label={tr("Retirer {0}", [i.nom])} onClick={() => setImages(l => l.filter((_, j) => j !== k))}><X size={14} /></button>
+    </div>)}</div>}
+    <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+      <input ref={fichier} type="file" accept="image/png,image/jpeg" multiple hidden onChange={e => { ajouter(e.target.files); e.target.value = '' }} />
+      <button type="button" className="btn" disabled={images.length >= 4} onClick={() => fichier.current?.click()}><Paperclip size={15} strokeWidth={1.6} />{tr("Exemples ({0}/4)", [images.length])}</button>
+      <div style={{ flex: 1 }} />
+      <button className="btn pri" disabled={occupe || (!texte.trim() && !images.length)}><ImagePlus size={16} strokeWidth={1.6} />{base ? tr("Envoyer la modification") : tr("Générer une miniature")}</button>
+    </div>
+  </form>
+}
+
+/** Onglet Outils de Forge (#468) : une carte par outil. */
+export function ForgeOutils({ mapId, allerAgents }: { mapId: number; allerAgents: () => void }) {
+  const [outil, setOutil] = useState<'' | 'miniature'>('')
+  if (outil === 'miniature') return <ForgeMiniature mapId={mapId} retour={() => setOutil('')} allerAgents={allerAgents} />
+  return <div className="stack" style={{ gap: 18 }}>
+    <h1 className="forge-h1">{tr("Outils")}</h1>
+    <div className="outils-grille">
+      <button className="card outil-carte" onClick={() => setOutil('miniature')}>
+        <ImagePlus size={22} strokeWidth={1.5} />
+        <b>{tr("Miniature")}</b>
+        <span className="small muted">{tr("Décrivez la miniature à votre IA : elle prend des photos de l'île et POP la dessine, conforme aux règles d'Epic.")}</span>
+      </button>
+    </div>
+  </div>
 }
