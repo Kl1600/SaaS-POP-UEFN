@@ -1256,10 +1256,18 @@ pub async fn pair_studio(
         .as_array()
         .ok_or_else(|| anyhow!("{}", r["error"].as_str().unwrap_or("liaison refusée")))?;
     let mut links = vec![];
-    for (l, p) in list.iter().zip(projects.iter()) {
+    // Par nom de projet, pas par ordre (#153) : POP saute un projet dont plusieurs maps portent le nom.
+    for l in list {
+        let nom = l["project"].as_str().unwrap_or("");
+        let Some(p) = projects.iter().find(|p| {
+            p.file_name()
+                .is_some_and(|n| n.to_string_lossy().eq_ignore_ascii_case(nom))
+        }) else {
+            continue;
+        };
         links.push(ProjLink {
             project: std::path::absolute(p)?.to_string_lossy().to_string(),
-            map: l["project"].as_str().unwrap_or("").into(),
+            map: nom.into(),
             token: l["token"].as_str().unwrap_or("").into(),
         });
     }
