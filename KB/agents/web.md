@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-27 · #448 · Planifier sans l'avis de faisabilité au-dessus du calendrier
+- Fait : Plan.tsx : AvisFaisabilite n'est plus affiché sur le calendrier, seulement dans la vue « Équipe et faisabilité ». Le Dashboard le garde.
+- Vérifié : navigateur 1440 px.
+
 ### 2026-11-26 · #396 · Planifier : détail de la tâche sur place
 - Fait : PlanCalendar.tsx : « Ouvrir la tâche » ouvre TaskDrawer (exporté de Tasks.tsx) au lieu d'aller dans Tâches ; la liste des tâches n'est chargée qu'à l'ouverture (dépendances) ; à la fermeture, le calendrier se recharge.
 - Vérifié : navigateur 1440 px.
