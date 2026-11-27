@@ -7,6 +7,7 @@ const COMMUNS: &[&str] = &[
     "list_maps",
     "get_thumbnail_kit",
     "compose_thumbnail",
+    "submit_thumbnail",
     "read_other_map",
     "use_map",
     "ask_user",
