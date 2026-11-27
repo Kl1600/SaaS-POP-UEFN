@@ -3,6 +3,9 @@
 Une entrée par version de `forge/tauri.conf.json` (#437) : `## version · date`, puis 1 à 5 lignes en français.
 Le workflow « relais Windows » en tire les notes de la mise à jour ; le CI refuse une version sans entrée.
 
+## 0.3.6 · 27/11/2026
+- « + Terminal » ouvre une IA sans choisir de tâche : donnez-lui vos instructions dans son terminal.
+
 ## 0.3.5 · 27/11/2026
 - Agents : les terminaux ouverts remplissent la page (plein écran, moitiés, quarts) ; × en ferme un.
 - Chaque terminal peut s'ouvrir dans une fenêtre à part.

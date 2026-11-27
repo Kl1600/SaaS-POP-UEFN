@@ -590,8 +590,8 @@ fn apps_ia() -> Vec<agents_locaux::AppIa> {
 
 /// Consigne d'une tâche pour « Mon IA », à copier dans la conversation de l'IA de l'utilisateur (#420).
 #[tauri::command]
-fn consigne_mon_ia(map: String, map_id: i64, tache: i64, titre: String) -> String {
-    agents_locaux::consigne_mon_ia(&map, map_id, tache, &titre)
+fn consigne_mon_ia(map: String, map_id: i64, tache: Option<i64>, titre: Option<String>) -> String {
+    agents_locaux::consigne_mon_ia(&map, map_id, tache, &titre.unwrap_or_default())
 }
 
 /// Ouvre l'IA choisie (#420) : son app si elle est installée, sinon son site dans le navigateur par défaut.
@@ -662,8 +662,8 @@ fn lancer_agent(
     outil: String,
     token: String,
     map: String,
-    tache: i64,
-    titre: String,
+    tache: Option<i64>,
+    titre: Option<String>,
 ) -> Result<(), String> {
     if !token.starts_with("pop_")
         || token.len() > 200
@@ -699,7 +699,7 @@ fn lancer_agent(
         .filter(|p| p.is_dir())
         .or_else(dirs::home_dir)
         .ok_or("Dossier de travail introuvable.")?;
-    let consigne = agents_locaux::consigne(&map, tache, &titre);
+    let consigne = agents_locaux::consigne(&map, tache, &titre.unwrap_or_default());
     let args = agents_locaux::arguments(&outil, &serveur, &config, &consigne)
         .ok_or("Outil non pris en charge.")?;
     agents_locaux::lancer(&exe, &args, &dossier, &token)
