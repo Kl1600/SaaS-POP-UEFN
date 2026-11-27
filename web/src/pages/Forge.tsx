@@ -24,7 +24,7 @@ const forgeInvoke = (): Invoke | null => {
   const w = window as any
   return w.__TAURI__?.core?.invoke ?? w.__TAURI_INTERNALS__?.invoke ?? null
 }
-type Liaison = { projet: string; map: string; serveur: string; liens?: { projet: string; map: string }[] } | null
+type Liaison = { projet: string; map: string; serveur: string; liens?: { projet: string; map: string }[]; ignores?: string[] } | null
 type Section = 'accueil' | 'agents' | 'verifier' | 'plan' | 'bibliotheque' | 'outils' | 'reglages'
 
 const SECTIONS: [Section, string, any][] = [
@@ -318,7 +318,8 @@ function Accueil({ invoke, etat, liaison, relire }: { invoke: Invoke; etat: stri
       setOuvert(o); setProjets([...new Set([...(o ? [o] : []), ...l])])
     } catch (e: any) { setMsg({ ok: false, texte: String(e) }) }
   }, [invoke])
-  useEffect(() => { chercher() }, [chercher])
+  // Toutes les 30 s : un projet créé dans UEFN apparaît sans « Actualiser » (#153).
+  useEffect(() => { chercher(); const t = setInterval(chercher, 30000); return () => clearInterval(t) }, [chercher])
 
   const studios = (app.me?.studios ?? []).filter(s => ['member', 'admin', 'owner'].includes(s.role))
   const maps = studios.flatMap(s => s.maps.map(m => ({ id: m.id, nom: m.name, studio: studioName(s) })))
@@ -326,8 +327,13 @@ function Accueil({ invoke, etat, liaison, relire }: { invoke: Invoke; etat: stri
   const projetDe = (nom: string) => liens.find(l => l.map.toLowerCase() === nom.toLowerCase())?.projet
   const relies = new Set(liens.map(l => l.projet.toLowerCase()))
   const meme = (p: string, nom: string) => nomDossier(p).toLowerCase() === nom.toLowerCase()
-  // Projets trouvés sans map POP du même nom ni liaison : on propose de créer leur map.
-  const orphelins = projets.filter(p => !relies.has(p.toLowerCase()) && !maps.some(m => meme(p, m.nom)))
+  // Nouveaux projets UEFN (#153) : trouvés sur le PC, ni reliés ni ignorés. Forge relie tout seul ceux qui n'ont qu'une
+  // map du même nom ; les autres attendent ici une réponse.
+  const normal = (p: string) => p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
+  const ignores = new Set((liaison?.ignores ?? []).map(normal))
+  const nouveaux = projets.filter(p => !relies.has(p.toLowerCase()) && !ignores.has(normal(p)))
+  // Sans map du même nom : on propose de créer leur map.
+  const orphelins = nouveaux.filter(p => !maps.some(m => meme(p, m.nom)))
   const proposer = (nom: string) => choix[maps.find(m => m.nom === nom)?.id ?? -1] ?? projets.find(p => meme(p, nom)) ?? (ouvert && !relies.has(ouvert.toLowerCase()) ? ouvert : '') ?? ''
 
   const relier = async (mapId: number, projet: string) => {
@@ -352,15 +358,18 @@ function Accueil({ invoke, etat, liaison, relire }: { invoke: Invoke; etat: stri
   // « Créer les maps et relier » (#404, remplace le pop-link.exe « déjà configuré ») : POP crée dans le studio choisi
   // une map par projet trouvé sans map, et Forge les relie toutes d'un coup.
   const studioCible = studios.find(s => s.id === app.studio?.id) ?? studios[0]
-  const importer = async () => {
+  const importer = async (liste: string[], cle = 'importer') => {
     if (!studioCible) return
-    setOccupe('importer'); setMsg(null)
+    setOccupe(cle); setMsg(null)
     try {
       const { code } = await api.post<{ code: string }>(`/api/studios/${studioCible.id}/relay/code`)
-      const e = await invoke<string>('importer', { code, projets: orphelins })
+      const e = await invoke<string>('importer', { code, projets: liste })
       setMsg({ ok: true, texte: tr(e) })
       await app.reload(); await relire(); await chercher()
     } catch (e: any) { setMsg({ ok: false, texte: e?.message ?? String(e) }) } finally { setOccupe(null) }
+  }
+  const ignorer = async (projet: string) => {
+    try { await invoke('ignorer', { projet }); await relire() } catch (e: any) { setMsg({ ok: false, texte: e?.message ?? String(e) }) }
   }
   const parcourir = async (mapId: number) => {
     const d = await invoke<string | null>('choisir_dossier').catch(() => null)
@@ -406,15 +415,28 @@ function Accueil({ invoke, etat, liaison, relire }: { invoke: Invoke; etat: stri
           </div>
         })}
       </div>
-      {orphelins.length > 0 && <div className="stack" style={{ gap: 6 }}>
+      {nouveaux.length > 0 && <div className="stack" style={{ gap: 6 }}>
         <div className="row" style={{ gap: 8, flexWrap: 'wrap', justifyContent: 'space-between' }}>
-          <span className="small muted">{tr("Projets UEFN trouvés sur ce PC sans map POP.")}</span>
-          {studioCible && <button className="btn pri" disabled={occupe !== null} onClick={importer}>{occupe === 'importer' ? tr("Liaison…") : tr("Créer les maps et relier ({0}) dans {1}", [orphelins.length, studioName(studioCible)])}</button>}
+          <h3 className="forge-h2" style={{ margin: 0, fontSize: 15 }}>{tr("Nouveaux projets UEFN détectés")}</h3>
+          {studioCible && orphelins.length > 1 && <button className="btn" disabled={occupe !== null} onClick={() => importer(orphelins)}>{occupe === 'importer' ? tr("Liaison…") : tr("Créer les maps et relier ({0}) dans {1}", [orphelins.length, studioName(studioCible)])}</button>}
         </div>
-        {orphelins.map(o => <div key={o} className="forge-map-ligne row" style={{ gap: 12, flexWrap: 'wrap' }}>
-          <span style={{ flex: 1, minWidth: 0 }}>{nomDossier(o)}{ouvert === o && <span className="small muted"> · {tr("ouvert dans UEFN")}</span>}</span>
-          <button className="btn" title={tr("S'ouvre dans le navigateur")} onClick={() => ouvrirPOP('/')}><ExternalLink size={16} strokeWidth={1.5} />{tr("Créer la map dans POP")}</button>
-        </div>)}
+        {nouveaux.map(o => {
+          const memes = maps.filter(m => meme(o, m.nom))
+          const choisi = choix[-(nouveaux.indexOf(o) + 2)]
+          const mapId = Number(choisi ?? memes[0]?.id ?? 0)
+          return <div key={o} className="forge-map-ligne row" style={{ gap: 12, flexWrap: 'wrap' }}>
+            <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+              <span>{nomDossier(o)}{ouvert === o && <span className="small muted"> · {tr("ouvert dans UEFN")}</span>}</span>
+              <span className="small muted">{memes.length > 1 ? tr("Plusieurs maps portent ce nom : laquelle ?") : memes.length === 1 ? tr("Relié tout seul à « {0} » dans un instant.", [memes[0].nom]) : tr("Aucune map POP de ce nom.")}</span>
+            </span>
+            {memes.length > 1 && <Selecteur label={tr("Map pour {0}", [nomDossier(o)])} placeholder={tr("Choisir la map…")} value={String(mapId)}
+              options={memes.map(m => ({ value: String(m.id), label: m.nom + ' · ' + m.studio }))}
+              onChange={v => setChoix(c => ({ ...c, [-(nouveaux.indexOf(o) + 2)]: v }))} />}
+            {memes.length > 0 && <button className="btn pri" disabled={occupe !== null || !mapId} onClick={() => relier(mapId, o)}>{occupe === String(mapId) ? tr("Liaison…") : tr("Relier")}</button>}
+            {memes.length === 0 && studioCible && <button className="btn pri" disabled={occupe !== null} onClick={() => importer([o], 'creer' + o)}>{occupe === 'creer' + o ? tr("Liaison…") : tr("Créer la map dans {0}", [studioName(studioCible)])}</button>}
+            <button className="btn" disabled={occupe !== null} onClick={() => ignorer(o)}>{tr("Ignorer")}</button>
+          </div>
+        })}
       </div>}
       {projets.length === 0 && <p className="small muted" style={{ margin: 0 }}>{tr("Aucun projet UEFN trouvé sur ce PC. Ouvrez votre projet dans UEFN, puis « Actualiser », ou reliez une map avec « Parcourir… ».")}</p>}
       {msg && <p className="small" style={{ margin: 0, color: msg.ok ? 'var(--text)' : 'var(--red)' }}>{msg.texte}</p>}

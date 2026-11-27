@@ -97,3 +97,11 @@ Fait : module updater Tauri (https seulement), /api/forge/latest, bandeau ; sign
 Reste : signature Authenticode (#422)
 Bloque : rien
 ```
+
+```
+FAIT | #153 Relais : détecter un nouveau projet UEFN et le relier tout seul, sans écraser les autres liens | 27/11
+Owner : benybens | Sur la tâche : Claude Code, pour benybens
+Fait : Forge relit les projets toutes les 30 s, /api/relay/discover, ajout à chaud, Accueil « Nouveaux projets » (Relier, Créer, Ignorer), pair garde les liens ; testé avec une Forge isolée
+Reste : rien
+Bloque : rien
+```

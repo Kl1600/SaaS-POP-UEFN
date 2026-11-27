@@ -15,6 +15,7 @@
     "allow-importer",
     "allow-maj-verifier",
     "allow-maj-installer",
+    "allow-ignorer",
     "allow-projet-ouvert",
     "allow-liaison",
     "allow-fenetre",
