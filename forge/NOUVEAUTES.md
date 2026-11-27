@@ -3,6 +3,10 @@
 Une entrée par version de `forge/tauri.conf.json` (#437) : `## version · date`, puis 1 à 5 lignes en français.
 Le workflow « relais Windows » en tire les notes de la mise à jour ; le CI refuse une version sans entrée.
 
+## 0.3.8 · 27/11/2026
+- Installateur et désinstalleur aux couleurs de POP (logo, images, en français).
+- L'outil Miniature et le terminal de l'agent ont chacun leur discussion.
+
 ## 0.3.7 · 27/11/2026
 - « Fenêtre à part » d'un terminal ne bloque plus Forge.
 - « + Terminal » propose seulement les IA connectées à la map.
