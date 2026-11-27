@@ -37,6 +37,7 @@ const Admin = lazy(() => import('./pages/Admin'))
 const Authorize = lazy(() => import('./pages/Authorize'))
 const Organizer = lazy(() => import('./pages/Organizer'))
 const Forge = lazy(() => import('./pages/Forge'))
+const ForgeTerminal = lazy(() => import('./pages/ForgeTerminal'))
 const L = (C: any) => <Suspense fallback={<main className="content"><p className="muted" style={{ padding: 28 }}>{tr("Chargement…")}</p></main>}><C /></Suspense>
 
 function Gate() {
@@ -64,6 +65,7 @@ function Gate() {
     <Routes>
       {/* POP Forge (#78) : interface propre de l'application de bureau, sans la barre du site. */}
       <Route path="forge" element={L(Forge)} />
+      <Route path="forge/terminal" element={L(ForgeTerminal)} />
       <Route element={<Layout />}>
         <Route index element={<Home />} />
         <Route path="map/:mid" element={<MapScope />}>

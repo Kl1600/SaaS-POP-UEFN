@@ -138,7 +138,10 @@ export default function Forge() {
         <button className="iconbtn" aria-label={app.dark ? tr("Thème clair") : tr("Thème sombre")} onClick={app.toggleDark}>{app.dark ? <Sun size={20} strokeWidth={1.5} /> : <Moon size={20} strokeWidth={1.5} />}</button>
       </div>
       <div className="scroll" id="contenu" tabIndex={-1}>
-      <main className="content" style={{ padding: '40px 28px', width: '100%', maxWidth: 920, margin: '0 auto', boxSizing: 'border-box' }}>
+      <main className="content" style={section === 'agents' && !reserve
+        // Agents (#451) : les terminaux prennent toute la largeur et la hauteur de la page.
+        ? { padding: '18px 20px', width: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0 }
+        : { padding: '40px 28px', width: '100%', maxWidth: 920, margin: '0 auto', boxSizing: 'border-box' }}>
         <MajForge invoke={invoke} />
         <ForgeDictee invoke={invoke} />
         {app.map && section !== 'reglages' && !reserve && <Bandeau mapId={app.map.id} etat={etat} aller={setSection} />}

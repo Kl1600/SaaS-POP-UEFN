@@ -3,6 +3,11 @@
 Une entrée par version de `forge/tauri.conf.json` (#437) : `## version · date`, puis 1 à 5 lignes en français.
 Le workflow « relais Windows » en tire les notes de la mise à jour ; le CI refuse une version sans entrée.
 
+## 0.3.5 · 27/11/2026
+- Agents : les terminaux ouverts remplissent la page (plein écran, moitiés, quarts) ; × en ferme un.
+- Chaque terminal peut s'ouvrir dans une fenêtre à part.
+- « + Terminal » en haut à gauche ouvre une IA connectée ou en lance une sur votre PC.
+
 ## 0.3.4 · 27/11/2026
 - Dictée vocale : gardez Ctrl+Espace appuyé dans un champ pour dicter, transcrit sur votre PC (aucun son ne quitte l'ordinateur).
 - Le modèle de reconnaissance (547 Mio) se télécharge au premier usage, après votre accord ; raccourci modifiable dans Réglages.

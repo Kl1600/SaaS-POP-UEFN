@@ -127,6 +127,7 @@ fn autoriser(app: &AppHandle, u: &Url) {
         .permission("allow-ignorer")
         .permission("allow-forge-version")
         .permission("allow-maj-etat")
+        .permission("allow-fenetre-terminal")
         .permission("allow-dictee-etat")
         .permission("allow-dictee-telecharger")
         .permission("allow-dictee-debut")
@@ -180,6 +181,30 @@ fn autorise(app: &AppHandle, url: &Url) -> bool {
         let _ = tauri_plugin_opener::open_url(url.as_str(), None::<&str>);
     }
     false
+}
+
+/// « Fenêtre à part » (#451) : le terminal d'un agent dans sa propre fenêtre Forge (page /forge/terminal du POP
+/// relié). Une fenêtre par agent : la rouvrir la met au premier plan.
+#[tauri::command]
+fn fenetre_terminal(app: AppHandle, map: i64, agent: i64, titre: String) -> Result<(), String> {
+    let label = format!("agent-{agent}");
+    if let Some(w) = app.get_webview_window(&label) {
+        let _ = w.unminimize();
+        return w.set_focus().map_err(|e| e.to_string());
+    }
+    let mut u = normalize(&serveur(&app))?;
+    u.set_path("/forge/terminal");
+    u.set_query(Some(&format!("map={map}&agent={agent}")));
+    let h = app.clone();
+    let titre: String = titre.chars().take(80).collect();
+    WebviewWindowBuilder::new(&app, label, WebviewUrl::External(u))
+        .title(format!("{titre} · POP Forge"))
+        .inner_size(720.0, 640.0)
+        .min_inner_size(420.0, 320.0)
+        .on_navigation(move |u| autorise(&h, u))
+        .build()
+        .map(|_| ())
+        .map_err(|e| e.to_string())
 }
 
 /// Lien d'ouverture reçu avant que la page de Forge soit chargée (#297) : requête `map=…&tache=…`.
@@ -866,6 +891,7 @@ fn main() {
             maj::maj_installer,
             maj::forge_version,
             maj::maj_etat,
+            fenetre_terminal,
             dictee::dictee_etat,
             dictee::dictee_telecharger,
             dictee::dictee_debut,
