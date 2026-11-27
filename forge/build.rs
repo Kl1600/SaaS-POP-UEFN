@@ -24,6 +24,7 @@ fn main() {
             "dictee_telecharger",
             "dictee_debut",
             "dictee_fin",
+            "dictee_partiel",
             "projet_ouvert",
             "liaison",
             "fenetre",

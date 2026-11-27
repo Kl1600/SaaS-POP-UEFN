@@ -1828,6 +1828,7 @@ const EN: Record<string, string> = {
  "Ctrl/Cmd+clic : ajouter · Maj+clic : plage · Ctrl+Z : annuler": "Ctrl/Cmd+click: add · Shift+click: range · Ctrl+Z: undo",
  "Détails": "Details",
  "Vue du dessus": "Top view",
+ "Je vous écoute… relâchez pour terminer": "Listening… release to finish",
  "Fermer ce terminal arrête {0}. Continuer ?": "Closing this terminal stops {0}. Continue?",
  "en direct": "live",
  "Mettez Forge à jour (pop-uefn.com/forge) pour ouvrir un terminal en direct.": "Update Forge (pop-uefn.com/forge) to open a live terminal.",

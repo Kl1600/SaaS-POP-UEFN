@@ -30,6 +30,10 @@ pub struct Dictee {
 struct Enregistrement {
     arret: mpsc::Sender<()>,
     fil: std::thread::JoinHandle<Result<(Vec<f32>, u32), String>>,
+    /// Texte provisoire (#477) : transcription répétée pendant qu'on parle.
+    partiel: Arc<Mutex<(u64, String)>>,
+    en_cours: Arc<AtomicBool>,
+    transcripteur: Option<std::thread::JoinHandle<()>>,
 }
 
 fn chemin(app: &AppHandle) -> Result<PathBuf, String> {
@@ -109,17 +113,25 @@ async fn telecharger(app: &AppHandle, d: &Dictee) -> Result<(), String> {
 }
 
 /// Commence l'enregistrement du micro par défaut (raccourci appuyé).
+// Asynchrone : charger le modèle la première fois prend quelques secondes, sans figer la fenêtre.
 #[tauri::command]
-pub fn dictee_debut(d: tauri::State<'_, Dictee>) -> Result<(), String> {
+pub async fn dictee_debut(
+    app: AppHandle,
+    d: tauri::State<'_, Dictee>,
+    langue: Option<String>,
+) -> Result<(), String> {
     let mut e = d.enregistrement.lock().unwrap();
     if e.is_some() {
         return Ok(());
     }
     let (arret, attente) = mpsc::channel::<()>();
     let (pret, ok) = mpsc::channel::<Result<(), String>>();
+    let echantillons = Arc::new(Mutex::new(Vec::<f32>::new()));
+    let taux_partage = Arc::new(AtomicU64::new(0));
+    let (ech, tx) = (echantillons.clone(), taux_partage.clone());
     // Le flux du micro n'est pas transférable entre fils : il vit dans son propre fil jusqu'à l'arrêt.
     let fil = std::thread::spawn(move || {
-        let echantillons = Arc::new(Mutex::new(Vec::<f32>::new()));
+        let echantillons = ech;
         let flux = (|| {
             let micro = cpal::default_host()
                 .default_input_device()
@@ -184,6 +196,7 @@ pub fn dictee_debut(d: tauri::State<'_, Dictee>) -> Result<(), String> {
                 Err(e)
             }
             Ok((flux, taux)) => {
+                tx.store(taux as u64, Ordering::SeqCst);
                 let _ = pret.send(Ok(()));
                 let _ = attente.recv();
                 drop(flux);
@@ -193,8 +206,91 @@ pub fn dictee_debut(d: tauri::State<'_, Dictee>) -> Result<(), String> {
         }
     });
     ok.recv().map_err(|e| e.to_string())??;
-    *e = Some(Enregistrement { arret, fil });
+    // Transcription en temps réel (#477) : tant qu'on parle, on retranscrit tout ce qui a été dit dès que la
+    // transcription précédente est finie (les 30 dernières secondes au plus), et la page affiche ce texte provisoire.
+    let partiel = Arc::new(Mutex::new((0u64, String::new())));
+    let en_cours = Arc::new(AtomicBool::new(true));
+    let modele = charger(&app, &d).ok();
+    let transcripteur = modele.map(|m| {
+        let (p, c, ech, tx) = (
+            partiel.clone(),
+            en_cours.clone(),
+            echantillons.clone(),
+            taux_partage.clone(),
+        );
+        let langue = langue_sure(langue);
+        std::thread::spawn(move || {
+            let mut deja = 0usize;
+            while c.load(Ordering::SeqCst) {
+                let taux = tx.load(Ordering::SeqCst) as usize;
+                let son: Vec<f32> = {
+                    let v = ech.lock().unwrap();
+                    let debut = v.len().saturating_sub(taux * 30);
+                    v[debut..].to_vec()
+                };
+                // Au moins 0,4 s de nouveau son avant de retranscrire.
+                if taux == 0 || son.len() < taux / 2 || son.len() < deja + taux * 2 / 5 {
+                    std::thread::sleep(std::time::Duration::from_millis(80));
+                    continue;
+                }
+                deja = son.len();
+                if let Ok(t) = transcrire(&m, &a_16k(&son, taux as u32), &langue) {
+                    let mut g = p.lock().unwrap();
+                    g.0 += 1;
+                    g.1 = t;
+                }
+            }
+        })
+    });
+    *e = Some(Enregistrement {
+        arret,
+        fil,
+        partiel,
+        en_cours,
+        transcripteur,
+    });
     Ok(())
+}
+
+fn langue_sure(langue: Option<String>) -> String {
+    langue
+        .filter(|l| l.len() == 2 && l.chars().all(|c| c.is_ascii_lowercase()))
+        .unwrap_or_else(|| "fr".into())
+}
+
+/// Modèle chargé une seule fois (le premier chargement prend quelques secondes).
+fn charger(app: &AppHandle, d: &Dictee) -> Result<Arc<WhisperContext>, String> {
+    let mut m = d.modele.lock().unwrap();
+    if let Some(c) = &*m {
+        return Ok(c.clone());
+    }
+    let p = chemin(app)?;
+    if !p.exists() {
+        return Err("Le modèle de dictée n'est pas installé.".into());
+    }
+    let c = Arc::new(
+        WhisperContext::new_with_params(&p, WhisperContextParameters::default())
+            .map_err(|e| format!("Modèle de dictée illisible : {e}"))?,
+    );
+    *m = Some(c.clone());
+    Ok(c)
+}
+
+#[derive(Serialize)]
+pub struct Partiel {
+    version: u64,
+    texte: String,
+}
+
+/// Texte provisoire pendant qu'on parle (#477) : la page le relit et l'écrit dans le champ.
+#[tauri::command]
+pub fn dictee_partiel(d: tauri::State<'_, Dictee>) -> Option<Partiel> {
+    let e = d.enregistrement.lock().unwrap();
+    let g = e.as_ref()?.partiel.lock().unwrap().clone();
+    Some(Partiel {
+        version: g.0,
+        texte: g.1,
+    })
 }
 
 /// Raccourci relâché : arrête le micro et rend le texte transcrit (vide si rien n'a été dit).
@@ -211,31 +307,16 @@ pub async fn dictee_fin(
         .take()
         .ok_or("Aucune dictée en cours.")?;
     let _ = e.arret.send(());
+    e.en_cours.store(false, Ordering::SeqCst);
     let (son, taux) = e.fil.join().map_err(|_| "Erreur du micro.".to_string())??;
+    if let Some(t) = e.transcripteur {
+        let _ = tokio::task::spawn_blocking(move || t.join()).await;
+    }
     if son.len() < taux as usize / 4 {
         return Ok(String::new());
     }
-    let modele = {
-        let mut m = d.modele.lock().unwrap();
-        match &*m {
-            Some(c) => c.clone(),
-            None => {
-                let p = chemin(&app)?;
-                if !p.exists() {
-                    return Err("Le modèle de dictée n'est pas installé.".into());
-                }
-                let c = Arc::new(
-                    WhisperContext::new_with_params(&p, WhisperContextParameters::default())
-                        .map_err(|e| format!("Modèle de dictée illisible : {e}"))?,
-                );
-                *m = Some(c.clone());
-                c
-            }
-        }
-    };
-    let langue = langue
-        .filter(|l| l.len() == 2 && l.chars().all(|c| c.is_ascii_lowercase()))
-        .unwrap_or_else(|| "fr".into());
+    let modele = charger(&app, &d)?;
+    let langue = langue_sure(langue);
     tokio::task::spawn_blocking(move || transcrire(&modele, &a_16k(&son, taux), &langue))
         .await
         .map_err(|e| e.to_string())?
