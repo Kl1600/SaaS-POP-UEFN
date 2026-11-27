@@ -450,6 +450,32 @@ function BibliothequeMiniature() {
     } catch (er: any) { toast(er.message, true) } finally { setBusy(false) }
   }
   const ingr = f.drawer === 'ingredient'
+  const [lot, setLot] = useState<{ fait: number; total: number; echecs: string[] } | null>(null)
+  const [choix, setChoix] = useState<number[]>([])
+  // Import en lot (#460) : chaque image devient une inspiration ; mots-clés tirés du nom du fichier et du dossier.
+  const importer = async (fichiers: FileList | null) => {
+    const l = Array.from(fichiers ?? []).filter(x => /\.(png|jpe?g)$/i.test(x.name))
+    if (!l.length) { toast(tr("Aucune image PNG ou JPEG."), true); return }
+    const echecs: string[] = []
+    setLot({ fait: 0, total: l.length, echecs })
+    for (const [i, x] of l.entries()) {
+      const chemin = ((x as any).webkitRelativePath || x.name).replace(/\.[^.]+$/, '')
+      const mots = chemin.split(/[\/_\-.\s]+/).map((m: string) => m.toLowerCase()).filter((m: string) => m.length > 1 && !/^\d+$/.test(m) && m !== 'image')
+      const titre = chemin.split('/').pop()!.replace(/[_-]+/g, ' ').trim().slice(0, 120) || x.name
+      try {
+        const data = await new Promise<string>((ok, ko) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.onerror = ko; r.readAsDataURL(x) })
+        await api.post('/api/admin/miniatures', { drawer: 'inspiration', kind: 'image', title: titre, keywords: [...new Set(mots)].join(' '), source: tr("Import en lot"), license: '', data })
+      } catch (er: any) { echecs.push(`${x.name} : ${er.message}`) }
+      setLot({ fait: i + 1, total: l.length, echecs: [...echecs] })
+    }
+    reload()
+    toast(echecs.length ? tr("{0} ajoutée(s), {1} en échec", [l.length - echecs.length, echecs.length]) : tr("{0} inspiration(s) ajoutée(s)", [l.length]), echecs.length > 0)
+  }
+  const retirerChoix = async () => {
+    if (!confirm(tr("Retirer {0} élément(s) de la bibliothèque ?", [choix.length]))) return
+    for (const id of choix) { try { await api.del(`/api/admin/miniatures/${id}`) } catch (er: any) { toast(er.message, true); break } }
+    setChoix([]); reload()
+  }
   return <section className="card">
     <CardHead title={tr("Bibliothèque miniature")} sub={tr("Réservée à l’équipe POP. Inspirations : l’IA du client les regarde pour le style, jamais dans l’image. Ingrédients : polices, cadres, effets et fonds libres de droits ou créés par POP, licence obligatoire.")} />
     <form className="stack" onSubmit={ajouter} style={{ marginBottom: 20 }}>
@@ -473,8 +499,27 @@ function BibliothequeMiniature() {
       </div>
       <div><button className="btn pri" disabled={busy || (!fichier && !f.url)}>{busy ? tr("Envoi…") : tr("Ajouter")}</button></div>
     </form>
+    <div className="stack" style={{ marginBottom: 20 }}>
+      <b>{tr("Import en lot")}</b>
+      <span className="small muted">{tr("Chaque image devient une inspiration. Les mots-clés viennent du nom du fichier et du dossier (ex. competitif-rang/progression-unreal.jpg).")}</span>
+      <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+        <label className="btn">{tr("Choisir des images")}<input type="file" multiple accept="image/png,image/jpeg" hidden onChange={e => { importer(e.target.files); e.target.value = '' }} /></label>
+        <label className="btn">{tr("Choisir un dossier")}<input type="file" multiple hidden {...{ webkitdirectory: '' } as any} onChange={e => { importer(e.target.files); e.target.value = '' }} /></label>
+      </div>
+      {lot && <div role="status">
+        <progress max={lot.total} value={lot.fait} style={{ width: '100%' }} />
+        <span className="small">{tr("{0} / {1} envoyée(s)", [lot.fait, lot.total])}</span>
+        {lot.echecs.length > 0 && <ul className="small" style={{ margin: '4px 0 0', color: 'var(--red)' }}>{lot.echecs.map((e, i) => <li key={i}>{e}</li>)}</ul>}
+      </div>}
+    </div>
+    {data && data.length > 0 && <div className="row" style={{ gap: 8, marginBottom: 10 }}>
+      <button className="btn" onClick={() => setChoix(choix.length === data.length ? [] : data.map(x => x.id))}>{choix.length === data.length ? tr("Tout désélectionner") : tr("Tout sélectionner")}</button>
+      <button className="btn" disabled={!choix.length} onClick={retirerChoix}>{tr("Retirer la sélection ({0})", [choix.length])}</button>
+      <span className="small muted">{tr("{0} élément(s)", [data.length])}</span>
+    </div>}
     {!data ? null : !data.length ? <Empty text={tr("Bibliothèque vide.")} /> : <div className="mini-grille">
-      {data.map(x => <div key={x.id} className="mini-carte">
+      {data.map(x => <div key={x.id} className={'mini-carte' + (choix.includes(x.id) ? ' on' : '')}>
+        <label className="row small" style={{ gap: 6 }}><input type="checkbox" checked={choix.includes(x.id)} onChange={e => setChoix(c => e.target.checked ? [...c, x.id] : c.filter(i => i !== x.id))} />{tr("Sélectionner")}</label>
         {x.kind === 'police' ? <div className="mini-police">Aa</div> : x.url ? <img src={x.url} alt="" loading="lazy" /> : <div className="mini-police">?</div>}
         <b className="small">{x.title}</b>
         <span className="small muted">{x.drawer === 'inspiration' ? tr("Inspiration") : tr("Ingrédient")} · {x.kind}{x.license ? ' · ' + x.license : ''}</span>
