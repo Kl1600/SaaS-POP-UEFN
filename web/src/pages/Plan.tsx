@@ -34,7 +34,8 @@ export default function Plan() {
       <PageHead title={tr("Planifier")} help={tr("Objectifs, tâches et dates Fortnite sur un même calendrier. Glissez une tâche sur un jour pour la planifier.")}>
         <button className="btn" onClick={() => setSp(equipe ? {} : { vue: 'equipe' })}>{equipe ? tr("Retour au planning") : tr("Équipe et faisabilité")}</button>
       </PageHead>
-      {map && <AvisFaisabilite mapId={map.id} onEdit={equipe ? undefined : () => setSp({ vue: 'equipe' })} />}
+      {/* Avis de faisabilité retiré du calendrier (#448) : il reste dans la vue Équipe et faisabilité. */}
+      {equipe && map && <AvisFaisabilite mapId={map.id} />}
       {equipe && map ? <EquipeMap mapId={map.id} /> : <PlanCalendar />}
     </main>
   )
