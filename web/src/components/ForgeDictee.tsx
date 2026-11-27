@@ -86,9 +86,13 @@ export function ForgeDictee({ invoke }: { invoke: Invoke | null }) {
       arreterSuivi()
       setPhase('ecrit')
       try {
-        const texte = await invoke<string>('dictee_fin', { langue: LANG })
-        if (cible.current) { ecrireDicte(cible.current, texte); cible.current.el.focus() }
-        if (!texte) app.toast(tr("Rien entendu : gardez le raccourci appuyé pendant que vous parlez."))
+        // Au plus 20 s d'attente (#484) : au-delà, le texte provisoire déjà écrit reste.
+        const texte = await Promise.race([invoke<string>('dictee_fin', { langue: LANG }), new Promise<null>(ok => setTimeout(() => ok(null), 20000))])
+        if (texte === null) app.toast(tr("La transcription finale prend trop de temps : le texte provisoire est gardé."))
+        else {
+          if (cible.current) { ecrireDicte(cible.current, texte); cible.current.el.focus() }
+          if (!texte) app.toast(tr("Rien entendu : gardez le raccourci appuyé pendant que vous parlez."))
+        }
       } catch (er: any) { app.toast(String(er), true) } finally { setPhase('') }
     }
     window.addEventListener('keydown', bas, true)

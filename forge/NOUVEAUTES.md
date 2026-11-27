@@ -3,6 +3,9 @@
 Une entrée par version de `forge/tauri.conf.json` (#437) : `## version · date`, puis 1 à 5 lignes en français.
 Le workflow « relais Windows » en tire les notes de la mise à jour ; le CI refuse une version sans entrée.
 
+## 0.3.12 · 28/11/2026
+- Dictée bien plus rapide : le texte suit la voix et le texte final arrive dès le relâchement.
+
 ## 0.3.11 · 27/11/2026
 - La dictée vocale ne ferme plus Forge : reconnaissance vocale compilée pour tous les PC récents.
 
