@@ -21,6 +21,7 @@ pub async fn list(
 ) -> ApiResult<Value> {
     map_ctx(&st, &u, mid).await?;
     liberer_silencieux(&st).await?;
+    retirer_cles_jamais_connectees(&st, mid).await?;
     let rows: Vec<(i64, String, String, String, String, Option<String>, i64, Option<i64>, Option<String>, Option<String>, Option<String>, Option<String>, Option<i64>, Option<String>, Option<String>)> = sqlx::query_as(
         "SELECT a.id, a.name, a.kind, u.name, a.scope, a.last_used, a.calls, t.number, t.title, t.status, a.task_since,
                 (SELECT x.summary FROM uefn_actions x WHERE x.agent_id = a.id ORDER BY x.id DESC LIMIT 1), a.task_id, a.role,
@@ -233,6 +234,18 @@ pub const SILENCE: &str = "-2 hours";
 
 /// Libère les tâches des agents silencieux depuis plus de 2 h, en laissant une note de reprise pour le suivant.
 /// Appelée à la demande (claim_task, next_task, liste des agents) : pas de tâche de fond à surveiller.
+/// Clé créée par Forge pour un outil lancé (« … · Forge », #95) qui ne s'est jamais connecté au bout de 10 minutes
+/// (outil pas relié à POP, lancement raté) : révoquée, pour ne pas apparaître comme une IA connectée (#464).
+pub async fn retirer_cles_jamais_connectees(st: &AppState, mid: i64) -> Result<u64, AppError> {
+    Ok(sqlx::query(
+        "DELETE FROM api_tokens WHERE map_id = ? AND last_used IS NULL AND name LIKE '% · Forge' AND created_at < datetime('now', '-10 minutes')",
+    )
+    .bind(mid)
+    .execute(&st.db)
+    .await?
+    .rows_affected())
+}
+
 pub async fn liberer_silencieux(st: &AppState) -> Result<u64, AppError> {
     let mut tx = st.db.begin().await?;
     let r = sqlx::query(

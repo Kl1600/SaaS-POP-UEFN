@@ -129,6 +129,14 @@ pub async fn lire_pour_agent(st: &AppState, agent: i64) -> Result<Value, AppErro
     }))
 }
 
+/// Messages non lus joints à la réponse d'un outil (#464) : lus et marqués comme lus ; `None` s'il n'y en a pas.
+pub async fn joindre(st: &AppState, agent: i64) -> Option<Value> {
+    if non_lus(st, agent).await.ok()? == 0 {
+        return None;
+    }
+    lire_pour_agent(st, agent).await.ok()
+}
+
 /// Nombre de messages non lus pour cet agent (signalé par next_task).
 pub async fn non_lus(st: &AppState, agent: i64) -> Result<i64, AppError> {
     Ok(sqlx::query_scalar(
