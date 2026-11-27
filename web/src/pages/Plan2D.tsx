@@ -134,7 +134,7 @@ export default function Plan2D() {
 
   if (!mid) return null
   return (
-    <div className="stack" style={{ gap: 14 }}>
+    <div className="stack p2-page" style={{ gap: 14 }}>
       <h1 className="forge-h1">{tr("Plan 2D")}</h1>
       <p className="muted" style={{ margin: 0 }}>{tr("Le plan de la map à l'échelle, étage par étage. 1 case = 1 m de près ; positions en cm comme le panneau Détails d'UEFN (X vers l'avant, Y vers la droite).")}</p>
       <section className="card p2">

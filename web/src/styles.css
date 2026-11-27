@@ -1458,3 +1458,12 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 .term-seul-fond{height:100vh;background:#0c0c0c}
 .term-seul-fond .term{display:flex;flex-direction:column;min-height:0}
 .term-seul-fond .term-corps{flex:1;max-height:none}
+
+/* Contenu de Forge (#456) : largeur et marges relatives à la fenêtre ; Agents et Plan 2D prennent toute la page. */
+.forge-contenu{width:100%;box-sizing:border-box;max-width:1600px;margin:0 auto;padding:clamp(16px,3vh,40px) clamp(16px,3vw,48px)}
+.forge-contenu.plein{max-width:none;padding:clamp(12px,2vh,20px) clamp(12px,1.6vw,24px);display:flex;flex-direction:column;gap:12px;min-height:0}
+.forge-contenu p{max-width:95ch}
+.forge-contenu.plein > .p2-page{flex:1 1 0;min-height:420px;display:flex;flex-direction:column;gap:12px}
+.p2-page .p2{flex:1;min-height:0;display:flex;flex-direction:column}
+.p2-page .p2-zone{flex:1;min-height:0}
+.p2-page .p2-svg{height:auto;min-height:300px}
