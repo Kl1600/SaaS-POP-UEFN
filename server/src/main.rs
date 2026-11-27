@@ -467,6 +467,15 @@ fn api() -> Router<AppState> {
             get(miniature::liste).post(miniature::ajouter),
         )
         .route("/api/admin/miniatures/{id}", delete(miniature::retirer))
+        .route("/api/maps/{mid}/miniatures", get(miniature::de_la_map))
+        .route(
+            "/api/maps/{mid}/miniatures/demandes",
+            post(miniature::demander),
+        )
+        .route(
+            "/api/maps/{mid}/miniatures/{id}/utiliser",
+            post(miniature::utiliser),
+        )
         .route("/api/admin/overview", get(admin::overview))
         .route(
             "/api/admin/announcement",

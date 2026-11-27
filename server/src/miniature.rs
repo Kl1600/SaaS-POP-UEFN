@@ -106,17 +106,29 @@ pub fn verifier_texte(texte: &str) -> Result<(), String> {
                         || (m.len() >= 5 && colle.contains(&m.replace('-', "")))
                 }
             })
+            .map(|m| m.replace(['-', ' '], ""))
+            .collect::<Vec<String>>()
+    };
+    // Une seule fois par mot (« V-BUCKS », « VBUCKS » et « VBUCK » → « VBUCKS »).
+    let propres = |l: Vec<String>| -> Vec<String> {
+        let mut v: Vec<String> = vec![];
+        for m in &l {
+            if !l.iter().any(|x| x != m && x.contains(m.as_str())) && !v.contains(m) {
+                v.push(m.clone());
+            }
+        }
+        v.into_iter()
             .map(|m| format!("« {} »", m.to_uppercase()))
             .collect()
     };
-    let i = trouve(INTERDITS);
+    let i = propres(trouve(INTERDITS));
     if !i.is_empty() {
         return Err(format!(
             "Mots interdits par Epic dans une miniature : {}. Retirez-les (pas de récompense promise, pas de nom d'Epic, de Fortnite ou d'un autre jeu).",
             i.join(", ")
         ));
     }
-    let c = trouve(COMMANDES);
+    let c = propres(trouve(COMMANDES));
     if !c.is_empty() {
         return Err(format!(
             "Pas de commandes d'une plateforme dans une miniature : {}. Retirez-les.",
@@ -765,6 +777,204 @@ pub async fn composer_outil(
     }))
 }
 
+// ---------- « Générer une miniature » dans Forge (#308) ----------
+
+#[derive(Deserialize)]
+pub struct DemandeIn {
+    /// « Une idée en plus ? » (facultatif).
+    #[serde(default)]
+    idee: Option<String>,
+    /// « Modifier » : la miniature de départ et la phrase de changement.
+    #[serde(default)]
+    base: Option<i64>,
+}
+
+/// Consigne de la tâche donnée à l'IA du client.
+pub fn consigne(idee: &str, base: Option<(i64, &str)>) -> String {
+    let mut c = String::from("Fais la miniature de cette map, en suivant la compétence « miniature » (get_skill) :\n1. capture_island : 2 ou 3 vraies photos de l'île qui montrent le gameplay.\n2. get_thumbnail_kit : regarde des inspirations du même genre (sans les recopier).\n3. compose_thumbnail avec la meilleure photo et un titre court ; si POP refuse, corrige et recommence.\n4. submit_thumbnail avec l'id rendu et cette tâche, puis passe la tâche en done.\nUne seule miniature finie : l'humain la choisit dans Forge.");
+    if let Some((id, titre)) = base {
+        c.push_str(&format!("\n\nModification de la miniature #{id} (« {titre} ») : garde la même photo et le même style, change seulement ce que demande l'humain."));
+    }
+    if !idee.trim().is_empty() {
+        c.push_str(&format!("\n\nIdée de l'humain : « {} ». Si elle demande quelque chose d'interdit par Epic (V-Bucks, XP, nom de Fortnite…), ne le mets pas et fais au plus proche sans le lui redemander.", idee.trim()));
+    }
+    c
+}
+
+/// `POST /api/maps/{mid}/miniatures/demandes` : crée la tâche pour l'IA du client et la lui attribue si une IA
+/// travaille sur la map ; elle reçoit aussi un message (joint à sa prochaine réponse, #464).
+pub async fn demander(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(mid): Path<i64>,
+    Json(b): Json<DemandeIn>,
+) -> ApiResult<Value> {
+    crate::billing::require_forge(&st, u.id).await?;
+    let ctx = crate::access::map_ctx(&st, &u, mid).await?;
+    ctx.can_edit()?;
+    let idee: String = b
+        .idee
+        .unwrap_or_default()
+        .trim()
+        .chars()
+        .take(300)
+        .collect();
+    let base = match b.base {
+        Some(id) => Some(
+            sqlx::query_as::<_, (i64, String)>(
+                "SELECT id, title FROM map_thumbnails WHERE id = ? AND map_id = ?",
+            )
+            .bind(id)
+            .bind(mid)
+            .fetch_optional(&st.db)
+            .await?
+            .ok_or(AppError::NotFound)?,
+        ),
+        None => None,
+    };
+    if base.is_some() && idee.is_empty() {
+        return Err(bad("Dites en une phrase ce qu'il faut changer."));
+    }
+    let t = crate::tasks::NewTask {
+        title: if base.is_some() {
+            "Miniature : modifier".into()
+        } else {
+            "Miniature de la map".into()
+        },
+        tag: Some("conception".into()),
+        description: Some(consigne(
+            &idee,
+            base.as_ref().map(|(i, t)| (*i, t.as_str())),
+        )),
+        assignee_id: None,
+        deps: None,
+        planned_day: None,
+        lot: None,
+        status: None,
+        ai: Some(true),
+        origin: Some("miniature".into()),
+        uefn: None,
+    };
+    let (tid, number) = crate::tasks::insert_task(&st, &ctx, &t).await?;
+    sqlx::query("INSERT INTO thumbnail_requests (map_id, task_id, idea, base_id, created_by) VALUES (?, ?, ?, ?, ?)")
+        .bind(mid)
+        .bind(tid)
+        .bind(&idee)
+        .bind(base.as_ref().map(|b| b.0))
+        .bind(u.id)
+        .execute(&st.db)
+        .await?;
+    // L'IA de la personne qui travaille sur la map (la plus récente, depuis moins d'un jour).
+    let ia: Option<(i64, String)> = sqlx::query_as(
+        "SELECT id, name FROM api_tokens WHERE map_id = ? AND user_id = ? AND scope = 'write' AND last_used > datetime('now', '-1 day') ORDER BY last_used DESC LIMIT 1",
+    )
+    .bind(mid)
+    .bind(u.id)
+    .fetch_optional(&st.db)
+    .await?;
+    if let Some((aid, _)) = &ia {
+        sqlx::query("UPDATE tasks SET agent_id = ? WHERE id = ?")
+            .bind(aid)
+            .bind(tid)
+            .execute(&st.db)
+            .await?;
+        sqlx::query("INSERT INTO agent_messages (map_id, agent_id, user_id, body) VALUES (?, ?, ?, ?)")
+            .bind(mid)
+            .bind(aid)
+            .bind(u.id)
+            .bind(format!("Fais la miniature de la map : tâche #{number} (get_task {number}), puis submit_thumbnail."))
+            .execute(&st.db)
+            .await?;
+    }
+    crate::access::notify(&st, mid, json!({ "t": "refresh", "what": "tasks" }));
+    Ok(Json(json!({ "task": number, "agent": ia.map(|i| i.1) })))
+}
+
+/// `GET /api/maps/{mid}/miniatures` : miniatures rendues par l'IA (la plus récente d'abord) et demandes en cours.
+pub async fn de_la_map(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path(mid): Path<i64>,
+) -> ApiResult<Value> {
+    crate::access::map_ctx(&st, &u, mid).await?;
+    let rows: Vec<(i64, String, String, String, i64, Option<String>, Option<String>, String)> = sqlx::query_as(
+        "SELECT id, title, s3_key, logo_key, bytes, submitted_at, used_at, created_at FROM map_thumbnails WHERE map_id = ? AND submitted_at IS NOT NULL ORDER BY id DESC LIMIT 20",
+    )
+    .bind(mid)
+    .fetch_all(&st.db)
+    .await?;
+    let s3 = S3::from_env();
+    let lien = |k: &str| {
+        s3.as_ref()
+            .map(|s| s.presign("GET", k, 3600, chrono::Utc::now()))
+    };
+    let en_cours: Vec<(i64, String, String)> = sqlx::query_as(
+        "SELECT t.number, t.status, r.idea FROM thumbnail_requests r JOIN tasks t ON t.id = r.task_id WHERE r.map_id = ? AND t.status <> 'done'
+           AND NOT EXISTS (SELECT 1 FROM map_thumbnails m WHERE m.task_id = r.task_id AND m.submitted_at IS NOT NULL) ORDER BY r.id DESC",
+    )
+    .bind(mid)
+    .fetch_all(&st.db)
+    .await?;
+    Ok(Json(json!({
+        "miniatures": rows.iter().map(|r| json!({ "id": r.0, "title": r.1, "url": lien(&r.2), "logo": lien(&r.3), "bytes": r.4, "submitted_at": r.5, "used_at": r.6, "created_at": r.7 })).collect::<Vec<_>>(),
+        "en_cours": en_cours.iter().map(|r| json!({ "task": r.0, "status": r.1, "idea": r.2 })).collect::<Vec<_>>(),
+    })))
+}
+
+/// `POST /api/maps/{mid}/miniatures/{id}/utiliser` : la miniature choisie pour la map (versions gardées).
+pub async fn utiliser(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Path((mid, id)): Path<(i64, i64)>,
+) -> ApiResult<Value> {
+    let ctx = crate::access::map_ctx(&st, &u, mid).await?;
+    ctx.can_edit()?;
+    let n = sqlx::query("UPDATE map_thumbnails SET used_at = datetime('now') WHERE id = ? AND map_id = ? AND submitted_at IS NOT NULL")
+        .bind(id)
+        .bind(mid)
+        .execute(&st.db)
+        .await?
+        .rows_affected();
+    if n == 0 {
+        return Err(AppError::NotFound);
+    }
+    crate::access::notify(&st, mid, json!({ "t": "refresh", "what": "miniatures" }));
+    Ok(Json(json!({ "ok": true })))
+}
+
+/// `submit_thumbnail { id, task }` : l'IA rend la miniature finie à l'humain (Forge la lui montre).
+pub async fn rendre(st: &AppState, mid: i64, a: &Value) -> Result<Value, AppError> {
+    let id = a["id"]
+        .as_i64()
+        .ok_or_else(|| bad("id manquant : celui rendu par compose_thumbnail."))?;
+    let tid: Option<i64> = match a["task"].as_i64() {
+        Some(n) => {
+            sqlx::query_scalar("SELECT id FROM tasks WHERE map_id = ? AND number = ?")
+                .bind(mid)
+                .bind(n)
+                .fetch_optional(&st.db)
+                .await?
+        }
+        None => None,
+    };
+    let n = sqlx::query("UPDATE map_thumbnails SET submitted_at = datetime('now'), task_id = COALESCE(?, task_id) WHERE id = ? AND map_id = ?")
+        .bind(tid)
+        .bind(id)
+        .bind(mid)
+        .execute(&st.db)
+        .await?
+        .rows_affected();
+    if n == 0 {
+        return Err(bad(
+            "Miniature introuvable sur cette map : utilisez l'id rendu par compose_thumbnail.",
+        ));
+    }
+    crate::access::notify(st, mid, json!({ "t": "refresh", "what": "miniatures" }));
+    Ok(
+        json!({ "ok": true, "message": "Miniature montrée à l'humain dans Forge. Passez la tâche en done." }),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -778,10 +988,26 @@ mod tests {
     }
 
     #[test]
+    fn consigne_de_la_tache() {
+        let c = consigne("ajoute des V-Bucks", None);
+        assert!(
+            c.contains("capture_island")
+                && c.contains("submit_thumbnail")
+                && c.contains("interdit par Epic"),
+            "{c}"
+        );
+        assert!(consigne("", Some((3, "Course"))).contains("#3"));
+    }
+
+    #[test]
     fn mots_interdits() {
         let e = verifier_texte("AFK XP illimité").unwrap_err();
         assert!(e.contains("AFK") && e.contains("XP"), "{e}");
-        assert!(verifier_texte("Gagne des V-Bucks").is_err());
+        let e = verifier_texte("Gagne des V-Bucks").unwrap_err();
+        assert!(
+            e.contains("« VBUCKS »") && !e.contains("VBUCK »") && e.matches('«').count() == 1,
+            "{e}"
+        );
         assert!(verifier_texte("pièces gratuites").is_err());
         assert!(verifier_texte("Appuie sur X")
             .unwrap_err()
@@ -869,6 +1095,118 @@ mod tests {
             "une inspiration n'entre jamais dans l'image"
         );
         assert!(valider(&e("inspiration", "cadre", "")).is_err());
+    }
+
+    /// #308 : « Générer une miniature » crée la tâche pour l'IA qui travaille sur la map (avec un message) ;
+    /// submit_thumbnail la montre dans Forge ; « Utiliser » la choisit ; « Modifier » demande une phrase.
+    #[tokio::test]
+    async fn generer_rendre_utiliser() {
+        let st = crate::test_state().await;
+        let q = |sql: &'static str| sqlx::query_scalar::<_, i64>(sql);
+        let uid = q("INSERT INTO users (email, name, password_hash, email_verified_at, is_admin) VALUES ('kl@a.fr', 'KL', 'x', datetime('now'), 1) RETURNING id").fetch_one(&st.db).await.unwrap();
+        let sid = q("INSERT INTO studios (name) VALUES ('S') RETURNING id")
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO memberships (studio_id, user_id, role) VALUES (?, ?, 'owner')")
+            .bind(sid)
+            .bind(uid)
+            .execute(&st.db)
+            .await
+            .unwrap();
+        let mid: i64 = sqlx::query_scalar(
+            "INSERT INTO maps (studio_id, name) VALUES (?, 'GrassCutter') RETURNING id",
+        )
+        .bind(sid)
+        .fetch_one(&st.db)
+        .await
+        .unwrap();
+        let ag: i64 = sqlx::query_scalar("INSERT INTO api_tokens (user_id, map_id, name, token_hash, scope, last_used) VALUES (?, ?, 'Claude', 'h', 'write', datetime('now')) RETURNING id")
+            .bind(uid).bind(mid).fetch_one(&st.db).await.unwrap();
+        let u = AuthUser {
+            id: uid,
+            email: "kl@a.fr".into(),
+            name: "KL".into(),
+            sid: String::new(),
+        };
+        let d = |idee: &str, base: Option<i64>| {
+            Json(DemandeIn {
+                idee: Some(idee.into()),
+                base,
+            })
+        };
+        let Json(r) = demander(
+            State(st.clone()),
+            u.clone(),
+            Path(mid),
+            d("ambiance fun, ajoute des V-Bucks", None),
+        )
+        .await
+        .unwrap();
+        assert_eq!(r["agent"], "Claude");
+        let n = r["task"].as_i64().unwrap();
+        let (desc, agent): (String, Option<i64>) = sqlx::query_as(
+            "SELECT description, agent_id FROM tasks WHERE map_id = ? AND number = ?",
+        )
+        .bind(mid)
+        .bind(n)
+        .fetch_one(&st.db)
+        .await
+        .unwrap();
+        assert_eq!(agent, Some(ag));
+        assert!(
+            desc.contains("V-Bucks") && desc.contains("ne le mets pas"),
+            "l'idée interdite est corrigée par l'IA sans redemander"
+        );
+        assert_eq!(
+            crate::messages::non_lus(&st, ag).await.unwrap(),
+            1,
+            "l'IA est prévenue"
+        );
+        let Json(l) = de_la_map(State(st.clone()), u.clone(), Path(mid))
+            .await
+            .unwrap();
+        assert_eq!(l["en_cours"][0]["task"], n);
+        // L'IA a composé (#307), puis rend la miniature.
+        let tid: i64 = sqlx::query_scalar("INSERT INTO map_thumbnails (map_id, title, s3_key, logo_key, bytes) VALUES (?, 'Course des toits', 'k', 'l', 10) RETURNING id").bind(mid).fetch_one(&st.db).await.unwrap();
+        rendre(&st, mid, &json!({ "id": tid, "task": n }))
+            .await
+            .unwrap();
+        assert!(rendre(&st, mid, &json!({ "id": 999 })).await.is_err());
+        let Json(l) = de_la_map(State(st.clone()), u.clone(), Path(mid))
+            .await
+            .unwrap();
+        assert_eq!(l["miniatures"][0]["id"], tid);
+        assert!(l["en_cours"].as_array().unwrap().is_empty());
+        utiliser(State(st.clone()), u.clone(), Path((mid, tid)))
+            .await
+            .unwrap();
+        let Json(l) = de_la_map(State(st.clone()), u.clone(), Path(mid))
+            .await
+            .unwrap();
+        assert!(l["miniatures"][0]["used_at"].is_string());
+        // « Modifier » sans phrase : refus ; avec : nouvelle tâche qui part de cette miniature.
+        assert!(
+            demander(State(st.clone()), u.clone(), Path(mid), d("", Some(tid)))
+                .await
+                .is_err()
+        );
+        let Json(r2) = demander(
+            State(st.clone()),
+            u.clone(),
+            Path(mid),
+            d("titre plus gros", Some(tid)),
+        )
+        .await
+        .unwrap();
+        let desc: String =
+            sqlx::query_scalar("SELECT description FROM tasks WHERE map_id = ? AND number = ?")
+                .bind(mid)
+                .bind(r2["task"].as_i64().unwrap())
+                .fetch_one(&st.db)
+                .await
+                .unwrap();
+        assert!(desc.contains(&format!("#{tid}")) && desc.contains("titre plus gros"));
     }
 
     /// La bibliothèque est réservée à l'équipe POP : un client reçoit un refus.

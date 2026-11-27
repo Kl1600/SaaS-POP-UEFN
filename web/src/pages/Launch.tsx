@@ -1,3 +1,4 @@
+import { ForgeMiniature } from '../components/ForgeMiniature'
 import { Passage } from '../components/Scenarios'
 import { useState } from 'react'
 import { CheckCircle2, AlertTriangle, Ban, Circle } from 'lucide-react'
@@ -12,11 +13,12 @@ const ST: Record<string, [string, string, any]> = { ok: [tr("Conforme"), 'b-g', 
 
 export default function Launch() {
   const [tab, setTab] = useState<'discover' | 'checks' | 'swap' | 'dday'>('discover')
+  const { map } = useApp()
   return (
     <main className="content">
       <PageHead title={tr("Lancer et suivre")} help={tr("Préparez la sortie selon l’algorithme de Discover, suivez les 14 jours de test d’Epic, faites tester la map et préparez le jour J.")} />
       <Tabs value={tab} onChange={setTab} items={[['discover', 'Discover'], ['checks', tr("Vérification")], ['swap', tr("Test")], ['dday', tr("Jour J")]]} />
-      {tab === 'discover' && <LaunchDiscover />}
+      {tab === 'discover' && <><LaunchDiscover />{map && <div style={{ marginTop: 18 }}><ForgeMiniature mapId={map.id} versions /></div>}</>}
       {tab === 'checks' && <Checks />}
       {tab === 'swap' && <><Scenarios /><Swap /></>}
       {tab === 'dday' && <DDay />}
