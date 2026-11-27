@@ -1,1 +1,1 @@
-{"version": "0.3.12", "date": "2026-11-27", "notes": "· Dictée bien plus rapide : le texte suit la voix et le texte final arrive dès le relâchement."}
+{"version": "0.3.13", "date": "2026-11-27", "notes": "· Terminal en direct : si Claude Code n'est pas connecté à votre compte, Forge le dit et vous aide à le connecter, puis à le relancer."}

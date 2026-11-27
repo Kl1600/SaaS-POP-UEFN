@@ -19,6 +19,8 @@ fn main() {
             "direct_ecrire",
             "direct_lire",
             "direct_fermer",
+            "direct_relancer",
+            "connexion_claude",
             "direct_actifs",
             "dictee_etat",
             "dictee_telecharger",

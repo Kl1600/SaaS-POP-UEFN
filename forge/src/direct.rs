@@ -16,6 +16,8 @@ struct Session {
     entree: ChildStdin,
     process: Child,
     lignes: Arc<Mutex<(usize, Vec<String>)>>,
+    /// Pour relancer l'outil à l'identique (#483) : exécutable, arguments, dossier, clé.
+    relance: (std::path::PathBuf, Vec<String>, std::path::PathBuf, String),
 }
 
 #[derive(Default)]
@@ -129,15 +131,43 @@ pub fn ouvrir(
         }
     });
     let entree = p.stdin.take().ok_or("Entrée indisponible.")?;
+    // Une relance garde les lignes déjà affichées.
+    if let Some(ancienne) = sessions.remove(&agent) {
+        let (debut, l) = ancienne.lignes.lock().unwrap().clone();
+        let mut g = lignes.lock().unwrap();
+        g.0 = debut;
+        g.1 = [l, std::mem::take(&mut g.1)].concat();
+    }
+    let relance = (
+        exe.to_path_buf(),
+        args.to_vec(),
+        dossier.to_path_buf(),
+        token.to_string(),
+    );
     sessions.insert(
         agent,
         Session {
             entree,
             process: p,
             lignes,
+            relance,
         },
     );
     Ok(())
+}
+
+/// Relance l'outil d'un terminal à l'identique (après une connexion à Claude Code, #483).
+pub fn relancer(d: &Directs, agent: i64) -> Result<(), String> {
+    let r = {
+        let mut sessions = d.0.lock().unwrap();
+        let s = sessions
+            .get_mut(&agent)
+            .ok_or("Ce terminal n'est plus ouvert : rouvrez-le avec « + Terminal ».")?;
+        let _ = s.process.kill();
+        let _ = s.process.wait();
+        s.relance.clone()
+    };
+    ouvrir(d, agent, &r.0, &r.1, &r.2, &r.3)
 }
 
 pub fn ecrire(d: &Directs, agent: i64, texte: &str) -> Result<(), String> {
@@ -244,6 +274,11 @@ mod tests {
         let r = lire(&d, 7, 0).unwrap();
         assert!(r.vivant && lire(&d, 7, r.suite).unwrap().lignes.is_empty());
         assert_eq!(actifs(&d), [7]);
+        // Relance : même outil, lignes gardées, de nouveau vivant.
+        let avant = lire(&d, 7, 0).unwrap().lignes.len();
+        relancer(&d, 7).unwrap();
+        let r = lire(&d, 7, 0).unwrap();
+        assert!(r.vivant && r.lignes.len() >= avant, "{:?}", r.lignes);
         fermer(&d, 7);
         assert!(lire(&d, 7, 0).is_none() && actifs(&d).is_empty());
     }
