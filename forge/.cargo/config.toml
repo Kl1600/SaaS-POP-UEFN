@@ -1,0 +1,5 @@
+# Dictée vocale (#479) : whisper.cpp compilé pour tout PC x64 récent (SSE4.2, AVX, AVX2), pas pour le processeur du
+# serveur qui construit l'installateur. Sinon Forge s'arrête net sur un PC sans les mêmes instructions (AVX-512…).
+[env]
+GGML_NATIVE = "OFF"
+GGML_AVX512 = "OFF"
