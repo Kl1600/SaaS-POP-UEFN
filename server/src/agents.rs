@@ -22,10 +22,10 @@ pub async fn list(
     map_ctx(&st, &u, mid).await?;
     liberer_silencieux(&st).await?;
     retirer_cles_jamais_connectees(&st, mid).await?;
-    let rows: Vec<(i64, String, String, String, String, Option<String>, i64, Option<i64>, Option<String>, Option<String>, Option<String>, Option<String>, Option<i64>, Option<String>, Option<String>)> = sqlx::query_as(
+    let rows: Vec<(i64, String, String, String, String, Option<String>, i64, Option<i64>, Option<String>, Option<String>, Option<String>, Option<String>, Option<i64>, Option<String>, Option<String>, bool)> = sqlx::query_as(
         "SELECT a.id, a.name, a.kind, u.name, a.scope, a.last_used, a.calls, t.number, t.title, t.status, a.task_since,
                 (SELECT x.summary FROM uefn_actions x WHERE x.agent_id = a.id ORDER BY x.id DESC LIMIT 1), a.task_id, a.role,
-                (SELECT c.tool FROM agent_calls c WHERE c.agent_id = a.id ORDER BY c.id DESC LIMIT 1)
+                (SELECT c.tool FROM agent_calls c WHERE c.agent_id = a.id ORDER BY c.id DESC LIMIT 1), a.forge
          FROM api_tokens a JOIN users u ON u.id = a.user_id LEFT JOIN tasks t ON t.id = a.task_id
          WHERE a.map_id = ? AND a.user_id = ? ORDER BY a.last_used IS NULL, a.last_used DESC, a.id DESC",
     )
@@ -53,7 +53,7 @@ pub async fn list(
         out.push(json!({
             "id": r.0, "name": r.1, "kind": r.2, "owner": r.3, "scope": r.4, "last_used": r.5, "calls": r.6,
             "task": r.7.map(|n| json!({ "number": n, "title": r.8, "status": r.9, "since": r.10, "step": step })),
-            "last_action": r.11, "role": r.13, "orchestrator": Some(r.0) == orch, "last_tool": r.14,
+            "last_action": r.11, "role": r.13, "orchestrator": Some(r.0) == orch, "last_tool": r.14, "forge": r.15,
             "attribuees": attribuees.into_iter().map(|(n, ti)| json!({ "number": n, "title": ti })).collect::<Vec<_>>(),
         }));
     }
