@@ -368,7 +368,7 @@ export default function Admin() {
   // Modérateur (#65) : seulement la liste d'attente et les utilisateurs.
   const staff = !!(me?.admin || me?.moderator)
   const mod = staff && !me?.admin
-  const [tab, setTab] = useState<'overview' | 'waitlist' | 'create' | 'users' | 'ia' | 'audit' | 'journal' | 'legal' | 'announce'>(mod || me?.admin_pending ? 'waitlist' : 'overview')
+  const [tab, setTab] = useState<'overview' | 'waitlist' | 'create' | 'users' | 'ia' | 'audit' | 'journal' | 'legal' | 'announce' | 'miniatures'>(mod || me?.admin_pending ? 'waitlist' : 'overview')
   const [gate, setGate] = useState<{ code: string; msg: string } | null | 'ok'>(null)
   const check = () => api.get(mod ? '/api/admin/waitlist?status=pending' : '/api/admin/overview').then(() => setGate('ok')).catch((e: any) => setGate({ code: e.code ?? 'forbidden', msg: e.message }))
   useEffect(() => { if (staff) check() }, [staff])
@@ -379,7 +379,7 @@ export default function Admin() {
     </PageHead>
     {gate === null ? null : gate !== 'ok' ? <Gate code={gate.code} msg={gate.msg} onOk={() => { setGate(null); check() }} /> : <>
       <div className="tabs" role="tablist" style={{ alignSelf: 'flex-start' }}>
-        {([['overview', tr("Vue générale")], ['waitlist', tr("Liste d’attente{0}", [me.admin_pending ? ` (${me.admin_pending})` : ''])], ['create', tr("Créer un compte")], ['users', tr("Utilisateurs")], ['ia', tr("Apprentissage de l’IA")], ['audit', tr("Sécurité")], ['journal', tr("Journal")], ['legal', tr("Infos légales")], ['announce', tr("Annonce")]] as const).filter(([k]) => !mod || k === 'waitlist' || k === 'users').map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}
+        {([['overview', tr("Vue générale")], ['waitlist', tr("Liste d’attente{0}", [me.admin_pending ? ` (${me.admin_pending})` : ''])], ['create', tr("Créer un compte")], ['users', tr("Utilisateurs")], ['ia', tr("Apprentissage de l’IA")], ['audit', tr("Sécurité")], ['journal', tr("Journal")], ['legal', tr("Infos légales")], ['announce', tr("Annonce")], ['miniatures', tr("Bibliothèque miniature")]] as const).filter(([k]) => !mod || k === 'waitlist' || k === 'users').map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}
       </div>
       {tab === 'overview' && <Overview />}
       {tab === 'waitlist' && <Waitlist />}
@@ -390,6 +390,7 @@ export default function Admin() {
       {tab === 'journal' && <Journal />}
       {tab === 'legal' && <LegalInfo />}
       {tab === 'announce' && <AnnounceAdmin />}
+      {tab === 'miniatures' && <BibliothequeMiniature />}
     </>}
   </main>
 }
@@ -430,6 +431,60 @@ function LegalInfo() {
 }
 
 /** Annonce en bandeau pour tous les comptes connectés (#67). Une seule à la fois : publier remplace l'ancienne. */
+/** Bibliothèque miniature (#307), équipe POP seulement : inspirations (images trouvées sur Internet, que l'IA regarde
+ * sans jamais les recopier ni les mettre dans l'image) et ingrédients (polices, cadres, effets, fonds), licence
+ * obligatoire. */
+function BibliothequeMiniature() {
+  const { toast } = useApp()
+  const { data, reload } = useLoad<any[]>('/api/admin/miniatures')
+  const [f, setF] = useState({ drawer: 'inspiration', kind: 'image', title: '', keywords: '', source: '', license: '', url: '' })
+  const [fichier, setFichier] = useState<File | null>(null)
+  const [busy, setBusy] = useState(false)
+  const maj = (k: string, v: string) => setF(x => ({ ...x, [k]: v, ...(k === 'drawer' ? { kind: v === 'inspiration' ? 'image' : 'cadre' } : {}) }))
+  const ajouter = async (e: React.FormEvent) => {
+    e.preventDefault(); setBusy(true)
+    try {
+      const data = fichier ? await new Promise<string>((ok, ko) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.onerror = ko; r.readAsDataURL(fichier) }) : undefined
+      await api.post('/api/admin/miniatures', { ...f, url: fichier ? undefined : f.url || undefined, data })
+      toast(tr("Ajouté à la bibliothèque miniature")); setF(x => ({ ...x, title: '', keywords: '', source: '', url: '' })); setFichier(null); reload()
+    } catch (er: any) { toast(er.message, true) } finally { setBusy(false) }
+  }
+  const ingr = f.drawer === 'ingredient'
+  return <section className="card">
+    <CardHead title={tr("Bibliothèque miniature")} sub={tr("Réservée à l’équipe POP. Inspirations : l’IA du client les regarde pour le style, jamais dans l’image. Ingrédients : polices, cadres, effets et fonds libres de droits ou créés par POP, licence obligatoire.")} />
+    <form className="stack" onSubmit={ajouter} style={{ marginBottom: 20 }}>
+      <div className="grid2">
+        <label className="label">{tr("Tiroir")}<select className="field" value={f.drawer} onChange={e => maj('drawer', e.target.value)}><option value="inspiration">{tr("Inspiration")}</option><option value="ingredient">{tr("Ingrédient")}</option></select></label>
+        <label className="label">{tr("Sorte")}<select className="field" value={f.kind} disabled={!ingr} onChange={e => maj('kind', e.target.value)}>
+          {ingr ? [['cadre', tr("Cadre")], ['effet', tr("Effet")], ['fond', tr("Fond")], ['police', tr("Police")]].map(([k, l]) => <option key={k} value={k}>{l}</option>) : <option value="image">{tr("Image")}</option>}
+        </select></label>
+      </div>
+      <div className="grid2">
+        <label className="label">{tr("Titre")}<input className="field" required maxLength={120} value={f.title} onChange={e => maj('title', e.target.value)} placeholder={tr("Ex. : Guess the number, titre jaune en haut")} /></label>
+        <label className="label">{tr("Mots-clés")}<input className="field" maxLength={200} value={f.keywords} onChange={e => maj('keywords', e.target.value)} placeholder={tr("guess number devinette jaune")} /></label>
+      </div>
+      <div className="grid2">
+        <label className="label">{tr("Source")}<input className="field" maxLength={300} value={f.source} onChange={e => maj('source', e.target.value)} placeholder={tr("Lien ou origine")} /></label>
+        <label className="label">{tr("Licence")}{ingr ? ' *' : ''}<input className="field" required={ingr} maxLength={200} value={f.license} onChange={e => maj('license', e.target.value)} placeholder={ingr ? tr("Ex. : SIL OFL 1.1, CC0, créé par POP") : tr("Facultatif pour une inspiration")} /></label>
+      </div>
+      <div className="grid2">
+        <label className="label">{tr("Fichier")}<input className="field" type="file" accept={f.kind === 'police' ? '.ttf,.otf' : 'image/png,image/jpeg'} onChange={e => setFichier(e.target.files?.[0] ?? null)} /></label>
+        <label className="label">{tr("Ou lien https:// d’une image")}<input className="field" type="url" disabled={!!fichier || f.kind === 'police'} value={f.url} onChange={e => maj('url', e.target.value)} placeholder="https://…" /></label>
+      </div>
+      <div><button className="btn pri" disabled={busy || (!fichier && !f.url)}>{busy ? tr("Envoi…") : tr("Ajouter")}</button></div>
+    </form>
+    {!data ? null : !data.length ? <Empty text={tr("Bibliothèque vide.")} /> : <div className="mini-grille">
+      {data.map(x => <div key={x.id} className="mini-carte">
+        {x.kind === 'police' ? <div className="mini-police">Aa</div> : x.url ? <img src={x.url} alt="" loading="lazy" /> : <div className="mini-police">?</div>}
+        <b className="small">{x.title}</b>
+        <span className="small muted">{x.drawer === 'inspiration' ? tr("Inspiration") : tr("Ingrédient")} · {x.kind}{x.license ? ' · ' + x.license : ''}</span>
+        {x.keywords && <span className="small muted">{x.keywords}</span>}
+        <button className="linkbtn small" onClick={async () => { if (!confirm(tr("Retirer « {0} » de la bibliothèque ?", [x.title]))) return; try { await api.del(`/api/admin/miniatures/${x.id}`); reload() } catch (er: any) { toast(er.message, true) } }}>{tr("Retirer")}</button>
+      </div>)}
+    </div>}
+  </section>
+}
+
 function AnnounceAdmin() {
   const { toast } = useApp()
   const { data, reload } = useLoad<any>('/api/admin/announcement')
