@@ -787,13 +787,37 @@ pub struct DemandeIn {
     /// « Modifier » : la miniature de départ et la phrase de changement.
     #[serde(default)]
     base: Option<i64>,
+    /// Images d'exemple (data URL ou base64 PNG/JPEG), 4 au plus (#468).
+    #[serde(default)]
+    exemples: Vec<String>,
+}
+
+/// L'IA connectée de la personne sur cette map (la plus récente, active depuis moins d'un jour).
+async fn ia_connectee(
+    st: &AppState,
+    mid: i64,
+    uid: i64,
+) -> Result<Option<(i64, String)>, AppError> {
+    Ok(sqlx::query_as(
+        "SELECT id, name FROM api_tokens WHERE map_id = ? AND user_id = ? AND scope = 'write' AND last_used > datetime('now', '-1 day') ORDER BY last_used DESC LIMIT 1",
+    )
+    .bind(mid)
+    .bind(uid)
+    .fetch_optional(&st.db)
+    .await?)
 }
 
 /// Consigne de la tâche donnée à l'IA du client.
-pub fn consigne(idee: &str, base: Option<(i64, &str)>) -> String {
+pub fn consigne(idee: &str, base: Option<(i64, &str)>, exemples: &[String]) -> String {
     let mut c = String::from("Fais la miniature de cette map, en suivant la compétence « miniature » (get_skill) :\n1. capture_island : 2 ou 3 vraies photos de l'île qui montrent le gameplay.\n2. get_thumbnail_kit : regarde des inspirations du même genre (sans les recopier).\n3. compose_thumbnail avec la meilleure photo et un titre court ; si POP refuse, corrige et recommence.\n4. submit_thumbnail avec l'id rendu et cette tâche, puis passe la tâche en done.\nUne seule miniature finie : l'humain la choisit dans Forge.");
     if let Some((id, titre)) = base {
         c.push_str(&format!("\n\nModification de la miniature #{id} (« {titre} ») : garde la même photo et le même style, change seulement ce que demande l'humain."));
+    }
+    if !exemples.is_empty() {
+        c.push_str("\n\nImages d'exemple de l'humain (à regarder pour comprendre ce qu'il veut, jamais à recopier ni à mettre dans l'image) :");
+        for e in exemples {
+            c.push_str(&format!("\n- {e}"));
+        }
     }
     if !idee.trim().is_empty() {
         c.push_str(&format!("\n\nIdée de l'humain : « {} ». Si elle demande quelque chose d'interdit par Epic (V-Bucks, XP, nom de Fortnite…), ne le mets pas et fais au plus proche sans le lui redemander.", idee.trim()));
@@ -835,6 +859,37 @@ pub async fn demander(
     if base.is_some() && idee.is_empty() {
         return Err(bad("Dites en une phrase ce qu'il faut changer."));
     }
+    // L'outil parle à l'IA de la personne : sans IA connectée à la map, rien n'est envoyé (#468).
+    let (aid, nom) = ia_connectee(&st, mid, u.id).await?.ok_or_else(|| {
+        bad("Aucune IA connectée à cette map : lancez-en une depuis Agents → + Terminal, ou connectez la vôtre (POP → IA connectées).")
+    })?;
+    if b.exemples.len() > 4 {
+        return Err(bad("4 images d'exemple au plus."));
+    }
+    let mut cles = vec![];
+    let mut liens = vec![];
+    if !b.exemples.is_empty() {
+        let s3 = stockage()?;
+        for e in &b.exemples {
+            use base64::Engine;
+            let v = base64::engine::general_purpose::STANDARD
+                .decode(e.rsplit(',').next().unwrap_or(e).trim())
+                .map_err(|_| bad("Image d'exemple illisible."))?;
+            if v.len() > 5 * 1024 * 1024 {
+                return Err(bad("Image d'exemple de plus de 5 Mo."));
+            }
+            let img = image::load_from_memory(&v)
+                .map_err(|_| bad("Image d'exemple illisible (PNG ou JPEG)."))?;
+            let mut png = std::io::Cursor::new(vec![]);
+            img.write_to(&mut png, image::ImageFormat::Png)
+                .map_err(|e| bad(e.to_string()))?;
+            let k = format!("miniatures/demandes/{mid}/{}.png", &random_token()[..20]);
+            envoyer(&s3, &k, png.into_inner(), "image/png").await?;
+            // Lien valable 7 jours (le maximum d'un lien signé) : le temps que l'IA prenne la tâche.
+            liens.push(s3.presign("GET", &k, 7 * 24 * 3600, chrono::Utc::now()));
+            cles.push(k);
+        }
+    }
     let t = crate::tasks::NewTask {
         title: if base.is_some() {
             "Miniature : modifier".into()
@@ -845,6 +900,7 @@ pub async fn demander(
         description: Some(consigne(
             &idee,
             base.as_ref().map(|(i, t)| (*i, t.as_str())),
+            &liens,
         )),
         assignee_id: None,
         deps: None,
@@ -856,38 +912,43 @@ pub async fn demander(
         uefn: None,
     };
     let (tid, number) = crate::tasks::insert_task(&st, &ctx, &t).await?;
-    sqlx::query("INSERT INTO thumbnail_requests (map_id, task_id, idea, base_id, created_by) VALUES (?, ?, ?, ?, ?)")
+    sqlx::query("INSERT INTO thumbnail_requests (map_id, task_id, idea, base_id, created_by, examples) VALUES (?, ?, ?, ?, ?, ?)")
         .bind(mid)
         .bind(tid)
         .bind(&idee)
         .bind(base.as_ref().map(|b| b.0))
         .bind(u.id)
+        .bind(json!(cles).to_string())
         .execute(&st.db)
         .await?;
-    // L'IA de la personne qui travaille sur la map (la plus récente, depuis moins d'un jour).
-    let ia: Option<(i64, String)> = sqlx::query_as(
-        "SELECT id, name FROM api_tokens WHERE map_id = ? AND user_id = ? AND scope = 'write' AND last_used > datetime('now', '-1 day') ORDER BY last_used DESC LIMIT 1",
-    )
-    .bind(mid)
-    .bind(u.id)
-    .fetch_optional(&st.db)
-    .await?;
-    if let Some((aid, _)) = &ia {
-        sqlx::query("UPDATE tasks SET agent_id = ? WHERE id = ?")
-            .bind(aid)
-            .bind(tid)
-            .execute(&st.db)
-            .await?;
-        sqlx::query("INSERT INTO agent_messages (map_id, agent_id, user_id, body) VALUES (?, ?, ?, ?)")
-            .bind(mid)
-            .bind(aid)
-            .bind(u.id)
-            .bind(format!("Fais la miniature de la map : tâche #{number} (get_task {number}), puis submit_thumbnail."))
-            .execute(&st.db)
-            .await?;
-    }
+    sqlx::query("UPDATE tasks SET agent_id = ? WHERE id = ?")
+        .bind(aid)
+        .bind(tid)
+        .execute(&st.db)
+        .await?;
+    // Le message de l'humain, tel quel, dans la discussion avec son IA (#468).
+    let corps = if idee.is_empty() {
+        "Fais la miniature de la map.".to_string()
+    } else {
+        idee.clone()
+    };
+    let pj = if cles.is_empty() {
+        String::new()
+    } else {
+        format!(" {} image(s) d'exemple dans la tâche.", cles.len())
+    };
+    sqlx::query("INSERT INTO agent_messages (map_id, agent_id, user_id, body) VALUES (?, ?, ?, ?)")
+        .bind(mid)
+        .bind(aid)
+        .bind(u.id)
+        .bind(format!("{corps}\n(Outil Miniature : tâche #{number}, get_task {number}, puis submit_thumbnail.{pj})"))
+        .execute(&st.db)
+        .await?;
     crate::access::notify(&st, mid, json!({ "t": "refresh", "what": "tasks" }));
-    Ok(Json(json!({ "task": number, "agent": ia.map(|i| i.1) })))
+    crate::access::notify(&st, mid, json!({ "t": "refresh", "what": "messages" }));
+    Ok(Json(
+        json!({ "task": number, "agent": nom, "agent_id": aid }),
+    ))
 }
 
 /// `GET /api/maps/{mid}/miniatures` : miniatures rendues par l'IA (la plus récente d'abord) et demandes en cours.
@@ -915,7 +976,9 @@ pub async fn de_la_map(
     .bind(mid)
     .fetch_all(&st.db)
     .await?;
+    let ia = ia_connectee(&st, mid, u.id).await?;
     Ok(Json(json!({
+        "ia": ia.map(|(id, name)| json!({ "id": id, "name": name })),
         "miniatures": rows.iter().map(|r| json!({ "id": r.0, "title": r.1, "url": lien(&r.2), "logo": lien(&r.3), "bytes": r.4, "submitted_at": r.5, "used_at": r.6, "created_at": r.7 })).collect::<Vec<_>>(),
         "en_cours": en_cours.iter().map(|r| json!({ "task": r.0, "status": r.1, "idea": r.2 })).collect::<Vec<_>>(),
     })))
@@ -989,14 +1052,15 @@ mod tests {
 
     #[test]
     fn consigne_de_la_tache() {
-        let c = consigne("ajoute des V-Bucks", None);
+        let c = consigne("ajoute des V-Bucks", None, &["https://r2/ex.png".into()]);
+        assert!(c.contains("https://r2/ex.png") && c.contains("jamais à recopier"));
         assert!(
             c.contains("capture_island")
                 && c.contains("submit_thumbnail")
                 && c.contains("interdit par Epic"),
             "{c}"
         );
-        assert!(consigne("", Some((3, "Course"))).contains("#3"));
+        assert!(consigne("", Some((3, "Course")), &[]).contains("#3"));
     }
 
     #[test]
@@ -1121,6 +1185,26 @@ mod tests {
         .fetch_one(&st.db)
         .await
         .unwrap();
+        let u0 = AuthUser {
+            id: uid,
+            email: "kl@a.fr".into(),
+            name: "KL".into(),
+            sid: String::new(),
+        };
+        // Sans IA connectée : refus, rien n'est créé (#468).
+        let e = demander(
+            State(st.clone()),
+            u0,
+            Path(mid),
+            Json(DemandeIn {
+                idee: Some("fun".into()),
+                base: None,
+                exemples: vec![],
+            }),
+        )
+        .await
+        .unwrap_err();
+        assert!(format!("{e:?}").contains("Aucune IA connectée"));
         let ag: i64 = sqlx::query_scalar("INSERT INTO api_tokens (user_id, map_id, name, token_hash, scope, last_used) VALUES (?, ?, 'Claude', 'h', 'write', datetime('now')) RETURNING id")
             .bind(uid).bind(mid).fetch_one(&st.db).await.unwrap();
         let u = AuthUser {
@@ -1133,6 +1217,7 @@ mod tests {
             Json(DemandeIn {
                 idee: Some(idee.into()),
                 base,
+                exemples: vec![],
             })
         };
         let Json(r) = demander(
