@@ -1828,6 +1828,8 @@ const EN: Record<string, string> = {
  "Ctrl/Cmd+clic : ajouter · Maj+clic : plage · Ctrl+Z : annuler": "Ctrl/Cmd+click: add · Shift+click: range · Ctrl+Z: undo",
  "Détails": "Details",
  "Vue du dessus": "Top view",
+ "{0} agent(s) dans Forge": "{0} agent(s) in Forge",
+ "Demande Claude Code installé et connecté sur ce PC.": "Needs Claude Code installed and signed in on this PC.",
  "Claude Code n’est pas connecté à votre compte Claude.": "Claude Code isn't signed in to your Claude account.",
  "Connectez Claude Code à votre compte Claude : une console s’ouvre, tapez /login et suivez les étapes, puis revenez ici et relancez.": "Sign Claude Code in to your Claude account: a console opens, type /login and follow the steps, then come back here and restart.",
  "Mettez Forge à jour (pop-uefn.com/forge).": "Update Forge (pop-uefn.com/forge).",

@@ -11,14 +11,23 @@ import { useApp } from '../state'
 import { tr } from '../i18n/t'
 import { CLIENTS, ClientLogo, ConnectTabs, clientName } from './AiTokens'
 
-export type AccountAI = { tokens: any[] | null; live: any[]; pending: any[]; reload: () => void }
+export type AccountAI = { tokens: any[] | null; live: any[]; pending: any[]; reload: () => void; agentsForge: (t: any) => number }
 
 /** IA du compte, relues toutes les 3 s tant qu'on attend une connexion, toutes les 30 s sinon, et au retour sur l'onglet. */
 // La pastille et la section « Mes IA » partagent la dernière lecture : elles changent ensemble.
 let last: any[] | null = null
 const subs = new Set<(t: any[]) => void>()
+/** Famille d'une IA (Claude, Codex…), pour ranger les agents de Forge sous l'IA de l'utilisateur (#487). */
+export const familleIA = (t: { kind?: string; name?: string }) => {
+  const x = `${t.kind ?? ''} ${t.name ?? ''}`.toLowerCase()
+  return x.includes('claude') ? 'claude' : x.includes('codex') ? 'codex' : x.includes('chatgpt') ? 'chatgpt' : x.includes('cursor') ? 'cursor' : x
+}
+
 export function useAccountAI(waiting: boolean): AccountAI {
-  const [tokens, setTokens] = useState<any[] | null>(last)
+  const [toutes, setTokens] = useState<any[] | null>(last)
+  // Les agents ouverts dans Forge (#487) ne sont pas des IA de plus : ils sont comptés sous l'IA de la même famille.
+  const tokens = toutes ? toutes.filter(t => !t.forge) : null
+  const agentsForge = (t: any) => (toutes ?? []).filter(x => x.forge && familleIA(x) === familleIA(t)).length
   useEffect(() => { subs.add(setTokens); return () => { subs.delete(setTokens) } }, [])
   const reload = async () => { try { last = await api.get<any[]>('/api/me/tokens'); subs.forEach(f => f(last!)) } catch {} }
   const live = (tokens ?? []).filter(t => t.last_used)
@@ -35,7 +44,7 @@ export function useAccountAI(waiting: boolean): AccountAI {
     const h = setInterval(reload, fast ? 3000 : 30000)
     return () => clearInterval(h)
   }, [fast])
-  return { tokens, live, pending, reload }
+  return { tokens, live, pending, reload, agentsForge }
 }
 
 /** Pastille d'état de l'IA, à côté de celle d'UEFN Link. Sans IA connectée, elle mène à « Mes IA » sur l'accueil. */
@@ -101,7 +110,7 @@ export function AiSection() {
           </span>
           <span className="small muted">{t.oauth ? tr("Autorisée depuis l’IA") : clientName(t.kind)}{t.scope === 'read' ? ` · ${tr("Lecture seule")}` : ''}</span>
           <span className={'myai-state' + (live ? ' on' : '')}>{live ? <span className="udot" /> : <span className="aiwait-dot" />}{live ? tr("Connectée · {0}", [ago(t.last_used)]) : tr("En attente de connexion…")}</span>
-          <span className="small muted">{t.map ? tr("Travaille sur « {0} »", [t.map.name]) : live ? tr("Aucune map choisie") : tr("Sera connectée à son premier appel")}</span>
+          <span className="small muted">{t.map ? tr("Travaille sur « {0} »", [t.map.name]) : live ? tr("Aucune map choisie") : tr("Sera connectée à son premier appel")}{ai.agentsForge(t) ? ' · ' + tr("{0} agent(s) dans Forge", [ai.agentsForge(t)]) : ''}</span>
         </div>
       })}
       {!open && !none && <button className="home-map add" onClick={() => setOpen(true)}><Plus size={20} /><b>{tr("Connecter une IA")}</b></button>}

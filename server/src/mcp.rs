@@ -29,6 +29,9 @@ pub struct TokenIn {
     /// Map de travail dès la création (agent lancé depuis Forge, #95) : il apparaît tout de suite dans les agents
     /// de la map. Le compte doit pouvoir la modifier.
     map: Option<i64>,
+    /// Clé d'un agent ouvert dans Forge (terminal, #487) : rangée sous l'IA de l'utilisateur.
+    #[serde(default)]
+    forge: bool,
 }
 
 const KINDS: &[&str] = &[
@@ -66,18 +69,23 @@ pub async fn create_token(
     if let Some(mid) = b.map {
         crate::access::map_ctx(&st, &u, mid).await?.can_edit()?;
     }
-    let id: i64 = sqlx::query_scalar("INSERT INTO api_tokens (user_id, name, token_hash, kind, scope, role, map_id) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id").bind(u.id).bind(b.name.trim()).bind(sha256_hex(&token)).bind(&kind).bind(scope).bind(role).bind(b.map).fetch_one(&st.db).await?;
+    let id: i64 = sqlx::query_scalar("INSERT INTO api_tokens (user_id, name, token_hash, kind, scope, role, map_id, forge) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id").bind(u.id).bind(b.name.trim()).bind(sha256_hex(&token)).bind(&kind).bind(scope).bind(role).bind(b.map).bind(b.forge).fetch_one(&st.db).await?;
     Ok(Json(json!({ "token": token, "id": id })))
 }
 
 /// Jetons du compte, avec leur map de travail (seulement si le compte y a encore accès).
 pub async fn tokens(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
-    let rows: Vec<(i64, String, String, String, String, Option<String>, i64, Option<i64>, Option<String>, bool, Option<String>)> = sqlx::query_as(
-        "SELECT t.id, t.name, t.created_at, t.kind, t.scope, t.last_used, t.calls, m.id, m.name, t.oauth_client IS NOT NULL, t.role FROM api_tokens t
+    // Clés d'agents de Forge inutilisées depuis un jour : retirées (#487).
+    sqlx::query("DELETE FROM api_tokens WHERE user_id = ? AND forge = 1 AND COALESCE(last_used, created_at) < datetime('now', '-1 day')")
+        .bind(u.id)
+        .execute(&st.db)
+        .await?;
+    let rows: Vec<(i64, String, String, String, String, Option<String>, i64, Option<i64>, Option<String>, bool, Option<String>, bool)> = sqlx::query_as(
+        "SELECT t.id, t.name, t.created_at, t.kind, t.scope, t.last_used, t.calls, m.id, m.name, t.oauth_client IS NOT NULL, t.role, t.forge FROM api_tokens t
          LEFT JOIN maps m ON m.id = t.map_id AND EXISTS (SELECT 1 FROM memberships ms WHERE ms.studio_id = m.studio_id AND ms.user_id = t.user_id)
          WHERE t.user_id = ? ORDER BY t.id DESC",
     ).bind(u.id).fetch_all(&st.db).await?;
-    Ok(Json(json!(rows.into_iter().map(|(id, n, at, kind, scope, last, calls, mid, mname, oauth, role)| json!({"id": id, "name": n, "created_at": at, "kind": kind, "scope": scope, "role": role, "last_used": last, "calls": calls, "oauth": oauth, "map": mid.map(|i| json!({ "id": i, "name": mname }))})).collect::<Vec<_>>())))
+    Ok(Json(json!(rows.into_iter().map(|(id, n, at, kind, scope, last, calls, mid, mname, oauth, role, forge)| json!({"id": id, "name": n, "created_at": at, "kind": kind, "scope": scope, "role": role, "last_used": last, "calls": calls, "oauth": oauth, "forge": forge, "map": mid.map(|i| json!({ "id": i, "name": mname }))})).collect::<Vec<_>>())))
 }
 
 #[derive(Deserialize)]
@@ -2780,6 +2788,7 @@ mod tests_compte {
                 scope: None,
                 role: None,
                 map: Some(map),
+                forge: true,
             })
         };
         let Json(r) = create_token(State(m.st.clone()), u.clone(), nouveau(m.equipe))
@@ -2791,6 +2800,19 @@ mod tests_compte {
             .await
             .unwrap();
         assert_eq!(map, Some(m.equipe));
+        // #487 : la clé d'un agent de Forge est marquée, et retirée après un jour sans servir.
+        let Json(l) = tokens(State(m.st.clone()), u.clone()).await.unwrap();
+        assert_eq!(l[0]["forge"], true);
+        sqlx::query("UPDATE api_tokens SET created_at = datetime('now', '-2 days')")
+            .execute(&m.st.db)
+            .await
+            .unwrap();
+        let Json(l) = tokens(State(m.st.clone()), u.clone()).await.unwrap();
+        assert_eq!(
+            l.as_array().unwrap().len(),
+            0,
+            "clé d'agent de Forge inutilisée depuis un jour"
+        );
         assert!(
             create_token(State(m.st.clone()), u, nouveau(m.autre))
                 .await
@@ -2817,6 +2839,7 @@ mod tests_compte {
                 scope: None,
                 role: Some("testeur".into()),
                 map: None,
+                forge: false,
             }),
         )
         .await

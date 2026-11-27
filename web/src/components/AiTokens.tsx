@@ -50,7 +50,7 @@ export function AccountAI() {
       <div className="list">{live.map(t => (
         <div key={t.id} className="li" style={{ flexWrap: 'wrap' }}>
           <ClientLogo kind={t.kind} />
-          <span style={{ flex: 1, minWidth: 180 }}>{t.name}<span className="small muted"> · {clientName(t.kind)} · {t.oauth ? tr("connexion OAuth") : tr("clé API")} · {t.map ? tr("travaille sur « {0} »", [t.map.name]) : tr("aucune map choisie")}</span></span>
+          <span style={{ flex: 1, minWidth: 180 }}>{t.name}<span className="small muted"> · {clientName(t.kind)} · {t.oauth ? tr("connexion OAuth") : tr("clé API")} · {t.map ? tr("travaille sur « {0} »", [t.map.name]) : tr("aucune map choisie")}{ai.agentsForge(t) ? ' · ' + tr("{0} agent(s) dans Forge", [ai.agentsForge(t)]) : ''}</span></span>
           <span className={'badge ' + (t.last_used ? 'b-g' : '')}>{t.last_used ? tr("Utilisée {0} · {1} appel{2}", [ago(t.last_used), t.calls, t.calls > 1 ? 's' : '']) : tr("Jamais utilisée")}</span>
           <select className="field" style={{ height: 34, width: 'auto' }} aria-label={tr("Rôle de {0}", [t.name])} title={roles?.find(r => r.id === t.role)?.instructions ?? tr("Sans rôle : tous les outils de POP.")} value={t.role ?? ''} onChange={async e => { await api.post(`/api/tokens/${t.id}/role`, { role: e.target.value || null }); reload() }}>
             <option value="">{tr("Sans rôle")}</option>
