@@ -82,22 +82,34 @@ fn propre(s: &str) -> String {
 const ETAPES: &str = "lis-la avec get_task, passe-la en cours, avance en notant ta progression avec save_progress, puis termine-la. Reponds en francais.";
 
 /// Consigne de départ d'un agent lancé par Forge (elle passe par la ligne de commande).
-pub fn consigne(map: &str, tache: i64, titre: &str) -> String {
-    format!(
-        "Tu travailles sur POP, map {}. Prends la tache #{tache} ({}) : {ETAPES}",
-        propre(map),
-        propre(titre)
-    )
+pub fn consigne(map: &str, tache: Option<i64>, titre: &str) -> String {
+    match tache {
+        Some(tache) => format!(
+            "Tu travailles sur POP, map {}. Prends la tache #{tache} ({}) : {ETAPES}",
+            propre(map),
+            propre(titre)
+        ),
+        None => format!("Tu travailles sur POP, map {}. {ATTENDRE}", propre(map)),
+    }
 }
+
+/// Sans tâche (#455) : l'humain donne les instructions depuis le terminal de l'agent dans Forge.
+const ATTENDRE: &str = "L'humain va te donner ses instructions depuis Forge : lis tes messages avec read_messages, reponds avec send_message, et relis-les entre deux actions. Reponds en francais.";
 
 /// Consigne pour « Mon IA » (#420) : l'IA est déjà branchée à POP, peut-être sur une autre map ; elle choisit d'abord
 /// la map avec use_map.
-pub fn consigne_mon_ia(map: &str, map_id: i64, tache: i64, titre: &str) -> String {
-    format!(
-        "Dans POP, choisis la map {} avec use_map({map_id}) si ce n'est pas deja ta map de travail. Prends la tache #{tache} ({}) : {ETAPES}",
-        propre(map),
-        propre(titre)
-    )
+pub fn consigne_mon_ia(map: &str, map_id: i64, tache: Option<i64>, titre: &str) -> String {
+    let debut = format!(
+        "Dans POP, choisis la map {} avec use_map({map_id}) si ce n'est pas deja ta map de travail.",
+        propre(map)
+    );
+    match tache {
+        Some(tache) => format!(
+            "{debut} Prends la tache #{tache} ({}) : {ETAPES}",
+            propre(titre)
+        ),
+        None => format!("{debut} {ATTENDRE}"),
+    }
 }
 
 /// IA que l'utilisateur a branchée à POP par MCP (#420) : Forge ouvre son app si elle est installée, sinon son site.
@@ -205,14 +217,18 @@ mod tests {
 
     #[test]
     fn consigne_sans_caracteres_dangereux() {
-        let c = consigne("Vault\"Rush & co", 3, "Ajouter | le minuteur %PATH% <x>");
+        let c = consigne(
+            "Vault\"Rush & co",
+            Some(3),
+            "Ajouter | le minuteur %PATH% <x>",
+        );
         assert!(!c.contains(['"', '&', '|', '%', '<', '>', '^']), "{c}");
         assert!(c.contains("#3"));
     }
 
     #[test]
     fn consigne_pour_mon_ia() {
-        let c = consigne_mon_ia("VaultRush", 12, 3, "Ajouter le minuteur");
+        let c = consigne_mon_ia("VaultRush", 12, Some(3), "Ajouter le minuteur");
         assert!(
             c.starts_with("Dans POP, choisis la map VaultRush avec use_map(12)"),
             "{c}"
@@ -221,6 +237,20 @@ mod tests {
             c.contains("Prends la tache #3 (Ajouter le minuteur)") && c.contains("get_task"),
             "{c}"
         );
+    }
+
+    /// #455 : sans tâche, l'IA attend les instructions de l'humain dans son terminal.
+    #[test]
+    fn consigne_sans_tache() {
+        for c in [
+            consigne("VaultRush", None, ""),
+            consigne_mon_ia("VaultRush", 12, None, ""),
+        ] {
+            assert!(
+                !c.contains("tache #") && c.contains("read_messages") && c.contains("VaultRush"),
+                "{c}"
+            );
+        }
     }
 
     #[test]

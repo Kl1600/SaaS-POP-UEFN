@@ -1,1 +1,1 @@
-{"version": "0.3.5", "date": "2026-11-27", "notes": "· Agents : les terminaux ouverts remplissent la page (plein écran, moitiés, quarts) ; × en ferme un.\n· Chaque terminal peut s'ouvrir dans une fenêtre à part.\n· « + Terminal » en haut à gauche ouvre une IA connectée ou en lance une sur votre PC."}
+{"version": "0.3.6", "date": "2026-11-27", "notes": "· « + Terminal » ouvre une IA sans choisir de tâche : donnez-lui vos instructions dans son terminal."}
