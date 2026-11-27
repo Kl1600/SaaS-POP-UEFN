@@ -17,6 +17,7 @@ on:
       - 'forge/ui/**'
       - 'forge/icons/**'
       - 'forge/capabilities/**'
+      - 'forge/.cargo/**'
       - 'forge/Cargo.toml'
       - 'forge/Cargo.lock'
       - 'forge/tauri.conf.json'
@@ -42,6 +43,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: forge
+          # Changer cette clé force la recompilation de whisper.cpp (options de forge/.cargo/config.toml, #479).
+          prefix-key: whisper-portable-1
       - uses: actions/setup-node@v4
         with:
           node-version: 22
