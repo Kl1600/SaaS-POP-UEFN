@@ -23,6 +23,8 @@
     "allow-direct-ecrire",
     "allow-direct-lire",
     "allow-direct-fermer",
+    "allow-direct-relancer",
+    "allow-connexion-claude",
     "allow-direct-actifs",
     "allow-dictee-etat",
     "allow-dictee-telecharger",

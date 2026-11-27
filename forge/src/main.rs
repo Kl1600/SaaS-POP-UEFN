@@ -133,6 +133,8 @@ fn autoriser(app: &AppHandle, u: &Url) {
         .permission("allow-direct-ecrire")
         .permission("allow-direct-lire")
         .permission("allow-direct-fermer")
+        .permission("allow-direct-relancer")
+        .permission("allow-connexion-claude")
         .permission("allow-direct-actifs")
         .permission("allow-dictee-etat")
         .permission("allow-dictee-telecharger")
@@ -784,6 +786,27 @@ fn direct_lire(
 }
 
 #[tauri::command]
+fn direct_relancer(d: tauri::State<'_, direct::Directs>, agent: i64) -> Result<(), String> {
+    direct::relancer(&d, agent)
+}
+
+/// Connexion de Claude Code au compte Claude de l'utilisateur (#483) : Claude Code s'ouvre dans une console Windows,
+/// où l'on tape /login ; Forge ne voit jamais les identifiants.
+#[tauri::command]
+fn connexion_claude() -> Result<(), String> {
+    let o = agents_locaux::outils()
+        .into_iter()
+        .find(|o| o.id == "claude_code")
+        .ok_or("Claude Code introuvable.")?;
+    let exe = PathBuf::from(
+        o.chemin
+            .ok_or("Claude Code n'est pas installé sur ce PC.")?,
+    );
+    let dossier = dirs::home_dir().ok_or("Dossier de l'utilisateur introuvable.")?;
+    agents_locaux::lancer(&exe, &[], &dossier, "")
+}
+
+#[tauri::command]
 fn direct_fermer(d: tauri::State<'_, direct::Directs>, agent: i64) {
     direct::fermer(&d, agent)
 }
@@ -985,6 +1008,8 @@ fn main() {
             direct_ecrire,
             direct_lire,
             direct_fermer,
+            direct_relancer,
+            connexion_claude,
             direct_actifs,
             dictee::dictee_etat,
             dictee::dictee_telecharger,

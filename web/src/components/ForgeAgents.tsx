@@ -69,7 +69,7 @@ export function ForgeAgents({ mapId, tache, invoke }: { mapId: number; tache?: n
   const { cols, rows } = grille(affiches.length)
   return <div className="term-page">
     <div className="term-haut">
-      {app.canEdit && <PlusTerminal connectees={connectees} directs={directs} ouvrir={ouvrir} mapId={mapId} invoke={invoke} lance={id => { relireDirects(); changer([...affiches.map(a => a.id), id]); reload() }} />}
+      {app.canEdit && <PlusTerminal connectees={connectees} directs={directs} ouvrir={ouvrir} mapId={mapId} invoke={invoke} lance={id => { relireDirects(); changer([...affiches.filter(a => famille(a) !== 'Claude').map(a => a.id), id]); reload() }} />}
       <h1 className="forge-h1" style={{ margin: 0, fontSize: 20 }}>{tr("Agents")}</h1>
       {res?.equipe?.phrase && <span className="muted small">{res.equipe.phrase}</span>}
       <div style={{ flex: 1 }} />
@@ -175,6 +175,9 @@ export function Terminal({ mapId, a, phrase }: { mapId: number; a: any; phrase?:
   </>
 }
 
+/** Message de Claude Code quand il n'est connecté à aucun compte Claude (#483). */
+const PAS_CONNECTE = /not logged in|please run \/login|invalid api key|authentication/i
+
 /** Une ligne du flux JSON de Claude Code, en ligne de terminal (#466). */
 function ligneDirecte(l: string, i: number): React.ReactNode {
   let v: any
@@ -186,7 +189,7 @@ function ligneDirecte(l: string, i: number): React.ReactNode {
     case 'fin': return <div key={i} className="term-l term-doux"><span className="term-etoile">✻</span> {tr("Claude Code s’est arrêté.")}</div>
     case 'system': return v.subtype === 'init' ? <div key={i} className="term-l term-doux"><span className="term-etoile">✻</span> {tr("Claude Code prêt")}{v.model ? ` · ${v.model}` : ''}</div> : null
     case 'assistant': return <div key={i}>{(v.message?.content ?? []).map((c: any, j: number) => c.type === 'text'
-      ? <div key={j} className="term-l"><span className="term-ia">⏺</span> {c.text}</div>
+      ? <div key={j} className={'term-l' + (PAS_CONNECTE.test(c.text) ? ' term-ko' : '')}><span className="term-ia">⏺</span> {PAS_CONNECTE.test(c.text) ? tr("Claude Code n’est pas connecté à votre compte Claude.") : c.text}</div>
       : c.type === 'tool_use' ? <div key={j} className="term-l"><span className="term-ok">⏺</span> <b>{String(c.name).replace(/^mcp__pop__/, '')}</b><span className="term-doux">({court(c.input, 100)})</span></div> : null)}</div>
     case 'user': return <div key={i}>{(Array.isArray(v.message?.content) ? v.message.content : []).filter((c: any) => c.type === 'tool_result').map((c: any, j: number) =>
       <div key={j} className={'term-l ' + (c.is_error ? 'term-ko' : 'term-doux')}>  ⎿  {court(Array.isArray(c.content) ? c.content.map((x: any) => x.text ?? '').join(' ') : c.content)}</div>)}</div>
@@ -222,6 +225,10 @@ function TerminalDirect({ a, invoke }: { a: any; invoke: Invoke }) {
     return () => { fini = true; clearInterval(t) }
   }, [a.id])
   useEffect(() => { const c = corps.current; if (c) c.scrollTop = c.scrollHeight }, [lignes.length, attend])
+  // Claude Code non connecté (#483) : seulement si rien n'a marché depuis le dernier message d'erreur.
+  const derniereErreur = lignes.map(l => PAS_CONNECTE.test(l)).lastIndexOf(true)
+  const pasConnecte = derniereErreur >= 0 && !lignes.slice(derniereErreur + 1).some(l => l.includes('"type":"result"') && !l.includes('"is_error":true'))
+  const relancer = async () => { try { await invoke('direct_relancer', { agent: a.id }); setVivant(true) } catch (er: any) { app.toast(String(er?.message ?? er), true) } }
   const envoyer = async (e: React.FormEvent) => {
     e.preventDefault()
     const t = texte.trim()
@@ -233,6 +240,13 @@ function TerminalDirect({ a, invoke }: { a: any; invoke: Invoke }) {
       {!lignes.length && <div className="term-l term-doux"><span className="term-etoile">✻</span> {tr("Démarrage de Claude Code… Écrivez-lui ci-dessous.")}</div>}
       {lignes.map(ligneDirecte)}
       {attend && <div className="term-l term-doux"><span className="term-etoile term-pouls">✻</span> {tr("réfléchit…")}</div>}
+      {pasConnecte && <div className="term-l" role="alert" style={{ marginTop: 8 }}>
+        <div>{tr("Connectez Claude Code à votre compte Claude : une console s’ouvre, tapez /login et suivez les étapes, puis revenez ici et relancez.")}</div>
+        <div className="row" style={{ gap: 8, marginTop: 6, fontFamily: 'Plus Jakarta Sans, Inter, system-ui, sans-serif' }}>
+          <button className="btn pri" onClick={() => invoke('connexion_claude').catch((er: any) => app.toast(/not allowed|not found|unknown/i.test(String(er)) ? tr("Mettez Forge à jour (pop-uefn.com/forge).") : String(er), true))}>{tr("Connecter Claude Code")}</button>
+          <button className="btn" onClick={relancer}>{tr("Relancer")}</button>
+        </div>
+      </div>}
     </div>
     <form className="term-invite" onSubmit={envoyer}>
       <span aria-hidden="true">›</span>
