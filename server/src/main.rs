@@ -395,6 +395,7 @@ fn api() -> Router<AppState> {
         .route("/api/studios/{sid}/link-status", get(link::studio_status))
         .route("/api/studios/{sid}/skip-uefn", post(link::skip))
         .route("/api/relay/pair-studio", post(link::pair_studio))
+        .route("/api/relay/discover", post(link::discover))
         .route("/api/studios/{sid}/leave", post(manage::leave))
         .route("/api/studios/{sid}/export", get(manage::export_studio))
         .route(

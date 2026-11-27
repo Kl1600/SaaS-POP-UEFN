@@ -123,6 +123,7 @@ fn autoriser(app: &AppHandle, u: &Url) {
         .permission("allow-relier")
         .permission("allow-maj-verifier")
         .permission("allow-maj-installer")
+        .permission("allow-ignorer")
         .permission("allow-importer")
         .permission("allow-projet-ouvert")
         .permission("allow-liaison")
@@ -418,7 +419,18 @@ fn liaison() -> Option<serde_json::Value> {
     Some(serde_json::json!({
         "projet": premier.project, "map": premier.map, "serveur": c.server,
         "liens": liens.iter().map(|l| serde_json::json!({ "projet": l.project, "map": l.map })).collect::<Vec<_>>(),
+        "ignores": c.ignores,
     }))
+}
+
+/// « Ignorer » un projet UEFN du PC (#153) : il n'est plus relié tout seul ni proposé dans l'Accueil.
+#[tauri::command]
+fn ignorer(projet: String) -> Result<(), String> {
+    let mut c = pop_link::load().map_err(|e| format!("{e:#}"))?;
+    if !c.ignores.iter().any(|i| pop_link::meme_dossier(i, &projet)) {
+        c.ignores.push(projet);
+    }
+    pop_link::save(&c).map_err(|e| format!("Configuration non enregistrée : {e:#}"))
 }
 
 /// « Parcourir… » : choisir le dossier d'un projet UEFN dans l'explorateur de Windows.
@@ -836,6 +848,7 @@ fn main() {
             etat_relais,
             relier,
             importer,
+            ignorer,
             projet_ouvert,
             liaison,
             fenetre,
@@ -875,6 +888,7 @@ fn main() {
             let h = app.handle().clone();
             tauri::async_runtime::spawn(async move { relay::demarrer(&h).await });
             relay::suivre(app.handle().clone());
+            relay::surveiller(app.handle().clone());
             Ok(())
         })
         .run(tauri::generate_context!())

@@ -168,10 +168,16 @@ pub async fn pair_studio(
             .filter(|l| !l.is_empty() && l.len() <= 100)
             .map(String::from);
         let cible = studio_cible(&st, uid, sid, space.as_deref()).await?;
+        // #153 : sans map trouvée par #143, une seule map du même nom dans un autre studio où la personne peut éditer
+        // est reliée telle quelle, sans créer de double ; plusieurs : on ne choisit pas, le projet n'est pas relié ici.
         let mid =
             match map_existante(&st, uid, cible, &name, space.as_deref(), lore.as_deref()).await? {
                 Some(m) => m,
-                None => crate::studio::insert_map(&st, cible, &name, "", None).await?,
+                None => match maps_du_nom(&st, uid, &name).await?.as_slice() {
+                    [] => crate::studio::insert_map(&st, cible, &name, "", None).await?,
+                    [(m, _, _)] => *m,
+                    _ => continue,
+                },
             };
         sqlx::query("UPDATE maps SET creator_space = COALESCE(?, creator_space), lore_id = COALESCE(?, lore_id) WHERE id = ?")
             .bind(&space)
@@ -402,5 +408,187 @@ mod tests {
             .unwrap()
             .0;
         assert!(r["groups"].as_array().unwrap().is_empty());
+    }
+}
+
+/// Maps du nom donné (sans tenir compte de la casse) dans les studios où la personne peut éditer : (id, nom, studio).
+async fn maps_du_nom(
+    st: &AppState,
+    uid: i64,
+    nom: &str,
+) -> Result<Vec<(i64, String, String)>, AppError> {
+    Ok(sqlx::query_as(
+        "SELECT m.id, m.name, s.name FROM maps m JOIN studios s ON s.id = m.studio_id          JOIN memberships ms ON ms.studio_id = m.studio_id AND ms.user_id = ?          WHERE lower(m.name) = lower(?) AND ms.role IN ('owner', 'admin', 'member') ORDER BY m.id",
+    )
+    .bind(uid)
+    .bind(nom.trim())
+    .fetch_all(&st.db)
+    .await?)
+}
+
+#[derive(Deserialize)]
+pub struct DiscoverIn {
+    project: String,
+    device: Option<String>,
+}
+
+/// `POST /api/relay/discover` (#153) : le relais signale un nouveau projet UEFN du PC, avec le jeton d'un projet déjà
+/// relié (qui identifie la personne). Une seule map du même nom dans un studio où elle peut éditer : POP la relie et
+/// rend son jeton. Aucune ou plusieurs : rien n'est relié ni créé, Forge demande (`candidates`).
+pub async fn discover(
+    State(st): State<AppState>,
+    headers: axum::http::HeaderMap,
+    Json(b): Json<DiscoverIn>,
+) -> ApiResult<Value> {
+    let token = headers
+        .get("authorization")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .ok_or(AppError::Unauthorized)?;
+    let uid: i64 = sqlx::query_scalar(
+        "SELECT user_id FROM relay_devices WHERE token_hash = ? AND pair_code_hash IS NULL",
+    )
+    .bind(sha256_hex(token))
+    .fetch_optional(&st.db)
+    .await?
+    .ok_or(AppError::Unauthorized)?;
+    let nom: String = b.project.trim().chars().take(80).collect();
+    if nom.is_empty() {
+        return Err(bad("Nom de projet manquant."));
+    }
+    let maps = maps_du_nom(&st, uid, &nom).await?;
+    let [(mid, map, _)] = maps.as_slice() else {
+        return Ok(Json(
+            json!({ "candidates": maps.iter().map(|(id, m, s)| json!({ "map_id": id, "map": m, "studio": s })).collect::<Vec<_>>() }),
+        ));
+    };
+    let device: String = b
+        .device
+        .unwrap_or_else(|| "POP Forge".into())
+        .chars()
+        .take(60)
+        .collect();
+    sqlx::query("DELETE FROM relay_devices WHERE map_id = ? AND user_id = ? AND name = ?")
+        .bind(mid)
+        .bind(uid)
+        .bind(&device)
+        .execute(&st.db)
+        .await?;
+    let jeton = random_token();
+    sqlx::query(
+        "INSERT INTO relay_devices (map_id, user_id, name, token_hash) VALUES (?, ?, ?, ?)",
+    )
+    .bind(mid)
+    .bind(uid)
+    .bind(&device)
+    .bind(sha256_hex(&jeton))
+    .execute(&st.db)
+    .await?;
+    crate::access::notify(&st, *mid, json!({ "t": "uefn", "what": "status" }));
+    Ok(Json(json!({ "map_id": mid, "map": map, "token": jeton })))
+}
+
+#[cfg(test)]
+mod tests_decouverte {
+    //! #153 : un projet découvert sur le PC est relié à la map du même nom, dans n'importe quel studio où la
+    //! personne peut éditer ; aucune ou plusieurs : rien en silence.
+    use super::*;
+
+    async fn id(st: &AppState, sql: &str) -> i64 {
+        sqlx::query_scalar(sqlx::AssertSqlSafe(sql.to_string()))
+            .fetch_one(&st.db)
+            .await
+            .unwrap()
+    }
+
+    async fn appel(st: &AppState, jeton: &str, projet: &str) -> Result<Value, AppError> {
+        let mut h = axum::http::HeaderMap::new();
+        h.insert("authorization", format!("Bearer {jeton}").parse().unwrap());
+        discover(
+            State(st.clone()),
+            h,
+            Json(DiscoverIn {
+                project: projet.into(),
+                device: Some("PC".into()),
+            }),
+        )
+        .await
+        .map(|Json(v)| v)
+    }
+
+    #[tokio::test]
+    async fn quatre_cas() {
+        let st = crate::test_state().await;
+        let u = id(&st, "INSERT INTO users (email, name, password_hash) VALUES ('a@a.fr', 'A', 'x') RETURNING id").await;
+        let perso = id(
+            &st,
+            "INSERT INTO studios (name, personal) VALUES ('Perso', 1) RETURNING id",
+        )
+        .await;
+        let equipe = id(
+            &st,
+            "INSERT INTO studios (name) VALUES ('POP Studio') RETURNING id",
+        )
+        .await;
+        let lecture = id(
+            &st,
+            "INSERT INTO studios (name) VALUES ('Lecture') RETURNING id",
+        )
+        .await;
+        for (s, r) in [(perso, "owner"), (equipe, "member"), (lecture, "viewer")] {
+            sqlx::query("INSERT INTO memberships (studio_id, user_id, role) VALUES (?, ?, ?)")
+                .bind(s)
+                .bind(u)
+                .bind(r)
+                .execute(&st.db)
+                .await
+                .unwrap();
+        }
+        let map = |s: i64, n: &str| {
+            format!("INSERT INTO maps (studio_id, name) VALUES ({s}, '{n}') RETURNING id")
+        };
+        let solo = id(&st, &map(perso, "Solo")).await;
+        let grass = id(&st, &map(equipe, "GrassCutter")).await;
+        id(&st, &map(perso, "Double")).await;
+        id(&st, &map(equipe, "Double")).await;
+        id(&st, &map(lecture, "Interdite")).await;
+        // Jeton d'un projet déjà relié (Solo) : il identifie la personne.
+        sqlx::query(
+            "INSERT INTO relay_devices (map_id, user_id, name, token_hash) VALUES (?, ?, 'PC', ?)",
+        )
+        .bind(solo)
+        .bind(u)
+        .bind(sha256_hex("jeton-solo"))
+        .execute(&st.db)
+        .await
+        .unwrap();
+
+        // Une seule map du même nom, dans un autre studio : reliée, avec un jeton qui marche pour le relais.
+        let r = appel(&st, "jeton-solo", "grasscutter").await.unwrap();
+        assert_eq!(r["map_id"], grass);
+        let t = r["token"].as_str().unwrap();
+        let m: i64 = sqlx::query_scalar("SELECT map_id FROM relay_devices WHERE token_hash = ?")
+            .bind(sha256_hex(t))
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        assert_eq!(m, grass);
+        // Aucune : rien n'est créé.
+        let avant = id(&st, "SELECT COUNT(*) FROM maps").await;
+        let r = appel(&st, "jeton-solo", "TestDetect").await.unwrap();
+        assert!(r["token"].is_null() && r["candidates"].as_array().unwrap().is_empty());
+        assert_eq!(id(&st, "SELECT COUNT(*) FROM maps").await, avant);
+        // Plusieurs : POP demande laquelle.
+        let r = appel(&st, "jeton-solo", "Double").await.unwrap();
+        assert!(r["token"].is_null());
+        assert_eq!(r["candidates"].as_array().unwrap().len(), 2);
+        // Studio où la personne ne peut pas éditer : jamais relié.
+        let r = appel(&st, "jeton-solo", "Interdite").await.unwrap();
+        assert!(r["token"].is_null() && r["candidates"].as_array().unwrap().is_empty());
+        // Jeton inconnu : refusé.
+        assert!(matches!(
+            appel(&st, "faux", "GrassCutter").await,
+            Err(AppError::Unauthorized)
+        ));
     }
 }

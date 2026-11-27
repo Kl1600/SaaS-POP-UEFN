@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
     collections::HashMap,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -41,6 +41,9 @@ pub struct Config {
     /// Liaison simplifiée : un projet UEFN = une map POP, chacun avec son jeton.
     #[serde(default)]
     pub links: Vec<ProjLink>,
+    /// Projets que la personne a choisi d'ignorer (« Ignorer » dans Forge, #153) : jamais reliés ni proposés.
+    #[serde(default)]
+    pub ignores: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Default)]
@@ -149,6 +152,10 @@ pub struct Ui {
 }
 
 type Shared = Arc<Mutex<Ui>>;
+/// États des projets reliés, partagés avec la page locale : la liste grandit quand un projet est relié à chaud (#153).
+type Uis = Arc<Mutex<Vec<Shared>>>;
+/// Dossiers des projets reliés, partagés par toutes les liaisons (pour savoir lequel est ouvert dans UEFN).
+type Projets = Arc<Mutex<Vec<String>>>;
 
 fn log(ui: &Shared, action: &str, res: &str) {
     let now = std::time::SystemTime::now()
@@ -195,7 +202,7 @@ pub async fn open_project(projects: &[PathBuf]) -> Option<PathBuf> {
 
 struct Link {
     open: Open,
-    all_projects: Vec<String>,
+    all_projects: Projets,
     cfg: Config,
     mcp: mcpdriver::Mcp,
     scan: files::Scanner,
@@ -210,7 +217,8 @@ impl Link {
         if !self.mcp.alive().await {
             return false;
         }
-        if self.all_projects.len() <= 1 {
+        let all = self.all_projects.lock().unwrap().clone();
+        if all.len() <= 1 {
             return true;
         }
         let mut c = self.open.lock().await;
@@ -218,8 +226,7 @@ impl Link {
             .map(|t| t.elapsed() > Duration::from_secs(15))
             .unwrap_or(true)
         {
-            let names: Vec<String> = self
-                .all_projects
+            let names: Vec<String> = all
                 .iter()
                 .map(|p| {
                     PathBuf::from(p)
@@ -234,16 +241,14 @@ impl Link {
                 .await
                 .unwrap_or_default()
                 .to_lowercase();
-            let by_python = self
-                .all_projects
+            let by_python = all
                 .iter()
                 .zip(&names)
                 .find(|(_, n)| !n.is_empty() && out.contains(n.as_str()))
                 .map(|(p, _)| p.clone());
             // Sinon : le projet modifié le plus récemment (UEFN écrit dans le projet ouvert).
             c.open = by_python.or_else(|| {
-                self.all_projects
-                    .iter()
+                all.iter()
                     .max_by_key(|p| newest_mtime(&PathBuf::from(p), 3))
                     .cloned()
             });
@@ -636,21 +641,84 @@ async fn fichier_a_importer(server: &str, a: &Value) -> Result<(PathBuf, bool)> 
 
 // ---------- Boucle principale ----------
 
-/// Relais démarré par [`start`] : un état par projet relié, et l'arrêt.
+/// Relais démarré par [`start`] : un état par projet relié, l'ajout d'un projet à chaud (#153) et l'arrêt.
 pub struct Handle {
-    uis: Vec<Shared>,
-    tasks: Vec<tokio::task::JoinHandle<()>>,
+    uis: Uis,
+    tasks: Mutex<Vec<tokio::task::JoinHandle<()>>>,
+    base: Config,
+    open: Open,
+    projets: Projets,
 }
 
 impl Handle {
     /// Copie de l'état de chaque projet relié (relais, UEFN, journal…).
     pub fn status(&self) -> Vec<Ui> {
-        self.uis.iter().map(|u| u.lock().unwrap().clone()).collect()
+        self.uis
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|u| u.lock().unwrap().clone())
+            .collect()
+    }
+
+    /// Dossiers des projets reliés par ce relais.
+    pub fn projets(&self) -> Vec<String> {
+        self.projets.lock().unwrap().clone()
+    }
+
+    /// Relie un projet de plus sans redémarrer le relais (#153). Faux si son dossier n'existe pas ou s'il est déjà
+    /// relié (même dossier).
+    pub fn ajouter(&self, l: &ProjLink) -> bool {
+        let root = PathBuf::from(&l.project);
+        if !root.is_dir() || self.projets().iter().any(|p| meme_dossier(p, &l.project)) {
+            return false;
+        }
+        self.projets.lock().unwrap().push(l.project.clone());
+        let mut c = self.base.clone();
+        c.project = l.project.clone();
+        c.map = l.map.clone();
+        c.token = l.token.clone();
+        let mcp_url = mcpdriver::find_url(c.uefn_mcp_url.as_deref(), &root);
+        let ui: Shared = Arc::new(Mutex::new(Ui {
+            relay: "connexion…".into(),
+            uefn: "?".into(),
+            project: c.project.clone(),
+            map: c.map.clone(),
+            mcp_url: mcp_url.clone(),
+            ..Default::default()
+        }));
+        self.uis.lock().unwrap().push(ui.clone());
+        println!("  · {} → map « {} »", c.project, c.map);
+        let mut link = Link {
+            open: self.open.clone(),
+            all_projects: self.projets.clone(),
+            scan: files::Scanner::new(root),
+            mcp: mcpdriver::Mcp::new(mcp_url, c.tools.clone()),
+            cfg: c,
+            uefn: false,
+            last_actors: String::new(),
+            ui,
+        };
+        self.tasks.lock().unwrap().push(tokio::spawn(async move {
+            let mut backoff = 1;
+            loop {
+                match session(&mut link).await {
+                    Ok(()) => backoff = 1,
+                    Err(e) => {
+                        link.ui.lock().unwrap().relay = "hors ligne".into();
+                        log(&link.ui, "connexion", &format!("{e:#}"));
+                    }
+                }
+                tokio::time::sleep(Duration::from_secs(backoff)).await;
+                backoff = (backoff * 2).min(30);
+            }
+        }));
+        true
     }
 
     /// Arrête le relais : coupe la liaison avec POP et ne pilote plus UEFN.
     pub fn stop(&self) {
-        for t in &self.tasks {
+        for t in self.tasks.lock().unwrap().iter() {
             t.abort();
         }
     }
@@ -669,7 +737,7 @@ impl Handle {
 
     /// Vrai quand plus aucune liaison ne tourne (après [`Handle::stop`]).
     pub fn stopped(&self) -> bool {
-        self.tasks.iter().all(|t| t.is_finished())
+        self.tasks.lock().unwrap().iter().all(|t| t.is_finished())
     }
 }
 
@@ -677,6 +745,12 @@ impl Drop for Handle {
     fn drop(&mut self) {
         self.stop();
     }
+}
+
+/// Même dossier de projet, sans tenir compte de la casse ni du sens des barres (Windows).
+pub fn meme_dossier(a: &str, b: &str) -> bool {
+    let n = |s: &str| s.replace('\\', "/").trim_end_matches('/').to_lowercase();
+    n(a) == n(b)
 }
 
 /// Démarre le relais pour chaque projet de la configuration (à appeler dans un runtime tokio).
@@ -692,68 +766,30 @@ pub fn start(cfg: Config) -> Result<Handle> {
     } else {
         cfg.links.clone()
     };
-    let all: Vec<String> = links.iter().map(|l| l.project.clone()).collect();
-    let open: Open = Default::default();
-    let mut uis = vec![];
-    let mut tasks = vec![];
     println!(
         "UEFN Link · {} projet(s) relié(s) à {}",
         links.len(),
         cfg.server
     );
+    let h = Handle {
+        uis: Default::default(),
+        tasks: Default::default(),
+        base: cfg.clone(),
+        open: Default::default(),
+        projets: Default::default(),
+    };
     for l in &links {
-        let root = PathBuf::from(&l.project);
-        if !root.is_dir() {
-            println!("  ! dossier introuvable, ignoré : {}", root.display());
-            continue;
+        if !h.ajouter(l) && !PathBuf::from(&l.project).is_dir() {
+            println!("  ! dossier introuvable, ignoré : {}", l.project);
         }
-        let mut c = cfg.clone();
-        c.project = l.project.clone();
-        c.map = l.map.clone();
-        c.token = l.token.clone();
-        let mcp_url = mcpdriver::find_url(c.uefn_mcp_url.as_deref(), &root);
-        let ui: Shared = Arc::new(Mutex::new(Ui {
-            relay: "connexion…".into(),
-            uefn: "?".into(),
-            project: c.project.clone(),
-            map: c.map.clone(),
-            mcp_url: mcp_url.clone(),
-            ..Default::default()
-        }));
-        uis.push(ui.clone());
-        println!("  · {} → map « {} »", c.project, c.map);
-        let mut link = Link {
-            open: open.clone(),
-            all_projects: all.clone(),
-            scan: files::Scanner::new(root),
-            mcp: mcpdriver::Mcp::new(mcp_url, c.tools.clone()),
-            cfg: c,
-            uefn: false,
-            last_actors: String::new(),
-            ui: ui.clone(),
-        };
-        tasks.push(tokio::spawn(async move {
-            let mut backoff = 1;
-            loop {
-                match session(&mut link).await {
-                    Ok(()) => backoff = 1,
-                    Err(e) => {
-                        link.ui.lock().unwrap().relay = "hors ligne".into();
-                        log(&link.ui, "connexion", &format!("{e:#}"));
-                    }
-                }
-                tokio::time::sleep(Duration::from_secs(backoff)).await;
-                backoff = (backoff * 2).min(30);
-            }
-        }));
     }
-    if uis.is_empty() {
+    if h.uis.lock().unwrap().is_empty() {
         bail!(
             "Aucun projet UEFN valide dans la configuration ({}).",
             config_path().display()
         );
     }
-    Ok(Handle { uis, tasks })
+    Ok(h)
 }
 
 /// `pop-link run` : relais et page d'état locale, jusqu'à la fermeture de la fenêtre.
@@ -923,18 +959,23 @@ async fn sync(link: &mut Link, tx: &mpsc::UnboundedSender<Value>, full: bool) {
 
 // ---------- Page d'état locale ----------
 
-fn status_router(uis: Vec<Shared>) -> axum::Router {
+fn status_router(uis: Uis) -> axum::Router {
     use axum::{routing::get, Router};
     Router::new().route(
         "/",
         get(move || {
-            let list: Vec<Ui> = uis.iter().map(|u| u.lock().unwrap().clone()).collect();
+            let list: Vec<Ui> = uis
+                .lock()
+                .unwrap()
+                .iter()
+                .map(|u| u.lock().unwrap().clone())
+                .collect();
             async move { axum::response::Html(list.iter().map(page).collect::<Vec<_>>().join("")) }
         }),
     )
 }
 
-async fn local_page(uis: Vec<Shared>, port: u16) {
+async fn local_page(uis: Uis, port: u16) {
     match tokio::net::TcpListener::bind(("127.0.0.1", port)).await {
         Ok(l) => {
             let _ = axum::serve(l, status_router(uis)).await;
@@ -1007,15 +1048,102 @@ pub async fn pair(server: &str, code: &str, project: &str, name: &str) -> Result
         .as_str()
         .ok_or_else(|| anyhow!("{}", r["error"].as_str().unwrap_or("appairage refusé")))?;
     let project = std::path::absolute(project)?.to_string_lossy().to_string();
-    save(&Config {
-        server,
-        token: token.into(),
-        project: project.clone(),
-        map: r["map"].as_str().unwrap_or("").into(),
-        ..Default::default()
-    })?;
-    println!("Appairé à la map « {} ». Projet : {project}\nConfiguration : {}\nLancez maintenant : pop-link run", r["map"].as_str().unwrap_or(""), config_path().display());
+    let map = r["map"].as_str().unwrap_or("").to_string();
+    // #153 : on ajoute ce projet aux autres au lieu d'effacer la configuration, après l'avoir sauvegardée.
+    let avant = load().ok();
+    if avant.is_some() {
+        let p = config_path();
+        std::fs::copy(&p, p.with_extension("json.avant-pair.bak"))
+            .context("Sauvegarde de la configuration impossible")?;
+    }
+    save(&fusionner(
+        avant,
+        &server,
+        ProjLink {
+            project: project.clone(),
+            map: map.clone(),
+            token: token.into(),
+        },
+    ))?;
+    println!(
+        "Appairé à la map « {map} ». Projet : {project}
+Configuration : {}
+Lancez maintenant : pop-link run",
+        config_path().display()
+    );
     Ok(())
+}
+
+/// Configuration après l'ajout d'un lien (#153) : les autres projets reliés au même serveur sont gardés ; le lien du
+/// même projet ou de la même map est remplacé. Un autre serveur repart d'une configuration neuve.
+pub fn fusionner(avant: Option<Config>, server: &str, nouveau: ProjLink) -> Config {
+    let meme_serveur = |c: &Config| c.server.trim_end_matches('/') == server.trim_end_matches('/');
+    let mut c = match avant {
+        Some(c) if meme_serveur(&c) => c,
+        _ => Config {
+            server: server.to_string(),
+            ..Default::default()
+        },
+    };
+    let mut liens: Vec<ProjLink> = if c.links.is_empty() && !c.project.is_empty() {
+        vec![ProjLink {
+            project: c.project.clone(),
+            map: c.map.clone(),
+            token: c.token.clone(),
+        }]
+    } else {
+        c.links.clone()
+    };
+    liens.retain(|l| !meme_dossier(&l.project, &nouveau.project) && l.map != nouveau.map);
+    c.ignores.retain(|p| !meme_dossier(p, &nouveau.project));
+    c.project = nouveau.project.clone();
+    c.map = nouveau.map.clone();
+    c.token = nouveau.token.clone();
+    liens.push(nouveau);
+    c.links = liens;
+    c
+}
+
+/// Réponse de POP à un projet découvert sur le PC (#153).
+pub enum Decouverte {
+    /// Une seule map du même nom, où la personne peut éditer : POP a créé le lien.
+    Relie(ProjLink),
+    /// Aucune map, ou plusieurs : rien n'est relié, Forge demande à la personne.
+    ADemander,
+}
+
+/// Signale à POP un nouveau projet du PC (`/api/relay/discover`), avec le jeton d'un projet déjà relié (qui
+/// identifie la personne).
+pub async fn decouvrir(
+    server: &str,
+    token: &str,
+    projet: &Path,
+    appareil: &str,
+) -> Result<Decouverte> {
+    let nom = projet
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
+    let r: Value = reqwest::Client::new()
+        .post(format!(
+            "{}/api/relay/discover",
+            server.trim_end_matches('/')
+        ))
+        .bearer_auth(token)
+        .json(&json!({ "project": nom, "device": appareil }))
+        .send()
+        .await
+        .context("POP injoignable")?
+        .json()
+        .await?;
+    Ok(match (r["map"].as_str(), r["token"].as_str()) {
+        (Some(map), Some(t)) => Decouverte::Relie(ProjLink {
+            project: std::path::absolute(projet)?.to_string_lossy().to_string(),
+            map: map.into(),
+            token: t.into(),
+        }),
+        _ => Decouverte::ADemander,
+    })
 }
 
 pub fn ask(q: &str) -> String {
@@ -1294,5 +1422,57 @@ mod tests {
     async fn start_refuse_sans_projet() {
         let e = start(cfg("/dossier/qui/n/existe/pas")).err().unwrap();
         assert!(format!("{e}").contains("Aucun projet UEFN valide"));
+    }
+
+    fn lien(p: &str, m: &str) -> ProjLink {
+        ProjLink {
+            project: p.into(),
+            map: m.into(),
+            token: format!("jeton-{m}"),
+        }
+    }
+
+    /// #153 : `pop-link pair` ajoute un projet sans effacer les autres ; même projet ou même map → remplacé.
+    #[test]
+    fn fusionner_sans_perte() {
+        let mut avant = cfg("C:/P/A");
+        avant.server = "https://pop.test/".into();
+        avant.links = (0..10)
+            .map(|i| lien(&format!("C:/P/P{i}"), &format!("M{i}")))
+            .collect();
+        avant.ignores = vec![r"C:\P\Neuf".into()];
+        let c = fusionner(
+            Some(avant.clone()),
+            "https://pop.test",
+            lien("C:/P/Neuf", "Neuf"),
+        );
+        assert_eq!(c.links.len(), 11, "un projet de plus, les 10 autres gardés");
+        assert!(c.ignores.is_empty(), "un projet relié n'est plus ignoré");
+        let c = fusionner(Some(c), "https://pop.test", lien(r"c:\p\neuf\", "Neuf2"));
+        assert_eq!(c.links.len(), 11, "même dossier : remplacé");
+        assert_eq!(c.links.last().unwrap().map, "Neuf2");
+        let c = fusionner(Some(avant), "https://autre.test", lien("C:/P/X", "X"));
+        assert_eq!(c.links.len(), 1, "autre serveur : configuration neuve");
+    }
+
+    /// #153 : un projet relié à chaud apparaît dans l'état du relais, sans redémarrer ; pas deux fois le même.
+    #[tokio::test]
+    async fn ajouter_a_chaud() {
+        let d = std::env::temp_dir().join(format!("pop-chaud-{}", std::process::id()));
+        let (a, b) = (d.join("A"), d.join("B"));
+        std::fs::create_dir_all(&a).unwrap();
+        std::fs::create_dir_all(&b).unwrap();
+        let h = start(cfg(&a.to_string_lossy())).unwrap();
+        assert_eq!(h.status().len(), 1);
+        assert!(h.ajouter(&lien(&b.to_string_lossy(), "B")));
+        assert_eq!(h.status().len(), 2);
+        assert_eq!(h.projets().len(), 2);
+        assert!(!h.ajouter(&lien(&b.to_string_lossy(), "B")), "déjà relié");
+        assert!(
+            !h.ajouter(&lien(&d.join("absent").to_string_lossy(), "X")),
+            "dossier absent"
+        );
+        h.stop();
+        let _ = std::fs::remove_dir_all(&d);
     }
 }

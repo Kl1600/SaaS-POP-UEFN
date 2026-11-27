@@ -1,7 +1,7 @@
 //! UEFN Link dans Forge (#77) : le relais tourne dans le processus de Forge, avec la même configuration que
 //! `pop-link.exe` (`%APPDATA%\pop-link\config.json`). Si un `pop-link.exe` est déjà ouvert (port 47800 pris),
 //! Forge ne lance pas un second relais et le dit.
-use std::{sync::Mutex, time::Duration};
+use std::{collections::HashSet, sync::Mutex, time::Duration};
 use tauri::{AppHandle, Manager};
 
 /// Port de la page d'état du relais, le même que `pop-link.exe`.
@@ -117,6 +117,54 @@ pub fn suivre(app: AppHandle) {
                 avant = l;
             }
             tokio::time::sleep(Duration::from_secs(2)).await;
+        }
+    });
+}
+
+/// Nouveaux projets UEFN (#153) : toutes les 30 s, Forge regarde les projets du PC. Un projet ni relié ni ignoré est
+/// signalé à POP ; s'il n'y a qu'une map du même nom (dans un studio où l'on peut éditer), POP la relie et le lien
+/// démarre à chaud. Sinon rien en silence : l'Accueil de Forge le propose. On ne redemande pas pour le même projet
+/// tant que Forge tourne.
+pub fn surveiller(app: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        let mut demandes: HashSet<String> = HashSet::new();
+        loop {
+            tokio::time::sleep(Duration::from_secs(30)).await;
+            let actif = matches!(*app.state::<Relay>().etat.lock().unwrap(), Etat::Actif);
+            let Ok(cfg) = pop_link::load() else { continue };
+            if !actif {
+                continue;
+            }
+            let liens = crate::liens_de(&cfg);
+            let Some(jeton) = liens.first().map(|l| l.token.clone()) else {
+                continue;
+            };
+            let appareil = std::env::var("COMPUTERNAME").unwrap_or_else(|_| "POP Forge".into());
+            for p in crate::tous_les_projets() {
+                let chemin = p.to_string_lossy().to_string();
+                let deja = liens
+                    .iter()
+                    .any(|l| pop_link::meme_dossier(&l.project, &chemin))
+                    || cfg
+                        .ignores
+                        .iter()
+                        .any(|i| pop_link::meme_dossier(i, &chemin))
+                    || !demandes.insert(chemin.to_lowercase());
+                if deja {
+                    continue;
+                }
+                if let Ok(pop_link::Decouverte::Relie(l)) =
+                    pop_link::decouvrir(&cfg.server, &jeton, &p, &appareil).await
+                {
+                    // Relu juste avant d'écrire : une liaison faite entre-temps dans Forge n'est pas perdue.
+                    let c = pop_link::fusionner(pop_link::load().ok(), &cfg.server, l.clone());
+                    if pop_link::save(&c).is_ok() {
+                        if let Some((h, _)) = app.state::<Relay>().handle.lock().unwrap().as_ref() {
+                            h.ajouter(&l);
+                        }
+                    }
+                }
+            }
         }
     });
 }

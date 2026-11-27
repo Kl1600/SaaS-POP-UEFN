@@ -11,6 +11,7 @@ fn main() {
             "importer",
             "maj_verifier",
             "maj_installer",
+            "ignorer",
             "projet_ouvert",
             "liaison",
             "fenetre",
