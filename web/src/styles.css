@@ -1474,3 +1474,4 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 .mini-carte img,.mini-police{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:8px;background:var(--surface)}
 .mini-police{display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:700}
 .mini-carte .linkbtn{align-self:flex-start}
+.mini-carte.on{border-color:var(--text,#111)}
