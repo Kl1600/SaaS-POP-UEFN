@@ -439,23 +439,42 @@ pub async fn mcp(
                 )
                 .await;
             }
+            // Messages de l'humain non lus (#464) : joints à la réponse de n'importe quel outil, pour que l'IA les voie
+            // à son action suivante sans devoir penser à read_messages.
+            let courrier = if name != "read_messages" {
+                crate::messages::joindre(&st, agent).await
+            } else {
+                None
+            };
             match res {
-                Ok(v) => rpc_ok(
-                    id,
-                    text(serde_json::to_string_pretty(&v).unwrap_or_default(), false),
-                ),
-                Err(e) => rpc_ok(
-                    id,
-                    text(
-                        match e {
-                            AppError::BadRequest(m) | AppError::Conflict(m) => m,
-                            AppError::Forbidden => "Action non autorisée pour votre rôle.".into(),
-                            AppError::NotFound => "Introuvable.".into(),
-                            other => format!("{other}"),
-                        },
-                        true,
-                    ),
-                ),
+                Ok(mut v) => {
+                    let mut t = None;
+                    if let Some(c) = courrier {
+                        match v.as_object_mut() {
+                            Some(o) => {
+                                o.insert("messages_de_votre_humain".into(), c);
+                            }
+                            None => t = Some(c),
+                        }
+                    }
+                    let mut s = serde_json::to_string_pretty(&v).unwrap_or_default();
+                    if let Some(c) = t {
+                        s.push_str(&format!("\n\nMessages de votre humain : {c}"));
+                    }
+                    rpc_ok(id, text(s, false))
+                }
+                Err(e) => {
+                    let mut s = match e {
+                        AppError::BadRequest(m) | AppError::Conflict(m) => m,
+                        AppError::Forbidden => "Action non autorisée pour votre rôle.".into(),
+                        AppError::NotFound => "Introuvable.".into(),
+                        other => format!("{other}"),
+                    };
+                    if let Some(c) = courrier {
+                        s.push_str(&format!("\n\nMessages de votre humain : {c}"));
+                    }
+                    rpc_ok(id, text(s, true))
+                }
             }
         }
         _ => rpc_err(id, -32601, "Méthode inconnue"),
@@ -2368,6 +2387,77 @@ mod tests_compte {
             .await
             .unwrap();
         t
+    }
+
+    /// #464 : un message de l'humain arrive avec la réponse du prochain outil de l'IA, et passe à « lu » ;
+    /// une clé « … · Forge » jamais connectée depuis plus de 10 minutes est retirée.
+    #[tokio::test]
+    async fn messages_joints_et_cles_jamais_connectees() {
+        let m = monde().await;
+        let t = jeton(&m, Some(m.equipe), "write").await;
+        let ag: i64 = sqlx::query_scalar("SELECT id FROM api_tokens WHERE token_hash = ?")
+            .bind(sha256_hex(&t))
+            .fetch_one(&m.st.db)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO agent_messages (map_id, agent_id, user_id, body) VALUES (?, ?, ?, 'Pose le pont rouge')")
+            .bind(m.equipe)
+            .bind(ag)
+            .bind(m.uid)
+            .execute(&m.st.db)
+            .await
+            .unwrap();
+        let (err, txt) = mcp_call(&m.st, &t, "list_tasks", json!({})).await;
+        assert!(!err, "{txt}");
+        let v: Value = serde_json::from_str(&txt).unwrap_or(Value::Null);
+        assert!(txt.contains("Pose le pont rouge"), "{txt}");
+        assert!(
+            v.is_null()
+                || v.get("messages_de_votre_humain").is_some()
+                || txt.contains("Messages de votre humain")
+        );
+        let lus: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM agent_messages WHERE agent_id = ? AND read_at IS NOT NULL",
+        )
+        .bind(ag)
+        .fetch_one(&m.st.db)
+        .await
+        .unwrap();
+        assert_eq!(lus, 1);
+        // Pas deux fois.
+        let (_, txt) = mcp_call(&m.st, &t, "list_tasks", json!({})).await;
+        assert!(!txt.contains("Pose le pont rouge"));
+        // Clés de Forge : jamais connectée et ancienne → retirée ; récente ou déjà utilisée → gardée.
+        for (nom, age, utilise) in [
+            ("Codex · Forge", "-20 minutes", false),
+            ("Claude Code · Forge", "-1 minutes", false),
+            ("Codex · Forge", "-30 minutes", true),
+        ] {
+            sqlx::query("INSERT INTO api_tokens (user_id, map_id, name, token_hash, scope, created_at, last_used) VALUES (?, ?, ?, ?, 'write', datetime('now', ?), CASE WHEN ? THEN datetime('now') END)")
+                .bind(m.uid)
+                .bind(m.equipe)
+                .bind(nom)
+                .bind(random_token())
+                .bind(age)
+                .bind(utilise)
+                .execute(&m.st.db)
+                .await
+                .unwrap();
+        }
+        assert_eq!(
+            crate::agents::retirer_cles_jamais_connectees(&m.st, m.equipe)
+                .await
+                .unwrap(),
+            1
+        );
+        let reste: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM api_tokens WHERE map_id = ? AND name LIKE '% · Forge'",
+        )
+        .bind(m.equipe)
+        .fetch_one(&m.st.db)
+        .await
+        .unwrap();
+        assert_eq!(reste, 2);
     }
 
     /// #353 : lire une autre map de l'utilisateur (lecture seule), refus identique pour une map interdite ou absente,

@@ -46,10 +46,12 @@ export function ForgeAgents({ mapId, tache, invoke }: { mapId: number; tache?: n
   const cible = tache ? liste.find(t => t.number === tache) : null
   const porteur = cible ? data?.find(a => a.task?.number === tache) ?? data?.find(a => a.attribuees?.some((x: any) => x.number === tache)) : null
   if (!data) return null
-  const ids = choisis ?? data.map(a => a.id)
+  // Seules les IA qui ont déjà appelé POP sont « connectées » (#464) : une clé jamais utilisée n'ouvre pas de terminal.
+  const connectees = data.filter(a => a.last_used)
+  const ids = choisis ?? connectees.map(a => a.id)
   // L'agent de la tâche ouverte depuis le site est toujours affiché.
   const affiches = data.filter(a => ids.includes(a.id) || a.id === porteur?.id)
-  const fermes = data.filter(a => !affiches.includes(a))
+  const fermes = connectees.filter(a => !affiches.includes(a))
   const changer = (v: number[]) => { setChoisis(v); garderOuverts(mapId, v) }
   const ouvrir = (id: number) => changer([...affiches.map(a => a.id).filter(x => x !== id), id])
   const fermer = (id: number) => changer(affiches.map(a => a.id).filter(x => x !== id))
