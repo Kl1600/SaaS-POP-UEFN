@@ -1,1 +1,1 @@
-{"version": "0.3.10", "date": "2026-11-27", "notes": "· Dictée en temps réel : le texte s'écrit pendant que vous parlez ; au relâchement de Ctrl+Espace, le texte final reste."}
+{"version": "0.3.11", "date": "2026-11-27", "notes": "· La dictée vocale ne ferme plus Forge : reconnaissance vocale compilée pour tous les PC récents."}

@@ -1,7 +1,10 @@
-import{l as _,r as d,j as e,a8 as Pe,t as s,N as Ye,a9 as Se,p as B,n as Me,aa as Ze,ab as Ke,ac as Qe,o as q,V as Ae,ad as es,ae as fe,af as ae,s as je,Y as me,k as ss,ag as We,ah as ts,$ as as,J as ns,X as qe,ai as rs,Z as ve,aj as ls,ak as is,al as $e,M as Re,w as os,u as De,am as cs,B as ds,an as us,ao as ms,ap as ps,aq as hs,a7 as xs,ar as ie,as as Ue,at as gs,au as fs,C as js,av as vs,L as bs}from"./index-CQEBSjFk.js";import{S as ce,F as ys}from"./ForgeAgents-Bb47N1XJ.js";import{M as Ns,G as ws,P as ks,a as Cs,B as Ps,F as Ss,O as Ee,C as Es,b as Fs,c as zs,H as Ls,R as Os,d as Ms,e as As,f as Ws,L as qs,W as $s}from"./wrench-CQGio4Y-.js";import{B as Rs}from"./box-zNxWDc33.js";const Ds=`# Nouveautés de POP Forge
+import{l as _,r as d,j as e,a8 as Pe,t as s,N as Ye,a9 as Se,p as B,n as Me,aa as Ze,ab as Ke,ac as Qe,o as q,V as Ae,ad as es,ae as fe,af as ae,s as je,Y as me,k as ss,ag as We,ah as ts,$ as as,J as ns,X as qe,ai as rs,Z as ve,aj as ls,ak as is,al as $e,M as Re,w as os,u as De,am as cs,B as ds,an as us,ao as ms,ap as ps,aq as hs,a7 as xs,ar as ie,as as Ue,at as gs,au as fs,C as js,av as vs,L as bs}from"./index-bxJbaFqi.js";import{S as ce,F as ys}from"./ForgeAgents-DT9Vit5S.js";import{M as Ns,G as ws,P as ks,a as Cs,B as Ps,F as Ss,O as Ee,C as Es,b as Fs,c as zs,H as Ls,R as Os,d as Ms,e as As,f as Ws,L as qs,W as $s}from"./wrench-D4meBWWf.js";import{B as Rs}from"./box-gqkmNK7_.js";const Ds=`# Nouveautés de POP Forge
 
 Une entrée par version de \`forge/tauri.conf.json\` (#437) : \`## version · date\`, puis 1 à 5 lignes en français.
 Le workflow « relais Windows » en tire les notes de la mise à jour ; le CI refuse une version sans entrée.
+
+## 0.3.11 · 27/11/2026
+- La dictée vocale ne ferme plus Forge : reconnaissance vocale compilée pour tous les PC récents.
 
 ## 0.3.10 · 27/11/2026
 - Dictée en temps réel : le texte s'écrit pendant que vous parlez ; au relâchement de Ctrl+Espace, le texte final reste.
