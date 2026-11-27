@@ -31,7 +31,9 @@ struct Enregistrement {
     arret: mpsc::Sender<()>,
     fil: std::thread::JoinHandle<Result<(Vec<f32>, u32), String>>,
     /// Texte provisoire (#477) : transcription répétée pendant qu'on parle.
-    partiel: Arc<Mutex<(u64, String)>>,
+    /// (version, texte, échantillons couverts) : le dernier texte provisoire et la longueur de son qu'il couvre.
+    partiel: Arc<Mutex<(u64, String, usize)>>,
+    echantillons: Arc<Mutex<Vec<f32>>>,
     en_cours: Arc<AtomicBool>,
     transcripteur: Option<std::thread::JoinHandle<()>>,
 }
@@ -208,7 +210,7 @@ pub async fn dictee_debut(
     ok.recv().map_err(|e| e.to_string())??;
     // Transcription en temps réel (#477) : tant qu'on parle, on retranscrit tout ce qui a été dit dès que la
     // transcription précédente est finie (les 30 dernières secondes au plus), et la page affiche ce texte provisoire.
-    let partiel = Arc::new(Mutex::new((0u64, String::new())));
+    let partiel = Arc::new(Mutex::new((0u64, String::new(), 0usize)));
     let en_cours = Arc::new(AtomicBool::new(true));
     let modele = charger(&app, &d).ok();
     let transcripteur = modele.map(|m| {
@@ -223,10 +225,10 @@ pub async fn dictee_debut(
             let mut deja = 0usize;
             while c.load(Ordering::SeqCst) {
                 let taux = tx.load(Ordering::SeqCst) as usize;
-                let son: Vec<f32> = {
+                let (son, total) = {
                     let v = ech.lock().unwrap();
                     let debut = v.len().saturating_sub(taux * 30);
-                    v[debut..].to_vec()
+                    (v[debut..].to_vec(), v.len())
                 };
                 // Au moins 0,4 s de nouveau son avant de retranscrire.
                 if taux == 0 || son.len() < taux / 2 || son.len() < deja + taux * 2 / 5 {
@@ -238,6 +240,7 @@ pub async fn dictee_debut(
                     let mut g = p.lock().unwrap();
                     g.0 += 1;
                     g.1 = t;
+                    g.2 = total;
                 }
             }
         })
@@ -246,6 +249,7 @@ pub async fn dictee_debut(
         arret,
         fil,
         partiel,
+        echantillons,
         en_cours,
         transcripteur,
     });
@@ -306,14 +310,20 @@ pub async fn dictee_fin(
         .unwrap()
         .take()
         .ok_or("Aucune dictée en cours.")?;
+    // Ce qui a été dit jusqu'au relâchement, et le dernier texte provisoire.
+    let dit = e.echantillons.lock().unwrap().len();
+    let (_, provisoire, couvert) = e.partiel.lock().unwrap().clone();
     let _ = e.arret.send(());
     e.en_cours.store(false, Ordering::SeqCst);
     let (son, taux) = e.fil.join().map_err(|_| "Erreur du micro.".to_string())??;
-    if let Some(t) = e.transcripteur {
-        let _ = tokio::task::spawn_blocking(move || t.join()).await;
-    }
+    // Le fil de transcription s'arrête de lui-même après son passage en cours ; on ne l'attend pas (#484).
+    drop(e.transcripteur);
     if son.len() < taux as usize / 4 {
         return Ok(String::new());
+    }
+    // Le texte provisoire couvre déjà presque tout (à 0,6 s près) : c'est le texte final, tout de suite.
+    if !provisoire.is_empty() && dit.saturating_sub(couvert) <= taux as usize * 3 / 5 {
+        return Ok(provisoire);
     }
     let modele = charger(&app, &d)?;
     let langue = langue_sure(langue);
@@ -328,7 +338,7 @@ fn transcrire(modele: &WhisperContext, son: &[f32], langue: &str) -> Result<Stri
     p.set_language(Some(langue));
     p.set_n_threads(
         std::thread::available_parallelism()
-            .map(|n| n.get().min(8) as i32)
+            .map(|n| n.get().min(16) as i32)
             .unwrap_or(4),
     );
     p.set_print_special(false);
@@ -336,7 +346,12 @@ fn transcrire(modele: &WhisperContext, son: &[f32], langue: &str) -> Result<Stri
     p.set_print_realtime(false);
     p.set_print_timestamps(false);
     p.set_no_context(true);
-    p.set_single_segment(false);
+    // Rapide (#484) : pas d'horodatage, un seul segment, pas de nouvel essai à plus haute température, et une fenêtre
+    // audio à la taille du son (whisper calcule sinon toujours 30 s : jusqu'à 10 fois plus lent pour 3 s de voix).
+    p.set_no_timestamps(true);
+    p.set_single_segment(true);
+    p.set_temperature_inc(0.0);
+    p.set_audio_ctx(contexte_audio(son.len()));
     etat.full(p, son)
         .map_err(|e| format!("Transcription impossible : {e}"))?;
     let mut texte = String::new();
@@ -346,6 +361,11 @@ fn transcrire(modele: &WhisperContext, son: &[f32], langue: &str) -> Result<Stri
         }
     }
     Ok(texte.trim().to_string())
+}
+
+/// Fenêtre audio de whisper pour `n` échantillons à 16 kHz : 1500 pour 30 s (50 par seconde), plus une marge.
+fn contexte_audio(n: usize) -> i32 {
+    ((n as f64 / 16_000.0 * 50.0).ceil() as i32 + 64).min(1500)
 }
 
 /// Rééchantillonne en 16 kHz (format attendu par whisper), par interpolation linéaire.
@@ -370,6 +390,13 @@ fn a_16k(son: &[f32], taux: u32) -> Vec<f32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn fenetre_audio() {
+        assert_eq!(contexte_audio(16_000 * 3), 214);
+        assert_eq!(contexte_audio(16_000 * 30), 1500);
+        assert_eq!(contexte_audio(16_000 * 60), 1500);
+    }
 
     #[test]
     fn reechantillonnage() {

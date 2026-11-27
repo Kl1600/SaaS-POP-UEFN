@@ -1,1 +1,1 @@
-{"version": "0.3.11", "date": "2026-11-27", "notes": "· La dictée vocale ne ferme plus Forge : reconnaissance vocale compilée pour tous les PC récents."}
+{"version": "0.3.12", "date": "2026-11-27", "notes": "· Dictée bien plus rapide : le texte suit la voix et le texte final arrive dès le relâchement."}
