@@ -1,19 +1,13 @@
 import { useRef, useState } from 'react'
-import { Download, Lock, Users, Globe, PackagePlus, Upload, Box, Music, Image as ImageIcon } from 'lucide-react'
+import { Download, Lock, Globe, PackagePlus, Upload, Box, Music, Image as ImageIcon } from 'lucide-react'
 import { api } from '../api'
 import { useApp, useLoad } from '../state'
 import { tr } from '../i18n/t'
-import { Selecteur } from './Selecteur'
 
-// Bibliothèque de Forge (#382) : vos assets (privés par défaut), ceux du studio et les publics ; vous choisissez
-// qui voit les vôtres et vous les ajoutez au projet UEFN de n'importe laquelle de vos maps.
+// Bibliothèque de Forge (#382, #462) : tout asset est public (décision du 27/11) ; « Public » montre ceux de tous,
+// « Mes assets » les vôtres, même publics. On les ajoute au projet UEFN de n'importe laquelle de ses maps.
 // #92 : aperçus (image affichée, son écoutable, 3D : nom et taille) et envoi avec déclaration de droits.
-type Onglet = 'mine' | 'studio' | 'public'
-const VIS: Record<string, [string, typeof Lock]> = {
-  private: [tr("Privé"), Lock],
-  studio: [tr("Studio"), Users],
-  public: [tr("Public"), Globe],
-}
+type Onglet = 'public' | 'mine'
 
 function taille(o: number) {
   return o >= 1048576 ? `${(o / 1048576).toFixed(1)} Mo` : `${Math.max(1, Math.round(o / 1024))} Ko`
@@ -30,13 +24,13 @@ function Apercu({ a }: { a: any }) {
   return <div className="asset-img asset-ico" aria-hidden="true"><Icone size={26} strokeWidth={1.25} /></div>
 }
 
-/** Envoi d'un asset (#92) : refusé sans déclaration de droits ; privé par défaut (#382). */
+/** Envoi d'un asset (#92) : refusé sans déclaration de droits ni accord de partage public (#462). */
 function Envoi({ studioId, fini }: { studioId: number; fini: () => void }) {
   const app = useApp()
   const fichier = useRef<HTMLInputElement>(null)
   const [f, setF] = useState<File | null>(null)
   const [droits, setDroits] = useState('')
-  const [vis, setVis] = useState('private')
+  const [partage, setPartage] = useState(false)
   const [occupe, setOccupe] = useState(false)
   const envoyer = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -44,11 +38,11 @@ function Envoi({ studioId, fini }: { studioId: number; fini: () => void }) {
     if (!droits.trim()) { app.toast(tr("Déclarez d'où vient ce fichier et vos droits dessus."), true); return }
     setOccupe(true)
     try {
-      const r = await api.post(`/api/studios/${studioId}/assets`, { name: f.name, size: f.size, rights: droits.trim(), visibility: vis })
+      const r = await api.post(`/api/studios/${studioId}/assets`, { name: f.name, size: f.size, rights: droits.trim(), partage_public: partage })
       const put = await fetch(r.upload_url, { method: 'PUT', body: f })
       if (!put.ok) throw new Error(tr("Envoi refusé par le stockage ({0})", [put.status]))
       await api.post(`/api/assets/${r.id}/confirm`)
-      app.toast(tr("{0} est dans votre bibliothèque", [f.name])); setF(null); setDroits(''); if (fichier.current) fichier.current.value = ''; fini()
+      app.toast(tr("{0} est publié dans la bibliothèque", [f.name])); setF(null); setDroits(''); setPartage(false); if (fichier.current) fichier.current.value = ''; fini()
     } catch (er: any) { app.toast(er.message, true) }
     setOccupe(false)
   }
@@ -57,25 +51,27 @@ function Envoi({ studioId, fini }: { studioId: number; fini: () => void }) {
       <input ref={fichier} type="file" hidden accept=".fbx,.obj,.png,.jpg,.jpeg,.tga,.wav,.ogg,.mp3" onChange={e => setF(e.target.files?.[0] ?? null)} aria-label={tr("Fichier")} />
       <button type="button" className="btn" onClick={() => fichier.current?.click()}><Upload size={16} strokeWidth={1.5} />{tr("Choisir un fichier")}</button>
       <span className={f ? '' : 'muted'} style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f ? f.name : tr("FBX, OBJ, PNG, JPG, TGA, WAV, OGG ou MP3")}</span>
-      <div className="sel-compact"><Selecteur label={tr("Visibilité")} placeholder={tr("Visibilité")} value={vis}
-        options={Object.entries(VIS).map(([k, [l]]) => ({ value: k, label: l }))} onChange={setVis} /></div>
     </div>
     <input className="field" style={{ height: 36 }} value={droits} maxLength={300} onChange={e => setDroits(e.target.value)}
       placeholder={tr("Droits : ex. « Créé par moi », « Acheté sur Fab, licence standard »")} aria-label={tr("Déclaration de droits")} />
-    <div><button className="btn pri" disabled={!f || occupe}>{occupe ? tr("Envoi…") : tr("Envoyer")}</button></div>
+    <label className="row small" style={{ gap: 8, alignItems: 'flex-start' }}><input type="checkbox" checked={partage} onChange={e => setPartage(e.target.checked)} style={{ marginTop: 2 }} />
+      <span>{tr("Tout asset est public dans POP : je confirme avoir le droit de partager ce fichier avec tous les utilisateurs (créé par moi, ou licence libre).")}</span></label>
+    <div><button className="btn pri" disabled={!f || occupe || !partage}>{occupe ? tr("Envoi…") : tr("Envoyer")}</button></div>
   </form>
 }
 
 export function ForgeBibliotheque({ mapId, studioId }: { mapId: number | null; studioId: number | null }) {
   const app = useApp()
-  const [onglet, setOnglet] = useState<Onglet>('mine')
+  const [onglet, setOnglet] = useState<Onglet>('public')
   const [q, setQ] = useState('')
-  const url = onglet === 'studio' ? (studioId ? `/api/studios/${studioId}/assets` : null) : `/api/me/assets?tab=${onglet}`
+  const url = `/api/me/assets?tab=${onglet}`
   const { data, reload } = useLoad<any>(url, [url])
   const [occupe, setOccupe] = useState<number | null>(null)
 
-  const changer = async (id: number, visibility: string) => {
-    try { await api.post(`/api/assets/${id}/visibility`, { visibility }); app.toast(tr("Visibilité : {0}", [VIS[visibility][0]])); reload() }
+  // Un ancien asset privé ou « studio » (d'avant le 27/11) peut seulement devenir public.
+  const publier = async (a: any) => {
+    if (!confirm(tr("Publier « {0} » ? Tous les utilisateurs de POP pourront le voir et l'importer.", [a.name]))) return
+    try { await api.post(`/api/assets/${a.id}/visibility`, { visibility: 'public' }); app.toast(tr("{0} est public", [a.name])); reload() }
     catch (e: any) { app.toast(e.message, true) }
   }
   const ajouter = async (a: any) => {
@@ -87,7 +83,7 @@ export function ForgeBibliotheque({ mapId, studioId }: { mapId: number | null; s
   }
 
   const liste: any[] = (data?.assets ?? []).filter((a: any) => !q || a.name.toLowerCase().includes(q.toLowerCase()))
-  const onglets: [Onglet, string][] = [['mine', tr("Mes assets")], ['studio', tr("Studio")], ['public', tr("Public")]]
+  const onglets: [Onglet, string][] = [['public', tr("Public")], ['mine', tr("Mes assets")]]
   return <div className="stack" style={{ gap: 18 }}>
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
       <div className="tabs" role="tablist">
@@ -97,15 +93,14 @@ export function ForgeBibliotheque({ mapId, studioId }: { mapId: number | null; s
       <input className="field" style={{ width: 240, height: 36 }} placeholder={tr("Rechercher")} value={q} onChange={e => setQ(e.target.value)} aria-label={tr("Rechercher")} />
     </div>
     {onglet === 'mine' && studioId && <Envoi studioId={studioId} fini={reload} />}
-    {onglet === 'mine' && <p className="muted" style={{ margin: 0 }}>{tr("Ce que vous envoyez est privé : vous seul le voyez et le réutilisez dans toutes vos maps. Rendez-le visible au studio ou à tous quand vous voulez.")}</p>}
-    {onglet === 'studio' && !studioId && <p className="muted">{tr("Choisissez une map.")}</p>}
+    <p className="muted" style={{ margin: 0 }}>{onglet === 'mine' ? tr("Tout ce que vous envoyez, ou que POP crée pour vous, est public : chacun peut le réutiliser. Ici, seulement les vôtres.") : tr("Les assets de tous les utilisateurs de POP, à ajouter à vos projets.")}</p>
     {data && liste.length === 0 && <div className="card muted" style={{ padding: 24, textAlign: 'center' }}>
       {onglet === 'mine' ? tr("Aucun asset pour l'instant. Ceux que vous envoyez, ou que POP crée pour vous, arrivent ici.") : tr("Aucun asset.")}
     </div>}
     <div className="stack" style={{ gap: 8 }}>
       {liste.map(a => {
-        const v = a.visibility && VIS[a.visibility]
-        const Icone = v ? v[1] : Users
+        const prive = a.visibility && a.visibility !== 'public'
+        const Icone = prive ? Lock : Globe
         return <div key={a.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px 10px 10px' }}>
           <Apercu a={a} />
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -113,11 +108,7 @@ export function ForgeBibliotheque({ mapId, studioId }: { mapId: number | null; s
             <small className="muted">{[a.kind, taille(a.size), a.pop ? 'POP' : a.author].filter(Boolean).join(' · ')}</small>
             {SONS.includes(String(a.kind).toLowerCase()) && <audio controls preload="none" src={`/api/assets/${a.id}/download`} style={{ display: 'block', height: 32, marginTop: 6, maxWidth: '100%' }} />}
           </div>
-          {a.mine && <div className="sel-compact">
-            <Selecteur label={tr("Visibilité")} placeholder={tr("Visibilité")} value={a.visibility}
-              options={Object.entries(VIS).map(([k, [l]]) => ({ value: k, label: l }))}
-              onChange={x => changer(a.id, x)} />
-          </div>}
+          {a.mine && prive && <button className="btn" onClick={() => publier(a)}>{tr("Rendre public")}</button>}
           <a className="iconbtn" href={`/api/assets/${a.id}/download`} title={tr("Télécharger")} aria-label={tr("Télécharger")}><Download size={18} strokeWidth={1.5} /></a>
           <button className="btn" disabled={occupe === a.id || !mapId} onClick={() => ajouter(a)} title={mapId ? '' : tr("Choisissez une map.")}>
             <PackagePlus size={16} strokeWidth={1.5} />{occupe === a.id ? tr("Ajout…") : tr("Ajouter au projet")}

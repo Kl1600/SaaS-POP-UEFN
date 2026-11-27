@@ -22,7 +22,6 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 
 /// Visibilités d'un asset (#382).
-pub const VISIBILITES: &[&str] = &["private", "studio", "public"];
 
 pub const TYPES: &[&str] = &[
     "fbx", "obj", "png", "jpg", "jpeg", "tga", "wav", "ogg", "mp3",
@@ -87,8 +86,11 @@ pub struct NewAsset {
     /// true : asset de l'équipe POP, visible par tous (administrateurs du serveur seulement).
     #[serde(default)]
     pop: bool,
-    /// private (par défaut, #382), studio ou public.
+    /// Ancien choix de visibilité (#382) : seul « public » est accepté (décision du 27/11, #462).
     visibility: Option<String>,
+    /// L'auteur confirme avoir le droit de partager ce fichier publiquement (tout asset est public, #462).
+    #[serde(default)]
+    partage_public: bool,
 }
 
 /// Prépare l'envoi : contrôles (type, taille, quota, droits), fiche « en cours », lien signé d'envoi (PUT, 15 min).
@@ -104,10 +106,14 @@ pub async fn create(
     if b.pop && !est_admin(&st, &u).await? {
         return Err(AppError::Forbidden);
     }
-    let vis = b.visibility.clone().unwrap_or_else(|| "private".into());
-    if !VISIBILITES.contains(&vis.as_str()) {
-        return Err(bad("Visibilité : private, studio ou public."));
+    // Tout asset est public (décision du 27/11, #462).
+    if b.visibility.as_deref().is_some_and(|v| v != "public") {
+        return Err(bad("Tout asset est public dans POP : on ne peut plus en garder un privé ou réservé au studio."));
     }
+    if !b.pop && !b.partage_public {
+        return Err(bad("Tout asset est public dans POP : confirmez que vous avez le droit de partager ce fichier avec tous les utilisateurs (créé par vous, ou licence libre). Sinon, ne l'envoyez pas."));
+    }
+    let vis = "public".to_string();
     check_len("Nom", &b.name, 1, 120)?;
     check_len("Déclaration de droits", &b.rights, 3, 300)?;
     let nom: String = b
@@ -327,19 +333,44 @@ mod tests {
 
     fn envoi(name: &str, size: i64, rights: &str) -> Json<NewAsset> {
         Json(
-            serde_json::from_value(json!({ "name": name, "size": size, "rights": rights }))
-                .unwrap(),
+            serde_json::from_value(
+                json!({ "name": name, "size": size, "rights": rights, "partage_public": true }),
+            )
+            .unwrap(),
         )
     }
 
-    /// #382 : privé par défaut, public au choix de l'auteur, réutilisable par l'auteur partout.
+    /// #462 (décision du 27/11) : tout asset est public ; l'auteur le retrouve dans « Mes assets » ; plus de privé.
     #[tokio::test]
-    async fn bibliotheque_personnelle() {
+    async fn assets_publics_d_office() {
         std::env::set_var("POP_S3_ENDPOINT", "https://compte.r2.cloudflarestorage.com");
         std::env::set_var("POP_S3_BUCKET", "pop-assets");
         std::env::set_var("POP_S3_KEY_ID", "cle");
         std::env::set_var("POP_S3_SECRET", "secret");
-        let (st, s1, m, v, o) = monde().await;
+        let (st, s1, m, _v, o) = monde().await;
+        // Sans confirmer le droit de partage public : refus, avec la raison.
+        let e = create(
+            State(st.clone()),
+            m.clone(),
+            Path(s1),
+            Json(
+                serde_json::from_value(
+                    json!({ "name": "arbre.fbx", "size": 1000, "rights": "Acheté sur un store" }),
+                )
+                .unwrap(),
+            ),
+        )
+        .await
+        .unwrap_err();
+        assert!(format!("{e:?}").contains("public"), "{e:?}");
+        assert!(create(
+            State(st.clone()),
+            m.clone(),
+            Path(s1),
+            Json(serde_json::from_value(json!({ "name": "arbre.fbx", "size": 1000, "rights": "Créé par moi", "partage_public": true, "visibility": "private" })).unwrap()),
+        )
+        .await
+        .is_err(), "plus de privé");
         let Json(r) = create(
             State(st.clone()),
             m.clone(),
@@ -359,44 +390,31 @@ mod tests {
             .fetch_one(&st.db)
             .await
             .unwrap();
-        assert_eq!(vis, "private");
-        // Privé : un membre du même studio ne le voit pas, l'auteur le retrouve dans « Mes assets ».
-        let Json(l) = list(State(st.clone()), v.clone(), Path(s1)).await.unwrap();
-        assert!(l["assets"].as_array().unwrap().is_empty());
-        assert!(lien_import(&st, &v, id).await.is_err());
+        assert_eq!(vis, "public");
         let q = |tab: &str| {
             axum::extract::Query(std::collections::HashMap::from([(
                 "tab".to_string(),
                 tab.to_string(),
             )]))
         };
+        // L'auteur le voit dans « Mes assets » et dans « Public » ; un compte d'un autre studio le voit dans « Public »
+        // et peut l'importer, mais pas dans ses « Mes assets ».
         let Json(mien) = miens(State(st.clone()), m.clone(), q("mine"))
             .await
             .unwrap();
         assert_eq!(mien["assets"][0]["id"], id);
-        assert!(lien_import(&st, &m, id)
-            .await
-            .unwrap()
-            .0
-            .contains("/api/assets/import/"));
-        // Seul l'auteur change la visibilité ; public : tout compte, même d'un autre studio, le lit.
-        let vis_in = |x: &str| {
-            Json(VisIn {
-                visibility: x.into(),
-            })
-        };
-        assert!(
-            visibilite(State(st.clone()), o.clone(), Path(id), vis_in("public"))
-                .await
-                .is_err()
-        );
-        visibilite(State(st.clone()), m.clone(), Path(id), vis_in("public"))
-            .await
-            .unwrap();
         let Json(pubs) = miens(State(st.clone()), o.clone(), q("public"))
             .await
             .unwrap();
         assert!(pubs["assets"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|a| a["id"] == id));
+        let Json(siens) = miens(State(st.clone()), o.clone(), q("mine"))
+            .await
+            .unwrap();
+        assert!(!siens["assets"]
             .as_array()
             .unwrap()
             .iter()
@@ -408,15 +426,27 @@ mod tests {
                 .is_err(),
             "public ne veut pas dire modifiable"
         );
-        visibilite(State(st.clone()), m.clone(), Path(id), vis_in("private"))
-            .await
-            .unwrap();
-        assert!(lien_import(&st, &o, id).await.is_err());
+        let vis_in = |x: &str| {
+            Json(VisIn {
+                visibility: x.into(),
+            })
+        };
         assert!(
-            visibilite(State(st.clone()), m.clone(), Path(id), vis_in("tous"))
+            visibilite(State(st.clone()), m.clone(), Path(id), vis_in("private"))
                 .await
                 .is_err()
         );
+        // Un ancien asset privé reste privé ; son auteur peut le rendre public.
+        sqlx::query("UPDATE assets SET visibility = 'private' WHERE id = ?")
+            .bind(id)
+            .execute(&st.db)
+            .await
+            .unwrap();
+        assert!(lien_import(&st, &o, id).await.is_err());
+        visibilite(State(st.clone()), m.clone(), Path(id), vis_in("public"))
+            .await
+            .unwrap();
+        assert!(lien_import(&st, &o, id).await.is_ok());
     }
 
     #[tokio::test]
@@ -470,7 +500,7 @@ mod tests {
             m.clone(),
             Path(s1),
             Json(
-                serde_json::from_value(json!({ "name": "arbre.fbx", "size": 9 * mb, "rights": "Créé par notre équipe", "visibility": "studio" }))
+                serde_json::from_value(json!({ "name": "arbre.fbx", "size": 9 * mb, "rights": "Créé par notre équipe", "partage_public": true }))
                     .unwrap(),
             ),
         )
@@ -531,15 +561,16 @@ pub struct VisIn {
     visibility: String,
 }
 
-/// `POST /api/assets/{id}/visibility` (#382) : l'auteur rend son asset privé, visible par son studio ou public.
+/// `POST /api/assets/{id}/visibility` (#382, #462) : l'auteur rend public un ancien asset privé ou « studio » ;
+/// l'inverse n'est plus possible (tout asset est public, décision du 27/11).
 pub async fn visibilite(
     State(st): State<AppState>,
     u: AuthUser,
     Path(id): Path<i64>,
     Json(b): Json<VisIn>,
 ) -> ApiResult<Value> {
-    if !VISIBILITES.contains(&b.visibility.as_str()) {
-        return Err(bad("Visibilité : private, studio ou public."));
+    if b.visibility != "public" {
+        return Err(bad("Tout asset est public dans POP : on ne peut plus en rendre un privé ou réservé au studio."));
     }
     let n = sqlx::query(
         "UPDATE assets SET visibility = ? WHERE id = ? AND author_id = ? AND studio_id IS NOT NULL",
