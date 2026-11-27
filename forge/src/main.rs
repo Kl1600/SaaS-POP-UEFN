@@ -124,6 +124,8 @@ fn autoriser(app: &AppHandle, u: &Url) {
         .permission("allow-maj-verifier")
         .permission("allow-maj-installer")
         .permission("allow-ignorer")
+        .permission("allow-forge-version")
+        .permission("allow-maj-etat")
         .permission("allow-importer")
         .permission("allow-projet-ouvert")
         .permission("allow-liaison")
@@ -855,7 +857,9 @@ fn main() {
             action_forge,
             choisir_dossier,
             maj::maj_verifier,
-            maj::maj_installer
+            maj::maj_installer,
+            maj::forge_version,
+            maj::maj_etat
         ])
         .setup(|app| {
             let h = app.handle().clone();

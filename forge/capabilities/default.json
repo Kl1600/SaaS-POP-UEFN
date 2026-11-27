@@ -16,6 +16,8 @@
     "allow-maj-verifier",
     "allow-maj-installer",
     "allow-ignorer",
+    "allow-forge-version",
+    "allow-maj-etat",
     "allow-projet-ouvert",
     "allow-liaison",
     "allow-fenetre",

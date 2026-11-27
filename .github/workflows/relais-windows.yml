@@ -86,7 +86,8 @@ jobs:
           cp /tmp/pop-forge/*.exe web/public/downloads/pop-forge-setup.exe
           # Signature de mise à jour (#79), lue par /api/forge/latest.
           cp /tmp/pop-forge/*.exe.sig web/public/downloads/pop-forge-setup.exe.sig
-          python3 -c "import json,datetime; v=json.load(open('forge/tauri.conf.json'))['version']; json.dump({'version': v, 'date': datetime.date.today().isoformat()}, open('web/public/downloads/pop-forge.json','w'))"
+          # Notes de la version : forge/NOUVEAUTES.md (#437), montrées dans le bandeau de mise à jour de Forge.
+          python3 -c "import json,datetime,subprocess; v=json.load(open('forge/tauri.conf.json'))['version']; n=subprocess.run(['python3','tools/nouveautes.py','notes',v],capture_output=True,text=True).stdout.strip(); json.dump({'version': v, 'date': datetime.date.today().isoformat(), 'notes': n or 'Nouvelle version de POP Forge.'}, open('web/public/downloads/pop-forge.json','w'), ensure_ascii=False)"
       - uses: actions/setup-node@v4
         with:
           node-version: 22
