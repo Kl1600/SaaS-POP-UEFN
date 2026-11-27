@@ -12,6 +12,7 @@
 
 mod agents_locaux;
 mod dictee;
+mod direct;
 mod maj;
 mod relay;
 
@@ -128,6 +129,11 @@ fn autoriser(app: &AppHandle, u: &Url) {
         .permission("allow-forge-version")
         .permission("allow-maj-etat")
         .permission("allow-fenetre-terminal")
+        .permission("allow-direct-ouvrir")
+        .permission("allow-direct-ecrire")
+        .permission("allow-direct-lire")
+        .permission("allow-direct-fermer")
+        .permission("allow-direct-actifs")
         .permission("allow-dictee-etat")
         .permission("allow-dictee-telecharger")
         .permission("allow-dictee-debut")
@@ -671,13 +677,29 @@ fn lancer_agent(
     tache: Option<i64>,
     titre: Option<String>,
 ) -> Result<(), String> {
+    let p = preparer(&app, &outil, &token, &map)?;
+    let consigne = agents_locaux::consigne(&map, tache, &titre.unwrap_or_default());
+    let args = agents_locaux::arguments(&outil, &p.serveur, &p.config, &consigne)
+        .ok_or("Outil non pris en charge.")?;
+    agents_locaux::lancer(&p.exe, &args, &p.dossier, &token)
+}
+
+/// Ce qu'il faut pour faire tourner un outil d'IA sur ce PC : exécutable, config MCP (sans clé), dossier de travail.
+struct Prepare {
+    serveur: String,
+    exe: PathBuf,
+    config: PathBuf,
+    dossier: PathBuf,
+}
+
+fn preparer(app: &AppHandle, outil: &str, token: &str, map: &str) -> Result<Prepare, String> {
     if !token.starts_with("pop_")
         || token.len() > 200
         || !token[4..].bytes().all(|b| b.is_ascii_alphanumeric())
     {
         return Err("Clé d'agent invalide.".into());
     }
-    let serveur = serveur(&app);
+    let serveur = serveur(app);
     let o = agents_locaux::outils()
         .into_iter()
         .find(|o| o.id == outil)
@@ -699,16 +721,75 @@ fn lancer_agent(
         .and_then(|c| {
             liens_de(&c)
                 .into_iter()
-                .find(|l| l.map.eq_ignore_ascii_case(&map))
+                .find(|l| l.map.eq_ignore_ascii_case(map))
                 .map(|l| PathBuf::from(l.project))
         })
         .filter(|p| p.is_dir())
         .or_else(dirs::home_dir)
         .ok_or("Dossier de travail introuvable.")?;
-    let consigne = agents_locaux::consigne(&map, tache, &titre.unwrap_or_default());
-    let args = agents_locaux::arguments(&outil, &serveur, &config, &consigne)
-        .ok_or("Outil non pris en charge.")?;
-    agents_locaux::lancer(&exe, &args, &dossier, &token)
+    Ok(Prepare {
+        serveur,
+        exe,
+        config,
+        dossier,
+    })
+}
+
+/// Terminal en direct (#466) : Claude Code tourne dans Forge, sans fenêtre ; son terminal lui parle directement.
+#[tauri::command]
+async fn direct_ouvrir(
+    app: AppHandle,
+    d: tauri::State<'_, direct::Directs>,
+    outil: String,
+    token: String,
+    map: String,
+    agent: i64,
+) -> Result<(), String> {
+    if outil != "claude_code" {
+        return Err("Le terminal en direct marche avec Claude Code pour l'instant.".into());
+    }
+    let p = preparer(&app, &outil, &token, &map)?;
+    let consigne = agents_locaux::consigne(&map, None, "");
+    direct::ouvrir(
+        &d,
+        agent,
+        &p.exe,
+        &direct::arguments_claude(&p.config, &consigne),
+        &p.dossier,
+        &token,
+    )
+}
+
+#[tauri::command]
+fn direct_ecrire(
+    d: tauri::State<'_, direct::Directs>,
+    agent: i64,
+    texte: String,
+) -> Result<(), String> {
+    let t = texte.trim();
+    if t.is_empty() || t.len() > 8000 {
+        return Err("Message vide ou trop long.".into());
+    }
+    direct::ecrire(&d, agent, t)
+}
+
+#[tauri::command]
+fn direct_lire(
+    d: tauri::State<'_, direct::Directs>,
+    agent: i64,
+    depuis: usize,
+) -> Option<direct::Lecture> {
+    direct::lire(&d, agent, depuis)
+}
+
+#[tauri::command]
+fn direct_fermer(d: tauri::State<'_, direct::Directs>, agent: i64) {
+    direct::fermer(&d, agent)
+}
+
+#[tauri::command]
+fn direct_actifs(d: tauri::State<'_, direct::Directs>) -> Vec<i64> {
+    direct::actifs(&d)
 }
 
 /// Assistant de premier lancement (#299) : vérifications du poste (UEFN, serveur MCP, toolsets, Python, démarrage
@@ -871,6 +952,7 @@ fn main() {
         .manage(relay::Relay::default())
         .manage(Cible::default())
         .manage(dictee::Dictee::default())
+        .manage(direct::Directs::default())
         .invoke_handler(tauri::generate_handler![
             capture_jeu,
             bilan_poste,
@@ -898,6 +980,11 @@ fn main() {
             maj::forge_version,
             maj::maj_etat,
             fenetre_terminal,
+            direct_ouvrir,
+            direct_ecrire,
+            direct_lire,
+            direct_fermer,
+            direct_actifs,
             dictee::dictee_etat,
             dictee::dictee_telecharger,
             dictee::dictee_debut,
@@ -937,8 +1024,14 @@ fn main() {
             relay::surveiller(app.handle().clone());
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("POP Forge n'a pas pu démarrer");
+        .build(tauri::generate_context!())
+        .expect("POP Forge n'a pas pu démarrer")
+        .run(|app, e| {
+            // Fermer Forge arrête les outils lancés en direct (#466).
+            if let tauri::RunEvent::Exit = e {
+                app.state::<direct::Directs>().tout_arreter();
+            }
+        });
 }
 
 #[cfg(test)]

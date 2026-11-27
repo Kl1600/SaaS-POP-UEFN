@@ -1486,3 +1486,7 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 .mini-pj{position:relative;width:120px;aspect-ratio:16/9;border-radius:8px;overflow:hidden;border:1px solid var(--border)}
 .mini-pj img{width:100%;height:100%;object-fit:cover}
 .mini-pj .iconbtn{position:absolute;top:2px;right:2px;background:var(--bg,#fff)}
+/* Terminal en direct (#466) */
+.term-direct{font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;padding:1px 6px;border-radius:6px;background:#ED753E;color:#0c0c0c;font-weight:700}
+.term-pouls{animation:forge-dictee-pouls 1s ease-in-out infinite}
+@media (prefers-reduced-motion: reduce){.term-pouls{animation:none}}

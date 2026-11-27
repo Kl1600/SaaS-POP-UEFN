@@ -38,6 +38,10 @@ export function ForgeAgents({ mapId, tache, invoke }: { mapId: number; tache?: n
   // Chaque appel d'outil d'un agent arrive sur le WebSocket de la map (#298) : l'écran suit en direct.
   useEffect(() => app.subscribe(m => { if (m?.t === 'agent') tout() }), [mapId])
   const [choisis, setChoisis] = useState<number[] | null>(() => lireOuverts(mapId))
+  // Terminaux en direct (#466) : agents dont Forge fait tourner l'outil.
+  const [directs, setDirects] = useState<number[]>([])
+  const relireDirects = () => { invoke?.('direct_actifs').then((l: number[]) => setDirects(l ?? [])).catch(() => setDirects([])) }
+  useEffect(() => { relireDirects(); const t = setInterval(relireDirects, 3000); return () => clearInterval(t) }, [invoke])
   useEffect(() => setChoisis(lireOuverts(mapId)), [mapId])
   const liste: any[] = Array.isArray(taches) ? taches : taches?.tasks ?? []
   const ouvertes = liste.filter(t => t.status !== 'done')
@@ -58,7 +62,7 @@ export function ForgeAgents({ mapId, tache, invoke }: { mapId: number; tache?: n
   const { cols, rows } = grille(affiches.length)
   return <div className="term-page">
     <div className="term-haut">
-      {app.canEdit && <PlusTerminal fermes={fermes} ouvrir={ouvrir} />}
+      {app.canEdit && <PlusTerminal fermes={fermes} ouvrir={ouvrir} mapId={mapId} invoke={invoke} lance={id => { relireDirects(); changer([...affiches.map(a => a.id), id]); reload() }} />}
       <h1 className="forge-h1" style={{ margin: 0, fontSize: 20 }}>{tr("Agents")}</h1>
       {res?.equipe?.phrase && <span className="muted small">{res.equipe.phrase}</span>}
       <div style={{ flex: 1 }} />
@@ -77,20 +81,28 @@ export function ForgeAgents({ mapId, tache, invoke }: { mapId: number; tache?: n
           cible={porteur?.id === a.id} ouvertes={ouvertes} agir={agir}
           // 3 terminaux : le dernier prend toute la largeur du bas.
           style={affiches.length === 3 && i === 2 ? { gridColumn: '1 / -1' } : undefined}
-          fermer={() => fermer(a.id)}
+          direct={invoke && directs.includes(a.id) ? invoke : undefined}
+          fermer={() => {
+            if (invoke && directs.includes(a.id)) {
+              if (!confirm(tr("Fermer ce terminal arrête {0}. Continuer ?", [a.name]))) return
+              invoke('direct_fermer', { agent: a.id }).finally(relireDirects)
+            }
+            fermer(a.id)
+          }}
           aPart={invoke ? () => invoke('fenetre_terminal', { map: mapId, agent: a.id, titre: a.name }).catch(() => app.toast(tr("Mettez Forge à jour (pop-uefn.com/forge) pour ouvrir un terminal dans une fenêtre à part."), true)) : () => window.open(`/forge/terminal?map=${mapId}&agent=${a.id}`, '_blank')} />)}
       </div>}
   </div>
 }
 
 /** Un terminal de la grille : barre (nom, rôle, modes, fenêtre à part, fermer), terminal, attribution. */
-export function Fenetre({ mapId, a, phrase, cible, ouvertes, agir, fermer, aPart, style }: { mapId: number; a: any; phrase?: string; cible?: boolean; ouvertes: any[]; agir: (f: () => Promise<any>, ok: string) => void; fermer?: () => void; aPart?: () => void; style?: React.CSSProperties }) {
+export function Fenetre({ mapId, a, phrase, cible, ouvertes, agir, fermer, aPart, style, direct }: { mapId: number; a: any; phrase?: string; cible?: boolean; ouvertes: any[]; agir: (f: () => Promise<any>, ok: string) => void; fermer?: () => void; aPart?: () => void; style?: React.CSSProperties; direct?: Invoke }) {
   const app = useApp()
   const mode = a.scope === 'off' ? 'off' : a.scope === 'read' ? 'read' : 'write'
   return <div id={`agent-${a.id}`} className={'term' + (cible ? ' forge-cible' : '')} style={style}>
     <div className="term-barre">
       <span className="forge-point" style={{ background: mode === 'off' ? 'var(--red)' : actif(a.last_used) ? 'var(--tg)' : '#6b6b6b' }} aria-hidden="true" />
       <b>{a.name}</b>
+      {direct && <span className="term-direct">{tr("en direct")}</span>}
       <span className="term-doux term-coupe">{[a.role ? ROLES[a.role] ?? a.role : null, a.owner].filter(Boolean).join(' · ')}{a.last_used ? ' · ' + tr("dernier appel {0}", [ago(a.last_used)]) : ''}</span>
       <div style={{ flex: 1 }} />
       <div className="term-modes" role="group" aria-label={tr("Mode de l’agent {0}", [a.name])}>
@@ -100,7 +112,7 @@ export function Fenetre({ mapId, a, phrase, cible, ouvertes, agir, fermer, aPart
       {aPart && <button className="term-bouton" title={tr("Ouvrir dans une fenêtre à part")} aria-label={tr("Ouvrir {0} dans une fenêtre à part", [a.name])} onClick={aPart}><ExternalLink size={14} /></button>}
       {fermer && <button className="term-bouton" title={tr("Fermer le terminal (l’agent continue)")} aria-label={tr("Fermer le terminal de {0}", [a.name])} onClick={fermer}><X size={14} /></button>}
     </div>
-    <Terminal mapId={mapId} a={a} phrase={phrase} />
+    {direct ? <TerminalDirect a={a} invoke={direct} /> : <Terminal mapId={mapId} a={a} phrase={phrase} />}
     {app.canEdit && <div className="term-pied">
       <Selecteur label={tr("Attribuer une tâche à {0}", [a.name])} placeholder={tr("Attribuer une tâche…")}
         options={ouvertes.map(t => ({ value: String(t.number), label: `#${t.number} ${t.title}` }))}
@@ -156,6 +168,72 @@ export function Terminal({ mapId, a, phrase }: { mapId: number; a: any; phrase?:
   </>
 }
 
+/** Une ligne du flux JSON de Claude Code, en ligne de terminal (#466). */
+function ligneDirecte(l: string, i: number): React.ReactNode {
+  let v: any
+  try { v = JSON.parse(l) } catch { return <div key={i} className="term-l term-doux">{l}</div> }
+  const court = (x: any, n = 160) => { const t = typeof x === 'string' ? x : JSON.stringify(x); return t.length > n ? t.slice(0, n) + '…' : t }
+  switch (v.type) {
+    case 'moi': return <div key={i} className="term-l term-moi">› {v.text}</div>
+    case 'erreur': return <div key={i} className="term-l term-ko">{v.text}</div>
+    case 'fin': return <div key={i} className="term-l term-doux"><span className="term-etoile">✻</span> {tr("Claude Code s’est arrêté.")}</div>
+    case 'system': return v.subtype === 'init' ? <div key={i} className="term-l term-doux"><span className="term-etoile">✻</span> {tr("Claude Code prêt")}{v.model ? ` · ${v.model}` : ''}</div> : null
+    case 'assistant': return <div key={i}>{(v.message?.content ?? []).map((c: any, j: number) => c.type === 'text'
+      ? <div key={j} className="term-l"><span className="term-ia">⏺</span> {c.text}</div>
+      : c.type === 'tool_use' ? <div key={j} className="term-l"><span className="term-ok">⏺</span> <b>{String(c.name).replace(/^mcp__pop__/, '')}</b><span className="term-doux">({court(c.input, 100)})</span></div> : null)}</div>
+    case 'user': return <div key={i}>{(Array.isArray(v.message?.content) ? v.message.content : []).filter((c: any) => c.type === 'tool_result').map((c: any, j: number) =>
+      <div key={j} className={'term-l ' + (c.is_error ? 'term-ko' : 'term-doux')}>  ⎿  {court(Array.isArray(c.content) ? c.content.map((x: any) => x.text ?? '').join(' ') : c.content)}</div>)}</div>
+    case 'result': return <div key={i} className="term-l term-doux">  {v.is_error ? tr("✗ erreur") : '✓'}{v.duration_ms ? ` · ${(v.duration_ms / 1000).toFixed(1)} s` : ''}</div>
+    default: return null
+  }
+}
+
+/** Terminal en direct (#466) : ce qu'on écrit part tout de suite dans Claude Code (tournant dans Forge) ; sa réponse et
+ * ses outils s'affichent au fil de l'eau (lecture toutes les 250 ms). */
+function TerminalDirect({ a, invoke }: { a: any; invoke: Invoke }) {
+  const app = useApp()
+  const [lignes, setLignes] = useState<string[]>([])
+  const [vivant, setVivant] = useState(true)
+  const [attend, setAttend] = useState(false)
+  const [texte, setTexte] = useState('')
+  const pos = useRef(0)
+  const corps = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    let fini = false
+    const lire = async () => {
+      try {
+        const r = await invoke('direct_lire', { agent: a.id, depuis: pos.current })
+        if (fini || !r) { if (!r) setVivant(false); return }
+        pos.current = r.suite; setVivant(r.vivant)
+        if (r.lignes.length) {
+          setLignes(l => [...l, ...r.lignes].slice(-1500))
+          if (r.lignes.some((x: string) => x.includes('"type":"result"') || x.includes('"type":"fin"'))) setAttend(false)
+        }
+      } catch { /* Forge occupé : on relit au prochain tour */ }
+    }
+    lire(); const t = setInterval(lire, 250)
+    return () => { fini = true; clearInterval(t) }
+  }, [a.id])
+  useEffect(() => { const c = corps.current; if (c) c.scrollTop = c.scrollHeight }, [lignes.length, attend])
+  const envoyer = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const t = texte.trim()
+    if (!t) return
+    try { await invoke('direct_ecrire', { agent: a.id, texte: t }); setTexte(''); setAttend(true) } catch (er: any) { app.toast(String(er?.message ?? er), true) }
+  }
+  return <>
+    <div className="term-corps" ref={corps} role="log" aria-live="polite" aria-label={tr("Terminal en direct de {0}", [a.name])}>
+      {!lignes.length && <div className="term-l term-doux"><span className="term-etoile">✻</span> {tr("Démarrage de Claude Code… Écrivez-lui ci-dessous.")}</div>}
+      {lignes.map(ligneDirecte)}
+      {attend && <div className="term-l term-doux"><span className="term-etoile term-pouls">✻</span> {tr("réfléchit…")}</div>}
+    </div>
+    <form className="term-invite" onSubmit={envoyer}>
+      <span aria-hidden="true">›</span>
+      <input value={texte} maxLength={8000} onChange={e => setTexte(e.target.value)} placeholder={vivant ? tr("Écrire à {0}…", [a.name]) : tr("Claude Code s’est arrêté : rouvrez-en un avec « + Terminal ».")} aria-label={tr("Message à {0}", [a.name])} disabled={!vivant || !app.canEdit} />
+    </form>
+  </>
+}
+
 /** Message à toutes ses IA de la map (#381). */
 function Equipe({ mapId }: { mapId: number }) {
   const app = useApp()
@@ -171,8 +249,27 @@ function Equipe({ mapId }: { mapId: number }) {
 }
 
 /** « + Terminal » (#451, #470), en haut à gauche de la page Agents : ouvrir le terminal d'une IA connectée à la map. */
-function PlusTerminal({ fermes, ouvrir }: { fermes: any[]; ouvrir: (id: number) => void }) {
+function PlusTerminal({ fermes, ouvrir, mapId, invoke, lance }: { fermes: any[]; ouvrir: (id: number) => void; mapId: number; invoke?: Invoke; lance: (id: number) => void }) {
+  const app = useApp()
   const [ouvert, setOuvert] = useState(false)
+  const [claude, setClaude] = useState<any | null>(null)
+  const [occupe, setOccupe] = useState(false)
+  useEffect(() => { if (ouvert && invoke) invoke('outils_ia').then((l: any[]) => setClaude(l?.find(o => o.id === 'claude_code') ?? null)).catch(() => setClaude(null)) }, [ouvert])
+  // Nouveau terminal en direct (#466) : Claude Code tourne dans Forge, avec une clé POP pour cette map.
+  const nouveau = async () => {
+    if (!invoke || !claude) return
+    setOccupe(true)
+    let cle: { id: number; token: string } | null = null
+    try {
+      cle = await api.post('/api/me/tokens', { name: 'Claude Code · terminal', kind: 'claude_code', scope: 'write', map: mapId })
+      await invoke('direct_ouvrir', { outil: 'claude_code', token: cle!.token, map: app.map?.name ?? '', agent: cle!.id })
+      lance(cle!.id); setOuvert(false)
+    } catch (e: any) {
+      if (cle) await api.del(`/api/tokens/${cle.id}`).catch(() => {})
+      app.toast(/not allowed|not found|unknown/i.test(String(e?.message ?? e)) ? tr("Mettez Forge à jour (pop-uefn.com/forge) pour ouvrir un terminal en direct.") : (e?.message ?? String(e)), true)
+    }
+    setOccupe(false)
+  }
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (!ouvert) return
@@ -189,6 +286,11 @@ function PlusTerminal({ fermes, ouvrir }: { fermes: any[]; ouvrir: (id: number) 
         <span className="forge-point" style={{ background: actif(a.last_used) ? 'var(--tg)' : '#6b6b6b' }} aria-hidden="true" />
         <b style={{ fontWeight: 500 }}>{a.name}</b><span className="small muted">{[a.role ? ROLES[a.role] ?? a.role : null, a.owner].filter(Boolean).join(' · ')}</span>
       </button>)}</div> : <p className="small muted" style={{ margin: 0 }}>{tr("Toutes les IA connectées ont déjà leur terminal.")}</p>}
+      {invoke && <><div className="small muted" style={{ margin: '12px 0 6px' }}>{tr("Nouveau terminal en direct")}</div>
+        <button className="term-choix" disabled={!claude?.lancable || occupe} onClick={nouveau} title={claude?.raison ?? ''}>
+          <span className="term-direct">{tr("direct")}</span><b style={{ fontWeight: 500 }}>Claude Code</b>
+          <span className="small muted">{occupe ? tr("Démarrage…") : claude?.lancable ? tr("tourne dans Forge, avec votre abonnement") : (claude?.raison ?? tr("pas installé sur ce PC"))}</span>
+        </button></>}
 
     </div>}
   </div>
