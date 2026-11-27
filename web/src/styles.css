@@ -1433,3 +1433,10 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 .p2-mesure{color:#ED753E;font-weight:600}
 .p2-panneau{width:240px;display:flex;flex-direction:column;gap:8px}
 @media (max-width:800px){.p2-zone{flex-direction:column}.p2-panneau{width:auto}}
+
+/* Dictée vocale de Forge (#356) */
+.forge-dictee { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 60; display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: #111; color: #fff; font-size: 13px; box-shadow: 0 6px 24px rgba(0,0,0,.25); }
+.app.dark .forge-dictee { background: #fff; color: #111; }
+.forge-dictee-micro { animation: forge-dictee-pouls 1s ease-in-out infinite; }
+@keyframes forge-dictee-pouls { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .forge-dictee-micro { animation: none; } }

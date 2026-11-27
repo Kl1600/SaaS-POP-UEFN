@@ -29,6 +29,10 @@ reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"
 dirs = "7"
 # Capture de l'écran du jeu pendant un scénario de test (#350), envoyée à POP en base64.
 base64 = "0.22"
+# Dictée vocale locale (#356) : micro (cpal) et transcription sur le PC avec whisper.cpp (licence MIT).
+cpal = "0.15"
+whisper-rs = "0.16"
+sha1 = "0.10"
 
 [target.'cfg(windows)'.dependencies]
 xcap = "0.9"

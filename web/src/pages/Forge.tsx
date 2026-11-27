@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom'
 import { Bell, Bot, Building2, Check, ChevronsUpDown, ExternalLink, Home, Library, Minus, Moon, RefreshCw, ShieldCheck, Grid3x3, Square, Sun, User, Wrench, X } from 'lucide-react'
 import LangPicker from '../components/LangPicker'
 import { ForgeAgents } from '../components/ForgeAgents'
+import { ForgeDictee, RACCOURCIS, raccourci, choisirRaccourci, type Raccourci } from '../components/ForgeDictee'
 import { Selecteur } from '../components/Selecteur'
 import { useApp, studioName, useLive, useLoad } from '../state'
 import { ago, api } from '../api'
@@ -139,6 +140,7 @@ export default function Forge() {
       <div className="scroll" id="contenu" tabIndex={-1}>
       <main className="content" style={{ padding: '40px 28px', width: '100%', maxWidth: 920, margin: '0 auto', boxSizing: 'border-box' }}>
         <MajForge invoke={invoke} />
+        <ForgeDictee invoke={invoke} />
         {app.map && section !== 'reglages' && !reserve && <Bandeau mapId={app.map.id} etat={etat} aller={setSection} />}
         {reserve ? <ForgePro />
           : section === 'accueil' ? <Accueil invoke={invoke} etat={etat} liaison={liaison} relie={relie} relire={lire} />
@@ -320,6 +322,9 @@ function Reglages({ invoke }: { invoke: Invoke | null }) {
       <h2 className="forge-h2">Forge</h2>
       {ligne(tr("Langue"), '', <LangPicker app />)}
       {ligne(tr("Thème"), '', <button className="btn" onClick={app.toggleDark}>{app.dark ? tr("Sombre") : tr("Clair")}</button>)}
+      {ligne(tr("Dictée vocale"), tr("Gardez le raccourci appuyé dans un champ pour dicter ; transcrit sur votre PC"), <select className="field" style={{ width: 'auto' }} aria-label={tr("Raccourci de la dictée")} defaultValue={raccourci()} onChange={e => { choisirRaccourci(e.target.value as Raccourci); app.toast(tr("Raccourci de la dictée : {0}", [RACCOURCIS[e.target.value as Raccourci]])) }}>
+        {Object.entries(RACCOURCIS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+      </select>)}
       {ligne(tr("Version"), version ? `POP Forge ${version}` : tr("Version inconnue : réinstallez Forge depuis pop-uefn.com/forge"), version && <button className="btn" disabled={verif === 'encours'} onClick={verifier}>{verif === 'encours' ? tr("Vérification…") : tr("Vérifier les mises à jour")}</button>)}
       {verif === 'ajour' && <p className="small" role="status" style={{ margin: '6px 0 0' }}>{tr("Forge est à jour.")}</p>}
       {ligne(tr("Diagnostic"), tr("État de Forge, du relais et de la map, à coller dans une demande d’aide"), <button className="btn" onClick={async () => {
