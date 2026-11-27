@@ -138,6 +138,7 @@ fn autoriser(app: &AppHandle, u: &Url) {
         .permission("allow-dictee-telecharger")
         .permission("allow-dictee-debut")
         .permission("allow-dictee-fin")
+        .permission("allow-dictee-partiel")
         .permission("allow-importer")
         .permission("allow-projet-ouvert")
         .permission("allow-liaison")
@@ -988,7 +989,8 @@ fn main() {
             dictee::dictee_etat,
             dictee::dictee_telecharger,
             dictee::dictee_debut,
-            dictee::dictee_fin
+            dictee::dictee_fin,
+            dictee::dictee_partiel
         ])
         .setup(|app| {
             let h = app.handle().clone();

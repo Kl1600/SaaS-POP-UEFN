@@ -25,17 +25,21 @@ type Champ = HTMLInputElement | HTMLTextAreaElement
 const champDeTexte = (el: Element | null): el is Champ =>
   !!el && (el instanceof HTMLTextAreaElement || (el instanceof HTMLInputElement && ['text', 'search', ''].includes(el.type))) && !el.readOnly && !el.disabled
 
-/** Ajoute le texte dicté à l'emplacement du curseur, de façon que React voie le changement. */
-export function inserer(el: Champ, texte: string) {
+/** Place du texte dicté dans le champ (#477) : ce qui était avant et après le curseur quand on a commencé. */
+type Place = { el: Champ; avant: string; apres: string }
+const placer = (el: Champ): Place => {
   const a = el.selectionStart ?? el.value.length, b = el.selectionEnd ?? a
-  const avant = el.value.slice(0, a), apres = el.value.slice(b)
-  const t = (avant && !/\s$/.test(avant) ? ' ' : '') + texte
-  const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype
-  Object.getOwnPropertyDescriptor(proto, 'value')!.set!.call(el, avant + t + apres)
-  el.dispatchEvent(new Event('input', { bubbles: true }))
-  el.selectionStart = el.selectionEnd = a + t.length
-  el.focus()
+  return { el, avant: el.value.slice(0, a), apres: el.value.slice(b) }
 }
+/** Écrit le texte dicté (provisoire ou final) entre `avant` et `apres`, de façon que React voie le changement. */
+export function ecrireDicte(p: Place, texte: string) {
+  const t = texte ? (p.avant && !/\s$/.test(p.avant) ? ' ' : '') + texte : ''
+  const proto = p.el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype
+  Object.getOwnPropertyDescriptor(proto, 'value')!.set!.call(p.el, p.avant + t + p.apres)
+  p.el.dispatchEvent(new Event('input', { bubbles: true }))
+  p.el.selectionStart = p.el.selectionEnd = p.avant.length + t.length
+}
+
 
 const mio = (o: number) => Math.round(o / 1048576)
 
@@ -44,8 +48,10 @@ export function ForgeDictee({ invoke }: { invoke: Invoke | null }) {
   const [phase, setPhase] = useState<'' | 'ecoute' | 'ecrit'>('')
   const [proposer, setProposer] = useState<Etat | null>(null)
   const [recu, setRecu] = useState<number | null>(null)
-  const cible = useRef<Champ | null>(null)
+  const cible = useRef<Place | null>(null)
   const actif = useRef(false)
+  const suivi = useRef<number | null>(null)
+  const arreterSuivi = () => { if (suivi.current) { clearInterval(suivi.current); suivi.current = null } }
 
   useEffect(() => {
     if (!invoke) return
@@ -55,12 +61,19 @@ export function ForgeDictee({ invoke }: { invoke: Invoke | null }) {
       if (!champDeTexte(el)) return
       e.preventDefault()
       actif.current = true
-      cible.current = el
+      cible.current = placer(el)
       try {
         const etat = await invoke<Etat>('dictee_etat')
         if (!etat.modele) { actif.current = false; setProposer(etat); if (etat.recu != null) suivre(); return }
-        await invoke('dictee_debut')
+        await invoke('dictee_debut', { langue: LANG })
         setPhase('ecoute')
+        // Temps réel (#477) : le texte provisoire s'écrit dans le champ pendant qu'on parle.
+        let version = 0
+        arreterSuivi()
+        suivi.current = window.setInterval(async () => {
+          const p = await invoke<{ version: number; texte: string } | null>('dictee_partiel').catch(() => null)
+          if (p && p.version !== version && cible.current && actif.current) { version = p.version; ecrireDicte(cible.current, p.texte) }
+        }, 250)
       } catch (er: any) {
         actif.current = false
         app.toast(/not allowed|not found|unknown/i.test(String(er)) ? tr("Dictée indisponible : mettez Forge à jour depuis pop-uefn.com/forge.") : String(er), true)
@@ -70,16 +83,17 @@ export function ForgeDictee({ invoke }: { invoke: Invoke | null }) {
       if (!actif.current || !relache(e, raccourci())) return
       e.preventDefault()
       actif.current = false
+      arreterSuivi()
       setPhase('ecrit')
       try {
         const texte = await invoke<string>('dictee_fin', { langue: LANG })
-        if (texte && cible.current) inserer(cible.current, texte)
-        else if (!texte) app.toast(tr("Rien entendu : gardez le raccourci appuyé pendant que vous parlez."))
+        if (cible.current) { ecrireDicte(cible.current, texte); cible.current.el.focus() }
+        if (!texte) app.toast(tr("Rien entendu : gardez le raccourci appuyé pendant que vous parlez."))
       } catch (er: any) { app.toast(String(er), true) } finally { setPhase('') }
     }
     window.addEventListener('keydown', bas, true)
     window.addEventListener('keyup', haut, true)
-    return () => { window.removeEventListener('keydown', bas, true); window.removeEventListener('keyup', haut, true) }
+    return () => { arreterSuivi(); window.removeEventListener('keydown', bas, true); window.removeEventListener('keyup', haut, true) }
   }, [invoke])
 
   const suivre = () => {
@@ -97,7 +111,7 @@ export function ForgeDictee({ invoke }: { invoke: Invoke | null }) {
   return <>
     {phase && <Layer><div className="forge-dictee" role="status" aria-live="polite">
       <Mic size={16} strokeWidth={1.6} className={phase === 'ecoute' ? 'forge-dictee-micro' : ''} />
-      {phase === 'ecoute' ? tr("Je vous écoute… relâchez pour écrire") : tr("Transcription sur votre PC…")}
+      {phase === 'ecoute' ? tr("Je vous écoute… relâchez pour terminer") : tr("Transcription sur votre PC…")}
     </div></Layer>}
     {proposer && <Layer><Modal label={tr("Dictée vocale")} onClose={() => recu == null && setProposer(null)}>
       <h2 style={{ marginTop: 0 }}>{tr("Dictée vocale")}</h2>
