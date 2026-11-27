@@ -11,6 +11,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod agents_locaux;
+mod dictee;
 mod maj;
 mod relay;
 
@@ -126,6 +127,10 @@ fn autoriser(app: &AppHandle, u: &Url) {
         .permission("allow-ignorer")
         .permission("allow-forge-version")
         .permission("allow-maj-etat")
+        .permission("allow-dictee-etat")
+        .permission("allow-dictee-telecharger")
+        .permission("allow-dictee-debut")
+        .permission("allow-dictee-fin")
         .permission("allow-importer")
         .permission("allow-projet-ouvert")
         .permission("allow-liaison")
@@ -834,6 +839,7 @@ fn main() {
         .manage(Home(Mutex::new(None)))
         .manage(relay::Relay::default())
         .manage(Cible::default())
+        .manage(dictee::Dictee::default())
         .invoke_handler(tauri::generate_handler![
             capture_jeu,
             bilan_poste,
@@ -859,7 +865,11 @@ fn main() {
             maj::maj_verifier,
             maj::maj_installer,
             maj::forge_version,
-            maj::maj_etat
+            maj::maj_etat,
+            dictee::dictee_etat,
+            dictee::dictee_telecharger,
+            dictee::dictee_debut,
+            dictee::dictee_fin
         ])
         .setup(|app| {
             let h = app.handle().clone();
