@@ -45,6 +45,7 @@ mod manage;
 mod mcp;
 mod mcp_sse;
 mod messages;
+mod miniature;
 mod model;
 mod money;
 mod oauth;
@@ -461,6 +462,11 @@ fn api() -> Router<AppState> {
         .route("/api/admin/lock", post(security::lock_admin))
         .route("/api/admin/audit", get(security::admin_audit))
         .route("/api/admin/journal", get(admin::journal))
+        .route(
+            "/api/admin/miniatures",
+            get(miniature::liste).post(miniature::ajouter),
+        )
+        .route("/api/admin/miniatures/{id}", delete(miniature::retirer))
         .route("/api/admin/overview", get(admin::overview))
         .route(
             "/api/admin/announcement",

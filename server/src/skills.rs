@@ -40,6 +40,11 @@ pub const POP: &[(&str, &str, &str)] = &[
         "Ranger le niveau",
         include_str!("../skills/rangement.md"),
     ),
+    (
+        "miniature",
+        "Faire la miniature de la map",
+        include_str!("../skills/miniature.md"),
+    ),
 ];
 
 /// Liste des compétences (POP puis studio), sans le contenu.

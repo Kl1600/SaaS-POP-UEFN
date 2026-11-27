@@ -1467,3 +1467,10 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 .p2-page .p2{flex:1;min-height:0;display:flex;flex-direction:column}
 .p2-page .p2-zone{flex:1;min-height:0}
 .p2-page .p2-svg{height:auto;min-height:300px}
+
+/* Bibliothèque miniature de l'Administration (#307) */
+.mini-grille{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.mini-carte{display:flex;flex-direction:column;gap:4px;border:1px solid var(--border);border-radius:12px;padding:8px}
+.mini-carte img,.mini-police{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:8px;background:var(--surface)}
+.mini-police{display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:700}
+.mini-carte .linkbtn{align-self:flex-start}

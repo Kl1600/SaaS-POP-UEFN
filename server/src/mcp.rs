@@ -190,6 +190,8 @@ fn tools() -> Value {
         tool("check_level", "Vérifie le niveau sur le dernier état connu : références d'appareils vers un acteur absent (bloquant), réglages non reliés, options réglées sans effet, tags Verse inutilisés. Chaque problème a sa gravité, l'acteur et une explication.", json!({}), &[]),
         tool("list_verse_files", "Liste les fichiers .verse du projet.", json!({}), &[]),
         tool("read_other_map", "Lit une AUTRE map de l'utilisateur comme contexte, en lecture seule (ex. reprendre une idée ou un module d'une map précédente) ; la map de travail ne change pas. map : identifiant (list_maps). what : pages | page | tasks | task | verse_files | verse_file | modules | module ; selon what : path (page ou fichier Verse), number (tâche), id (module), query (recherche dans les modules). Aucun outil d'écriture n'agit sur l'autre map.", json!({ "map": { "type": "integer" }, "what": { "type": "string", "enum": ["pages", "page", "tasks", "task", "verse_files", "verse_file", "modules", "module"] }, "path": { "type": "string" }, "number": { "type": "integer" }, "id": { "type": "integer" }, "query": { "type": "string" } }), &["map", "what"]),
+        tool("get_thumbnail_kit", "Bibliothèque miniature de POP (#307) : inspirations (images à regarder pour le style, les couleurs et le placement du titre, JAMAIS à recopier ni à mettre dans l'image) et ingrédients (polices, cadres, effets, fonds libres de droits, utilisables dans compose_thumbnail). keywords : mots-clés (ex. « guess number »), drawer : inspiration | ingredient. Liens valables 10 min. Lisez d'abord la compétence « miniature ».", json!({ "keywords": { "type": "string" }, "drawer": { "type": "string", "enum": ["inspiration", "ingredient"] } }), &[]),
+        tool("compose_thumbnail", "Fabrique la miniature de la map (1920 × 1080, moins de 5 Mo) et son logo (PNG transparent 1440 × 608), dessinés par POP. capture : une photo de l'île (capture_island) comme fond, ou background_png_base64 (image faite par votre IA). title (40 car. au plus), subtitle, title_color / outline_color (#RRVVBB), position (haut, centre, bas), font : id d'une police (ingrédient), overlays : ids de cadres ou d'effets (ingrédients). Refus avec la raison si un mot est interdit par Epic (XP, AFK, V-Bucks, Fortnite…), s'il y a une commande de plateforme ou si l'image ressemble trop à une inspiration : corrigez et recommencez.", json!({ "capture": { "type": "integer" }, "background_png_base64": { "type": "string" }, "title": { "type": "string" }, "subtitle": { "type": "string" }, "title_color": { "type": "string" }, "outline_color": { "type": "string" }, "position": { "type": "string", "enum": ["haut", "centre", "bas"] }, "font": { "type": "integer" }, "overlays": { "type": "array", "items": { "type": "integer" } } }), &["title"]),
         tool("read_verse_file", "Lit un fichier .verse.", json!({ "path": { "type": "string" } }), &["path"]),
         tool("write_verse_file", "Écrit un fichier .verse dans le projet (crée ou remplace).", json!({ "path": { "type": "string" }, "content": { "type": "string" }, "task": task }), &["path", "content"]),
         tool("create_widget", "Crée une interface de jeu (HUD ou menu) : un appareil Verse prêt à poser dans le niveau, écrit dans Content/POP_UI/pop_ui_<name>.verse. kind : texte (affiché à tous), compteur (libellé + nombre par joueur, +1 à chaque activation d'un déclencheur ; Ajouter/Definir depuis le Verse), bouton (s'ouvre par un déclencheur, un clic active un appareil Cible). position : haut, centre ou bas. Ensuite : compile_verse, puis place_device ou poser l'appareil à la main. Annulable tant qu'aucun acteur ne l'utilise.", json!({ "kind": { "type": "string", "enum": ["texte", "compteur", "bouton"] }, "name": { "type": "string", "description": "minuscules, chiffres, _ (ex. score)" }, "text": { "type": "string" }, "position": { "type": "string", "enum": ["haut", "centre", "bas"] }, "task": task }), &["kind", "name", "text"]),
@@ -273,6 +275,7 @@ pub(crate) fn tool_names() -> Vec<String> {
 
 const READ_TOOLS: &[&str] = &[
     "list_maps",
+    "get_thumbnail_kit",
     "read_other_map",
     "use_map",
     "uefn_status",
@@ -1252,6 +1255,8 @@ async fn call_as(
             exec(st, o(), "actor_scatter", args).await
         }
         "capture_island" => crate::captures::capturer(st, mid, user.id, &a["shots"]).await,
+        "get_thumbnail_kit" => crate::miniature::kit(st, &a).await,
+        "compose_thumbnail" => crate::miniature::composer_outil(st, mid, user.id, &a).await,
         "place_mesh" => {
             exec(
                 st,
@@ -1536,6 +1541,65 @@ mod tests {
     use super::*;
 
     /// Une IA connectée cherche dans la bibliothèque Verse de son studio, puis lit un module (#85).
+    /// #307 : une miniature dont le texte contient « AFK XP » est refusée avec la raison, avant tout dessin.
+    #[tokio::test]
+    async fn miniature_mots_interdits() {
+        let st = crate::test_state().await;
+        let sid: i64 = sqlx::query_scalar("INSERT INTO studios (name) VALUES ('S') RETURNING id")
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        let mid: i64 =
+            sqlx::query_scalar("INSERT INTO maps (studio_id, name) VALUES (?, 'M') RETURNING id")
+                .bind(sid)
+                .fetch_one(&st.db)
+                .await
+                .unwrap();
+        let uid: i64 = sqlx::query_scalar("INSERT INTO users (email, name, password_hash) VALUES ('ia@a.fr', 'IA', 'x') RETURNING id")
+            .fetch_one(&st.db)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO memberships (studio_id, user_id, role) VALUES (?, ?, 'member')")
+            .bind(sid)
+            .bind(uid)
+            .execute(&st.db)
+            .await
+            .unwrap();
+        let u = AuthUser {
+            id: uid,
+            email: "ia@a.fr".into(),
+            name: "IA".into(),
+            sid: String::new(),
+        };
+        let e = call(
+            &st,
+            &u,
+            mid,
+            "compose_thumbnail",
+            json!({ "title": "AFK XP Map", "capture": 1 }),
+        )
+        .await
+        .unwrap_err();
+        let t = format!("{e:?}");
+        assert!(
+            t.contains("AFK") && t.contains("XP") && t.contains("Epic"),
+            "{t}"
+        );
+        let k = call(
+            &st,
+            &u,
+            mid,
+            "get_thumbnail_kit",
+            json!({ "keywords": "guess" }),
+        )
+        .await
+        .unwrap();
+        assert!(
+            k["items"].as_array().unwrap().is_empty()
+                && k["rules"].as_str().unwrap().contains("jamais")
+        );
+    }
+
     #[tokio::test]
     async fn bibliotheque_par_mcp() {
         let st = crate::test_state().await;

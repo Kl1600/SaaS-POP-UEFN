@@ -5,6 +5,10 @@ edition = "2021"
 
 [dependencies]
 lettre = { version = "0.11", default-features = false, features = ["builder", "smtp-transport", "tokio1", "tokio1-rustls-tls", "hostname"] }
+# Miniatures (#307) : composition des images (photos de l'île, titre) et contrôle avant de les rendre.
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+ab_glyph = "0.2"
+base64 = "0.22"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 ed25519-dalek = "2"
 hmac = "0.12"
