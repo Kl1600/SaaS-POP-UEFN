@@ -4,6 +4,8 @@ WORKDIR /web
 COPY web/package*.json ./
 RUN npm ci --no-audit --no-fund
 COPY web/ ./
+# Nouveautés de Forge (#437), importées par la page /forge (../../../forge/NOUVEAUTES.md depuis web/src/pages).
+COPY forge/NOUVEAUTES.md /forge/NOUVEAUTES.md
 RUN npm run build
 
 FROM rust:1-bookworm AS server
