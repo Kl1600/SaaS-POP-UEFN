@@ -185,8 +185,14 @@ fn autorise(app: &AppHandle, url: &Url) -> bool {
 
 /// « Fenêtre à part » (#451) : le terminal d'un agent dans sa propre fenêtre Forge (page /forge/terminal du POP
 /// relié). Une fenêtre par agent : la rouvrir la met au premier plan.
+// Asynchrone : sous Windows, créer une fenêtre dans une commande synchrone bloque Forge (page blanche, #470).
 #[tauri::command]
-fn fenetre_terminal(app: AppHandle, map: i64, agent: i64, titre: String) -> Result<(), String> {
+async fn fenetre_terminal(
+    app: AppHandle,
+    map: i64,
+    agent: i64,
+    titre: String,
+) -> Result<(), String> {
     let label = format!("agent-{agent}");
     if let Some(w) = app.get_webview_window(&label) {
         let _ = w.unminimize();
