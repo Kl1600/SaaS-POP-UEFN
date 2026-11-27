@@ -1828,6 +1828,7 @@ const EN: Record<string, string> = {
  "Ctrl/Cmd+clic : ajouter · Maj+clic : plage · Ctrl+Z : annuler": "Ctrl/Cmd+click: add · Shift+click: range · Ctrl+Z: undo",
  "Détails": "Details",
  "Vue du dessus": "Top view",
+ "Mettez Forge à jour (pop-uefn.com/forge) pour ouvrir un terminal dans une fenêtre à part.": "Update Forge (pop-uefn.com/forge) to open a terminal in a separate window.",
  "← Outils": "← Tools",
  "Vous parlez à {0}. Il s'aide des compétences et de la bibliothèque miniature de POP.": "You're talking to {0}. It uses POP's skills and thumbnail library.",
  "Aucune IA connectée à cette map": "No AI connected to this map",

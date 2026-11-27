@@ -1,1 +1,1 @@
-{"version": "0.3.6", "date": "2026-11-27", "notes": "· « + Terminal » ouvre une IA sans choisir de tâche : donnez-lui vos instructions dans son terminal."}
+{"version": "0.3.7", "date": "2026-11-27", "notes": "· « Fenêtre à part » d'un terminal ne bloque plus Forge.\n· « + Terminal » propose seulement les IA connectées à la map."}

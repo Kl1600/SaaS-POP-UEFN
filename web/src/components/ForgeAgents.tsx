@@ -58,7 +58,7 @@ export function ForgeAgents({ mapId, tache, invoke }: { mapId: number; tache?: n
   const { cols, rows } = grille(affiches.length)
   return <div className="term-page">
     <div className="term-haut">
-      {app.canEdit && <PlusTerminal mapId={mapId} invoke={invoke} fermes={fermes} ouvrir={ouvrir} lance={id => { changer([...affiches.map(a => a.id), id]); reload(); relireTaches() }} />}
+      {app.canEdit && <PlusTerminal fermes={fermes} ouvrir={ouvrir} />}
       <h1 className="forge-h1" style={{ margin: 0, fontSize: 20 }}>{tr("Agents")}</h1>
       {res?.equipe?.phrase && <span className="muted small">{res.equipe.phrase}</span>}
       <div style={{ flex: 1 }} />
@@ -78,7 +78,7 @@ export function ForgeAgents({ mapId, tache, invoke }: { mapId: number; tache?: n
           // 3 terminaux : le dernier prend toute la largeur du bas.
           style={affiches.length === 3 && i === 2 ? { gridColumn: '1 / -1' } : undefined}
           fermer={() => fermer(a.id)}
-          aPart={invoke ? () => invoke('fenetre_terminal', { map: mapId, agent: a.id, titre: a.name }).catch(() => window.open(`/forge/terminal?map=${mapId}&agent=${a.id}`, '_blank')) : () => window.open(`/forge/terminal?map=${mapId}&agent=${a.id}`, '_blank')} />)}
+          aPart={invoke ? () => invoke('fenetre_terminal', { map: mapId, agent: a.id, titre: a.name }).catch(() => app.toast(tr("Mettez Forge à jour (pop-uefn.com/forge) pour ouvrir un terminal dans une fenêtre à part."), true)) : () => window.open(`/forge/terminal?map=${mapId}&agent=${a.id}`, '_blank')} />)}
       </div>}
   </div>
 }
@@ -170,9 +170,8 @@ function Equipe({ mapId }: { mapId: number }) {
   </form>
 }
 
-/** « + Terminal » (#451), en haut à gauche de la page Agents : ouvrir le terminal d'une IA connectée à la map, ou lancer
- * un outil sur ce PC (« Lancer avec… » de #95 et #420, déplacé ici). */
-function PlusTerminal({ mapId, invoke, fermes, ouvrir, lance }: { mapId: number; invoke?: Invoke; fermes: any[]; ouvrir: (id: number) => void; lance: (id: number) => void }) {
+/** « + Terminal » (#451, #470), en haut à gauche de la page Agents : ouvrir le terminal d'une IA connectée à la map. */
+function PlusTerminal({ fermes, ouvrir }: { fermes: any[]; ouvrir: (id: number) => void }) {
   const [ouvert, setOuvert] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -190,64 +189,8 @@ function PlusTerminal({ mapId, invoke, fermes, ouvrir, lance }: { mapId: number;
         <span className="forge-point" style={{ background: actif(a.last_used) ? 'var(--tg)' : '#6b6b6b' }} aria-hidden="true" />
         <b style={{ fontWeight: 500 }}>{a.name}</b><span className="small muted">{[a.role ? ROLES[a.role] ?? a.role : null, a.owner].filter(Boolean).join(' · ')}</span>
       </button>)}</div> : <p className="small muted" style={{ margin: 0 }}>{tr("Toutes les IA connectées ont déjà leur terminal.")}</p>}
-      {invoke && <><hr style={{ margin: '12px 0', border: 0, borderTop: '1px solid var(--line, #e5e5e5)' }} />
-        <Lancer mapId={mapId} invoke={invoke} fini={id => { if (id) lance(id); setOuvert(false) }} /></>}
+
     </div>}
   </div>
 }
 
-/** Lancer sur ce PC (#95, #420, #455) : un outil en ligne de commande (Claude Code, Codex) démarré par Forge avec une
- * clé d'agent pour cette map, ou « Mon IA » (app Claude, ChatGPT, Cursor…), déjà branchée à POP par MCP : la consigne
- * est copiée et Forge ouvre l'IA. Pas de tâche à choisir : l'humain donne ses instructions dans le terminal. */
-function Lancer({ mapId, invoke, fini }: { mapId: number; invoke: Invoke; fini: (agent?: number) => void }) {
-  const app = useApp()
-  const [outils, setOutils] = useState<any[] | null>(null)
-  const [apps, setApps] = useState<any[]>([])
-  const [branchees, setBranchees] = useState<any[] | null>(null)
-  const [occupe, setOccupe] = useState('')
-  useEffect(() => {
-    Promise.all([invoke('outils_ia').catch(() => []), invoke('apps_ia').catch(() => [])]).then(([o, a]: any[]) => { setOutils(o); setApps(a) })
-    // IA branchées à POP par l'utilisateur (hors clés créées par Forge pour ses agents lancés).
-    api.get('/api/me/tokens').then((l: any[]) => setBranchees(l.filter(k => !String(k.name).endsWith(' · Forge')))).catch(() => setBranchees([]))
-  }, [])
-  if (!outils) return null
-  const vieux = (e: any) => /tache|missing|invalid args/i.test(String(e?.message ?? e)) ? tr("Mettez Forge à jour (pop-uefn.com/forge) pour ouvrir une IA sans tâche.") : (e?.message ?? String(e))
-  const monIa = async (a: any) => {
-    setOccupe(a.id)
-    try {
-      const consigne = await invoke('consigne_mon_ia', { map: app.map?.name ?? '', mapId })
-      await navigator.clipboard.writeText(consigne)
-      await invoke('ouvrir_ia', { id: a.id })
-      app.toast(tr("Consigne copiée : collez-la dans {0}, puis donnez vos instructions dans son terminal.", [a.nom]))
-      fini(branchees?.find(k => k.kind === a.id && k.map?.id === mapId)?.id)
-    } catch (e: any) { app.toast(vieux(e), true) }
-    setOccupe('')
-  }
-  const lancer = async (o: any) => {
-    setOccupe(o.id)
-    let cle: { id: number; token: string } | null = null
-    try {
-      cle = await api.post('/api/me/tokens', { name: `${o.nom} · Forge`, kind: o.id, scope: 'write', map: mapId })
-      await invoke('lancer_agent', { outil: o.id, token: cle!.token, map: app.map?.name ?? '' })
-      app.toast(tr("{0} démarre : donnez-lui vos instructions dans son terminal.", [o.nom])); fini(cle!.id)
-    } catch (e: any) {
-      // Lancement raté : la clé créée pour lui est révoquée tout de suite.
-      if (cle) await api.del(`/api/tokens/${cle.id}`).catch(() => {})
-      app.toast(vieux(e), true)
-    }
-    setOccupe('')
-  }
-  const appsDispo = apps.filter(a => a.app || a.site)
-  return <section className="stack" style={{ gap: 6 }} aria-label={tr("Lancer sur ce PC")}>
-    <div className="small muted">{tr("Lancer sur ce PC")}</div>
-    {outils.map(o => <button key={o.id} className="term-choix" disabled={!o.lancable || !!occupe} title={o.raison ?? o.chemin ?? ''} onClick={() => lancer(o)}>
-      <b style={{ fontWeight: 500 }}>{o.nom}</b><span className="small muted">{occupe === o.id ? tr("Lancement…") : o.lancable ? tr("terminal") : o.raison}</span>
-    </button>)}
-    {branchees !== null && branchees.length === 0 ? <button className="term-choix" onClick={() => { window.location.href = '/parametres?onglet=ia' }}>
-      <b style={{ fontWeight: 500 }}>{tr("Mon IA")}</b><span className="small muted">{tr("à brancher d'abord dans POP (IA connectées)")}</span>
-    </button> : appsDispo.map(a => <button key={a.id} className="term-choix" disabled={!!occupe} onClick={() => monIa(a)}>
-      <b style={{ fontWeight: 500 }}>{a.nom}</b><span className="small muted">{occupe === a.id ? tr("Ouverture…") : a.app ? tr("app installée") : tr("dans le navigateur")}</span>
-    </button>)}
-    <small className="muted">{tr("L'outil tourne sur votre PC avec votre abonnement ; sa clé POP lui est passée en mémoire, jamais écrite dans un fichier.")}</small>
-  </section>
-}
