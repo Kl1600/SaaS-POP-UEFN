@@ -79,7 +79,7 @@ export function ForgeMiniature({ mapId, versions, retour, allerAgents }: { mapId
 
 /** Discussion avec l'IA (#468) : les messages échangés dans POP Forge, les plus récents en bas. */
 function Discussion({ mapId, aid, nom }: { mapId: number; aid: number; nom: string }) {
-  const { data, reload } = useLoad<any[]>(`/api/maps/${mapId}/agents/${aid}/messages`, [mapId, aid])
+  const { data, reload } = useLoad<any[]>(`/api/maps/${mapId}/agents/${aid}/messages?canal=miniature`, [mapId, aid])
   useLive(['messages'], reload)
   const fin = useRef<HTMLDivElement>(null)
   useEffect(() => { fin.current?.scrollIntoView({ block: 'nearest' }) }, [data?.length])
@@ -88,7 +88,7 @@ function Discussion({ mapId, aid, nom }: { mapId: number; aid: number; nom: stri
     {!l.length && <p className="muted small" style={{ margin: 0 }}>{tr("Expliquez la miniature que vous voulez : l'ambiance, le titre, ce qu'on doit voir. Joignez des exemples si vous en avez.")}</p>}
     {l.map(m => <div key={m.id} className={'mini-bulle' + (m.from === 'ia' ? ' ia' : '')}>
       <span className="small muted">{m.from === 'ia' ? nom : tr("Vous")} · {ago(m.at)}{m.from !== 'ia' && !m.read ? ' · ' + tr("pas encore lu") : ''}</span>
-      <span style={{ whiteSpace: 'pre-wrap' }}>{m.body}</span>
+      <span style={{ whiteSpace: 'pre-wrap' }}>{String(m.body).replace(/\n\(Outil Miniature :[^)]*\)\s*$/, '')}</span>
     </div>)}
     <div ref={fin} />
   </div>

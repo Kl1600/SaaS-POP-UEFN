@@ -25,13 +25,16 @@ async fn mon_agent(st: &AppState, mid: i64, aid: i64, uid: i64) -> Result<(), Ap
     ok.map(|_| ()).ok_or(AppError::NotFound)
 }
 
-/// Fil d'un agent : 100 derniers messages, du plus ancien au plus récent.
-pub async fn fil(st: &AppState, aid: i64) -> Result<Value, AppError> {
+/// Fils de discussion d'un agent (#473) : le terminal (aucun) ou un outil de Forge.
+pub const CANAUX: &[&str] = &["miniature"];
+
+/// Fil d'un agent : 100 derniers messages d'un fil (`canal` : None = terminal), du plus ancien au plus récent.
+pub async fn fil(st: &AppState, aid: i64, canal: Option<&str>) -> Result<Value, AppError> {
     let rows: Vec<(i64, Option<String>, bool, bool, String, String, Option<String>)> = sqlx::query_as(
         "SELECT m.id, u.name, m.de_ia, m.equipe, m.body, m.created_at, m.read_at FROM agent_messages m LEFT JOIN users u ON u.id = m.user_id
-         WHERE m.agent_id = ? ORDER BY m.id DESC LIMIT 100",
+         WHERE m.agent_id = ? AND m.canal IS ? ORDER BY m.id DESC LIMIT 100",
     )
-    .bind(aid).fetch_all(&st.db).await?;
+    .bind(aid).bind(canal).fetch_all(&st.db).await?;
     Ok(json!(rows.into_iter().rev().map(|(id, qui, ia, eq, b, at, lu)| json!({ "id": id, "from": if ia { "ia" } else { "humain" }, "author": qui, "team": eq, "body": b, "at": at, "read": lu.is_some() })).collect::<Vec<_>>()))
 }
 
@@ -51,11 +54,16 @@ pub async fn route_fil(
     State(st): State<AppState>,
     u: AuthUser,
     Path((mid, aid)): Path<(i64, i64)>,
+    axum::extract::Query(q): axum::extract::Query<std::collections::HashMap<String, String>>,
 ) -> ApiResult<Value> {
     crate::billing::require_forge(&st, u.id).await?;
     map_ctx(&st, &u, mid).await?;
     mon_agent(&st, mid, aid, u.id).await?;
-    Ok(Json(fil(&st, aid).await?))
+    let canal = q
+        .get("canal")
+        .map(String::as_str)
+        .filter(|c| CANAUX.contains(c));
+    Ok(Json(fil(&st, aid, canal).await?))
 }
 
 /// `POST /api/maps/{mid}/agents/{aid}/messages` : écrire à une de ses IA.
@@ -109,8 +117,8 @@ pub async fn route_equipe(
 
 /// MCP `read_messages` : messages non lus de l'humain pour cet agent (marqués lus).
 pub async fn lire_pour_agent(st: &AppState, agent: i64) -> Result<Value, AppError> {
-    let rows: Vec<(i64, Option<String>, bool, String, String)> = sqlx::query_as(
-        "SELECT m.id, u.name, m.equipe, m.body, m.created_at FROM agent_messages m LEFT JOIN users u ON u.id = m.user_id
+    let rows: Vec<(i64, Option<String>, bool, String, String, Option<String>)> = sqlx::query_as(
+        "SELECT m.id, u.name, m.equipe, m.body, m.created_at, m.canal FROM agent_messages m LEFT JOIN users u ON u.id = m.user_id
          WHERE m.agent_id = ? AND m.de_ia = 0 AND m.read_at IS NULL ORDER BY m.id",
     )
     .bind(agent).fetch_all(&st.db).await?;
@@ -124,8 +132,8 @@ pub async fn lire_pour_agent(st: &AppState, agent: i64) -> Result<Value, AppErro
         notify(st, m, json!({ "t": "refresh", "what": "messages" }));
     }
     Ok(json!({
-        "messages": rows.into_iter().map(|(id, qui, eq, b, at)| json!({ "id": id, "from": qui, "to": if eq { "toute l'équipe" } else { "vous" }, "body": b, "at": at })).collect::<Vec<_>>(),
-        "consigne": "Répondez avec send_message, puis faites ce qui est demandé (en créant ou en prenant une tâche si besoin).",
+        "messages": rows.into_iter().map(|(id, qui, eq, b, at, canal)| json!({ "id": id, "from": qui, "to": if eq { "toute l'équipe" } else { "vous" }, "body": b, "at": at, "canal": canal.unwrap_or_else(|| "terminal".into()) })).collect::<Vec<_>>(),
+        "consigne": "Répondez avec send_message dans le même fil que le message (canal : terminal ou miniature), puis faites ce qui est demandé (en créant ou en prenant une tâche si besoin).",
     }))
 }
 
@@ -155,12 +163,21 @@ pub async fn ecrire_par_agent(
     a: &Value,
 ) -> Result<Value, AppError> {
     let b = texte(a["body"].as_str().unwrap_or(""))?;
-    sqlx::query("INSERT INTO agent_messages (map_id, agent_id, de_ia, body) VALUES (?, ?, 1, ?)")
-        .bind(mid)
-        .bind(agent)
-        .bind(&b)
-        .execute(&st.db)
-        .await?;
+    // Fil de la réponse (#473) : terminal par défaut, ou un outil de Forge (canal « miniature »).
+    let canal = match a["canal"].as_str().unwrap_or("terminal") {
+        "terminal" | "" => None,
+        c if CANAUX.contains(&c) => Some(c),
+        c => return Err(bad(format!("Fil inconnu « {c} » : terminal ou miniature."))),
+    };
+    sqlx::query(
+        "INSERT INTO agent_messages (map_id, agent_id, de_ia, body, canal) VALUES (?, ?, 1, ?, ?)",
+    )
+    .bind(mid)
+    .bind(agent)
+    .bind(&b)
+    .bind(canal)
+    .execute(&st.db)
+    .await?;
     notify(st, mid, json!({ "t": "refresh", "what": "messages" }));
     Ok(
         json!({ "ok": true, "message": "Message envoyé à votre humain (fil de l'agent dans POP Forge)." }),
@@ -228,12 +245,54 @@ mod tests {
         let r = lire_pour_agent(&st, ag[0]).await.unwrap();
         assert_eq!(r["messages"][0]["body"], "Fais la boutique");
         assert_eq!(non_lus(&st, ag[0]).await.unwrap(), 0);
+        // #473 : deux fils séparés, le terminal et l'outil Miniature.
+        assert_eq!(r["messages"][0]["canal"], "terminal");
+        sqlx::query("INSERT INTO agent_messages (map_id, agent_id, user_id, body, canal) VALUES (?, ?, ?, 'Miniature fun', 'miniature')")
+            .bind(mid).bind(ag[0]).bind(us[0].id).execute(&st.db).await.unwrap();
+        let r2 = lire_pour_agent(&st, ag[0]).await.unwrap();
+        assert_eq!(r2["messages"][0]["canal"], "miniature");
+        ecrire_par_agent(
+            &st,
+            ag[0],
+            mid,
+            &json!({ "body": "Je fais la miniature", "canal": "miniature" }),
+        )
+        .await
+        .unwrap();
+        ecrire_par_agent(&st, ag[0], mid, &json!({ "body": "Boutique faite" }))
+            .await
+            .unwrap();
+        assert!(
+            ecrire_par_agent(&st, ag[0], mid, &json!({ "body": "x", "canal": "autre" }))
+                .await
+                .is_err()
+        );
+        let corps = |v: Value| {
+            v.as_array()
+                .unwrap()
+                .iter()
+                .map(|m| m["body"].as_str().unwrap().to_string())
+                .collect::<Vec<_>>()
+        };
+        let terminal = corps(fil(&st, ag[0], None).await.unwrap());
+        let mini = corps(fil(&st, ag[0], Some("miniature")).await.unwrap());
+        assert!(
+            terminal.contains(&"Boutique faite".to_string())
+                && !terminal.iter().any(|b| b.contains("iniature")),
+            "{terminal:?}"
+        );
+        assert_eq!(mini, ["Miniature fun", "Je fais la miniature"]);
         ecrire_par_agent(&st, ag[0], mid, &json!({ "body": "Je m'en occupe" }))
             .await
             .unwrap();
-        let Json(f) = route_fil(s(), us[0].clone(), Path((mid, ag[0])))
-            .await
-            .unwrap();
+        let Json(f) = route_fil(
+            s(),
+            us[0].clone(),
+            Path((mid, ag[0])),
+            axum::extract::Query(Default::default()),
+        )
+        .await
+        .unwrap();
         assert_eq!(f[1]["from"], "ia");
         assert_eq!(f[0]["read"], true);
         // À toute l'équipe : mes deux IA, pas celle de Ben.
@@ -244,9 +303,14 @@ mod tests {
         assert_eq!(non_lus(&st, ag[1]).await.unwrap(), 1);
         assert_eq!(non_lus(&st, ag[2]).await.unwrap(), 0);
         // Ben ne lit ni n'écrit dans le fil de mes IA.
-        assert!(route_fil(s(), us[1].clone(), Path((mid, ag[0])))
-            .await
-            .is_err());
+        assert!(route_fil(
+            s(),
+            us[1].clone(),
+            Path((mid, ag[0])),
+            axum::extract::Query(Default::default())
+        )
+        .await
+        .is_err());
         assert!(
             route_ecrire(s(), us[1].clone(), Path((mid, ag[0])), m("coucou"))
                 .await

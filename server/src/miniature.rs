@@ -809,7 +809,7 @@ async fn ia_connectee(
 
 /// Consigne de la tâche donnée à l'IA du client.
 pub fn consigne(idee: &str, base: Option<(i64, &str)>, exemples: &[String]) -> String {
-    let mut c = String::from("Fais la miniature de cette map, en suivant la compétence « miniature » (get_skill) :\n1. capture_island : 2 ou 3 vraies photos de l'île qui montrent le gameplay.\n2. get_thumbnail_kit : regarde des inspirations du même genre (sans les recopier).\n3. compose_thumbnail avec la meilleure photo et un titre court ; si POP refuse, corrige et recommence.\n4. submit_thumbnail avec l'id rendu et cette tâche, puis passe la tâche en done.\nUne seule miniature finie : l'humain la choisit dans Forge.");
+    let mut c = String::from("Fais la miniature de cette map, en suivant la compétence « miniature » (get_skill) :\n1. capture_island : 2 ou 3 vraies photos de l'île qui montrent le gameplay.\n2. get_thumbnail_kit : regarde des inspirations du même genre (sans les recopier).\n3. compose_thumbnail avec la meilleure photo et un titre court ; si POP refuse, corrige et recommence.\n4. submit_thumbnail avec l'id rendu et cette tâche, puis passe la tâche en done. Pour parler à l'humain pendant ce travail : send_message avec canal « miniature » (il est dans l'outil Miniature, pas dans votre terminal).\nUne seule miniature finie : l'humain la choisit dans Forge.");
     if let Some((id, titre)) = base {
         c.push_str(&format!("\n\nModification de la miniature #{id} (« {titre} ») : garde la même photo et le même style, change seulement ce que demande l'humain."));
     }
@@ -937,11 +937,11 @@ pub async fn demander(
     } else {
         format!(" {} image(s) d'exemple dans la tâche.", cles.len())
     };
-    sqlx::query("INSERT INTO agent_messages (map_id, agent_id, user_id, body) VALUES (?, ?, ?, ?)")
+    sqlx::query("INSERT INTO agent_messages (map_id, agent_id, user_id, body, canal) VALUES (?, ?, ?, ?, 'miniature')")
         .bind(mid)
         .bind(aid)
         .bind(u.id)
-        .bind(format!("{corps}\n(Outil Miniature : tâche #{number}, get_task {number}, puis submit_thumbnail.{pj})"))
+        .bind(format!("{corps}\n(Outil Miniature : tâche #{number}, get_task {number}, puis submit_thumbnail ; répondez avec send_message canal « miniature ».{pj})"))
         .execute(&st.db)
         .await?;
     crate::access::notify(&st, mid, json!({ "t": "refresh", "what": "tasks" }));
