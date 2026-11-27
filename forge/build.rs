@@ -14,6 +14,7 @@ fn main() {
             "ignorer",
             "forge_version",
             "maj_etat",
+            "fenetre_terminal",
             "dictee_etat",
             "dictee_telecharger",
             "dictee_debut",

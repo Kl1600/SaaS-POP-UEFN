@@ -225,11 +225,8 @@ pub async fn dictee_fin(
                     return Err("Le modèle de dictée n'est pas installé.".into());
                 }
                 let c = Arc::new(
-                    WhisperContext::new_with_params(
-                        &p,
-                        WhisperContextParameters::default(),
-                    )
-                    .map_err(|e| format!("Modèle de dictée illisible : {e}"))?,
+                    WhisperContext::new_with_params(&p, WhisperContextParameters::default())
+                        .map_err(|e| format!("Modèle de dictée illisible : {e}"))?,
                 );
                 *m = Some(c.clone());
                 c
