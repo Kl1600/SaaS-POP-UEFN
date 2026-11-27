@@ -3,6 +3,7 @@
 // ses commandes (projets, état, liaison). Forge ne reprend aucun écran de gestion du site (décision du 24/11) :
 // « Ouvrir POP » et « Voir dans POP » ouvrent le site dans le navigateur (Forge y renvoie toute page autre que /forge).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import NOUVEAUTES from '../../../forge/NOUVEAUTES.md?raw'
 import { useNavigate } from 'react-router-dom'
 import { Bell, Bot, Building2, Check, ChevronsUpDown, ExternalLink, Home, Library, Minus, Moon, RefreshCw, ShieldCheck, Grid3x3, Square, Sun, User, Wrench, X } from 'lucide-react'
 import LangPicker from '../components/LangPicker'
@@ -20,6 +21,24 @@ import Plan2D from './Plan2D'
 import { cssRect } from '../zoom'
 
 type Invoke = <T = any>(cmd: string, args?: Record<string, unknown>) => Promise<T>
+/** Version installée de Forge (#437) ; `null` pour une Forge d'avant 0.3.2 (pas de commande) ou hors Forge. */
+function useVersionForge(invoke: Invoke | null): string | null {
+  const [v, setV] = useState<string | null>(null)
+  useEffect(() => { invoke?.<string>('forge_version').then(setV).catch(() => setV(null)) }, [invoke])
+  return v
+}
+
+/** Nouveautés de chaque version de Forge (#437), tirées de forge/NOUVEAUTES.md au moment de la construction. */
+function nouveautes(): { version: string; date: string; lignes: string[] }[] {
+  const res: { version: string; date: string; lignes: string[] }[] = []
+  for (const l of NOUVEAUTES.split('\n')) {
+    const m = l.match(/^##\s+(\S+)\s*·\s*(.*)$/)
+    if (m) res.push({ version: m[1], date: m[2].trim(), lignes: [] })
+    else if (res.length && l.trim().startsWith('- ')) res[res.length - 1].lignes.push(l.trim().slice(2))
+  }
+  return res
+}
+
 const forgeInvoke = (): Invoke | null => {
   const w = window as any
   return w.__TAURI__?.core?.invoke ?? w.__TAURI_INTERNALS__?.invoke ?? null
@@ -123,7 +142,7 @@ export default function Forge() {
         {app.map && section !== 'reglages' && !reserve && <Bandeau mapId={app.map.id} etat={etat} aller={setSection} />}
         {reserve ? <ForgePro />
           : section === 'accueil' ? <Accueil invoke={invoke} etat={etat} liaison={liaison} relie={relie} relire={lire} />
-          : section === 'reglages' ? <Reglages />
+          : section === 'reglages' ? <Reglages invoke={invoke} />
           : section === 'agents' ? (app.map ? <ForgeAgents mapId={app.map.id} tache={app.map.id === lien.map ? lien.tache : null} invoke={invoke} /> : <p className="muted">{tr("Choisissez une map.")}</p>)
           : section === 'verifier' ? (app.map ? <div className="stack" style={{ gap: 18 }}><ForgeVerifications mapId={app.map.id} ouvrir={ouvrirPOP} /><ForgeScenarios mapId={app.map.id} capturer={() => captureJeu(invoke)} /></div> : <p className="muted">{tr("Choisissez une map.")}</p>)
           : section === 'plan' ? (app.map ? <Plan2D /> : <p className="muted">{tr("Choisissez une map.")}</p>)
@@ -198,6 +217,7 @@ function MapPicker() {
 
 /** Profil en bas de la barre latérale, avec son menu (comme sur le site) : Réglages y est rangé. */
 function ProfileMenu({ invoke, onReglages, actif }: { invoke: Invoke; onReglages: () => void; actif: boolean }) {
+  const version = useVersionForge(invoke)
   const app = useApp()
   const [ouvert, setOuvert] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -209,6 +229,7 @@ function ProfileMenu({ invoke, onReglages, actif }: { invoke: Invoke; onReglages
   const choisir = (f: () => void) => () => { setOuvert(false); f() }
   return <div ref={ref} style={{ position: 'relative' }}>
     {ouvert && <div role="menu" className="forge-menu">
+      {version && <div className="small muted" style={{ padding: '6px 12px 4px' }}>POP Forge {version}</div>}
       <button role="menuitem" onClick={choisir(onReglages)}>{tr("Réglages")}</button>
       <button role="menuitem" onClick={choisir(() => ouvrirPOP('/parametres?onglet=ia'))}>{tr("IA connectées")}<ExternalLink size={14} /></button>
       <button role="menuitem" onClick={choisir(app.toggleDark)}>{tr("Thème")}<span>{app.dark ? tr("Sombre") : tr("Clair")}</span></button>
@@ -274,8 +295,18 @@ function AVenir({ section, titre }: { section: Section; titre: string }) {
   </div>
 }
 
-function Reglages() {
+function Reglages({ invoke }: { invoke: Invoke | null }) {
   const app = useApp()
+  const version = useVersionForge(invoke)
+  const [verif, setVerif] = useState<'' | 'encours' | 'ajour'>('')
+  const verifier = async () => {
+    if (!invoke) return
+    setVerif('encours')
+    try {
+      const n = await invoke<{ version: string; notes?: string } | null>('maj_etat')
+      if (n) { window.dispatchEvent(new CustomEvent('pop-forge-maj', { detail: n })); setVerif('') } else setVerif('ajour')
+    } catch (e: any) { setVerif(''); app.toast(String(e), true) }
+  }
   const ligne = (label: string, detail: string, action: React.ReactNode) =>
     <div className="li"><span style={{ flex: 1, display: 'flex', flexDirection: 'column', lineHeight: 1.35 }}><span>{label}</span>{detail && <span className="small muted">{detail}</span>}</span>{action}</div>
   return <div className="stack" style={{ gap: 28 }}>
@@ -289,12 +320,20 @@ function Reglages() {
       <h2 className="forge-h2">Forge</h2>
       {ligne(tr("Langue"), '', <LangPicker app />)}
       {ligne(tr("Thème"), '', <button className="btn" onClick={app.toggleDark}>{app.dark ? tr("Sombre") : tr("Clair")}</button>)}
-      {ligne(tr("Mises à jour"), tr("Proposées automatiquement, à venir (#79)"), null)}
+      {ligne(tr("Version"), version ? `POP Forge ${version}` : tr("Version inconnue : réinstallez Forge depuis pop-uefn.com/forge"), version && <button className="btn" disabled={verif === 'encours'} onClick={verifier}>{verif === 'encours' ? tr("Vérification…") : tr("Vérifier les mises à jour")}</button>)}
+      {verif === 'ajour' && <p className="small" role="status" style={{ margin: '6px 0 0' }}>{tr("Forge est à jour.")}</p>}
       {ligne(tr("Diagnostic"), tr("État de Forge, du relais et de la map, à coller dans une demande d’aide"), <button className="btn" onClick={async () => {
         const d = app.map ? await api.get(`/api/maps/${app.map.id}/diagnostic`).catch(() => null) : null
-        const txt = [`POP Forge · ${navigator.userAgent}`, `Serveur : ${location.origin}`, `Map : ${app.map?.name ?? '—'}`, ...(d?.problems ?? []).map((p: any) => `- ${p.title}`)].join('\n')
+        const txt = [`POP Forge ${version ?? '(version inconnue)'} · ${navigator.userAgent}`, `Serveur : ${location.origin}`, `Map : ${app.map?.name ?? '—'}`, ...(d?.problems ?? []).map((p: any) => `- ${p.title}`)].join('\n')
         try { await navigator.clipboard.writeText(txt); app.toast(tr("Diagnostic copié")) } catch { app.toast(txt) }
       }}>{tr("Copier le diagnostic")}</button>)}
+    </section>
+    <section>
+      <h2 className="forge-h2">{tr("Nouveautés")}</h2>
+      {nouveautes().slice(0, 6).map(n => <div key={n.version} className="li" style={{ alignItems: 'flex-start' }}>
+        <span style={{ flex: 1 }}><b>{n.version}</b>{n.version === version && <span className="small muted"> · {tr("installée")}</span>}<span className="small muted"> · {n.date}</span>
+          <ul className="small" style={{ margin: '4px 0 0', paddingLeft: 18 }}>{n.lignes.map((l, i) => <li key={i}>{l}</li>)}</ul></span>
+      </div>)}
     </section>
   </div>
 }
@@ -501,7 +540,11 @@ function MajForge({ invoke }: { invoke: Invoke }) {
   const [erreur, setErreur] = useState('')
   useEffect(() => {
     const verifier = () => invoke<{ version: string; notes?: string } | null>('maj_verifier').then(setMaj).catch(() => {})
-    verifier(); const t = setInterval(verifier, 6 * 3600 * 1000); return () => clearInterval(t)
+    verifier(); const t = setInterval(verifier, 6 * 3600 * 1000)
+    // « Vérifier les mises à jour » des Réglages (#437).
+    const f = (e: Event) => { setMaj((e as CustomEvent).detail); setPlusTard(false) }
+    window.addEventListener('pop-forge-maj', f)
+    return () => { clearInterval(t); window.removeEventListener('pop-forge-maj', f) }
   }, [invoke])
   if (!maj || plusTard) return null
   const installer = async () => {
@@ -510,7 +553,7 @@ function MajForge({ invoke }: { invoke: Invoke }) {
   }
   return <div className="warn" role="status" style={{ marginBottom: 18, flexWrap: 'wrap' }}>
     <RefreshCw size={18} strokeWidth={1.5} />
-    <span style={{ flex: 1 }}>{tr("Nouvelle version de Forge : {0}. Elle s’installe en un clic, puis Forge redémarre.", [maj.version])}{erreur && <span className="err small" style={{ display: 'block' }}>{erreur}</span>}</span>
+    <span style={{ flex: 1 }}>{tr("Nouvelle version de Forge : {0}. Elle s’installe en un clic, puis Forge redémarre.", [maj.version])}{maj.notes && maj.notes !== 'Nouvelle version de POP Forge.' && <span className="small" style={{ display: 'block', whiteSpace: 'pre-line', marginTop: 4 }}>{maj.notes}</span>}{erreur && <span className="err small" style={{ display: 'block' }}>{erreur}</span>}</span>
     <button className="btn pri" disabled={occupe} onClick={installer}>{occupe ? tr("Mise à jour…") : tr("Mettre à jour")}</button>
     {!occupe && <button className="btn" onClick={() => setPlusTard(true)}>{tr("Plus tard")}</button>}
   </div>

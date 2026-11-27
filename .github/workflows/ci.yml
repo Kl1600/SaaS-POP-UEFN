@@ -139,6 +139,11 @@ jobs:
           lire() { python3 -c "import json,sys; print(json.load(sys.stdin)['version'])"; }
           v=$(lire < forge/tauri.conf.json)
           p=$(lire < web/public/downloads/pop-forge.json)
+          # Nouveautés de chaque version (#437).
+          if ! python3 tools/nouveautes.py notes "$v" > /dev/null; then
+            echo "::error::forge/NOUVEAUTES.md n'a pas d'entrée pour la version $v de Forge : ajoutez « ## $v · date » et 1 à 5 lignes « - … » (#437)."
+            exit 1
+          fi
           if [ "$v" != "$p" ]; then
             echo "::error::forge/tauri.conf.json est en version $v mais l'installateur publié (web/public/downloads/pop-forge.json) en $p : attendez le commit du workflow « relais Windows »."
             exit 1

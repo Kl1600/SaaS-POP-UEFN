@@ -43,6 +43,21 @@ pub async fn maj_verifier(app: AppHandle) -> Option<Nouvelle> {
     })
 }
 
+/// Version installée de Forge (#437), affichée dans Forge et dans le diagnostic.
+#[tauri::command]
+pub fn forge_version(app: AppHandle) -> String {
+    app.package_info().version.to_string()
+}
+
+/// « Vérifier les mises à jour » (#437) : comme `maj_verifier`, mais distingue « à jour » (`None`) d'une erreur.
+#[tauri::command]
+pub async fn maj_etat(app: AppHandle) -> Result<Option<Nouvelle>, String> {
+    Ok(chercher(&app).await?.map(|u| Nouvelle {
+        version: u.version.clone(),
+        notes: u.body.clone(),
+    }))
+}
+
 /// Télécharge, vérifie la signature, installe, puis relance Forge. Une signature qui ne correspond pas est refusée.
 #[tauri::command]
 pub async fn maj_installer(app: AppHandle) -> Result<(), String> {

@@ -12,6 +12,8 @@ fn main() {
             "maj_verifier",
             "maj_installer",
             "ignorer",
+            "forge_version",
+            "maj_etat",
             "projet_ouvert",
             "liaison",
             "fenetre",
