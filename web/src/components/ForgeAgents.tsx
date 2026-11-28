@@ -71,7 +71,7 @@ export function ForgeAgents({ mapId, tache, invoke }: { mapId: number; tache?: n
   const { cols, rows } = grille(affiches.length)
   return <div className="term-page">
     <div className="term-haut">
-      {app.canEdit && <PlusTerminal connectees={connectees} directs={directs} ouvrir={ouvrir} />}
+      {app.canEdit && <PlusTerminal connectees={connectees} directs={directs} ouvrir={ouvrir} mapId={mapId} invoke={invoke} lance={id => { relireDirects(); changer([...affiches.filter(a => famille(a) !== 'Claude').map(a => a.id), id]); reload() }} />}
       <h1 className="forge-h1" style={{ margin: 0, fontSize: 20 }}>{tr("Agents")}</h1>
       {res?.equipe?.phrase && <span className="muted small">{res.equipe.phrase}</span>}
       <div style={{ flex: 1 }} />
@@ -111,7 +111,7 @@ export function Fenetre({ mapId, a, phrase, cible, ouvertes, agir, fermer, aPart
   return <div id={`agent-${a.id}`} className={'term' + (cible ? ' forge-cible' : '')} style={style}>
     <div className="term-barre">
       <span className="forge-point" style={{ background: mode === 'off' ? 'var(--red)' : actif(a.last_used) ? 'var(--tg)' : '#6b6b6b' }} aria-hidden="true" />
-      <b title={a.name}>{a.forge ? 'Claude Code' : famille(a)}</b>
+      <b title={a.name}>{famille(a)}</b>
       {direct && <span className="term-direct">{tr("en direct")}</span>}
       <span className="term-doux term-coupe">{[a.orchestrator ? tr("Orchestrateur") : a.role === 'relecteur' ? ROLES.relecteur : null, a.owner].filter(Boolean).join(' · ')}{a.last_used ? ' · ' + tr("dernier appel {0}", [ago(a.last_used)]) : ''}</span>
       <div style={{ flex: 1 }} />
@@ -189,10 +189,10 @@ function ligneDirecte(l: string, i: number): React.ReactNode {
   switch (v.type) {
     case 'moi': return <div key={i} className="term-l term-moi">› {v.text}</div>
     case 'erreur': return <div key={i} className="term-l term-ko">{v.text}</div>
-    case 'fin': return <div key={i} className="term-l term-doux"><span className="term-etoile">✻</span> {tr("Claude Code s’est arrêté.")}</div>
-    case 'system': return v.subtype === 'init' ? <div key={i} className="term-l term-doux"><span className="term-etoile">✻</span> {tr("Claude Code prêt")}{v.model ? ` · ${v.model}` : ''}</div> : null
+    case 'fin': return <div key={i} className="term-l term-doux"><span className="term-etoile">✻</span> {tr("Claude s’est arrêté.")}</div>
+    case 'system': return v.subtype === 'init' ? <div key={i} className="term-l term-doux"><span className="term-etoile">✻</span> {tr("Claude prêt")}{v.model ? ` · ${v.model}` : ''}</div> : null
     case 'assistant': return <div key={i}>{(v.message?.content ?? []).map((c: any, j: number) => c.type === 'text'
-      ? <div key={j} className={'term-l' + (PAS_CONNECTE.test(c.text) ? ' term-ko' : '')}><span className="term-ia">⏺</span> {PAS_CONNECTE.test(c.text) ? tr("Claude Code n’est pas connecté à votre compte Claude.") : c.text}</div>
+      ? <div key={j} className={'term-l' + (PAS_CONNECTE.test(c.text) ? ' term-ko' : '')}><span className="term-ia">⏺</span> {PAS_CONNECTE.test(c.text) ? tr("Claude n’est pas encore connecté à Forge.") : c.text}</div>
       : c.type === 'tool_use' ? <div key={j} className="term-l"><span className="term-ok">⏺</span> <b>{String(c.name).replace(/^mcp__pop__/, '')}</b><span className="term-doux">({court(c.input, 100)})</span></div> : null)}</div>
     case 'user': return <div key={i}>{(Array.isArray(v.message?.content) ? v.message.content : []).filter((c: any) => c.type === 'tool_result').map((c: any, j: number) =>
       <div key={j} className={'term-l ' + (c.is_error ? 'term-ko' : 'term-doux')}>  ⎿  {court(Array.isArray(c.content) ? c.content.map((x: any) => x.text ?? '').join(' ') : c.content)}</div>)}</div>
@@ -240,20 +240,20 @@ function TerminalDirect({ a, invoke }: { a: any; invoke: Invoke }) {
   }
   return <>
     <div className="term-corps" ref={corps} role="log" aria-live="polite" aria-label={tr("Terminal en direct de {0}", [a.name])}>
-      {!lignes.length && <div className="term-l term-doux"><span className="term-etoile">✻</span> {tr("Démarrage de Claude Code… Écrivez-lui ci-dessous.")}</div>}
+      {!lignes.length && <div className="term-l term-doux"><span className="term-etoile">✻</span> {tr("Démarrage de Claude… Écrivez-lui ci-dessous.")}</div>}
       {lignes.map(ligneDirecte)}
       {attend && <div className="term-l term-doux"><span className="term-etoile term-pouls">✻</span> {tr("réfléchit…")}</div>}
       {pasConnecte && <div className="term-l" role="alert" style={{ marginTop: 8 }}>
-        <div>{tr("Connectez Claude Code à votre compte Claude : une console s’ouvre, tapez /login et suivez les étapes, puis revenez ici et relancez.")}</div>
+        <div>{tr("Connectez Claude à Forge, une seule fois : cliquez « Connecter ». Dans la fenêtre qui s’ouvre, choisissez votre compte Claude (ou tapez /login), autorisez dans le navigateur, puis revenez ici et cliquez « Relancer ».")}</div>
         <div className="row" style={{ gap: 8, marginTop: 6, fontFamily: 'Plus Jakarta Sans, Inter, system-ui, sans-serif' }}>
-          <button className="btn pri" onClick={() => invoke('connexion_claude').catch((er: any) => app.toast(/not allowed|not found|unknown/i.test(String(er)) ? tr("Mettez Forge à jour (pop-uefn.com/forge).") : String(er), true))}>{tr("Connecter Claude Code")}</button>
+          <button className="btn pri" onClick={() => invoke('connexion_claude').catch((er: any) => app.toast(/not allowed|not found|unknown/i.test(String(er)) ? tr("Mettez Forge à jour (pop-uefn.com/forge).") : String(er), true))}>{tr("Connecter")}</button>
           <button className="btn" onClick={relancer}>{tr("Relancer")}</button>
         </div>
       </div>}
     </div>
     <form className="term-invite" onSubmit={envoyer}>
       <span aria-hidden="true">›</span>
-      <input value={texte} maxLength={8000} onChange={e => setTexte(e.target.value)} placeholder={vivant ? tr("Écrire à {0}…", [a.name]) : tr("Claude Code s’est arrêté : rouvrez-en un avec « + Terminal ».")} aria-label={tr("Message à {0}", [a.name])} disabled={!vivant || !app.canEdit} />
+      <input value={texte} maxLength={8000} onChange={e => setTexte(e.target.value)} placeholder={vivant ? tr("Écrire à {0}…", [a.name]) : tr("Claude s’est arrêté : rouvrez-le avec « + Terminal ».")} aria-label={tr("Message à {0}", [a.name])} disabled={!vivant || !app.canEdit} />
     </form>
   </>
 }
@@ -273,13 +273,16 @@ function Equipe({ mapId }: { mapId: number }) {
 }
 
 /** « + Terminal » (#451, #481), en haut à gauche de la page Agents : une ligne par IA connectée à POP (Claude, Codex…).
- * Seules les IA connectées par l'utilisateur y figurent (#495) : pas de Claude Code lancé par Forge. */
-function PlusTerminal({ connectees, directs, ouvrir }: { connectees: any[]; directs: number[]; ouvrir: (id: number) => void }) {
+ * Seules les IA connectées par l'utilisateur y figurent (#495) ; Claude s'ouvre en direct sur le PC quand c'est possible (#501). */
+function PlusTerminal({ connectees, directs, ouvrir, mapId, invoke, lance }: { connectees: any[]; directs: number[]; ouvrir: (id: number) => void; mapId: number; invoke?: Invoke; lance: (id: number) => void }) {
   const app = useApp()
   const [ouvert, setOuvert] = useState(false)
+  const [claudeCode, setClaudeCode] = useState(false)
+  const [occupe, setOccupe] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (!ouvert) return
+    invoke?.('outils_ia').then((l: any[]) => setClaudeCode(!!l?.find(o => o.id === 'claude_code' && o.lancable))).catch(() => setClaudeCode(false))
     const f = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOuvert(false) }
     const k = (e: KeyboardEvent) => { if (e.key === 'Escape') setOuvert(false) }
     document.addEventListener('mousedown', f); document.addEventListener('keydown', k)
@@ -291,19 +294,35 @@ function PlusTerminal({ connectees, directs, ouvrir }: { connectees: any[]; dire
     const f = familles.find(x => x.nom === famille(a))
     if (f) f.agents.push(a); else familles.push({ nom: famille(a), agents: [a] })
   }
+  const enDirect = async () => {
+    setOccupe(true)
+    let cle: { id: number; token: string } | null = null
+    try {
+      cle = await api.post('/api/me/tokens', { name: 'Claude', kind: 'claude_code', scope: 'write', map: mapId, forge: true })
+      await invoke!('direct_ouvrir', { outil: 'claude_code', token: cle!.token, map: app.map?.name ?? '', agent: cle!.id })
+      lance(cle!.id)
+    } catch (e: any) {
+      if (cle) await api.del(`/api/tokens/${cle.id}`).catch(() => {})
+      app.toast(/not allowed|not found|unknown/i.test(String(e?.message ?? e)) ? tr("Mettez Forge à jour (pop-uefn.com/forge) pour ouvrir un terminal en direct.") : (e?.message ?? String(e)), true)
+    }
+    setOccupe(false)
+  }
   const choisir = async (f: { nom: string; agents: any[] }) => {
     setOuvert(false)
     const vivant = f.agents.find(a => directs.includes(a.id))
     if (vivant) return ouvrir(vivant.id)
-    // Claude = l'IA que l'utilisateur a connectée (#487).
+    // Claude répond tout de suite (#501) : il tourne sur le PC, avec le compte Claude de l'utilisateur, quand Claude
+    // Code est installé ; sinon, le Claude connecté par MCP (il lit les messages à sa prochaine action).
+    if (f.nom === 'Claude' && invoke && claudeCode) return enDirect()
     ouvrir(f.agents[0].id)
   }
   return <div ref={ref} style={{ position: 'relative' }}>
-    <button className="btn pri" aria-haspopup="dialog" aria-expanded={ouvert} onClick={() => setOuvert(o => !o)}><Plus size={15} strokeWidth={2} />{tr("Terminal")}</button>
+    <button className="btn pri" aria-haspopup="dialog" aria-expanded={ouvert} disabled={occupe} onClick={() => setOuvert(o => !o)}><Plus size={15} strokeWidth={2} />{occupe ? tr("Démarrage…") : tr("Terminal")}</button>
     {ouvert && <div className="term-menu card" role="dialog" aria-label={tr("Ouvrir un terminal")}>
       {familles.length ? <div className="stack" style={{ gap: 4 }}>{familles.map(f => <button key={f.nom} className="term-choix" onClick={() => choisir(f)}>
         <span className="forge-point" style={{ background: f.agents.some(a => actif(a.last_used)) ? 'var(--tg)' : '#6b6b6b' }} aria-hidden="true" />
         <b style={{ fontWeight: 500 }}>{f.nom}</b>
+        {f.nom === 'Claude' && invoke && claudeCode && <span className="term-direct">{tr("direct")}</span>}
       </button>)}
 </div> : <p className="small muted" style={{ margin: 0 }}>{tr("Aucune IA connectée à POP. Connectez Claude ou Codex (POP → IA connectées), puis revenez ici.")}</p>}
     </div>}
