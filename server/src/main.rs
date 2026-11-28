@@ -65,6 +65,7 @@ mod security;
 mod skills;
 mod stripe;
 mod studio;
+mod studio3d;
 mod suggestions;
 mod tasks;
 mod uefn;
@@ -476,6 +477,23 @@ fn api() -> Router<AppState> {
         .route(
             "/api/maps/{mid}/miniatures/{id}/utiliser",
             post(miniature::utiliser),
+        )
+        .route("/api/maps/{mid}/studio3d", get(studio3d::liste))
+        .route(
+            "/api/maps/{mid}/studio3d/demandes",
+            post(studio3d::demander),
+        )
+        .route(
+            "/api/maps/{mid}/studio3d/{id}/apercu",
+            get(studio3d::apercu),
+        )
+        .route(
+            "/api/maps/{mid}/studio3d/{id}/accepter",
+            post(studio3d::accepter),
+        )
+        .route(
+            "/api/maps/{mid}/studio3d/{id}/refuser",
+            post(studio3d::refuser),
         )
         .route("/api/admin/overview", get(admin::overview))
         .route(

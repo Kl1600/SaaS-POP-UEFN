@@ -129,3 +129,11 @@ Fait : link/src/lowmesh.rs (FBX/OBJ/GLB, Decimate de Blender, comptes et aperçu
 Reste : critère (UEFN) à tester sur le PC de benybens
 Bloque : rien
 ```
+
+```
+EN REVUE | #327 Forge · Outils : 3D Studio (modèle 3D depuis un texte ou une image) | 28/11
+Owner : Kl1600 | Sur la tâche : Claude Code, pour Kl1600
+Fait : outil MCP blender_build (script de l'IA + export FBX, exécuté par le relais blender_run keep=true, FBX gardé dans « POP Forge\creations »), table studio3d_modeles (0069), routes liste/aperçu/accepter (asset_import, journalisé)/refuser/demandes (fil « studio3d »), compétence « studio3d », Outils → 3D Studio
+Reste : critère (UEFN) à tester sur le PC de benybens ; image en entrée (seulement le texte pour l'instant)
+Bloque : rien
+```

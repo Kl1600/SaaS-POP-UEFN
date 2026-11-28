@@ -5,9 +5,9 @@
 //!
 //! `pop-link.exe` (téléchargeable sur le site) est recompilé sous Windows par le workflow « relais Windows » (#358).
 pub mod blender;
-pub mod lowmesh;
 mod digest;
 mod files;
+pub mod lowmesh;
 mod mcpdriver;
 pub mod poste;
 pub mod texte3d;
@@ -356,7 +356,42 @@ impl Link {
                     .map(|s| Duration::from_secs(s.clamp(5, 600)))
                     .unwrap_or(blender::DELAI);
                 let r = blender::lancer(script, entrees, delai).await?;
-                out["glb"] = json!(b64.encode(&r.glb));
+                if a["keep"].as_bool() == Some(true) {
+                    // 3D Studio (#327) : le FBX reste sur le PC (« POP Forge\creations ») pour l'import après
+                    // « Accepter » ; il ne repart pas vers POP.
+                    let (nom, data) = r
+                        .autres
+                        .iter()
+                        .find(|(n, _)| n == "sortie.fbx")
+                        .ok_or_else(|| anyhow!("Le script n'a produit aucun modèle FBX."))?;
+                    let base: String = a["name"]
+                        .as_str()
+                        .unwrap_or("Modele")
+                        .chars()
+                        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+                        .take(40)
+                        .collect();
+                    let quand = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map(|d| d.as_secs())
+                        .unwrap_or(0);
+                    let fichier = format!(
+                        "{}_{quand}.{}",
+                        base.trim_matches('_'),
+                        nom.rsplit('.').next().unwrap_or("fbx")
+                    );
+                    let dossier = blender::dossier()
+                        .parent()
+                        .map(|p| p.join("creations"))
+                        .ok_or_else(|| anyhow!("Dossier de Forge introuvable."))?;
+                    std::fs::create_dir_all(&dossier)?;
+                    let chemin = dossier.join(&fichier);
+                    std::fs::write(&chemin, data)?;
+                    out["local_path"] = json!(chemin.to_string_lossy());
+                    out["filename"] = json!(fichier);
+                } else {
+                    out["glb"] = json!(b64.encode(&r.glb));
+                }
                 out["preview"] = json!(b64.encode(&r.apercu));
                 out["triangles"] = json!(r.triangles);
                 out["objects"] = json!(r.objets);
