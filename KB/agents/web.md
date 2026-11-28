@@ -366,3 +366,10 @@ Reste : rien
 Piège : sous Windows (core.autocrlf=true), un fichier réécrit en CRLF change les empreintes de Vite : construire web/dist
         depuis une copie en LF (git -c core.autocrlf=false worktree add …), sinon le CI de main passe au rouge.
 ```
+
+```
+FAIT | #537 Forge · Écran d'ouverture : « Que voulez-vous faire ? » avant le tableau de bord | 28/11
+Owner : benybens | Sur la tâche : Claude Code, pour benybens
+Fait : écran d'ouverture (choisir, créer, gérer), Accueil de la map (feuille de route, tâches), réglage ui_prefs.forge_ouverture ; testé dans le navigateur avec les commandes de Forge simulées
+Reste : rien
+```
