@@ -1,6 +1,7 @@
 // Traduction anglaise de l'application. Clé = texte français de l'interface (ou du serveur), valeur = anglais.
 // Généré à partir des textes enveloppés dans tr(...) ; à compléter quand on ajoute des textes.
 const EN: Record<string, string> = {
+ "Ouvrir UEFN": "Open UEFN",
  "Reprendre là où j'en étais": "Pick up where I left off",
  "Ouvre {0} dans UEFN.": "Opens {0} in UEFN.",
  "Reliez d'abord une map à son projet UEFN.": "First link a map to its UEFN project.",

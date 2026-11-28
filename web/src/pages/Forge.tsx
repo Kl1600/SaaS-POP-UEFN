@@ -157,7 +157,7 @@ export default function Forge() {
         <MajForge invoke={invoke} />
         <ForgeDictee invoke={invoke} />
         {!reserve && section !== 'reglages' && <Didacticiel page={'forge-' + section} />}
-        {app.map && section !== 'reglages' && !reserve && <Bandeau mapId={app.map.id} etat={etat} aller={setSection} />}
+        {app.map && section !== 'reglages' && !reserve && <Bandeau mapId={app.map.id} etat={etat} aller={setSection} invoke={invoke} projet={projetCourant} />}
         {reserve ? <ForgePro />
           : section === 'accueil' ? <Accueil invoke={invoke} etat={etat} liaison={liaison} relie={relie} relire={lire} pro={pro} aller={setSection} prendre={n => { setTacheCible(n); setSection('agents') }} />
           : section === 'reglages' ? <Reglages invoke={invoke} />
@@ -670,8 +670,15 @@ function MajForge({ invoke }: { invoke: Invoke }) {
 }
 
 /** États et dépannage (#300) : chaque problème de la map avec son action et l'aide en un clic. */
-function Bandeau({ mapId, etat, aller }: { mapId: number; etat: string; aller: (s: any) => void }) {
+function Bandeau({ mapId, etat, aller, invoke, projet }: { mapId: number; etat: string; aller: (s: any) => void; invoke: Invoke; projet?: string }) {
   const app = useApp()
+  const [lancement, setLancement] = useState<string | null>(null)
+  // « Ouvrir UEFN » (#445, retour de benybens) : UEFN fermé → Forge le lance sur le projet relié de la map (#402).
+  const ouvrirUefn = async () => {
+    if (!projet) return
+    setLancement(tr("Ouverture…"))
+    try { setLancement(await invoke<string>('ouvrir_uefn', { projet })) } catch (e: any) { setLancement(String(e?.message ?? e)) }
+  }
   const { data, reload } = useLoad<any>(`/api/maps/${mapId}/diagnostic`, [mapId, etat])
   const [aide, setAide] = useState<string | null>(null)
   useEffect(() => app.subscribe(m => { if (m?.t === 'uefn' || m?.t === 'agent' || m?.t === 'relay') reload() }), [mapId])
@@ -690,9 +697,11 @@ function Bandeau({ mapId, etat, aller }: { mapId: number; etat: string; aller: (
       <div className="forge-ligne">
         <span className="forge-point" style={{ background: 'var(--red)' }} aria-hidden="true" />
         <span style={{ flex: 1 }}>{tr(p.title)}</span>
+        {p.code === 'mcp-arrete' && projet && <button className="btn pri" disabled={lancement === tr("Ouverture…")} onClick={ouvrirUefn}>{tr("Ouvrir UEFN")}</button>}
         <button className="btn" onClick={() => agir(p)}>{tr(p.label)}</button>
         <button className="linkbtn" onClick={() => setAide(aide === p.code + i ? null : p.code + i)}>{tr("Pourquoi ?")}</button>
       </div>
+      {p.code === 'mcp-arrete' && lancement && <p className="small" style={{ margin: '8px 0 0' }}>{lancement}</p>}
       {(aide === p.code + i || aide === p.code) && <p className="small" style={{ margin: '8px 0 0' }}>{tr(p.help)}</p>}
     </div>)}
   </div>
