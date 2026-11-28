@@ -141,6 +141,9 @@ fn autoriser(app: &AppHandle, u: &Url) {
         .permission("allow-dictee-debut")
         .permission("allow-dictee-fin")
         .permission("allow-dictee-partiel")
+        .permission("allow-blender-etat")
+        .permission("allow-blender-installer")
+        .permission("allow-blender-tester")
         .permission("allow-importer")
         .permission("allow-projet-ouvert")
         .permission("allow-liaison")
@@ -806,6 +809,35 @@ fn connexion_claude() -> Result<(), String> {
     agents_locaux::lancer(&exe, &[], &dossier, "")
 }
 
+/// Blender (#351) : installé ? taille à télécharger, progression.
+#[tauri::command]
+async fn blender_etat() -> pop_link::blender::Etat {
+    pop_link::blender::etat().await
+}
+
+/// Télécharge et installe Blender, seulement après l'accord de l'utilisateur dans Forge.
+#[tauri::command]
+async fn blender_installer() -> Result<(), String> {
+    pop_link::blender::installer()
+        .await
+        .map_err(|e| format!("{e:#}"))
+}
+
+/// Essai d'un script Blender isolé : aperçu PNG (base64), triangles, taille du glTF.
+#[tauri::command]
+async fn blender_tester(script: String) -> Result<serde_json::Value, String> {
+    use base64::Engine;
+    let r = pop_link::blender::lancer(&script, vec![], pop_link::blender::DELAI)
+        .await
+        .map_err(|e| format!("{e:#}"))?;
+    Ok(serde_json::json!({
+        "apercu": base64::engine::general_purpose::STANDARD.encode(&r.apercu),
+        "triangles": r.triangles,
+        "objets": r.objets,
+        "taille": r.glb.len(),
+    }))
+}
+
 #[tauri::command]
 fn direct_fermer(d: tauri::State<'_, direct::Directs>, agent: i64) {
     direct::fermer(&d, agent)
@@ -1015,7 +1047,10 @@ fn main() {
             dictee::dictee_telecharger,
             dictee::dictee_debut,
             dictee::dictee_fin,
-            dictee::dictee_partiel
+            dictee::dictee_partiel,
+            blender_etat,
+            blender_installer,
+            blender_tester
         ])
         .setup(|app| {
             let h = app.handle().clone();

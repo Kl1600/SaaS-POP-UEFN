@@ -3,7 +3,8 @@
 // Forge montre la miniature, « Conforme Discover », et « Utiliser », « Refaire », « Modifier ». Le site montre les
 // versions choisies (`versions`).
 import { useEffect, useRef, useState } from 'react'
-import { Check, Download, ImagePlus, RefreshCw, Pencil, Paperclip, X } from 'lucide-react'
+import { Box, Check, Download, ImagePlus, RefreshCw, Pencil, Paperclip, X } from 'lucide-react'
+import { ForgeBlender } from './ForgeBlender'
 import { ago, api } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { tr } from '../i18n/t'
@@ -133,9 +134,10 @@ function Composer({ occupe, base, annulerBase, envoyer }: { occupe: boolean; bas
 }
 
 /** Onglet Outils de Forge (#468) : une carte par outil. */
-export function ForgeOutils({ mapId, allerAgents }: { mapId: number; allerAgents: () => void }) {
-  const [outil, setOutil] = useState<'' | 'miniature'>('')
+export function ForgeOutils({ mapId, allerAgents, invoke }: { mapId: number; allerAgents: () => void; invoke: any }) {
+  const [outil, setOutil] = useState<'' | 'miniature' | 'blender'>('')
   if (outil === 'miniature') return <ForgeMiniature mapId={mapId} retour={() => setOutil('')} allerAgents={allerAgents} />
+  if (outil === 'blender') return <ForgeBlender invoke={invoke} retour={() => setOutil('')} />
   return <div className="stack" style={{ gap: 18 }}>
     <h1 className="forge-h1">{tr("Outils")}</h1>
     <div className="outils-grille">
@@ -143,6 +145,11 @@ export function ForgeOutils({ mapId, allerAgents }: { mapId: number; allerAgents
         <ImagePlus size={22} strokeWidth={1.5} />
         <b>{tr("Miniature")}</b>
         <span className="small muted">{tr("Décrivez la miniature à votre IA : elle prend des photos de l'île et POP la dessine, conforme aux règles d'Epic.")}</span>
+      </button>
+      <button className="card outil-carte" onClick={() => setOutil('blender')}>
+        <Box size={22} strokeWidth={1.5} />
+        <b>{tr("Blender")}</b>
+        <span className="small muted">{tr("Le moteur des outils 3D (texte 3D, Low Mesh, 3D Studio) : à installer une fois, si vous le voulez.")}</span>
       </button>
     </div>
   </div>

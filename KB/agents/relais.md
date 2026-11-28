@@ -105,3 +105,11 @@ Fait : Forge relit les projets toutes les 30 s, /api/relay/discover, ajout à ch
 Reste : rien
 Bloque : rien
 ```
+
+```
+EN REVUE | #351 Forge · Blender : installation au premier usage et lancement isolé | 28/11
+Owner : Kl1600 | Sur la tâche : Claude Code, pour Kl1600
+Fait : link/src/blender.rs (4.5.11 LTS, SHA-256 publiée, zip dans %LOCALAPPDATA%\POP Forge\blender, AppContainer sans capacité + icacls, Job Object 4 Gio, arrêt à 120 s), enveloppe Python (scène vide, export GLB, triangles, aperçu Cycles CPU), action du relais blender_run, Forge → Outils → Blender (installer, essai)
+Reste : critères (Forge) et (UEFN) à tester sur le PC Windows de benybens ; import GLB à vérifier (KB/UEFN.md)
+Bloque : rien
+```

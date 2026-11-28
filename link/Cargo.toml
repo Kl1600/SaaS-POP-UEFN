@@ -17,3 +17,9 @@ base64 = "0.22"
 axum = "0.8"
 anyhow = "1"
 rand = "0.8"
+# Blender (#351) : décompression du zip officiel.
+zip = { version = "2", default-features = false, features = ["deflate"] }
+
+# Isolation de Blender (#351) : AppContainer et Job Object.
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Isolation", "Win32_Security_Authorization", "Win32_System_JobObjects", "Win32_System_Threading"] }

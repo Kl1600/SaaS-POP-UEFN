@@ -149,6 +149,18 @@ concernée ; corrigez une ligne fausse en le disant.
 - `EditorAssetLibrary.delete_directory` retire un dossier vide du Content Browser ; le dossier reste sur le disque
   jusqu'à ce qu'on le supprime.
 
+## Modèles 3D faits par Blender : formats et limites d'import (#351, d'après la documentation d'Epic, **pas encore vérifié sur le vrai UEFN**)
+
+- Testé (#90) : FBX → `StaticMesh` + un matériau par matériau du fichier ; PNG → `Texture2D`.
+- Documentation d'Epic (page « Importing Assets in UEFN ») : le FBX passe par les options d'import FBX, avec les
+  mêmes restrictions que l'import FBX d'Unreal (FBX 2020.2) ; les autres formats (dont glTF/GLB) passent par
+  **Interchange**. Le relais n'accepte pas encore `.glb`/`.gltf` à l'import (`IMPORT_EXT`, link/src/lib.rs) : à
+  ajouter quand l'import d'un GLB sera vérifié.
+- Budgets conseillés par Epic (« Fortnite-ready assets ») : petit objet ≤ 1 000 sommets ; LOD0 de 400 à 9 000
+  polygones selon la taille et la complexité. Le validateur de mesh d'Epic avertit au-delà de 30 000 sommets (#325).
+- À vérifier sur le vrai UEFN (benybens, copie de projet) : import d'un GLB produit par Blender (Interchange),
+  taille maximale de texture, échelle (Blender en mètres, UEFN en centimètres : facteur 100 à l'export FBX).
+
 ## Décor : meshes, réglages de l'île, mesh en Verse (testé le 23/11/2026, projet TestPopHub, UEFN 43.12, #148)
 
 **Toolsets repérés** (62 au total) :
