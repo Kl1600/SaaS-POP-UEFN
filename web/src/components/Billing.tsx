@@ -1,7 +1,7 @@
 // Abonnement (Starter / Pro) et écran de fin d'essai. Les paiements passent par Stripe.
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { CreditCard, Check, LogOut, Download } from '../icons'
+import { CreditCard, Check, LogOut, Download, ShieldCheck, RotateCcw } from '../icons'
 import { api } from '../api'
 import { useApp, useLoad } from '../state'
 import { CardHead } from './ui'
@@ -18,18 +18,31 @@ async function go(path: string, body: any, toast: (m: string, e?: boolean) => vo
   try { const r = await api.post(path, body); if (r.url) location.href = r.url } catch (e: any) { toast(e.message, true) }
 }
 
+// Prix ramené au jour (inspiré de Vinteer, #516) : 12,99 € / 30 j ≈ 0,43 €, 24,99 € ≈ 0,83 €.
+const PAR_JOUR: Record<string, string> = { starter: tr("Moins de 0,50 € par jour"), pro: tr("Moins d’1 € par jour") }
+
 function Plans({ b }: { b: any }) {
   const { toast } = useApp()
+  const [an, setAn] = useState(false)
+  const annuel = an && b.annual
   const active = ['active', 'trialing', 'past_due'].includes(b.sub_status)
-  return <div className="bplans">{(['starter', 'pro'] as const).map(p => {
+  return <>
+    {b.annual && !active && <div className="bfreq" role="group" aria-label={tr("Fréquence de facturation")}>
+      <button type="button" className={!an ? 'on' : ''} aria-pressed={!an} onClick={() => setAn(false)}>{tr("Mensuel")}</button>
+      <button type="button" className={an ? 'on' : ''} aria-pressed={an} onClick={() => setAn(true)}>{tr("Annuel")}<em>{tr("2 mois offerts")}</em></button>
+    </div>}
+    <div className="bplans">{(['starter', 'pro'] as const).map(p => {
     const current = active && b.plan === p
     return <div key={p} className={'bplan' + (p === 'pro' ? ' best' : '') + (current ? ' current' : '')}>
       <div className="row" style={{ justifyContent: 'space-between' }}><b>{p === 'pro' ? 'Pro' : 'Starter'}</b>{current && <span className="badge b-g">{tr("Votre plan")}</span>}</div>
-      <div className="bprice">{b.prices[p]}<span>{tr("/ mois")}</span></div>
+      <div className="bprice">{annuel ? b.prices_year[p] : b.prices[p]}<span>{annuel ? tr("/ an") : tr("/ mois")}</span></div>
+      <div className="bjour">{annuel ? tr("Soit 2 mois offerts sur l’année") : PAR_JOUR[p]}</div>
       <ul>{FEATURES[p].map(f => <li key={f}><Check size={14} />{f}</li>)}</ul>
-      {!current && <button className={'btn' + (p === 'pro' ? ' pri' : '')} disabled={!b.configured} onClick={() => go('/api/billing/checkout', { kind: p }, toast)}>{active ? tr("Changer pour {0}", [p === 'pro' ? 'Pro' : 'Starter']) : tr("Choisir {0}", [p === 'pro' ? 'Pro' : 'Starter'])}</button>}
+      {!current && <button className={'btn' + (p === 'pro' ? ' pri' : '')} disabled={!b.configured} onClick={() => go('/api/billing/checkout', { kind: p, annuel }, toast)}>{active ? tr("Changer pour {0}", [p === 'pro' ? 'Pro' : 'Starter']) : tr("Choisir {0}", [p === 'pro' ? 'Pro' : 'Starter'])}</button>}
     </div>
   })}</div>
+    <div className="bsure"><span><Check size={14} />{tr("Annulable à tout moment, en un clic")}</span><span><ShieldCheck size={14} />{tr("Paiement sécurisé par Stripe")}</span></div>
+  </>
 }
 
 /** Paramètres → Abonnement. */
@@ -63,8 +76,9 @@ export function Paywall() {
   return <div className="app paywall">
     <img src="/logo.png" alt="POP" className="paywall-logo" />
     <div className="card paywall-box">
-      <h1>{tr("Votre essai est terminé")}</h1>
-      <p>{tr("Choisissez un plan pour retrouver vos maps, vos tâches et votre équipe. Tout est gardé tel quel.")}</p>
+      <h1>{tr("Votre essai de 7 jours est terminé")}</h1>
+      <p>{tr("Merci d’avoir essayé POP. Rien n’est supprimé : vos maps, vos tâches, vos pages et votre équipe vous attendent. Choisissez un plan et tout reprend là où vous vous étiez arrêté.")}</p>
+      <div className="bsure" style={{ justifyContent: 'center', marginBottom: 14 }}><span><RotateCcw size={14} />{tr("Tout est gardé tel quel")}</span><span><Check size={14} />{tr("Sans engagement, annulable en un clic")}</span><span><Download size={14} />{tr("Vos données exportables à tout moment")}</span></div>
       {b && <Plans b={b} />}
       <div className="row" style={{ gap: 10, justifyContent: 'center', marginTop: 18, flexWrap: 'wrap' }}>
         <a className="btn" href="/api/me/export"><Download size={16} />{tr("Exporter mes données")}</a>

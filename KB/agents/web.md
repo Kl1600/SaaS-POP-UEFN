@@ -2,6 +2,11 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-28 · #516 · abonnement : prix par jour, annuel, fin d'essai
+- Fait : Billing.tsx : « moins de 0,50 € / d'1 € par jour », choix Mensuel / Annuel (2 mois offerts, 129,90 € et 249,90 €), réassurance ; écran de fin d'essai plus doux. stripe.rs : STRIPE_PRICE_STARTER_ANNUAL / STRIPE_PRICE_PRO_ANNUAL facultatifs (choix affiché si les deux existent), reconnus par le webhook ; checkout { kind, annuel }.
+- Reste à faire par l'humain ou benybens : créer les deux prix annuels dans Stripe et les mettre dans /opt/pop/.env.
+- Vérifié : faux Stripe local (POP_STRIPE_BASE) : Annuel Pro envoie price_a_p ; captures.
+
 ### 2026-11-28 · #508 · icônes Tabler (style Vinteer)
 - Fait : @tabler/icons-react ; web/src/icons.tsx ré-exporte chaque icône sous son ancien nom lucide (props size / strokeWidth / className, trait 1,75 par défaut, classe pi pi-<nom>). Tous les imports passent par ce module ; seul lucideAll.ts (icônes choisies pour les pages) garde lucide.
 - Nouvelle icône : l'ajouter dans icons.tsx (vérifier que IconXxx existe dans @tabler/icons-react).

@@ -1528,3 +1528,14 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 .nav a svg{width:18px;height:18px}
 .navsec{font-size:12.5px;text-transform:uppercase;letter-spacing:.07em;font-weight:500;padding:16px 12px 4px}
 }
+
+@layer app{
+/* #516 : abonnement façon Vinteer */
+.bfreq{display:inline-flex;width:fit-content;align-self:flex-start;gap:4px;padding:4px;border:1px solid var(--border);border-radius:999px;margin:4px 0 14px}
+.bfreq button{border:0;background:none;color:var(--text2);font:inherit;font-size:14px;padding:7px 14px;border-radius:999px;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
+.bfreq button.on{background:var(--text);color:var(--bg)}
+.bfreq em{font-style:normal;font-size:12px;padding:2px 8px;border-radius:999px;background:rgba(242,122,47,.15);color:var(--accent)}
+.bjour{font-size:13px;color:var(--text2);margin:-4px 0 12px}
+.bsure{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:14px;font-size:13px;color:var(--text2)}
+.bsure span{display:inline-flex;align-items:center;gap:6px}
+}
