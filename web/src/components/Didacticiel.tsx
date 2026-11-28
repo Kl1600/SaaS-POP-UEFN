@@ -96,6 +96,20 @@ function cible(sel?: string): HTMLElement | null {
   return null
 }
 
+const zoom = () => parseFloat(getComputedStyle(document.documentElement).zoom || '1') || 1
+const MARGE = 8
+
+/** Contour d'un rectangle arrondi pour le voile (règle evenodd : la zone reste nette). */
+function trou(W: number, H: number, r: DOMRect | null) {
+  const cadre = `M0 0H${W}V${H}H0Z`
+  if (!r) return `path(evenodd, '${cadre}')`
+  const x = r.left - MARGE, y = r.top - MARGE, w = r.width + 2 * MARGE, h = r.height + 2 * MARGE, k = Math.min(14, w / 2, h / 2)
+  return `path(evenodd, '${cadre} M${x + k} ${y}H${x + w - k}A${k} ${k} 0 0 1 ${x + w} ${y + k}V${y + h - k}A${k} ${k} 0 0 1 ${x + w - k} ${y + h}H${x + k}A${k} ${k} 0 0 1 ${x} ${y + h - k}V${y + k}A${k} ${k} 0 0 1 ${x + k} ${y}Z')`
+}
+
+/** Touches qui font défiler la page : bloquées pendant le didacticiel. */
+const TOUCHES = new Set([' ', 'PageUp', 'PageDown', 'Home', 'End', 'ArrowUp', 'ArrowDown'])
+
 /** Affiche le didacticiel de l'onglet `page` s'il n'a pas encore été vu par ce compte. */
 export function Didacticiel({ page }: { page: string }) {
   const { me } = useApp()
@@ -105,50 +119,79 @@ export function Didacticiel({ page }: { page: string }) {
   const [pret, setPret] = useState(false)
   const [fini, setFini] = useState<string[]>([])
   const [r, setR] = useState<DOMRect | null>(null)
+  const [, setTaille] = useState(0)
   const actif = !!me && !!etapes && !vus.includes(page) && !fini.includes(page)
-  // On attend que la page ait dessiné ses zones avant la première bulle.
-  useEffect(() => { setI(0); setPret(false); if (!actif) return; const t = setTimeout(() => setPret(true), 900); return () => clearTimeout(t) }, [page, actif])
-  useLayoutEffect(() => {
-    if (!actif || !pret) return
-    const el = cible(etapes[i]?.sel)
-    if (el) el.scrollIntoView({ block: 'nearest' })
-    // L'interface est zoomée à 90 % sur grand écran (html { zoom }) : on ramène la zone en pixels CSS.
-    const maj = () => {
-      const b = cible(etapes[i]?.sel)?.getBoundingClientRect()
-      const z = parseFloat(getComputedStyle(document.documentElement).zoom || '1') || 1
-      setR(b ? new DOMRect(b.left / z, b.top / z, b.width / z, b.height / z) : null)
-    }
-    maj(); const t = setTimeout(maj, 350)
-    window.addEventListener('resize', maj); window.addEventListener('scroll', maj, true)
-    return () => { clearTimeout(t); window.removeEventListener('resize', maj); window.removeEventListener('scroll', maj, true) }
-  }, [i, pret, actif, page])
-  if (!actif || !pret) return null
   const fin = () => {
     setFini(f => [...f, page])
     const all = { ...(me!.ui_prefs ?? {}), tours: [...vus, page] }
     me!.ui_prefs = all
     api.put('/api/me/ui-prefs', all).catch(() => {})
   }
+  // On attend que la page ait dessiné ses zones avant la première bulle.
+  useEffect(() => { setI(0); setPret(false); if (!actif) return; const t = setTimeout(() => setPret(true), 900); return () => clearTimeout(t) }, [page, actif])
+  // Pas de défilement à la main pendant le didacticiel (molette, tactile, clavier) ; ← → et Échap le pilotent.
+  useEffect(() => {
+    if (!actif || !pret) return
+    const bloque = (e: Event) => { if (!(e.target as HTMLElement)?.closest?.('.tuto')) e.preventDefault() }
+    const touche = (e: KeyboardEvent) => {
+      if (TOUCHES.has(e.key) && !(e.target as HTMLElement)?.closest?.('input, textarea, [contenteditable]')) e.preventDefault()
+    }
+    const o = { passive: false, capture: true } as AddEventListenerOptions
+    window.addEventListener('wheel', bloque, o); window.addEventListener('touchmove', bloque, o); window.addEventListener('keydown', touche, o)
+    return () => { window.removeEventListener('wheel', bloque, o); window.removeEventListener('touchmove', bloque, o); window.removeEventListener('keydown', touche, o) }
+  }, [actif, pret])
+  useLayoutEffect(() => {
+    if (!actif || !pret) return
+    // La page défile toute seule jusqu'à la zone si elle est coupée ou hors de l'écran.
+    const el = cible(etapes[i]?.sel)
+    if (el) {
+      const b = el.getBoundingClientRect(), H = window.innerHeight
+      if (b.top < 70 || b.bottom > H - 20) el.scrollIntoView({ block: b.height > H * 0.6 ? 'start' : 'center', inline: 'nearest', behavior: 'smooth' })
+    }
+    // L'interface est zoomée à 90 % sur grand écran (html { zoom }) : on ramène la zone en pixels CSS.
+    const maj = () => {
+      const b = cible(etapes[i]?.sel)?.getBoundingClientRect()
+      const z = zoom()
+      // Zone gardée à l'intérieur de l'écran, avec la même marge que le contour.
+      const vw = window.innerWidth / z, vh = window.innerHeight / z, m = MARGE + 4
+      if (!b) { setR(null) } else {
+        const l = Math.max(m, b.left / z), t = Math.max(m, b.top / z), rr = Math.min(vw - m, b.right / z), bb = Math.min(vh - m, b.bottom / z)
+        setR(new DOMRect(l, t, Math.max(0, rr - l), Math.max(0, bb - t)))
+      }
+      setTaille(window.innerWidth * 10000 + window.innerHeight)
+    }
+    maj(); const t1 = setTimeout(maj, 300), t2 = setTimeout(maj, 700)
+    window.addEventListener('resize', maj); window.addEventListener('scroll', maj, true)
+    return () => { clearTimeout(t1); clearTimeout(t2); window.removeEventListener('resize', maj); window.removeEventListener('scroll', maj, true) }
+  }, [i, pret, actif, page])
+  if (!actif || !pret) return null
   const e = etapes[i]
-  // Bulle sous la zone visée, ou au-dessus s'il n'y a pas la place ; centrée sans zone.
-  const W = 340
-  const z = parseFloat(getComputedStyle(document.documentElement).zoom || '1') || 1
+  const avant = () => setI(Math.max(0, i - 1))
+  const apres = () => i + 1 < etapes.length ? setI(i + 1) : fin()
+  // Bulle sous la zone visée, sinon au-dessus, sinon en bas de l'écran ; centrée sans zone.
+  const W = 340, HB = 200
+  const z = zoom()
   const vw = window.innerWidth / z, vh = window.innerHeight / z
   const style: React.CSSProperties = r
-    ? { left: Math.max(12, Math.min(vw - W - 12, r.left + Math.min(r.width, 400) / 2 - W / 2)), ...(r.bottom + 190 < vh ? { top: r.bottom + 12 } : { top: Math.max(12, r.top - 190) }) }
+    ? { left: Math.max(12, Math.min(vw - W - 12, r.left + Math.min(r.width, 400) / 2 - W / 2)),
+        top: r.bottom + MARGE + 12 + HB < vh ? r.bottom + MARGE + 12 : r.top - MARGE - 12 - HB > 0 ? r.top - MARGE - 12 - HB : vh - HB - 16 }
     : { left: '50%', top: '40%', transform: 'translate(-50%, -50%)' }
   return <>
-    {r && <div className="tuto-zone" style={{ left: r.left - 6, top: r.top - 6, width: r.width + 12, height: r.height + 12 }} aria-hidden="true" />}
-    <div className="tuto" style={{ ...style, width: W }} role="dialog" aria-label={tr("Didacticiel")}>
+    <div className="tuto-voile" style={{ clipPath: trou(vw, vh, r) }} aria-hidden="true" onClick={ev => ev.stopPropagation()} />
+    {r && <div className="tuto-zone" style={{ left: r.left - MARGE, top: r.top - MARGE, width: r.width + 2 * MARGE, height: r.height + 2 * MARGE }} aria-hidden="true" />}
+    <div className="tuto" style={{ ...style, width: W }} role="dialog" aria-modal="true" aria-label={tr("Didacticiel")}
+      onKeyDown={ev => { if (ev.key === 'ArrowRight') apres(); else if (ev.key === 'ArrowLeft') avant(); else if (ev.key === 'Escape') fin() }}>
       <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-        <span className="small muted">{tr("{0} sur {1}", [String(i + 1), String(etapes.length)])}</span>
+        <span className="tuto-pas">{etapes.map((_, k) => <i key={k} className={k === i ? 'on' : k < i ? 'vu' : ''} />)}<span className="small muted">{tr("{0} sur {1}", [String(i + 1), String(etapes.length)])}</span></span>
         <button className="iconbtn" aria-label={tr("Passer le didacticiel")} onClick={fin}><X size={16} /></button>
       </div>
       <b>{e.titre}</b>
       <p className="small" style={{ margin: '6px 0 12px' }}>{e.texte}</p>
-      <div className="row" style={{ gap: 8, justifyContent: 'flex-end' }}>
-        {i === 0 ? <button className="btn" onClick={fin}>{tr("Passer")}</button> : <button className="btn" onClick={() => setI(i - 1)}>{tr("Précédent")}</button>}
-        <button className="btn pri" onClick={() => i + 1 < etapes.length ? setI(i + 1) : fin()}>{i + 1 < etapes.length ? tr("Suivant") : tr("Terminer")}</button>
+      <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+        <button className="btn ghost" onClick={fin}>{tr("Passer")}</button>
+        <span style={{ flex: 1 }} />
+        <button className="btn" onClick={avant} disabled={i === 0}>{tr("Précédent")}</button>
+        <button className="btn pri" autoFocus onClick={apres}>{i + 1 < etapes.length ? tr("Suivant") : tr("Terminer")}</button>
       </div>
     </div>
   </>

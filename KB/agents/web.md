@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-28 · #533 · didacticiel : flou, défilement, centrage
+- Fait : Didacticiel.tsx : voile flouté (.tuto-voile, backdrop-filter) percé par clip-path path(evenodd) autour de la zone ; contour à 8 px de chaque côté, gardé dans l'écran ; défilement automatique (scrollIntoView center/start) si la zone est coupée ; molette, tactile et touches de défilement bloquées pendant le didacticiel ; Précédent toujours visible, ← → Échap ; points de progression.
+- Vérifié : Playwright 1440×760 sur le Dashboard (écarts 8 px, molette sans effet, défilement auto à l'étape 3, page libre à la fin).
+
 ### 2026-11-28 · #519 · vitrine : prix par jour et explications du comparatif
 - Fait : pricing.perDay et pricing.hints (alignés sur pricing.rows, '' pour les titres de groupe) dans les 16 dictionnaires ; Landing.tsx les affiche (.lperday, small.lhint).
 - Vérifié : captures FR, EN, AR (droite à gauche).
