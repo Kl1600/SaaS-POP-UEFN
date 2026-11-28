@@ -1592,3 +1592,15 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 /* #552 : exemples d'actions de Léo */
 .chip.chip-act{border-color:rgba(242,122,47,.45);color:#d4642a}
 }
+
+@layer app{
+/* #557 : Nouveautés */
+.nouveautes .nv-jour{margin-bottom:22px}
+.nv-date{font-size:13px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--text2);margin:0 0 10px}
+.nv-liste{display:flex;flex-direction:column;gap:10px}
+.nv-item{display:flex;align-items:center;gap:14px;padding:14px 16px}
+.nv-tag{flex:none;font-size:12px;font-weight:500;padding:3px 10px;border-radius:999px;border:1px solid var(--border)}
+.nv-new{color:var(--accent);border-color:rgba(242,122,47,.4);background:rgba(242,122,47,.08)}
+.nv-up{color:var(--text)}
+.nv-fix{color:var(--text2)}
+}
