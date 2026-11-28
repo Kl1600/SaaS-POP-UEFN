@@ -3,6 +3,9 @@
 Une entrée par version de `forge/tauri.conf.json` (#437) : `## version · date`, puis 1 à 5 lignes en français.
 Le workflow « relais Windows » en tire les notes de la mise à jour ; le CI refuse une version sans entrée.
 
+## 0.3.22 · 28/11/2026
+- Assistant de liaison : le démarrage automatique du serveur MCP d'UEFN, actif par défaut, n'est plus signalé comme manquant.
+
 ## 0.3.21 · 28/11/2026
 - Même thème que le site : barre latérale avec catégories repliables, onglets à réordonner en tenant ⋮⋮.
 - Didacticiel à la première visite de chaque écran de Forge (Accueil, Agents, Terminal, Outils, Vérifications, Plan 2D, Bibliothèque).
