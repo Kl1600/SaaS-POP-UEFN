@@ -5,6 +5,7 @@ import { api } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { tr } from '../i18n/t'
 import { Fenetre } from '../components/ForgeAgents'
+import { Didacticiel } from '../components/Didacticiel'
 
 export default function ForgeTerminal() {
   const app = useApp()
@@ -21,5 +22,5 @@ export default function ForgeTerminal() {
   if (!a) return <p className="muted" style={{ padding: 24 }}>{tr("Cet agent n’est plus connecté à la map.")}</p>
   const liste: any[] = Array.isArray(taches) ? taches : taches?.tasks ?? []
   const agir = async (f: () => Promise<any>, ok: string) => { try { const r = await f(); app.toast(r?.message ?? ok); reload(); relireTaches() } catch (e: any) { app.toast(e.message, true) } }
-  return <div className="term-seul-fond"><Fenetre mapId={mapId} a={a} ouvertes={liste.filter(t => t.status !== 'done')} agir={agir} style={{ height: '100vh', borderRadius: 0, border: 0 }} /></div>
+  return <div className="term-seul-fond"><Didacticiel page="forge-terminal" /><Fenetre mapId={mapId} a={a} ouvertes={liste.filter(t => t.status !== 'done')} agir={agir} style={{ height: '100vh', borderRadius: 0, border: 0 }} /></div>
 }

@@ -20,6 +20,7 @@ import { ForgeVerifications } from '../components/ForgeVerifications'
 import { ForgeScenarios } from '../components/ForgeScenarios'
 import { ForgeAssistant } from '../components/ForgeAssistant'
 import Plan2D from './Plan2D'
+import { Didacticiel } from '../components/Didacticiel'
 import { cssRect } from '../zoom'
 
 type Invoke = <T = any>(cmd: string, args?: Record<string, unknown>) => Promise<T>
@@ -152,6 +153,7 @@ export default function Forge() {
       <main className={'content forge-contenu' + ((section === 'agents' || section === 'plan') && !reserve ? ' plein' : '')}>
         <MajForge invoke={invoke} />
         <ForgeDictee invoke={invoke} />
+        {!reserve && section !== 'reglages' && <Didacticiel page={'forge-' + section} />}
         {app.map && section !== 'reglages' && !reserve && <Bandeau mapId={app.map.id} etat={etat} aller={setSection} />}
         {reserve ? <ForgePro />
           : section === 'accueil' ? <Accueil invoke={invoke} etat={etat} liaison={liaison} relie={relie} relire={lire} />
