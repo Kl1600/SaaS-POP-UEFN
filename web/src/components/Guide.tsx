@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Compass, Play, ArrowRight, X, Send } from '../icons'
 import { ask, suggested, type Fiche } from '../guideKB'
+import { comprendre, type Reponse } from '../leoActions'
 import { api } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { tr, LANG } from '../i18n/t'
@@ -42,13 +43,13 @@ function Recap({ onNavigate }: { onNavigate?: () => void }) {
   </div>
 }
 
-type Msg = { who: 'me' | 'bot'; recap?: boolean; text?: string; f?: Fiche; others?: Fiche[]; today?: boolean; items?: { label: string; link: string; kind?: string }[]; typing?: boolean }
+type Msg = { who: 'me' | 'bot'; act?: Extract<Reponse, { kind: 'action' }>; etat?: 'attente' | 'encours' | 'fait' | 'annule'; lien?: string; recap?: boolean; text?: string; f?: Fiche; others?: Fiche[]; today?: boolean; items?: { label: string; link: string; kind?: string }[]; typing?: boolean }
 
 /** Questions-réponses : Léo guide l'utilisateur dans POP (base de fiches locale, pas d'IA). */
 function GuideChat({ initial, onNavigate }: { initial?: string; onNavigate?: () => void }) {
   const nav = useNav()
   const loc = useLocation()
-  const { map, me } = useApp()
+  const { map, me, studio, toast } = useApp()
   const first = (me?.user.name ?? '').split(' ')[0]
   // Le chat s'ouvre sur le récap de la journée (si une map est ouverte), puis l'invitation à poser une question.
   const [msgs, setMsgs] = useState<Msg[]>([
@@ -60,6 +61,14 @@ function GuideChat({ initial, onNavigate }: { initial?: string; onNavigate?: () 
   const send = async (text: string) => {
     const t = text.trim(); if (!t) return
     setQ(''); setMsgs(m => [...m, { who: 'me', text: t }, { who: 'bot', typing: true }])
+    // 0. Une demande d'action (« crée une tâche test pour demain », « ouvre le planning »…), comme Siri (#552).
+    const r = await comprendre(t, { mapId: map?.id, studioId: studio?.id, meId: me!.user.id }).catch(() => null)
+    if (r) {
+      const msg: Msg = r.kind === 'action' ? { who: 'bot', text: r.text, act: r, etat: 'attente' } : { who: 'bot', text: r.text }
+      setMsgs(m => [...m.filter(x => !x.typing), msg])
+      if (r.kind === 'nav') { onNavigate?.(); nav(r.to) }
+      return
+    }
     const res = ask(t, shortPath(loc.pathname))
     let bot: Msg
     // 1. Question sur les données de la map (retards, une personne, une tâche, l’objectif, les chiffres…).
@@ -76,6 +85,17 @@ function GuideChat({ initial, onNavigate }: { initial?: string; onNavigate?: () 
     }
     setMsgs(m => [...m.filter(x => !x.typing), bot])
   }
+  const lancer = async (i: number) => {
+    const m = msgs[i]; if (!m.act) return
+    setMsgs(l => l.map((x, k) => k === i ? { ...x, etat: 'encours' } : x))
+    try {
+      const out = await m.act.run()
+      setMsgs(l => [...l.map((x, k) => k === i ? { ...x, etat: 'fait' as const } : x), { who: 'bot', text: out.text, lien: out.to }])
+    } catch (e: any) {
+      setMsgs(l => l.map((x, k) => k === i ? { ...x, etat: 'attente' as const } : x)); toast(e.message, true)
+    }
+  }
+  const annuler = (i: number) => setMsgs(l => [...l.map((x, k) => k === i ? { ...x, etat: 'annule' as const } : x), { who: 'bot', text: tr("D’accord, je ne fais rien.") }])
   const pick = (f: Fiche) => setMsgs(m => [...m, { who: 'me', text: f.q }, { who: 'bot', f }])
   useEffect(() => { if (initial) send(initial) }, [initial])
   useEffect(() => { end.current?.scrollIntoView({ block: 'end', behavior: 'smooth' }) }, [msgs])
@@ -85,6 +105,11 @@ function GuideChat({ initial, onNavigate }: { initial?: string; onNavigate?: () 
         {m.recap && <Recap onNavigate={onNavigate} />}
         {m.typing && <span className="gtyping"><i /><i /><i /></span>}
         {m.text && <p>{m.text}</p>}
+        {m.act && m.etat !== 'annule' && m.etat !== 'fait' && <div className="row" style={{ gap: 8, marginTop: 6 }}>
+          <button className="btn pri" style={{ height: 32 }} disabled={m.etat === 'encours'} onClick={() => lancer(i)}>{m.act.bouton}</button>
+          <button className="btn" style={{ height: 32 }} disabled={m.etat === 'encours'} onClick={() => annuler(i)}>{tr("Annuler")}</button>
+        </div>}
+        {m.lien && <button className="btn" style={{ height: 32, marginTop: 6 }} onClick={() => { onNavigate?.(); nav(m.lien!) }}>{tr("Voir")}<ArrowRight size={14} /></button>}
         {m.items && m.items.length > 0 && <div className="gitems">{m.items.map((it, j) => <button key={j} onClick={() => { onNavigate?.(); nav(it.link) }}>{it.kind && <span className="badge" style={{ marginRight: 6 }}>{it.kind}</span>}{it.label}<ArrowRight size={13} /></button>)}</div>}
         {m.f && <>
           <p style={{ fontWeight: 500 }}>{m.f.q}</p>
@@ -99,9 +124,12 @@ function GuideChat({ initial, onNavigate }: { initial?: string; onNavigate?: () 
       </div>)}
       <div ref={end} />
     </div>
-    {msgs.length <= 1 && <div className="gothers gsugs">{suggested(shortPath(loc.pathname)).slice(0, 3).map(f => <button key={f.id} className="chip" onClick={() => pick(f)}>{f.q}</button>)}</div>}
+    {msgs.length <= 1 && <div className="gothers gsugs">
+      {map && [tr("Crée une tâche … pour demain"), tr("Ouvre le planning"), tr("Marque #… comme faite")].map(x => <button key={x} className="chip chip-act" onClick={() => { setQ(x); setTimeout(() => { const el = document.querySelector<HTMLInputElement>('.gask-main input'); if (el) { el.focus(); const k = x.indexOf('…'); if (k >= 0) el.setSelectionRange(k, k + 1) } }, 0) }}>{x}</button>)}
+      {suggested(shortPath(loc.pathname)).slice(0, 2).map(f => <button key={f.id} className="chip" onClick={() => pick(f)}>{f.q}</button>)}
+    </div>}
     <form className="gask gask-main" onSubmit={e => { e.preventDefault(); send(q) }}>
-      <input className="field" value={q} onChange={e => setQ(e.target.value)} placeholder={tr("Posez votre question à Léo…")} aria-label={tr("Votre question")} />
+      <input className="field" value={q} onChange={e => setQ(e.target.value)} placeholder={tr("Une question ou une demande pour Léo…")} aria-label={tr("Votre question")} />
       <button className="btn pri" aria-label={tr("Envoyer")}><Send size={16} /></button>
     </form>
   </div>

@@ -1574,3 +1574,8 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 @media (max-width:760px){.drawer.gdrawer{right:8px;left:8px;width:auto;bottom:76px;height:calc(100dvh / var(--ui-zoom) - 100px)}}
 @media (prefers-reduced-motion:reduce){.drawer.gdrawer{animation:none}}
 }
+
+@layer app{
+/* #552 : exemples d'actions de Léo */
+.chip.chip-act{border-color:rgba(242,122,47,.45);color:#d4642a}
+}

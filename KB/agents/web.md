@@ -2,6 +2,11 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-28 · #552 · Léo fait des actions
+- Fait : web/src/leoActions.ts (règles, FR et EN, sans IA externe) : créer une tâche (titre, jour, personne), une page, un tableau blanc, un objectif ; sur « #N » : statut, assigner, déplacer, commenter, ouvrir ; aller sur une page. Guide.tsx : Léo propose l'action, « Confirmer » / « Annuler », puis lien « Voir ». Les « comment… ? » restent aux fiches.
+- Pour ajouter une action : une branche de plus dans comprendre(), avant la navigation.
+- Vérifié : Playwright, 12 demandes, résultat contrôlé en base.
+
 ### 2026-11-28 · #548 · UEFN Link → POP Forge (application), Léo rond
 - Fait : textes de l'application et du serveur (Paramètres, aide, abonnement, pastille, Léo, MCP) : « UEFN Link » → « POP Forge », « Organiseur → UEFN Link » → « Paramètres → POP Forge » ; avertissements pop-link.exe inchangés. 5 clés en double retirées de app-en.ts. Visage et bouton de Léo ronds.
 - Vérifié : Dashboard, Paramètres (POP Forge, Abonnement), Aide sans « UEFN Link » ; cargo test 151 ok. Côté serveur : guide.rs, mcp.rs, uefn.rs, aide_forge.rs (« Paramètres → POP Forge », relais nommé « POP Forge » par défaut).
