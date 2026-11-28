@@ -1,1 +1,1 @@
-{"version": "0.3.24", "date": "2026-11-28", "notes": "· « Ouvrir UEFN » présélectionne toujours le bon projet, même juste après en avoir ouvert un autre.\n· Quand UEFN est ouvert sur une autre map, Forge le dit (« UEFN est ouvert sur TestPopHub, pas sur GrassCutter ») et propose d'y passer."}
+{"version": "0.3.25", "date": "2026-11-28", "notes": "· Le sélecteur de map et le menu du compte s'ouvrent à droite de la barre latérale, comme sur le site ; glissez une map vers un autre groupe pour la déplacer."}
