@@ -111,6 +111,13 @@ export default function Forge() {
     } catch { /* relais indisponible : on réessaie au prochain tour */ }
   }, [invoke])
   useEffect(() => { lire(); const t = setInterval(lire, 2000); return () => clearInterval(t) }, [lire])
+  // Projet ouvert dans UEFN (#538), pour dire quand il n'est pas celui de la map choisie. Plus lent : toutes les 10 s.
+  const [projetOuvert, setProjetOuvert] = useState<string | null>(null)
+  useEffect(() => {
+    if (!invoke) return
+    const f = () => invoke<string | null>('projet_ouvert').then(setProjetOuvert).catch(() => {})
+    f(); const t = setInterval(f, 10000); return () => clearInterval(t)
+  }, [invoke])
   // F5 recharge Forge, comme l'ancien menu de Windows.
   useEffect(() => {
     const f = (e: KeyboardEvent) => { if (e.key === 'F5') { e.preventDefault(); location.reload() } }
@@ -126,6 +133,11 @@ export default function Forge() {
 
   const relie = !!liaison && memeServeur(liaison.serveur, location.origin) && etat !== 'UEFN non relié'
   const projetCourant = (liaison?.liens ?? []).find(l => app.map && l.map.toLowerCase() === app.map.name.toLowerCase())?.projet
+  // UEFN ouvert sur le projet d'une autre map reliée que la map choisie (#538) : son nom et sa map.
+  const lienOuvert = projetOuvert ? (liaison?.liens ?? []).find(l => l.projet.toLowerCase() === projetOuvert.toLowerCase()) : undefined
+  const ailleurs = etat === 'UEFN connecté' && projetCourant && lienOuvert && lienOuvert.projet.toLowerCase() !== projetCourant.toLowerCase()
+    ? { nom: nomDossier(lienOuvert.projet), mapId: app.me?.studios.flatMap(s => s.maps).find(m => m.name.toLowerCase() === lienOuvert.map.toLowerCase())?.id ?? null }
+    : null
   const titre = section === 'reglages' ? tr("Réglages") : SECTIONS.find(s => s[0] === section)?.[1]
 
   return <div className="forge-shell">
@@ -147,7 +159,7 @@ export default function Forge() {
     <div className="main">
       <div className="top" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <div style={{ fontSize: 17, display: 'flex', gap: 8 }}><span className="muted">Forge</span><span className="muted">/</span><span>{titre}</span></div>
-        <span className="badge" title={tr("État du relais")}><span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: relie ? 'var(--tg)' : 'var(--red)' }} />{relie && projetCourant ? nomDossier(projetCourant) + ' · ' + tr(etat) : relie ? tr(etat) : tr(etat)}</span>
+        <span className="badge" title={tr("État du relais")}><span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: ailleurs ? 'var(--accent)' : relie ? 'var(--tg)' : 'var(--red)' }} />{ailleurs ? nomDossier(projetCourant!) + ' · ' + tr("UEFN ouvert sur {0}", [ailleurs.nom]) : relie && projetCourant ? nomDossier(projetCourant) + ' · ' + tr(etat) : tr(etat)}</span>
         <div style={{ flex: 1 }} />
         <Cloche />
         <button className="iconbtn" aria-label={app.dark ? tr("Thème clair") : tr("Thème sombre")} onClick={app.toggleDark}>{app.dark ? <Sun size={20} strokeWidth={1.5} /> : <Moon size={20} strokeWidth={1.5} />}</button>
@@ -157,7 +169,7 @@ export default function Forge() {
         <MajForge invoke={invoke} />
         <ForgeDictee invoke={invoke} />
         {!reserve && section !== 'reglages' && <Didacticiel page={'forge-' + section} />}
-        {app.map && section !== 'reglages' && !reserve && <Bandeau mapId={app.map.id} etat={etat} aller={setSection} invoke={invoke} projet={projetCourant} />}
+        {app.map && section !== 'reglages' && !reserve && <Bandeau mapId={app.map.id} etat={etat} aller={setSection} invoke={invoke} projet={projetCourant} ailleurs={ailleurs} />}
         {reserve ? <ForgePro />
           : section === 'accueil' ? <Accueil invoke={invoke} etat={etat} liaison={liaison} relie={relie} relire={lire} pro={pro} aller={setSection} prendre={n => { setTacheCible(n); setSection('agents') }} />
           : section === 'reglages' ? <Reglages invoke={invoke} />
@@ -680,7 +692,7 @@ function MajForge({ invoke }: { invoke: Invoke }) {
 }
 
 /** États et dépannage (#300) : chaque problème de la map avec son action et l'aide en un clic. */
-function Bandeau({ mapId, etat, aller, invoke, projet }: { mapId: number; etat: string; aller: (s: any) => void; invoke: Invoke; projet?: string }) {
+function Bandeau({ mapId, etat, aller, invoke, projet, ailleurs }: { mapId: number; etat: string; aller: (s: any) => void; invoke: Invoke; projet?: string; ailleurs?: { nom: string; mapId: number | null } | null }) {
   const app = useApp()
   const [lancement, setLancement] = useState<string | null>(null)
   // « Ouvrir UEFN » (#445, retour de benybens) : UEFN fermé → Forge le lance sur le projet relié de la map (#402).
@@ -706,8 +718,10 @@ function Bandeau({ mapId, etat, aller, invoke, projet }: { mapId: number; etat: 
     {pbs.map((p, i) => <div key={i} className="card" style={{ padding: '10px 14px', borderColor: 'var(--red)' }}>
       <div className="forge-ligne">
         <span className="forge-point" style={{ background: 'var(--red)' }} aria-hidden="true" />
-        <span style={{ flex: 1 }}>{tr(p.title)}</span>
-        {p.code === 'mcp-arrete' && projet && <button className="btn pri" disabled={lancement === tr("Ouverture…")} onClick={ouvrirUefn}>{tr("Ouvrir UEFN")}</button>}
+        {/* UEFN ouvert sur une autre map (#538) : on le dit au lieu de « fermé », et on propose de passer à cette map. */}
+        <span style={{ flex: 1 }}>{p.code === 'mcp-arrete' && ailleurs && projet ? tr("UEFN est ouvert sur {0}, pas sur {1}.", [ailleurs.nom, nomDossier(projet)]) : tr(p.title)}</span>
+        {p.code === 'mcp-arrete' && ailleurs?.mapId && <button className="btn pri" onClick={() => app.setMapId(ailleurs.mapId!)}>{tr("Passer à {0}", [ailleurs.nom])}</button>}
+        {p.code === 'mcp-arrete' && projet && !ailleurs && <button className="btn pri" disabled={lancement === tr("Ouverture…")} onClick={ouvrirUefn}>{tr("Ouvrir UEFN")}</button>}
         <button className="btn" onClick={() => agir(p)}>{tr(p.label)}</button>
         <button className="linkbtn" onClick={() => setAide(aide === p.code + i ? null : p.code + i)}>{tr("Pourquoi ?")}</button>
       </div>

@@ -204,7 +204,7 @@ pub fn lore_id(projet: &Path) -> Option<String> {
     (!id.is_empty() && id.len() <= 100).then(|| id.to_string())
 }
 
-/// Date et heure UTC au format d'UEFN : `2026.11.26-15.21.51`.
+/// Date et heure au format d'UEFN : `2026.11.26-15.21.51` (secondes depuis 1970, sans fuseau).
 pub fn horodatage(secs: u64) -> String {
     let (j, s) = ((secs / 86_400) as i64, secs % 86_400);
     // Jours depuis 1970 → date civile (algorithme de Howard Hinnant).
@@ -223,6 +223,62 @@ pub fn horodatage(secs: u64) -> String {
         s / 60 % 60,
         s % 60
     )
+}
+
+/// Inverse de [`horodatage`] : `2026.11.26-15.21.51` → secondes depuis 1970 (`None` si le format est autre).
+pub fn en_secondes(h: &str) -> Option<u64> {
+    let (date, heure) = h.trim().split_once('-')?;
+    let d: Vec<i64> = date
+        .split('.')
+        .map(|x| x.parse().ok())
+        .collect::<Option<_>>()?;
+    let t: Vec<u64> = heure
+        .split('.')
+        .map(|x| x.parse().ok())
+        .collect::<Option<_>>()?;
+    let ([an, mois, jour], [hh, mm, ss]) = (d.as_slice(), t.as_slice()) else {
+        return None;
+    };
+    if !(1..=12).contains(mois) || !(1..=31).contains(jour) || *hh > 23 || *mm > 59 || *ss > 59 {
+        return None;
+    }
+    // Date civile → jours depuis 1970 (algorithme de Howard Hinnant).
+    let a = if *mois <= 2 { an - 1 } else { *an };
+    let ere = a.div_euclid(400);
+    let yoe = a - ere * 400;
+    let mp = (mois + 9) % 12;
+    let doy = (153 * mp + 2) / 5 + jour - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    let jours = ere * 146_097 + doe - 719_468;
+    u64::try_from(jours)
+        .ok()
+        .map(|j| j * 86_400 + hh * 3600 + mm * 60 + ss)
+}
+
+/// Date d'ouverture à écrire pour que ce projet soit le plus récent (#538) : UEFN écrit `LastOpenedTime` en heure
+/// locale et Forge ne connaît que l'heure UTC ; on prend donc au moins une seconde de plus que la plus récente des
+/// autres, quel que soit le fuseau.
+pub fn date_ouverture(maintenant: u64, autres: impl IntoIterator<Item = u64>) -> u64 {
+    autres.into_iter().map(|a| a + 1).fold(maintenant, u64::max)
+}
+
+/// Les `LastOpenedTime` de tous les projets (`VK_Projects\*.ini`).
+fn dates_ouverture(dossier: &Path) -> Vec<u64> {
+    std::fs::read_dir(dossier)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|e| std::fs::read_to_string(e.path()).ok())
+        .flat_map(|t| {
+            t.lines()
+                .filter_map(|l| {
+                    l.trim()
+                        .strip_prefix("LastOpenedTime=")
+                        .and_then(en_secondes)
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect()
 }
 
 /// Met `LastOpenedTime` à `quand` dans la section du projet ; ajoute la ligne (ou la section) si elle manque.
@@ -287,6 +343,7 @@ pub fn ouvrir_uefn(projet: &Path) -> Result<String> {
     let secs = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)?
         .as_secs();
+    let secs = date_ouverture(secs, dates_ouverture(&dossier));
     std::fs::write(&ini, maj_dernier_lancement(&avant, &horodatage(secs)))?;
     std::process::Command::new(&exe)
         .current_dir(exe.parent().unwrap_or(Path::new(".")))
@@ -401,6 +458,32 @@ mod tests {
         // 26/11/2026 15:21:51 UTC (exemple de #402).
         assert_eq!(horodatage(1_795_706_511), "2026.11.26-15.21.51");
         assert_eq!(horodatage(951_782_400), "2000.02.29-00.00.00");
+    }
+
+    #[test]
+    fn toujours_le_plus_recent() {
+        // #538 : TestPopHub écrit par UEFN en heure locale (12:45), Forge à 11:41 UTC → GrassCutter doit passer devant.
+        let maintenant = en_secondes("2026.11.28-11.41.55").unwrap();
+        let autre = en_secondes("2026.11.28-12.45.35").unwrap();
+        assert_eq!(
+            horodatage(date_ouverture(maintenant, [autre])),
+            "2026.11.28-12.45.36"
+        );
+        assert_eq!(date_ouverture(maintenant, []), maintenant);
+        assert_eq!(
+            date_ouverture(autre, [maintenant]),
+            autre,
+            "déjà le plus récent"
+        );
+        for h in [
+            "2026.11.26-15.21.51",
+            "2000.02.29-00.00.00",
+            "1970.01.01-00.00.00",
+        ] {
+            assert_eq!(horodatage(en_secondes(h).unwrap()), h);
+        }
+        assert_eq!(en_secondes("n'importe quoi"), None);
+        assert_eq!(en_secondes("2026.13.01-00.00.00"), None);
     }
 
     #[test]
