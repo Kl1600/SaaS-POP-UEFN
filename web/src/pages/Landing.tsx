@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   ArrowRight, Check, ChevronDown, Compass, ListChecks, Boxes, PenTool, LineChart, Coins, Bot, Minus, Sparkles, AlertTriangle, AlertCircle,
   FileText, Users, Link2, Hammer, Flame, Rocket, MessagesSquare, Monitor,
-} from 'lucide-react'
+} from '../icons'
 import '../landing.css'
 import { WaitlistModal } from '../components/Waitlist'
 import LangPicker from '../components/LangPicker'

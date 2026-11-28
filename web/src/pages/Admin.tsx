@@ -1,6 +1,6 @@
 // Panel administrateur de la plateforme POP : liste d'attente, création des comptes bêta, utilisateurs, vue générale.
 import { useEffect, useState } from 'react'
-import { Check, X, RotateCcw, Trash2, Copy, Mail, Ban, UserPlus, Lock, KeyRound, Link2, LockOpen, LogOut } from 'lucide-react'
+import { Check, X, RotateCcw, Trash2, Copy, Mail, Ban, UserPlus, Lock, KeyRound, Link2, LockOpen, LogOut } from '../icons'
 import { actionLabel } from '../components/Security'
 import { ago, api, frDate } from '../api'
 import { useApp, useLoad } from '../state'

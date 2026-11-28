@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Flame, RefreshCw, Star, X, ExternalLink, TrendingUp, TrendingDown, Search } from 'lucide-react'
+import { Flame, RefreshCw, Star, X, ExternalLink, TrendingUp, TrendingDown, Search } from '../icons'
 import { ago, api } from '../api'
 import { useApp, useLoad } from '../state'
 import { CardHead, Empty, PageHead, useDialog, Layer } from '../components/ui'

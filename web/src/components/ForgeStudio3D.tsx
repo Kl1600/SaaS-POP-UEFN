@@ -2,7 +2,7 @@
 // Forge l'exécute isolé sur le PC (#351) ; le modèle s'affiche ici avec « Accepter » (import dans UEFN, journalisé et
 // annulable) ou « Refuser » (rien n'est importé). Sans IA connectée ou sans Blender, l'outil l'explique.
 import { useEffect, useState } from 'react'
-import { Check, Send, X } from 'lucide-react'
+import { Check, Send, X } from '../icons'
 import { ago, api } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { tr } from '../i18n/t'

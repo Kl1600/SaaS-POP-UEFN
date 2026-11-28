@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Hammer, X } from 'lucide-react'
+import { Hammer, X } from '../icons'
 import { tr } from '../i18n/t'
 
 // « Ouvrir dans Forge » (#297) : lien pop-forge://map/{id}[/tache/{n}], que Forge déclare à l'installation. Si la

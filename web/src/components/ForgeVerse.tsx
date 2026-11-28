@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowLeft, FileDown, Plus, BadgeCheck, Lock } from 'lucide-react'
+import { ArrowLeft, FileDown, Plus, BadgeCheck, Lock } from '../icons'
 import { api } from '../api'
 import { useApp, useLoad } from '../state'
 import { tr } from '../i18n/t'

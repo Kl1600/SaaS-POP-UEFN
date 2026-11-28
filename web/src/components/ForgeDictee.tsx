@@ -2,7 +2,7 @@
 // pour dicter ; Forge transcrit sur le PC (whisper.cpp) et le texte s'ajoute au champ, modifiable avant l'envoi.
 // Le modèle (547 Mio) n'est téléchargé qu'après l'accord de l'utilisateur.
 import { useEffect, useRef, useState } from 'react'
-import { Mic } from 'lucide-react'
+import { Mic } from '../icons'
 import { tr, LANG } from '../i18n/t'
 import { Layer, Modal } from './ui'
 import { useApp } from '../state'

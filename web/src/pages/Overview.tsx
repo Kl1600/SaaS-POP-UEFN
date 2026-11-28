@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   Clock, Ban, CheckSquare, Flag, Coins, Users, Zap, Activity, ArrowRight, Upload, FileText, PenTool, AlertTriangle, MessageSquare, CheckCircle2, Rocket, Bot, User, Radio, 
-} from 'lucide-react'
+} from '../icons'
 import { ago, api, euros, frDate } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { CardHead, Drawer, Empty, PageHead, tagLabel } from '../components/ui'

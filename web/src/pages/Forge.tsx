@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import NOUVEAUTES from '../../../forge/NOUVEAUTES.md?raw'
 import { useNavigate } from 'react-router-dom'
-import { Bell, Bot, Building2, Check, ChevronsUpDown, ExternalLink, Home, Library, Minus, Moon, RefreshCw, ShieldCheck, Grid3x3, Square, Sun, User, Wrench, X } from 'lucide-react'
+import { Bell, Bot, Building2, Check, ChevronsUpDown, ExternalLink, Home, Library, Minus, Moon, RefreshCw, ShieldCheck, Grid3x3, Square, Sun, User, Wrench, X } from '../icons'
 import LangPicker from '../components/LangPicker'
 import { ForgeAgents } from '../components/ForgeAgents'
 import { ForgeOutils } from '../components/ForgeMiniature'

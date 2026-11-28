@@ -1,6 +1,6 @@
 // Onglet « Discover » de Lancer et suivre : être prêt pour l'algorithme d'Epic, puis suivre les 14 jours de test.
 import { useEffect, useRef, useState } from 'react'
-import { Lock, CheckCircle2, AlertTriangle, XCircle, Upload, TrendingUp, Rocket, Film, Megaphone, Type, Shapes, Image as ImageIcon, RefreshCw } from 'lucide-react'
+import { Lock, CheckCircle2, AlertTriangle, XCircle, Upload, TrendingUp, Rocket, Film, Megaphone, Type, Shapes, Image as ImageIcon, RefreshCw } from '../icons'
 import { api } from '../api'
 import { useApp, useLoad } from '../state'
 import { CardHead } from '../components/ui'

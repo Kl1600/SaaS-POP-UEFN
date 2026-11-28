@@ -5,7 +5,7 @@ import {
   Bold, Italic, Underline, Strikethrough, AlignLeft, AlignCenter, AlignRight, List, ListOrdered, Link2, Highlighter,
   AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, PaintBucket, Square, Lock, Unlock,
   Paintbrush, ClipboardPaste, Minus, Plus, MoveRight, MoveLeft, Baseline, Eraser, Shapes,
-} from 'lucide-react'
+} from '../icons'
 import { tr } from '../i18n/t'
 
 export type O = Record<string, any>

@@ -1,7 +1,7 @@
 // Abonnement (Starter / Pro) et écran de fin d'essai. Les paiements passent par Stripe.
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { CreditCard, Check, LogOut, Download } from 'lucide-react'
+import { CreditCard, Check, LogOut, Download } from '../icons'
 import { api } from '../api'
 import { useApp, useLoad } from '../state'
 import { CardHead } from './ui'

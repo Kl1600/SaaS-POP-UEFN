@@ -1,7 +1,7 @@
 // Rangement automatique du niveau (#84) : dossiers par type d'appareil et noms « type_n », avec un aperçu
 // avant → après, puis une seule action annulable. Les acteurs verrouillés dans Lore par un autre sont laissés et listés.
 import { useMemo, useState } from 'react'
-import { Lock } from 'lucide-react'
+import { Lock } from '../icons'
 import { Modal } from './ui'
 import { tr } from '../i18n/t'
 

@@ -1,6 +1,6 @@
 // IA qui travaillent sur la map ouverte (#145) : celles dont c'est la map de travail, avec leur tâche réservée et
 // leur dernière action. Affiché dans Paramètres → IA connectées, sous les IA du compte.
-import { Lock, Unlock } from 'lucide-react'
+import { Lock, Unlock } from '../icons'
 import { ago } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { CardHead } from '../components/ui'

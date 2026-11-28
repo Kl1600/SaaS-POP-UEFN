@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ClipboardCheck, Play } from 'lucide-react'
+import { ClipboardCheck, Play } from '../icons'
 import { useLoad } from '../state'
 import { tr } from '../i18n/t'
 import { Passage } from './Scenarios'

@@ -1,7 +1,7 @@
 // Blender dans Forge (#351) : installé au premier usage, après accord (taille annoncée), puis un essai de script isolé
 // (aperçu PNG et nombre de triangles). Base des outils Texte 3D/2D, Low Mesh et 3D Studio.
 import { useEffect, useRef, useState } from 'react'
-import { Box, Download, Play } from 'lucide-react'
+import { Box, Download, Play } from '../icons'
 import { useApp } from '../state'
 import { tr } from '../i18n/t'
 

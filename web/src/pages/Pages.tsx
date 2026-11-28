@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import {
   GripVertical, Plus, Star, FileText, Copy, Trash2, Type, Heading1, Heading2, Heading3, List, ListOrdered, CheckSquare, ChevronRight, ChevronDown, MoreHorizontal,
   AlertCircle, Quote, Code, Table, Image, Video, Paperclip, Columns2, ListTree, Link2, PenTool, Database, Minus, Download, History, Share2, MessageSquare, RotateCcw, X,
-} from 'lucide-react'
+} from '../icons'
 import { ago, api, frDate } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { Avatar, CardHead, Empty, PageHead, Tabs } from '../components/ui'

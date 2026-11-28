@@ -4,7 +4,7 @@
 import { useState } from 'react'
 import { api } from '../api'
 import { useNavigate } from 'react-router-dom'
-import { Building2, Plus, Settings2, User, Users, ArrowRight } from 'lucide-react'
+import { Building2, Plus, Settings2, User, Users, ArrowRight } from '../icons'
 import { euros, frDate } from '../api'
 import { useApp, useLoad, studioName, type Studio } from '../state'
 import { PageHead } from '../components/ui'

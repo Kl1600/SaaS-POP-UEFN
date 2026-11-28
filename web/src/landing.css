@@ -218,7 +218,7 @@
 @media (max-width:600px){.lwrow{grid-template-columns:1fr}}
 
 /* Arabe : lecture de droite à gauche */
-.lp[dir=rtl] .lucide-arrow-right{transform:scaleX(-1)}
+.lp[dir=rtl] .pi-arrow-right{transform:scaleX(-1)}
 .lp[dir=rtl] .lhero h1,.lp[dir=rtl] .lsub{letter-spacing:0}
 .lwtop{gap:12px}.lwtop .lwtopr{display:flex;align-items:center;gap:14px}
 .lghost,.lpill{white-space:nowrap}

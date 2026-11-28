@@ -4,7 +4,7 @@
 // - Pastille dans la barre du haut : aucune IA → « Connecter une IA » ; en attente ; connectée.
 // État lu dans /api/me/tokens : last_used vide = en attente de connexion, rempli = premier appel MCP reçu.
 import { useEffect, useRef, useState } from 'react'
-import { Check, Copy, X, Plus, Bot, Settings2 } from 'lucide-react'
+import { Check, Copy, X, Plus, Bot, Settings2 } from '../icons'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { ago, api } from '../api'
 import { useApp } from '../state'

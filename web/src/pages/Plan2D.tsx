@@ -2,7 +2,7 @@
 // Détails d'UEFN (X vers l'avant, Y vers la droite) ; l'écran montre X vers le haut et Y vers la droite, avec une
 // grille en mètres, une règle, les étages (les autres en transparence) et le calque « niveau réel » du relais.
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Circle, Hexagon, Layers, MousePointer2, Plus, Route, Ruler, Square, Trash2, Minus as Wall, MapPin } from 'lucide-react'
+import { Circle, Hexagon, Layers, MousePointer2, Plus, Route, Ruler, Square, Trash2, Minus as Wall, MapPin } from '../icons'
 import { api } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { tr } from '../i18n/t'

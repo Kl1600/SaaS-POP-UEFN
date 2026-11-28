@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Play, Pencil, Trash2, Check, History, X, ListPlus } from 'lucide-react'
+import { Plus, Play, Pencil, Trash2, Check, History, X, ListPlus } from '../icons'
 import { ago, api } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { CardHead, Modal } from './ui'

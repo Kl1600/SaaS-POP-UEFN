@@ -1,7 +1,7 @@
 import { ForgeMiniature } from '../components/ForgeMiniature'
 import { Passage } from '../components/Scenarios'
 import { useState } from 'react'
-import { CheckCircle2, AlertTriangle, Ban, Circle } from 'lucide-react'
+import { CheckCircle2, AlertTriangle, Ban, Circle } from '../icons'
 import { ago, api, frDate } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { CardHead, Modal, PageHead, Tabs } from '../components/ui'

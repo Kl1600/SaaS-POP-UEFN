@@ -1,5 +1,5 @@
 // Paramètres → Sécurité : appareils connectés et activité récente.
-import { Monitor } from 'lucide-react'
+import { Monitor } from '../icons'
 import { ago, api } from '../api'
 import { useApp, useLoad } from '../state'
 import { CardHead } from './ui'

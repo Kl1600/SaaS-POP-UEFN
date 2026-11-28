@@ -1,7 +1,7 @@
 import { OuvrirForge } from '../components/OuvrirForge'
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { ArrowRight, X , AlertTriangle } from 'lucide-react'
+import { ArrowRight, X , AlertTriangle } from '../icons'
 import { ago, api, frDate } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { Avatar, CardHead, Drawer, Modal, PageHead, STATUS, TAGS, Tabs, tagLabel } from '../components/ui'

@@ -1,7 +1,7 @@
 // Paramètres du compte, en onglets : Mon compte, IA connectées (#205 ; jetons du compte, #145), UEFN Link (#210, pour la map ouverte).
 import { useSearchParams } from 'react-router-dom'
 import { CardHead, PageHead, Tabs } from '../components/ui'
-import { PanelLeft } from 'lucide-react'
+import { PanelLeft } from '../icons'
 import { api } from '../api'
 import { BillingSettings } from '../components/Billing'
 import { Account } from './Team'

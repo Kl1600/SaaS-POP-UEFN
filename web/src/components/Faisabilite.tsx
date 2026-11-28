@@ -1,7 +1,7 @@
 // Équipe d'une map et avis de faisabilité (#149) : « Faisable », « Tendu » ou « Pas faisable », avec les heures
 // disponibles jusqu'à la sortie, le travail restant et des corrections chiffrées. Calcul fait par le serveur.
 import { useEffect, useState } from 'react'
-import { AlertTriangle, CheckCircle2, Gauge, Plus, Trash2, XCircle } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Gauge, Plus, Trash2, XCircle } from '../icons'
 import { api, frDate } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { CardHead } from './ui'

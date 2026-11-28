@@ -2,7 +2,7 @@
 // mini-mois, liste des calendriers (filtres mémorisés) et tâches à planifier ; vues Semaine, Mois et Année.
 // Remplace l'ancien onglet Planning : une tâche se planifie en la glissant sur un jour.
 import { useMemo, useState } from 'react'
-import { AlertTriangle, ChevronLeft, ChevronRight, Plus, RefreshCw, Trash2, X } from 'lucide-react'
+import { AlertTriangle, ChevronLeft, ChevronRight, Plus, RefreshCw, Trash2, X } from '../icons'
 import { addDays, api, frDate, ymd } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { Modal } from '../components/ui'

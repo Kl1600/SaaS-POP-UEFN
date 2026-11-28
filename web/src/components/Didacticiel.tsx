@@ -1,7 +1,7 @@
 // Didacticiel au premier passage sur un onglet (#496) : 3 ou 4 bulles qui pointent l'essentiel de la page.
 // Vu une fois par onglet et par compte : la liste des onglets vus est gardée dans ui_prefs.tours (#493).
 import { useEffect, useLayoutEffect, useState } from 'react'
-import { X } from 'lucide-react'
+import { X } from '../icons'
 import { api } from '../api'
 import { useApp } from '../state'
 import { tr } from '../i18n/t'

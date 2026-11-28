@@ -1,6 +1,6 @@
 // Icône d'une page (#197) : un emoji, ou « lucide:<nom> » (icône SVG chargée à part).
 import { lazy, useEffect, useState } from 'react'
-import { FileText } from 'lucide-react'
+import { FileText } from '../icons'
 
 let lib: Promise<typeof import('./lucideAll')> | null = null
 const loadLib = () => (lib ??= import('./lucideAll'))

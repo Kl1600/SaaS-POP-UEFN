@@ -3,7 +3,7 @@
 // un clic ouvre une bulle (tâche, dernière action, « Faire signe »). Aucune donnée inventée : seulement les vraies
 // présences et les vrais agents de la map.
 import { useEffect, useState } from 'react'
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import { ChevronDown, ChevronRight } from '../icons'
 import { api } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { tr } from '../i18n/t'

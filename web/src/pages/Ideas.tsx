@@ -1,7 +1,7 @@
 // Idées de maps : un fil de fiches, comme des annonces, calculées à partir du marché et adaptées au créateur.
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { Lightbulb, Heart, X, Rocket, Bell, BellOff, TrendingUp, Users, Clock, DoorOpen, Sparkles } from 'lucide-react'
+import { Lightbulb, Heart, X, Rocket, Bell, BellOff, TrendingUp, Users, Clock, DoorOpen, Sparkles } from '../icons'
 import { ago, api } from '../api'
 import { useApp, useLoad, studioName } from '../state'
 import { CardHead, Empty, PageHead, Tabs, useDialog, Layer } from '../components/ui'

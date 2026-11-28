@@ -1,7 +1,7 @@
 // Sélecteur de map dans la barre latérale : changer de map, créer une map ou un studio sans quitter la page.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Check, ChevronsUpDown, Building2, LayoutGrid, User, Users, Sparkles, MoreHorizontal, ArrowRight, Pencil, Trash2, Settings, LogIn } from 'lucide-react'
+import { Check, ChevronsUpDown, Building2, LayoutGrid, User, Users, Sparkles, MoreHorizontal, ArrowRight, Pencil, Trash2, Settings, LogIn } from '../icons'
 import { api } from '../api'
 import { useApp, useLoad, studioName } from '../state'
 import { Modal, ROLE } from './ui'
