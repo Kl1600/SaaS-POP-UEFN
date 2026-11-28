@@ -26,7 +26,7 @@ async fn mon_agent(st: &AppState, mid: i64, aid: i64, uid: i64) -> Result<(), Ap
 }
 
 /// Fils de discussion d'un agent (#473) : le terminal (aucun) ou un outil de Forge.
-pub const CANAUX: &[&str] = &["miniature"];
+pub const CANAUX: &[&str] = &["miniature", "studio3d"];
 
 /// Fil d'un agent : 100 derniers messages d'un fil (`canal` : None = terminal), du plus ancien au plus récent.
 pub async fn fil(st: &AppState, aid: i64, canal: Option<&str>) -> Result<Value, AppError> {
@@ -133,7 +133,7 @@ pub async fn lire_pour_agent(st: &AppState, agent: i64) -> Result<Value, AppErro
     }
     Ok(json!({
         "messages": rows.into_iter().map(|(id, qui, eq, b, at, canal)| json!({ "id": id, "from": qui, "to": if eq { "toute l'équipe" } else { "vous" }, "body": b, "at": at, "canal": canal.unwrap_or_else(|| "terminal".into()) })).collect::<Vec<_>>(),
-        "consigne": "Répondez avec send_message dans le même fil que le message (canal : terminal ou miniature), puis faites ce qui est demandé (en créant ou en prenant une tâche si besoin).",
+        "consigne": "Répondez avec send_message dans le même fil que le message (canal : terminal, miniature ou studio3d), puis faites ce qui est demandé (en créant ou en prenant une tâche si besoin).",
     }))
 }
 

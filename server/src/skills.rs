@@ -45,6 +45,11 @@ pub const POP: &[(&str, &str, &str)] = &[
         "Faire la miniature de la map",
         include_str!("../skills/miniature.md"),
     ),
+    (
+        "studio3d",
+        "Faire un modèle 3D avec Blender (3D Studio)",
+        include_str!("../skills/studio3d.md"),
+    ),
 ];
 
 /// Liste des compétences (POP puis studio), sans le contenu.

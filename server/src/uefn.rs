@@ -2392,6 +2392,58 @@ mod tests_rangement {
     }
 }
 
+/// Relais de test (#327) : connecté à la map, il répond à chaque commande avec `reponse(action, args)`
+/// (Ok = données, Err = message d'erreur). Rend les commandes reçues.
+#[cfg(test)]
+pub(crate) fn relais_de_test(
+    st: &AppState,
+    mid: i64,
+    reponse: impl Fn(&str, &Value) -> Result<Value, String> + Send + 'static,
+) -> Arc<Mutex<Vec<Value>>> {
+    let (tx, mut rx) = mpsc::unbounded_channel::<String>();
+    let pending: Arc<Mutex<HashMap<String, oneshot::Sender<Value>>>> = Default::default();
+    let conn_id = st
+        .relays
+        .next
+        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    st.relays.ajouter(
+        mid,
+        RelayConn {
+            tx,
+            pending: pending.clone(),
+            uefn: "connected".into(),
+            project: "P".into(),
+            conn_id,
+            tools: Value::Null,
+            proto: RELAY_PROTO,
+            app: "forge".into(),
+        },
+    );
+    let recues: Arc<Mutex<Vec<Value>>> = Default::default();
+    let r2 = recues.clone();
+    tokio::spawn(async move {
+        while let Some(m) = rx.recv().await {
+            let v: Value = serde_json::from_str(&m).unwrap_or_default();
+            if v["t"] != "cmd" {
+                continue;
+            }
+            r2.lock().unwrap().push(v.clone());
+            let rep = match reponse(v["action"].as_str().unwrap_or(""), &v["args"]) {
+                Ok(d) => json!({ "ok": true, "data": d }),
+                Err(e) => json!({ "ok": false, "error": e }),
+            };
+            if let Some(t) = pending
+                .lock()
+                .unwrap()
+                .remove(v["id"].as_str().unwrap_or(""))
+            {
+                let _ = t.send(rep);
+            }
+        }
+    });
+    recues
+}
+
 #[cfg(test)]
 mod tests_statut {
     use super::*;

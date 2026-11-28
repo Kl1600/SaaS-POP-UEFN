@@ -3,6 +3,9 @@
 Une entrée par version de `forge/tauri.conf.json` (#437) : `## version · date`, puis 1 à 5 lignes en français.
 Le workflow « relais Windows » en tire les notes de la mise à jour ; le CI refuse une version sans entrée.
 
+## 0.3.18 · 28/11/2026
+- Outils → 3D Studio : décrivez un objet à votre IA ; elle le construit avec Blender sur votre PC, vous voyez l'aperçu et vous l'acceptez avant tout import dans UEFN.
+
 ## 0.3.17 · 28/11/2026
 - Outils → Low Mesh : allégez un modèle 3D (FBX, OBJ, GLB) avant import, avec aperçu et nombre de triangles avant et après ; Forge prévient au-delà de 30 000 sommets.
 

@@ -3,10 +3,11 @@
 // Forge montre la miniature, « Conforme Discover », et « Utiliser », « Refaire », « Modifier ». Le site montre les
 // versions choisies (`versions`).
 import { useEffect, useRef, useState } from 'react'
-import { Box, Minimize2, Type, Check, Download, ImagePlus, RefreshCw, Pencil, Paperclip, X } from 'lucide-react'
+import { Box, Minimize2, Shapes, Type, Check, Download, ImagePlus, RefreshCw, Pencil, Paperclip, X } from 'lucide-react'
 import { ForgeBlender } from './ForgeBlender'
 import { ForgeTexte } from './ForgeTexte'
 import { ForgeLowMesh } from './ForgeLowMesh'
+import { ForgeStudio3D } from './ForgeStudio3D'
 import { ago, api } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { tr } from '../i18n/t'
@@ -81,17 +82,17 @@ export function ForgeMiniature({ mapId, versions, retour, allerAgents }: { mapId
 }
 
 /** Discussion avec l'IA (#468) : les messages échangés dans POP Forge, les plus récents en bas. */
-function Discussion({ mapId, aid, nom }: { mapId: number; aid: number; nom: string }) {
-  const { data, reload } = useLoad<any[]>(`/api/maps/${mapId}/agents/${aid}/messages?canal=miniature`, [mapId, aid])
+export function Discussion({ mapId, aid, nom, canal = 'miniature', vide }: { mapId: number; aid: number; nom: string; canal?: string; vide?: string }) {
+  const { data, reload } = useLoad<any[]>(`/api/maps/${mapId}/agents/${aid}/messages?canal=${canal}`, [mapId, aid, canal])
   useLive(['messages'], reload)
   const fin = useRef<HTMLDivElement>(null)
   useEffect(() => { fin.current?.scrollIntoView({ block: 'nearest' }) }, [data?.length])
   const l = (data ?? []).slice(-12)
   return <div className="card mini-discussion" role="log" aria-label={tr("Discussion avec {0}", [nom])}>
-    {!l.length && <p className="muted small" style={{ margin: 0 }}>{tr("Expliquez la miniature que vous voulez : l'ambiance, le titre, ce qu'on doit voir. Joignez des exemples si vous en avez.")}</p>}
+    {!l.length && <p className="muted small" style={{ margin: 0 }}>{vide ?? tr("Expliquez la miniature que vous voulez : l'ambiance, le titre, ce qu'on doit voir. Joignez des exemples si vous en avez.")}</p>}
     {l.map(m => <div key={m.id} className={'mini-bulle' + (m.from === 'ia' ? ' ia' : '')}>
       <span className="small muted">{m.from === 'ia' ? nom : tr("Vous")} · {ago(m.at)}{m.from !== 'ia' && !m.read ? ' · ' + tr("pas encore lu") : ''}</span>
-      <span style={{ whiteSpace: 'pre-wrap' }}>{String(m.body).replace(/\n\(Outil Miniature :[^)]*\)\s*$/, '')}</span>
+      <span style={{ whiteSpace: 'pre-wrap' }}>{String(m.body).replace(/\n\(Outil (Miniature|3D Studio) :[^)]*\)\s*$/, '')}</span>
     </div>)}
     <div ref={fin} />
   </div>
@@ -137,9 +138,10 @@ function Composer({ occupe, base, annulerBase, envoyer }: { occupe: boolean; bas
 
 /** Onglet Outils de Forge (#468) : une carte par outil. */
 export function ForgeOutils({ mapId, allerAgents, invoke }: { mapId: number; allerAgents: () => void; invoke: any }) {
-  const [outil, setOutil] = useState<'' | 'miniature' | 'blender' | 'texte' | 'lowmesh'>('')
+  const [outil, setOutil] = useState<'' | 'miniature' | 'blender' | 'texte' | 'lowmesh' | 'studio3d'>('')
   if (outil === 'miniature') return <ForgeMiniature mapId={mapId} retour={() => setOutil('')} allerAgents={allerAgents} />
   if (outil === 'blender') return <ForgeBlender invoke={invoke} retour={() => setOutil('')} />
+  if (outil === 'studio3d') return <ForgeStudio3D invoke={invoke} mapId={mapId} retour={() => setOutil('')} allerAgents={allerAgents} allerBlender={() => setOutil('blender')} allerLowMesh={() => setOutil('lowmesh')} />
   if (outil === 'lowmesh') return <ForgeLowMesh invoke={invoke} mapId={mapId} retour={() => setOutil('')} allerBlender={() => setOutil('blender')} />
   if (outil === 'texte') return <ForgeTexte invoke={invoke} mapId={mapId} retour={() => setOutil('')} allerBlender={() => setOutil('blender')} />
   return <div className="stack" style={{ gap: 18 }}>
@@ -149,6 +151,11 @@ export function ForgeOutils({ mapId, allerAgents, invoke }: { mapId: number; all
         <ImagePlus size={22} strokeWidth={1.5} />
         <b>{tr("Miniature")}</b>
         <span className="small muted">{tr("Décrivez la miniature à votre IA : elle prend des photos de l'île et POP la dessine, conforme aux règles d'Epic.")}</span>
+      </button>
+      <button className="card outil-carte" onClick={() => setOutil('studio3d')}>
+        <Shapes size={22} strokeWidth={1.5} />
+        <b>{tr("3D Studio")}</b>
+        <span className="small muted">{tr("Décrivez un objet à votre IA : elle le construit avec Blender sur votre PC ; vous l'acceptez avant tout import.")}</span>
       </button>
       <button className="card outil-carte" onClick={() => setOutil('texte')}>
         <Type size={22} strokeWidth={1.5} />
