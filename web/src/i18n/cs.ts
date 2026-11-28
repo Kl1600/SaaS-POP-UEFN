@@ -34,6 +34,8 @@ const cs: Dict = {
       { name: 'Pro', tag: "Nejúplnější", desc: "Vše ze Starteru a navíc analýza: nápady na mapy, trh, sledování Discover.", cta: 'Zapsat se' },
     ],
     rows: ['Organizace', 'Hodinové úkoly, Kanban, závislosti', 'Vestavěný asistent (shrnutí dne, zpoždění)', 'Stránky, tabule, plánování a milníky', 'Mapy', 'Členové', 'UEFN', 'UEFN Link: synchronizované projekty', 'Organizér aktérů a hromadné úpravy', 'Připojené AI (Claude, Cursor, Codex…)', 'POP Forge: asistované stavění v UEFN', 'Růst', "Nápady na mapy, analýza trhu, sledování Discover", 'Video trendy TikTok a YouTube Shorts', 'Výměna playtestů a den vydání', 'Dělení výdělků a výpisy', 'Discord, GitHub, Lore'],
+    perDay: ["Méně než 0,50 € denně", "Méně než 1 € denně"],
+    hints: ["", "Mapa rozdělená na hodinové úkoly, včetně toho, co co blokuje", "Každé ráno: co má zpoždění a čím začít", "Dokumentace mapy, nápady naživo a kalendář", "Tolik map, kolik chcete", "Pozvěte celý tým bez příplatku", "", "Vaše AI vidí skutečný projekt UEFN: aktéry a Verse", "", "Připojte svou AI přes MCP; každou akci lze vrátit", "Stavění v UEFN podle jednoduchého zadání", "", "Žánry, které lákají hráče, a kde je ještě místo", "Co právě roste na TikToku a YouTube Shorts", "Najděte testery a připravte den vydání", "Kdo dostane kolik, s výpisem pro každého", "Oznámení a odkazy na vaše nástroje"],
   },
   faq: {
     eyebrow: 'Otázky', h2: 'Na co se nás ptáte.',

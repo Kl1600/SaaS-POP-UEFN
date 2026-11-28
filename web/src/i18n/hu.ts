@@ -34,6 +34,8 @@ const hu: Dict = {
       { name: 'Pro', tag: "A legteljesebb", desc: "Minden, ami a Starterben, plusz elemzés: pályaötletek, piac, Discover-követés.", cta: 'Feliratkozom' },
     ],
     rows: ['Szervezés', 'Egyórás feladatok, Kanban, függőségek', 'Beépített asszisztens (napi összefoglaló, csúszások)', 'Oldalak, tábla, tervezés és mérföldkövek', 'Pályák', 'Tagok', 'UEFN', 'UEFN Link: szinkronizált projektek', 'Aktorrendező és tömeges szerkesztés', 'Bekötött MI-k (Claude, Cursor, Codex…)', 'POP Forge: segített építés az UEFN-ben', 'Növekedés', "Pályaötletek, piacelemzés, Discover-követés", 'TikTok- és YouTube Shorts-videótrendek', 'Playtest-csere és megjelenési nap', 'Bevételmegosztás és kimutatások', 'Discord, GitHub, Lore'],
+    perDay: ["Kevesebb mint napi 0,50 €", "Kevesebb mint napi 1 €"],
+    hints: ["", "A map egyórás feladatokra bontva, azzal, hogy mi mit blokkol", "Minden reggel: mi késik, és mivel kezdj", "A map dokumentációja, élő ötletek és a naptár", "Annyi map, amennyit csak szeretnél", "Hívd meg az egész csapatot felár nélkül", "", "Az MI-id látják a valódi UEFN-projektet: aktorok és Verse", "", "Kösd be az MI-det MCP-n; minden művelet visszavonható", "Építés UEFN-ben egy egyszerű kérésből", "", "Mely műfajok vonzzák a játékosokat, és hol van még hely", "Ami most felfut a TikTokon és a YouTube Shortsban", "Találj tesztelőket, és készülj fel a megjelenés napjára", "Ki mennyit kap, mindenkinek külön kimutatással", "Értesítések és hivatkozások az eszközeidhez"],
   },
   faq: {
     eyebrow: 'GYIK', h2: 'Amit kérdezni szoktak.',

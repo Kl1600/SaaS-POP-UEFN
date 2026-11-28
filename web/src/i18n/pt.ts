@@ -35,6 +35,8 @@ const ptBR: Dict = {
       { name: 'Pro', tag: "O mais completo", desc: "Tudo do Starter, mais a análise: ideias de mapas, mercado, acompanhamento do Discover.", cta: 'Entrar na lista' },
     ],
     rows: ['Organização', 'Tarefas de uma hora, Kanban, dependências', 'Assistente integrado (resumo do dia, atrasos)', 'Páginas, quadro branco, planejamento e marcos', 'Mapas', 'Membros', 'UEFN', 'UEFN Link: projetos sincronizados', 'Organizador de atores e edição em lote', 'IAs conectadas (Claude, Cursor, Codex…)', 'POP Forge: construção assistida no UEFN', 'Crescimento', "Ideias de mapas, análise de mercado, acompanhamento do Discover", 'Tendências de vídeo TikTok e YouTube Shorts', 'Troca de playtests e dia do lançamento', 'Divisão de ganhos e extratos', 'Discord, GitHub, Lore'],
+    perDay: ["Menos de 0,50 € por dia", "Menos de 1 € por dia"],
+    hints: ["", "Seu mapa dividido em tarefas de uma hora, com o que bloqueia o quê", "Toda manhã: o que está atrasado e por onde começar", "A documentação do mapa, ideias ao vivo e o calendário", "Quantos mapas você quiser", "Convide a equipe toda sem custo extra", "", "Suas IAs veem o projeto UEFN real: atores e Verse", "", "Conecte sua IA por MCP; toda ação pode ser desfeita", "Construir no UEFN a partir de um pedido", "", "Os gêneros que atraem jogadores e onde ainda há espaço", "O que está crescendo agora no TikTok e no YouTube Shorts", "Encontre testadores e prepare o dia do lançamento", "Quem recebe quanto, com um extrato para cada um", "Notificações e links para suas ferramentas"],
   },
   faq: {
     eyebrow: 'FAQ', h2: 'As perguntas que nos fazem.',

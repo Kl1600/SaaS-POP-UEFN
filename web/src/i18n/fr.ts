@@ -35,6 +35,8 @@ const fr = {
       { name: 'Pro', tag: "Le plus complet", desc: "Tout Starter, plus l’analyse : idées de maps, marché, suivi Discover.", cta: 'Rejoindre la liste' },
     ],
     rows: ['Organisation', 'Tâches d’une heure, Kanban, dépendances', 'Assistant intégré (résumé du jour, retards)', 'Pages, tableau blanc, planning et objectifs', 'Maps', 'Membres', 'UEFN', 'UEFN Link : projets synchronisés', 'Organiseur d’acteurs et modifications en lot', 'IA connectées (Claude, Cursor, Codex…)', 'POP Forge : construction assistée dans UEFN', 'Croissance', "Idées de maps, analyse du marché, suivi Discover", 'Tendances vidéo TikTok et YouTube Shorts', 'Échange de playtests et jour J', 'Partage des gains et relevés', 'Discord, GitHub, Lore'],
+    perDay: ["Moins de 0,50 € par jour", "Moins d’1 € par jour"],
+    hints: ["", "La map découpée en tâches d’une heure, avec ce qui bloque quoi", "Chaque matin : ce qui est en retard et par quoi commencer", "La doc de la map, les idées en direct et le calendrier", "Autant de maps que vous voulez", "Invitez toute l’équipe, sans supplément", "", "Vos IA voient le vrai projet UEFN : acteurs et Verse", "", "Branchez votre IA par MCP ; chaque action est annulable", "Construire dans UEFN à partir d’une demande", "", "Les genres qui attirent des joueurs et où il reste de la place", "Ce qui monte en ce moment sur TikTok et YouTube Shorts", "Trouvez des testeurs et préparez le jour de la sortie", "Qui touche combien, avec un relevé pour chacun", "Notifications et liens vers vos outils"],
   },
   faq: {
     eyebrow: 'FAQ', h2: 'Les questions qu’on nous pose.',
