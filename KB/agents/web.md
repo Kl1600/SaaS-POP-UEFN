@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-28 · #503 · poignée dans un cadre
+- Fait : .nav-grip en carré bordé arrondi 26 px (comme la capture de l'humain).
+- Vérifié : Playwright 1440 px, capture + glisser dans Organiser.
+
 ### 2026-11-28 · #499 · poignée de déplacement des onglets
 - Fait : Layout.tsx : poignée ⋮⋮ (GripVertical) à droite de l'onglet, visible au survol ; seule elle est draggable (setDragImage sur le lien entier) ; dépôt accepté seulement dans la catégorie d'origine (dragCat).
 - Vérifié : Playwright 1440 px (poignée, texte, autre catégorie, rechargement).
