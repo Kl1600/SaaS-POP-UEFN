@@ -2,7 +2,7 @@
 // par Kl1600 le 24/11). Servie par POP sur /forge et affichée dans Forge ; elle parle au relais POP Forge de Forge par
 // ses commandes (projets, état, liaison). Forge ne reprend aucun écran de gestion du site (décision du 24/11) :
 // « Ouvrir POP » et « Voir dans POP » ouvrent le site dans le navigateur (Forge y renvoie toute page autre que /forge).
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import NOUVEAUTES from '../../../forge/NOUVEAUTES.md?raw'
 import { useNavigate } from 'react-router-dom'
 import { Bell, Bot, Building2, CalendarDays, Check, ChevronDown, ChevronsUpDown, ClipboardCheck, ExternalLink, FolderOpen, Grid3x3, GripVertical, Home, Library, Lightbulb, ListChecks, Minus, Moon, Play, Plus, RefreshCw, Rocket, ShieldCheck, Square, Sun, User, Users, Wrench, X } from '../icons'
@@ -23,6 +23,7 @@ import Plan2D from './Plan2D'
 import { Didacticiel } from '../components/Didacticiel'
 import { ForgeApprendre } from '../components/ForgeApprendre'
 import { cssRect } from '../zoom'
+import { ConfirmMove, isAdmin, previewMove, type Drag, type Pending } from '../components/MoveMap'
 
 type Invoke = <T = any>(cmd: string, args?: Record<string, unknown>) => Promise<T>
 /** Version installée de Forge (#437) ; `null` pour une Forge d'avant 0.3.2 (pas de commande) ou hors Forge. */
@@ -208,24 +209,47 @@ function MapPicker() {
   const btn = useRef<HTMLButtonElement>(null)
   const pop = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState({ top: 0, left: 0, width: 280 })
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!ouvert || !btn.current) return
+    // Comme sur le site (#539, #549) : à droite de la barre latérale, aligné sur le haut du bouton, s'il y a la place.
     const r = cssRect(btn.current)
-    setPos({ top: r.bottom + 6, left: r.left, width: Math.max(280, r.width) })
+    const side = btn.current.closest('.side')
+    const sr = side ? cssRect(side) : null
+    const vw = window.innerWidth / r.k, vh = window.innerHeight / r.k, w = Math.max(320, r.width)
+    if (sr && sr.right + 8 + w <= vw - 8) setPos({ top: Math.max(8, Math.min(r.top, vh - 540)), left: sr.right + 8, width: w })
+    else setPos({ top: r.bottom + 6, left: r.left, width: Math.max(280, r.width) })
+  }, [ouvert])
+  useEffect(() => {
+    if (!ouvert) return
     const down = (e: MouseEvent) => { if (!pop.current?.contains(e.target as Node) && !btn.current?.contains(e.target as Node)) setOuvert(false) }
     const key = (e: KeyboardEvent) => { if (e.key === 'Escape') setOuvert(false) }
     document.addEventListener('mousedown', down); document.addEventListener('keydown', key)
     return () => { document.removeEventListener('mousedown', down); document.removeEventListener('keydown', key) }
   }, [ouvert])
   const studios = app.me?.studios ?? []
+  // Glisser une map vers un autre groupe la déplace, après confirmation (comme sur le site, #549).
+  const [drag, setDrag] = useState<Drag | null>(null)
+  const [over, setOver] = useState<number | null>(null)
+  const [attente, setAttente] = useState<Pending | null>(null)
+  const deposer = async (to: number) => {
+    const d = drag; setDrag(null); setOver(null)
+    if (!d || d.from === to) return
+    setOuvert(false)
+    try { setAttente(await previewMove(d, to)) } catch (er: any) { app.toast(er.message, true) }
+  }
   if (!studios.length) return null
   return <div className="mapsw lbl">
+    {attente && app.me && <ConfirmMove p={attente} studios={app.me.studios} onClose={() => setAttente(null)} />}
     <button ref={btn} className="mapsw-btn" onClick={() => setOuvert(o => !o)} aria-haspopup="menu" aria-expanded={ouvert} title={tr("Changer de map")}>
       <span className="mapsw-txt"><b>{app.map?.name ?? tr("Choisir une map")}</b><small>{app.studio ? studioName(app.studio) : ''}</small></span>
       <ChevronsUpDown size={16} strokeWidth={1.75} />
     </button>
     {ouvert && <div ref={pop} className="mapsw-pop" role="menu" style={{ top: pos.top, left: pos.left, width: pos.width }}>
-      {studios.map(s => <div key={s.id} className="mapsw-group">
+      {studios.map(s => { const peut = isAdmin(s) && !!drag && drag.from !== s.id; return <div key={s.id}
+        className={'mapsw-group' + (peut ? ' drop-ok' : '') + (peut && over === s.id ? ' drop-over' : '')}
+        onDragOver={e => { if (!peut) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (over !== s.id) setOver(s.id) }}
+        onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null) && over === s.id) setOver(null) }}
+        onDrop={e => { if (!peut) return; e.preventDefault(); deposer(s.id) }}>
         <div className="mapsw-studio">
           <span className="mapsw-gico">{s.personal ? <User size={14} /> : <Building2 size={14} />}</span>
           <span className="mapsw-gname">{s.personal ? tr('Mes maps (seul)') : s.name}</span>
@@ -233,12 +257,15 @@ function MapPicker() {
           <span className="mapsw-count">{s.maps.length}</span>
         </div>
         {s.maps.map(m => { const cur = m.id === app.map?.id; return <div key={m.id} className="mapsw-row">
-          <button role="menuitem" aria-current={cur ? 'true' : undefined} className={'mapsw-item' + (cur ? ' on' : '')} onClick={() => { setOuvert(false); app.setMapId(m.id) }}>
+          <button role="menuitem" aria-current={cur ? 'true' : undefined} className={'mapsw-item' + (cur ? ' on' : '') + (drag?.id === m.id ? ' dragging' : '')} onClick={() => { setOuvert(false); app.setMapId(m.id) }}
+            draggable={isAdmin(s)} title={isAdmin(s) && studios.length > 1 ? tr('Glissez la map vers un autre groupe pour la déplacer') : undefined}
+            onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(m.id)); setDrag({ id: m.id, name: m.name, from: s.id }) }}
+            onDragEnd={() => { setDrag(null); setOver(null) }}>
             <span>{m.name}</span>{cur && <em className="mapsw-cur"><Check size={13} />{tr('Ouverte')}</em>}
           </button>
         </div> })}
         {s.maps.length === 0 && <div className="mapsw-empty">{s.personal ? tr('Les maps que vous faites seul.') : tr('Aucune map dans ce studio.')}</div>}
-      </div>)}
+      </div> })}
       <div className="mapsw-foot">
         <button role="menuitem" className="mapsw-item" onClick={() => { setOuvert(false); ouvrirPOP('/') }}><ExternalLink size={15} /><span>{tr("Gérer les maps dans POP")}</span></button>
       </div>
@@ -252,14 +279,29 @@ function ProfileMenu({ invoke, onReglages, actif }: { invoke: Invoke; onReglages
   const app = useApp()
   const [ouvert, setOuvert] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const menu = useRef<HTMLDivElement>(null)
+  const bouton = useRef<HTMLButtonElement>(null)
+  // Comme sur le site (#539, #549) : à droite de la barre latérale, aligné sur le bas du bouton ; sinon au-dessus.
+  const [place, setPlace] = useState<React.CSSProperties | undefined>(undefined)
+  useLayoutEffect(() => {
+    if (!ouvert || !bouton.current || !menu.current) { setPlace(undefined); return }
+    const r = cssRect(bouton.current)
+    const side = bouton.current.closest('.side')
+    const sr = side ? cssRect(side) : null
+    const h = menu.current.offsetHeight, w = menu.current.offsetWidth
+    const vw = window.innerWidth / r.k
+    setPlace(sr && sr.right + 8 + w <= vw - 8 ? { left: sr.right + 8, top: Math.max(8, r.bottom - h), bottom: 'auto' } : undefined)
+  }, [ouvert])
   useEffect(() => {
     if (!ouvert) return
     const f = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOuvert(false) }
-    document.addEventListener('mousedown', f); return () => document.removeEventListener('mousedown', f)
+    const k = (e: KeyboardEvent) => { if (e.key === 'Escape') setOuvert(false) }
+    document.addEventListener('mousedown', f); document.addEventListener('keydown', k)
+    return () => { document.removeEventListener('mousedown', f); document.removeEventListener('keydown', k) }
   }, [ouvert])
   const choisir = (f: () => void) => () => { setOuvert(false); f() }
   return <div ref={ref} style={{ position: 'relative' }}>
-    {ouvert && <div role="menu" className="forge-menu">
+    {ouvert && <div ref={menu} role="menu" className="forge-menu" style={place}>
       {version && <div className="small muted" style={{ padding: '6px 12px 4px' }}>POP Forge {version}</div>}
       <button role="menuitem" onClick={choisir(onReglages)}>{tr("Réglages")}</button>
       <button role="menuitem" onClick={choisir(() => ouvrirPOP('/parametres?onglet=ia'))}>{tr("IA connectées")}<ExternalLink size={14} /></button>
@@ -272,7 +314,7 @@ function ProfileMenu({ invoke, onReglages, actif }: { invoke: Invoke; onReglages
       <button role="menuitem" onClick={choisir(() => ouvrirPOP('/parametres'))}>{tr("Mon compte dans POP")}<ExternalLink size={14} /></button>
       <button role="menuitem" onClick={choisir(async () => { await api.post('/api/auth/logout'); location.reload() })}>{tr("Se déconnecter")}</button>
     </div>}
-    <button className={'forge-profil' + (ouvert || actif ? ' on' : '')} aria-haspopup="menu" aria-expanded={ouvert} onClick={() => setOuvert(o => !o)}>
+    <button ref={bouton} className={'forge-profil' + (ouvert || actif ? ' on' : '')} aria-haspopup="menu" aria-expanded={ouvert} onClick={() => setOuvert(o => !o)}>
       <span aria-hidden="true" className="forge-avatar">{(app.me?.user.name ?? '?').slice(0, 1).toUpperCase()}</span>
       <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', lineHeight: 1.25, textAlign: 'left' }}>
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{app.me?.user.name}</span>

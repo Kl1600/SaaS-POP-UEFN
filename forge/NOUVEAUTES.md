@@ -3,6 +3,9 @@
 Une entrée par version de `forge/tauri.conf.json` (#437) : `## version · date`, puis 1 à 5 lignes en français.
 Le workflow « relais Windows » en tire les notes de la mise à jour ; le CI refuse une version sans entrée.
 
+## 0.3.25 · 28/11/2026
+- Le sélecteur de map et le menu du compte s'ouvrent à droite de la barre latérale, comme sur le site ; glissez une map vers un autre groupe pour la déplacer.
+
 ## 0.3.24 · 28/11/2026
 - « Ouvrir UEFN » présélectionne toujours le bon projet, même juste après en avoir ouvert un autre.
 - Quand UEFN est ouvert sur une autre map, Forge le dit (« UEFN est ouvert sur TestPopHub, pas sur GrassCutter ») et propose d'y passer.
