@@ -46,6 +46,8 @@ const mio = (o: number) => Math.round(o / 1048576)
 export function ForgeDictee({ invoke }: { invoke: Invoke | null }) {
   const app = useApp()
   const [phase, setPhase] = useState<'' | 'ecoute' | 'ecrit'>('')
+  // Niveau du micro et son nom pendant qu'on parle (#488) : on voit tout de suite si le micro capte.
+  const [micro, setMicro] = useState<{ niveau: number; pic: number; nom: string } | null>(null)
   const [proposer, setProposer] = useState<Etat | null>(null)
   const [recu, setRecu] = useState<number | null>(null)
   const cible = useRef<Place | null>(null)
@@ -66,12 +68,13 @@ export function ForgeDictee({ invoke }: { invoke: Invoke | null }) {
         const etat = await invoke<Etat>('dictee_etat')
         if (!etat.modele) { actif.current = false; setProposer(etat); if (etat.recu != null) suivre(); return }
         await invoke('dictee_debut', { langue: LANG })
-        setPhase('ecoute')
+        setPhase('ecoute'); setMicro(null)
         // Temps réel (#477) : le texte provisoire s'écrit dans le champ pendant qu'on parle.
         let version = 0
         arreterSuivi()
         suivi.current = window.setInterval(async () => {
-          const p = await invoke<{ version: number; texte: string } | null>('dictee_partiel').catch(() => null)
+          const p = await invoke<{ version: number; texte: string; niveau?: number; pic?: number; micro?: string } | null>('dictee_partiel').catch(() => null)
+          if (p?.micro != null) setMicro({ niveau: p.niveau ?? 0, pic: p.pic ?? 0, nom: p.micro })
           if (p && p.version !== version && cible.current && actif.current) { version = p.version; ecrireDicte(cible.current, p.texte) }
         }, 250)
       } catch (er: any) {
@@ -90,8 +93,9 @@ export function ForgeDictee({ invoke }: { invoke: Invoke | null }) {
         const texte = await Promise.race([invoke<string>('dictee_fin', { langue: LANG }), new Promise<null>(ok => setTimeout(() => ok(null), 20000))])
         if (texte === null) app.toast(tr("La transcription finale prend trop de temps : le texte provisoire est gardé."))
         else {
-          if (cible.current) { ecrireDicte(cible.current, texte); cible.current.el.focus() }
-          if (!texte) app.toast(tr("Rien entendu : gardez le raccourci appuyé pendant que vous parlez."))
+          // Texte final vide : le texte provisoire déjà écrit reste (#488).
+          if (cible.current) { if (texte) ecrireDicte(cible.current, texte); cible.current.el.focus() }
+          if (!texte && !(cible.current && cible.current.el.value.length > cible.current.avant.length + cible.current.apres.length)) app.toast(tr("Rien entendu : gardez le raccourci appuyé pendant que vous parlez."))
         }
       } catch (er: any) { app.toast(String(er), true) } finally { setPhase('') }
     }
@@ -116,6 +120,10 @@ export function ForgeDictee({ invoke }: { invoke: Invoke | null }) {
     {phase && <Layer><div className="forge-dictee" role="status" aria-live="polite">
       <Mic size={16} strokeWidth={1.6} className={phase === 'ecoute' ? 'forge-dictee-micro' : ''} />
       {phase === 'ecoute' ? tr("Je vous écoute… relâchez pour terminer") : tr("Transcription sur votre PC…")}
+      {phase === 'ecoute' && micro && <span className="forge-dictee-niveau" title={micro.nom} aria-label={tr("Niveau du micro {0}", [micro.nom])}>
+        <span style={{ width: `${Math.min(100, Math.round(Math.sqrt(micro.niveau) * 140))}%` }} />
+      </span>}
+      {phase === 'ecoute' && micro && <span className="small muted" style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{micro.pic < 0.002 ? tr("{0} : aucun son", [micro.nom]) : micro.nom}</span>}
     </div></Layer>}
     {proposer && <Layer><Modal label={tr("Dictée vocale")} onClose={() => recu == null && setProposer(null)}>
       <h2 style={{ marginTop: 0 }}>{tr("Dictée vocale")}</h2>
