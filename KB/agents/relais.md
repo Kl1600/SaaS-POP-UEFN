@@ -137,3 +137,10 @@ Fait : outil MCP blender_build (script de l'IA + export FBX, exécuté par le re
 Reste : critère (UEFN) à tester sur le PC de benybens ; image en entrée (seulement le texte pour l'instant)
 Bloque : rien
 ```
+
+```
+FAIT | #538 Forge : UEFN s'ouvre sur un autre projet (heure UTC au lieu de locale) et états contradictoires | 28/11
+Owner : benybens | Sur la tâche : Claude Code, pour benybens
+Fait : LastOpenedTime = max(maintenant, plus récente des autres + 1 s) ; badge et bandeau « UEFN ouvert sur X » ; testé avec le vrai UEFN (GrassCutter présélectionné)
+Piège : UEFN écrit LastOpenedTime dans VK_Projects en heure locale ; ne pas comparer avec une heure UTC
+```
