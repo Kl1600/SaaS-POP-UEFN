@@ -36,8 +36,6 @@ export const clientName = (kind: string) => CLIENTS.find(c => c.kind === kind)?.
 export function AccountAI() {
   const ai = useAccountAI(false)
   const data = ai.tokens, reload = ai.reload
-  // Rôles d'agents (#111) : consignes et outils permis, choisis par IA.
-  const { data: roles } = useLoad<{ id: string; name: string; instructions: string }[]>('/api/agent-roles', [])
   // Une IA ne compte comme connectée qu'une fois qu'elle a appelé POP (#280) ; les autres jetons sont « en attente ».
   const live = ai.live
   const pending = ai.pending
@@ -52,10 +50,6 @@ export function AccountAI() {
           <ClientLogo kind={t.kind} />
           <span style={{ flex: 1, minWidth: 180 }}>{t.name}<span className="small muted"> · {clientName(t.kind)} · {t.oauth ? tr("connexion OAuth") : tr("clé API")} · {t.map ? tr("travaille sur « {0} »", [t.map.name]) : tr("aucune map choisie")}{ai.agentsForge(t) ? ' · ' + tr("{0} agent(s) dans Forge", [ai.agentsForge(t)]) : ''}</span></span>
           <span className={'badge ' + (t.last_used ? 'b-g' : '')}>{t.last_used ? tr("Utilisée {0} · {1} appel{2}", [ago(t.last_used), t.calls, t.calls > 1 ? 's' : '']) : tr("Jamais utilisée")}</span>
-          <select className="field" style={{ height: 34, width: 'auto' }} aria-label={tr("Rôle de {0}", [t.name])} title={roles?.find(r => r.id === t.role)?.instructions ?? tr("Sans rôle : tous les outils de POP.")} value={t.role ?? ''} onChange={async e => { await api.post(`/api/tokens/${t.id}/role`, { role: e.target.value || null }); reload() }}>
-            <option value="">{tr("Sans rôle")}</option>
-            {roles?.map(r => <option key={r.id} value={r.id}>{tr(r.name)}</option>)}
-          </select>
           <button className="btn" style={{ height: 34 }} onClick={async () => { await api.post(`/api/tokens/${t.id}/scope`, { scope: t.scope === 'read' ? 'write' : 'read' }); reload() }}>{t.scope === 'read' ? <><Lock size={14} />{tr("Lecture seule")}</> : <><Unlock size={14} />{tr("Peut modifier")}</>}</button>
           <button className="btn" style={{ height: 34 }} aria-label={tr("Révoquer {0}", [t.name])} onClick={async () => { if (confirm(tr("Révoquer {0} ? Son accès à POP est coupé tout de suite ; pour la reconnecter, refaites la connexion.", [t.name]))) { await api.del(`/api/tokens/${t.id}`); reload() } }}><Trash2 size={14} />{tr("Révoquer")}</button>
         </div>

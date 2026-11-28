@@ -318,7 +318,7 @@ function Reglages({ invoke }: { invoke: Invoke | null }) {
     <section>
       <h2 className="forge-h2">{tr("Compte")}</h2>
       {ligne(app.me?.user.name ?? '', app.me?.user.email ?? '', <button className="linkbtn" onClick={() => ouvrirPOP('/parametres')}>{tr("Gérer dans POP")}</button>)}
-      {ligne(tr("IA connectées"), tr("Les mêmes que dans POP : clés, rôles, lecture seule"), <button className="linkbtn" onClick={() => ouvrirPOP('/parametres?onglet=ia')}>{tr("Gérer dans POP")}</button>)}
+      {ligne(tr("IA connectées"), tr("Les mêmes que dans POP : clés, lecture seule"), <button className="linkbtn" onClick={() => ouvrirPOP('/parametres?onglet=ia')}>{tr("Gérer dans POP")}</button>)}
     </section>
     <section>
       <h2 className="forge-h2">Forge</h2>

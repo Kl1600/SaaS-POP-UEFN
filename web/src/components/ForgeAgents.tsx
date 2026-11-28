@@ -113,7 +113,7 @@ export function Fenetre({ mapId, a, phrase, cible, ouvertes, agir, fermer, aPart
       <span className="forge-point" style={{ background: mode === 'off' ? 'var(--red)' : actif(a.last_used) ? 'var(--tg)' : '#6b6b6b' }} aria-hidden="true" />
       <b title={a.name}>{a.forge ? 'Claude Code' : famille(a)}</b>
       {direct && <span className="term-direct">{tr("en direct")}</span>}
-      <span className="term-doux term-coupe">{[a.role ? ROLES[a.role] ?? a.role : null, a.owner].filter(Boolean).join(' · ')}{a.last_used ? ' · ' + tr("dernier appel {0}", [ago(a.last_used)]) : ''}</span>
+      <span className="term-doux term-coupe">{[a.orchestrator ? tr("Orchestrateur") : a.role === 'relecteur' ? ROLES.relecteur : null, a.owner].filter(Boolean).join(' · ')}{a.last_used ? ' · ' + tr("dernier appel {0}", [ago(a.last_used)]) : ''}</span>
       <div style={{ flex: 1 }} />
       <div className="term-modes" role="group" aria-label={tr("Mode de l’agent {0}", [a.name])}>
         {MODES.map(([k, l]) => <button key={k} className={mode === k ? 'on' : ''} disabled={!app.canEdit}
