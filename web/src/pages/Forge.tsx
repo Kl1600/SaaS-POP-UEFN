@@ -537,9 +537,22 @@ function EnCeMoment({ mapId }: { mapId: number }) {
 function ForgePro() {
   const app = useApp()
   useEffect(() => { const t = setInterval(() => app.reload(), 10000); return () => clearInterval(t) }, [])
+  // Présentation du site (#516, #523) : prix par jour, Mensuel / Annuel seulement si l'annuel existe, réassurance.
+  const { data: b } = useLoad<any>('/api/billing')
+  const [an, setAn] = useState(false)
+  const annuel = an && !!b?.annual
   return <div className="card" style={{ maxWidth: 560, padding: 28, margin: '0 auto' }}>
     <h1 className="forge-h1">{tr("Inclus dans l’abonnement Pro")}</h1>
     <p className="muted">{tr("Les agents, les vérifications, la bibliothèque et les outils de Forge construisent votre map dans UEFN avec vos IA. Ils sont inclus dans l’abonnement Pro, essai gratuit compris. Sans Pro, Forge reste votre relais UEFN : il relie vos projets et pilote UEFN pour le site et vos IA connectées.")}</p>
+    {b?.prices?.pro && <div className="stack" style={{ gap: 10, margin: '6px 0 14px' }}>
+      {b.annual && <div className="bfreq" role="group" aria-label={tr("Fréquence de facturation")}>
+        <button type="button" className={!an ? 'on' : ''} aria-pressed={!an} onClick={() => setAn(false)}>{tr("Mensuel")}</button>
+        <button type="button" className={an ? 'on' : ''} aria-pressed={an} onClick={() => setAn(true)}>{tr("Annuel")}<em>{tr("2 mois offerts")}</em></button>
+      </div>}
+      <div className="bprice">{annuel ? b.prices_year?.pro : b.prices.pro}<span>{annuel ? tr("/ an") : tr("/ mois")}</span></div>
+      <div className="bjour">{annuel ? tr("Soit 2 mois offerts sur l’année") : tr("Moins d’1 € par jour")}</div>
+      <div className="bsure"><span><Check size={14} />{tr("Annulable à tout moment, en un clic")}</span><span><ShieldCheck size={14} />{tr("Paiement sécurisé par Stripe")}</span></div>
+    </div>}
     <div className="forge-ligne">
       <button className="btn pri" onClick={() => ouvrirPOP('/parametres')}>{tr("Voir l’abonnement Pro")}</button>
       <button className="btn" onClick={() => app.reload()}>{tr("J’ai changé d’abonnement")}</button>
