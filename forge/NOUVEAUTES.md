@@ -3,6 +3,10 @@
 Une entrée par version de `forge/tauri.conf.json` (#437) : `## version · date`, puis 1 à 5 lignes en français.
 Le workflow « relais Windows » en tire les notes de la mise à jour ; le CI refuse une version sans entrée.
 
+## 0.3.24 · 28/11/2026
+- « Ouvrir UEFN » présélectionne toujours le bon projet, même juste après en avoir ouvert un autre.
+- Quand UEFN est ouvert sur une autre map, Forge le dit (« UEFN est ouvert sur TestPopHub, pas sur GrassCutter ») et propose d'y passer.
+
 ## 0.3.23 · 28/11/2026
 - Didacticiel comme sur le site : zone entourée à 8 px, reste flouté, défilement automatique ; ← → et Échap marchent toujours.
 - Réglages : « Revoir les didacticiels » relance les bulles des écrans de Forge.

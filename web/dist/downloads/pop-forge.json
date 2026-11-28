@@ -1,1 +1,1 @@
-{"version": "0.3.23", "date": "2026-11-28", "notes": "· Didacticiel comme sur le site : zone entourée à 8 px, reste flouté, défilement automatique ; ← → et Échap marchent toujours.\n· Réglages : « Revoir les didacticiels » relance les bulles des écrans de Forge."}
+{"version": "0.3.24", "date": "2026-11-28", "notes": "· « Ouvrir UEFN » présélectionne toujours le bon projet, même juste après en avoir ouvert un autre.\n· Quand UEFN est ouvert sur une autre map, Forge le dit (« UEFN est ouvert sur TestPopHub, pas sur GrassCutter ») et propose d'y passer."}
