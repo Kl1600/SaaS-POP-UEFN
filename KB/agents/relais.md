@@ -113,3 +113,11 @@ Fait : link/src/blender.rs (4.5.11 LTS, SHA-256 publiée, zip dans %LOCALAPPDATA
 Reste : critères (Forge) et (UEFN) à tester sur le PC Windows de benybens ; import GLB à vérifier (KB/UEFN.md)
 Bloque : rien
 ```
+
+```
+EN REVUE | #324 Forge · Outils : texte 3D et texte 2D importés dans le projet UEFN | 28/11
+Owner : Kl1600 | Sur la tâche : Claude Code, pour Kl1600
+Fait : link/src/texte3d.rs (réglages en JSON hors du script, Poppins ou Inter, OFL), Blender rend FBX (3D) ou PNG transparent (2D) ; Forge garde le fichier et sa licence dans « POP Forge\creations » ; Outils → Texte 3D et 2D (aperçu, import par asset_import, journalisé et annulable)
+Reste : critères (UEFN) à tester sur le PC de benybens
+Bloque : rien
+```

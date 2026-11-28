@@ -30,6 +30,7 @@ fn main() {
             "blender_etat",
             "blender_installer",
             "blender_tester",
+            "texte_creer",
             "projet_ouvert",
             "liaison",
             "fenetre",
