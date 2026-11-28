@@ -1,9 +1,10 @@
 // Didacticiel au premier passage sur un onglet (#496) : 3 ou 4 bulles qui pointent l'essentiel de la page.
 // Vu une fois par onglet et par compte : la liste des onglets vus est gardée dans ui_prefs.tours (#493).
-import { useEffect, useLayoutEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { X } from '../icons'
 import { api } from '../api'
 import { useApp } from '../state'
+import { uiScale } from '../zoom'
 import { tr } from '../i18n/t'
 
 type Etape = { sel?: string; titre: string; texte: string }
@@ -96,7 +97,9 @@ function cible(sel?: string): HTMLElement | null {
   return null
 }
 
-const zoom = () => parseFloat(getComputedStyle(document.documentElement).zoom || '1') || 1
+// Échelle réelle de l'interface (html { zoom }), mesurée comme dans zoom.ts : selon le navigateur, les mesures
+// sont déjà en pixels CSS ou non (#542 : la zone était décalée dans la fenêtre Forge, zoomée à 90 %).
+const zoom = uiScale
 const MARGE = 8
 
 /** Contour d'un rectangle arrondi pour le voile (règle evenodd : la zone reste nette). */
@@ -164,10 +167,23 @@ export function Didacticiel({ page }: { page: string }) {
     window.addEventListener('resize', maj); window.addEventListener('scroll', maj, true)
     return () => { clearTimeout(t1); clearTimeout(t2); window.removeEventListener('resize', maj); window.removeEventListener('scroll', maj, true) }
   }, [i, pret, actif, page])
-  if (!actif || !pret) return null
-  const e = etapes[i]
   const avant = () => setI(Math.max(0, i - 1))
   const apres = () => i + 1 < etapes.length ? setI(i + 1) : fin()
+  // ← → et Échap marchent même si le focus a quitté la bulle (clic sur le voile, #542).
+  const nav = useRef({ avant, apres, fin })
+  nav.current = { avant, apres, fin }
+  useEffect(() => {
+    if (!actif || !pret) return
+    const k = (ev: KeyboardEvent) => {
+      if ((ev.target as HTMLElement)?.closest?.('input, textarea, [contenteditable]')) return
+      const f = ev.key === 'ArrowRight' ? nav.current.apres : ev.key === 'ArrowLeft' ? nav.current.avant : ev.key === 'Escape' ? nav.current.fin : null
+      if (f) { ev.preventDefault(); ev.stopPropagation(); f() }
+    }
+    window.addEventListener('keydown', k, true)
+    return () => window.removeEventListener('keydown', k, true)
+  }, [actif, pret])
+  if (!actif || !pret) return null
+  const e = etapes[i]
   // Bulle sous la zone visée, sinon au-dessus, sinon en bas de l'écran ; centrée sans zone.
   const W = 340, HB = 200
   const z = zoom()
@@ -179,8 +195,7 @@ export function Didacticiel({ page }: { page: string }) {
   return <>
     <div className="tuto-voile" style={{ clipPath: trou(vw, vh, r) }} aria-hidden="true" onClick={ev => ev.stopPropagation()} />
     {r && <div className="tuto-zone" style={{ left: r.left - MARGE, top: r.top - MARGE, width: r.width + 2 * MARGE, height: r.height + 2 * MARGE }} aria-hidden="true" />}
-    <div className="tuto" style={{ ...style, width: W }} role="dialog" aria-modal="true" aria-label={tr("Didacticiel")}
-      onKeyDown={ev => { if (ev.key === 'ArrowRight') apres(); else if (ev.key === 'ArrowLeft') avant(); else if (ev.key === 'Escape') fin() }}>
+    <div className="tuto" style={{ ...style, width: W }} role="dialog" aria-modal="true" aria-label={tr("Didacticiel")}>
       <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
         <span className="tuto-pas">{etapes.map((_, k) => <i key={k} className={k === i ? 'on' : k < i ? 'vu' : ''} />)}<span className="small muted">{tr("{0} sur {1}", [String(i + 1), String(etapes.length)])}</span></span>
         <button className="iconbtn" aria-label={tr("Passer le didacticiel")} onClick={fin}><X size={16} /></button>
