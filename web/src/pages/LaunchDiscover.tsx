@@ -38,6 +38,14 @@ const FACTOR: Record<string, [string, string]> = {
   minutes: [tr("Les joueurs restent longtemps"), tr("Les parties sont courtes : retravaillez les premières minutes")],
   d1: [tr("Les joueurs reviennent le lendemain"), tr("Peu de joueurs reviennent le lendemain")],
   growth: [tr("Les joueurs augmentent de jour en jour"), tr("Les joueurs baissent depuis la sortie")],
+  // Signaux ajoutés par #71, cités seulement s'ils ont été retenus par l'IA.
+  plays_pp: [tr("Chaque joueur relance plusieurs parties"), tr("Peu de parties par joueur : donnez une raison de relancer")],
+  fav_pp: [tr("Beaucoup de joueurs ajoutent la map en favori"), tr("Peu de favoris par joueur")],
+  rec_pp: [tr("Beaucoup de joueurs recommandent la map"), tr("Peu de recommandations par joueur")],
+  d7: [tr("Les joueurs reviennent une semaine après"), tr("Peu de joueurs reviennent une semaine après")],
+  creator: [tr("Le créateur a déjà fait percer une map"), tr("Le créateur n’a pas encore fait percer de map")],
+  weekend: [tr("Sortie en fin de semaine, quand les joueurs sont là"), tr("Sortie en semaine")],
+  genre: [tr("Le genre de la map perce souvent"), tr("Le genre de la map perce rarement")],
 }
 const GRADE: Record<string, [string, string]> = { top: [tr("Au niveau des meilleures"), 'b-g'], bon: [tr("Au-dessus de la niche"), 'b-g'], moyen: [tr("Un peu en dessous"), 'b-o'], faible: [tr("Nettement en dessous"), 'b-r'], inconnu: [tr("Pas encore mesuré"), ''] }
 

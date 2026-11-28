@@ -455,7 +455,7 @@ async fn track(
         }
     }
     let launch = if age.map(|a| (0..=14).contains(&a)).unwrap_or(false) {
-        crate::model::predict(st, &by_age).await
+        crate::model::predict(st, code).await
     } else {
         Value::Null
     };
