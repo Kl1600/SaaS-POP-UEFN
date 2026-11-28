@@ -1,1 +1,1 @@
-{"version": "0.3.17", "date": "2026-11-28", "notes": "· Outils → Low Mesh : allégez un modèle 3D (FBX, OBJ, GLB) avant import, avec aperçu et nombre de triangles avant et après ; Forge prévient au-delà de 30 000 sommets."}
+{"version": "0.3.18", "date": "2026-11-28", "notes": "· Outils → 3D Studio : décrivez un objet à votre IA ; elle le construit avec Blender sur votre PC, vous voyez l'aperçu et vous l'acceptez avant tout import dans UEFN."}
