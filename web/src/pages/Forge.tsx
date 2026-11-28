@@ -114,11 +114,17 @@ export default function Forge() {
   useEffect(() => { lire(); const t = setInterval(lire, 2000); return () => clearInterval(t) }, [lire])
   // Projet ouvert dans UEFN (#538), pour dire quand il n'est pas celui de la map choisie. Plus lent : toutes les 10 s.
   const [projetOuvert, setProjetOuvert] = useState<string | null>(null)
+  const [projetLu, setProjetLu] = useState(false)
   useEffect(() => {
     if (!invoke) return
-    const f = () => invoke<string | null>('projet_ouvert').then(setProjetOuvert).catch(() => {})
+    const f = () => invoke<string | null>('projet_ouvert').then(p => { setProjetOuvert(p); setProjetLu(true) }).catch(() => {})
     f(); const t = setInterval(f, 10000); return () => clearInterval(t)
   }, [invoke])
+  // Écran d'ouverture (#537) : « Que voulez-vous faire ? » à chaque lancement, sauf lien d'ouverture du site (#297) ou
+  // réglage « ne plus afficher » (préférence du compte). Ensuite, l'Accueil montre la map choisie, ou tout (« Gérer »).
+  const [ouverture, setOuverture] = useState<boolean | null>(lien.map ? false : null)
+  useEffect(() => { if (ouverture === null && app.me) setOuverture(app.me.ui_prefs?.forge_ouverture !== false) }, [app.me, ouverture])
+  const [vue, setVue] = useState<'map' | 'gerer'>('map')
   // F5 recharge Forge, comme l'ancien menu de Windows.
   useEffect(() => {
     const f = (e: KeyboardEvent) => { if (e.key === 'F5') { e.preventDefault(); location.reload() } }
@@ -140,6 +146,21 @@ export default function Forge() {
     ? { nom: nomDossier(lienOuvert.projet), mapId: app.me?.studios.flatMap(s => s.maps).find(m => m.name.toLowerCase() === lienOuvert.map.toLowerCase())?.id ?? null }
     : null
   const titre = section === 'reglages' ? tr("Réglages") : SECTIONS.find(s => s[0] === section)?.[1]
+  // Choisir une map (écran d'ouverture, #537) : elle devient la map de travail ; UEFN s'ouvre sur son projet s'il est fermé.
+  const choisirMap = async (mapId: number, nom: string) => {
+    app.setMapId(mapId); setVue('map'); setSection('accueil'); setOuverture(false)
+    const projet = (liaison?.liens ?? []).find(l => l.map.toLowerCase() === nom.toLowerCase())?.projet
+    if (projet && etat !== 'UEFN connecté') {
+      try { app.toast(await invoke<string>('ouvrir_uefn', { projet })) } catch (e: any) { app.toast(String(e?.message ?? e), true) }
+    }
+  }
+  if (ouverture === null) return null
+  if (ouverture) return <div className="forge-shell">
+    <TitleBar invoke={invoke} />
+    <div className={'app forge forge-ouverture-app' + (app.dark ? ' dark' : '')}>
+      <Ouverture invoke={invoke} liaison={liaison} choisir={choisirMap} gerer={() => { setVue('gerer'); setSection('accueil'); setOuverture(false) }} />
+    </div>
+  </div>
 
   return <div className="forge-shell">
   <TitleBar invoke={invoke} />
@@ -172,7 +193,9 @@ export default function Forge() {
         {!reserve && section !== 'reglages' && <Didacticiel page={'forge-' + section} />}
         {app.map && section !== 'reglages' && !reserve && <Bandeau mapId={app.map.id} etat={etat} aller={setSection} invoke={invoke} projet={projetCourant} ailleurs={ailleurs} />}
         {reserve ? <ForgePro />
-          : section === 'accueil' ? <Accueil invoke={invoke} etat={etat} liaison={liaison} relie={relie} relire={lire} pro={pro} aller={setSection} prendre={n => { setTacheCible(n); setSection('agents') }} />
+          : section === 'accueil' ? (vue === 'map' && app.map
+            ? <AccueilMap invoke={invoke} etat={etat} liaison={liaison} ouvert={projetOuvert} projetLu={projetLu} pro={pro} aller={setSection} prendre={n => { setTacheCible(n); setSection('agents') }} changer={() => setOuverture(true)} gerer={() => setVue('gerer')} />
+            : <Accueil invoke={invoke} etat={etat} liaison={liaison} relie={relie} relire={lire} pro={pro} aller={setSection} prendre={n => { setTacheCible(n); setSection('agents') }} retour={app.map ? () => setVue('map') : undefined} />)
           : section === 'reglages' ? <Reglages invoke={invoke} />
           : section === 'agents' ? (app.map ? <ForgeAgents mapId={app.map.id} tache={tacheCible ?? (app.map.id === lien.map ? lien.tache : null)} invoke={invoke} /> : <p className="muted">{tr("Choisissez une map.")}</p>)
           : section === 'verifier' ? (app.map ? <div className="stack" style={{ gap: 18 }}><ForgeVerifications mapId={app.map.id} ouvrir={ouvrirPOP} /><ForgeScenarios mapId={app.map.id} capturer={() => captureJeu(invoke)} /></div> : <p className="muted">{tr("Choisissez une map.")}</p>)
@@ -396,6 +419,9 @@ function Reglages({ invoke }: { invoke: Invoke | null }) {
       {ligne(tr("Dictée vocale"), tr("Gardez le raccourci appuyé dans un champ pour dicter ; transcrit sur votre PC"), <select className="field" style={{ width: 'auto' }} aria-label={tr("Raccourci de la dictée")} defaultValue={raccourci()} onChange={e => { choisirRaccourci(e.target.value as Raccourci); app.toast(tr("Raccourci de la dictée : {0}", [RACCOURCIS[e.target.value as Raccourci]])) }}>
         {Object.entries(RACCOURCIS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
       </select>)}
+      {ligne(tr("Écran d'ouverture"), tr("« Que voulez-vous faire ? » à chaque lancement de Forge"), <input type="checkbox" aria-label={tr("Écran d'ouverture")} checked={app.me?.ui_prefs?.forge_ouverture !== false} onChange={async e => {
+        try { await api.put('/api/me/ui-prefs', { ...(app.me?.ui_prefs ?? {}), forge_ouverture: e.target.checked }); await app.reload() } catch (er: any) { app.toast(er.message, true) }
+      }} />)}
       {ligne(tr("Didacticiels"), tr("Les bulles d’aide de chaque écran de Forge, vues une fois"), <button className="btn" disabled={!(app.me?.ui_prefs?.tours ?? []).some((t: string) => t.startsWith('forge-'))} onClick={async () => {
         // Comme Paramètres → Affichage sur le site (#533) ; ici, seulement les écrans de Forge (#542).
         const all = { ...(app.me?.ui_prefs ?? {}), tours: (app.me?.ui_prefs?.tours ?? []).filter((t: string) => !t.startsWith('forge-')) }
@@ -423,7 +449,7 @@ function Reglages({ invoke }: { invoke: Invoke | null }) {
  * relier une map à un projet trouvé tout seul (Documents, projets récents d'UEFN, projet ouvert) ou choisi avec
  * « Parcourir… » ; plusieurs projets reliés à la fois. Forge ne crée pas de map : « Créer la map dans POP » ouvre le
  * site (critère 7 de #78). */
-function Accueil({ invoke, etat, liaison, relire, pro, aller, prendre }: { invoke: Invoke; etat: string; liaison: Liaison; relie: boolean; relire: () => Promise<void>; pro: boolean; aller: (s: Section) => void; prendre: (n: number) => void }) {
+function Accueil({ invoke, etat, liaison, relire, pro, aller, prendre, retour }: { invoke: Invoke; etat: string; liaison: Liaison; relie: boolean; relire: () => Promise<void>; pro: boolean; aller: (s: Section) => void; prendre: (n: number) => void; retour?: () => void }) {
   const app = useApp()
   const [ouvert, setOuvert] = useState<string | null>(null)
   const [projets, setProjets] = useState<string[]>([])
@@ -500,7 +526,10 @@ function Accueil({ invoke, etat, liaison, relire, pro, aller, prendre }: { invok
   }
 
   return <div className="stack" style={{ gap: 32 }}>
-    <h1 className="forge-h1">{tr("Bonjour")} {app.me?.user.name}</h1>
+    <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+      <h1 className="forge-h1" style={{ margin: 0 }}>{tr("Gérer mes maps et mon studio")}</h1>
+      {retour && app.map && <button className="btn" onClick={retour}>{tr("Revenir à {0}", [app.map.name])}</button>}
+    </div>
     <ActionsContexte pro={pro} etat={etat} ouvert={ouvert} projetsLus={projetsLus} maps={maps} projetDe={projetDe} ouvrirUefn={ouvrirUefn} occupe={occupe} aller={aller} prendre={prendre} />
     <ForgeAssistant invoke={invoke} liens={liens} etat={etat} />
 
@@ -585,17 +614,25 @@ type Action = { titre: string; texte: string; Icon: any; faire: () => void; off?
 
 /** Trois gros boutons en haut de l'Accueil (#445) : quoi faire maintenant, selon le contexte. Ils mènent à ce qui existe
  * déjà : ouvrir UEFN (#402), les écrans de Forge, la tâche conseillée par POP lancée avec son IA (#420), le site. */
-function ActionsContexte({ pro, etat, ouvert, projetsLus, maps, projetDe, ouvrirUefn, occupe, aller, prendre }: {
+function ActionsContexte({ pro, etat, ouvert, projetsLus, maps, projetDe, ouvrirUefn, occupe, aller, prendre, mapId, versMaps: versMapsVue }: {
   pro: boolean; etat: string; ouvert: string | null; projetsLus: boolean; maps: { id: number; nom: string; studio: string }[]
   projetDe: (nom: string) => string | undefined; ouvrirUefn: (mapId: number, projet: string) => void; occupe: string | null
   aller: (s: Section) => void; prendre: (n: number) => void
+  /** Accueil d'une map (#537) : les boutons ne parlent que de cette map. */
+  mapId?: number
+  /** « Ouvrir une map » : par défaut, la liste des maps plus bas ; dans l'Accueil d'une map, le choix du projet. */
+  versMaps?: () => void
 }) {
   const app = useApp()
   const reliees = maps.filter(m => projetDe(m.nom))
-  // Map ouverte dans UEFN : celle dont le projet relié est le projet ouvert.
-  const ouverteMap = etat === 'UEFN connecté' && ouvert ? reliees.find(m => projetDe(m.nom)!.toLowerCase() === ouvert.toLowerCase()) : undefined
-  // Dernière map travaillée : la map courante si elle est reliée, sinon la première reliée.
-  const derniere = reliees.find(m => m.id === app.map?.id) ?? reliees[0]
+  const choisie = mapId ? reliees.find(m => m.id === mapId) : undefined
+  // Map ouverte dans UEFN : celle dont le projet relié est le projet ouvert (dans l'Accueil d'une map, seulement elle).
+  const ouverteMap = etat === 'UEFN connecté' && ouvert
+    ? (mapId ? (choisie && projetDe(choisie.nom)!.toLowerCase() === ouvert.toLowerCase() ? choisie : undefined)
+      : reliees.find(m => projetDe(m.nom)!.toLowerCase() === ouvert.toLowerCase()))
+    : undefined
+  // Dernière map travaillée : la map choisie, sinon la map courante si elle est reliée, sinon la première reliée.
+  const derniere = choisie ?? reliees.find(m => m.id === app.map?.id) ?? reliees[0]
   const cible = ouverteMap ?? derniere
   const { data: taches, reload: relireTaches } = useLoad<any[]>(ouverteMap ? `/api/maps/${ouverteMap.id}/tasks` : null, [ouverteMap?.id])
   const { data: guide, reload: relireGuide } = useLoad<any>(ouverteMap && pro ? `/api/maps/${ouverteMap.id}/guide` : null, [ouverteMap?.id, pro])
@@ -607,7 +644,7 @@ function ActionsContexte({ pro, etat, ouvert, projetsLus, maps, projetDe, ouvrir
   // (sinon « UEFN fermé » s'afficherait quelques secondes alors qu'UEFN est connecté).
   if (etat === 'UEFN connecté' && !projetsLus) return null
   if (ouverteMap && pro && !taches) return null
-  const versMaps = () => document.getElementById('forge-vos-maps')?.scrollIntoView({ behavior: 'smooth' })
+  const versMaps = versMapsVue ?? (() => document.getElementById('forge-vos-maps')?.scrollIntoView({ behavior: 'smooth' }))
   const suivante = guide?.suggestions?.[0]
   const reprendre: Action = {
     titre: tr("Reprendre là où j'en étais"),
@@ -644,6 +681,151 @@ function ActionsContexte({ pro, etat, ouvert, projetsLus, maps, projetDe, ouvrir
       </button>)}
     </div>
   </section>
+}
+
+/** Écran d'ouverture de Forge (#537) : une seule question, plein écran, sans tableau de bord derrière. */
+function Ouverture({ invoke, liaison, choisir, gerer }: {
+  invoke: Invoke; liaison: Liaison; choisir: (mapId: number, nom: string) => void; gerer: () => void
+}) {
+  const app = useApp()
+  const [etape, setEtape] = useState<'choix' | 'projets' | 'creer'>('choix')
+  const [nom, setNom] = useState('')
+  const admins = (app.me?.studios ?? []).filter(s => ['admin', 'owner'].includes(s.role))
+  const [studio, setStudio] = useState<number | null>(null)
+  const [cree, setCree] = useState<{ id: number; nom: string } | null>(null)
+  const [erreur, setErreur] = useState('')
+  const liens = liaison && memeServeur(liaison.serveur, location.origin) ? liaison.liens ?? [] : []
+  const relie = (n: string) => liens.some(l => l.map.toLowerCase() === n.toLowerCase())
+  // La dernière map travaillée en premier, puis les maps reliées, puis les autres.
+  const maps = (app.me?.studios ?? []).filter(s => ['member', 'admin', 'owner'].includes(s.role))
+    .flatMap(s => s.maps.map(m => ({ id: m.id, nom: m.name, studio: studioName(s) })))
+    .sort((a, b) => Number(b.id === app.map?.id) - Number(a.id === app.map?.id) || Number(relie(b.nom)) - Number(relie(a.nom)) || a.nom.localeCompare(b.nom))
+  const prenom = (app.me?.user.name ?? '').split(' ')[0]
+  const creer = async (e: React.FormEvent) => {
+    e.preventDefault(); setErreur('')
+    const sid = studio ?? admins[0]?.id
+    if (!sid || !nom.trim()) return
+    try {
+      const r = await api.post<{ map_id: number }>(`/api/studios/${sid}/maps`, { name: nom.trim() })
+      await app.reload(); setCree({ id: r.map_id, nom: nom.trim() })
+    } catch (er: any) { setErreur(er.message) }
+  }
+  const carte = (titre: string, texte: string, Icon: any, faire: () => void, premier?: boolean) =>
+    <button className={'forge-cta-carte' + (premier ? '' : ' secondaire')} onClick={faire}>
+      <Icon size={30} strokeWidth={1.5} aria-hidden="true" />
+      <span className="forge-cta-titre">{titre}</span>
+      <span className="forge-cta-texte small muted">{texte}</span>
+    </button>
+  return <main className="forge-ouverture" aria-label={tr("Que voulez-vous faire ?")}>
+    <img src="/logo.png" alt="POP" style={{ height: 52, filter: app.dark ? 'none' : 'invert(1)' }} />
+    {etape === 'choix' && <>
+      <h1 className="forge-h1" style={{ margin: 0, textAlign: 'center' }}>{tr("Bonjour {0}, que voulez-vous faire ?", [prenom])}</h1>
+      <div className="forge-cta">
+        {carte(tr("Choisir un projet"), maps.length ? tr("Reprendre une de vos {0} maps.", [maps.length]) : tr("Aucune map pour l'instant."), FolderOpen, () => setEtape('projets'), true)}
+        {carte(tr("Créer un nouveau projet"), tr("Une nouvelle map dans POP, reliée à UEFN."), Plus, () => setEtape('creer'))}
+        {carte(tr("Gérer mes maps et mon studio"), tr("Le tableau de bord complet de Forge."), Building2, gerer)}
+      </div>
+      <MajForge invoke={invoke} />
+    </>}
+    {etape === 'projets' && <section className="forge-ouverture-liste stack" style={{ gap: 8 }}>
+      <h1 className="forge-h1" style={{ margin: 0 }}>{tr("Choisir un projet")}</h1>
+      {maps.length === 0 && <p className="muted">{tr("Aucune map pour l'instant : créez-en une.")}</p>}
+      {maps.map(m => <button key={m.id} className="forge-map-ligne forge-ouverture-map" onClick={() => choisir(m.id, m.nom)}>
+        <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+          <span>{m.nom}{m.id === app.map?.id && <span className="small muted"> · {tr("dernière travaillée")}</span>}</span>
+          <span className="small muted">{m.studio} · {relie(m.nom) ? tr("reliée à UEFN") : tr("pas encore reliée à UEFN")}</span>
+        </span>
+        <span aria-hidden="true">→</span>
+      </button>)}
+      <button className="linkbtn" style={{ alignSelf: 'flex-start' }} onClick={() => setEtape('choix')}>← {tr("Retour")}</button>
+    </section>}
+    {etape === 'creer' && <section className="forge-ouverture-liste stack" style={{ gap: 12 }}>
+      <h1 className="forge-h1" style={{ margin: 0 }}>{tr("Créer un nouveau projet")}</h1>
+      {cree ? <>
+        <p style={{ margin: 0 }}>{tr("La map « {0} » est créée dans POP. Dans UEFN, créez un projet nommé « {0} » : Forge le reliera tout seul.", [cree.nom])}</p>
+        <button className="btn pri" style={{ alignSelf: 'flex-start' }} onClick={() => choisir(cree.id, cree.nom)}>{tr("Continuer sur {0}", [cree.nom])}</button>
+      </> : admins.length === 0 ? <p className="muted">{tr("Il faut être admin d'un studio pour y créer une map. Demandez à un admin, ou créez-la dans votre espace sur le site.")}</p> : <form className="stack" style={{ gap: 10 }} onSubmit={creer}>
+        <label className="stack" style={{ gap: 4 }}><span className="small muted">{tr("Nom de la map (le même que le projet UEFN)")}</span>
+          <input className="field" autoFocus value={nom} onChange={e => setNom(e.target.value)} maxLength={60} placeholder="GrassCutter" /></label>
+        {admins.length > 1 && <label className="stack" style={{ gap: 4 }}><span className="small muted">{tr("Studio")}</span>
+          <select className="field" value={studio ?? admins[0].id} onChange={e => setStudio(Number(e.target.value))}>{admins.map(s => <option key={s.id} value={s.id}>{studioName(s)}</option>)}</select></label>}
+        {erreur && <p className="small" style={{ color: 'var(--red)', margin: 0 }}>{erreur}</p>}
+        <button className="btn pri" style={{ alignSelf: 'flex-start' }} disabled={!nom.trim()}>{tr("Créer la map")}</button>
+      </form>}
+      <button className="linkbtn" style={{ alignSelf: 'flex-start' }} onClick={() => { setEtape('choix'); setCree(null) }}>← {tr("Retour")}</button>
+    </section>}
+  </main>
+}
+
+/** Accueil d'une map (#537, demande de benybens) : seulement la map de travail. Les trois boutons d'action (#445), sa
+ * feuille de route (jalons, prochain objectif, rythme) et ses tâches en cours et à faire ; la liste de toutes les maps
+ * est dans « Gérer mes maps et mon studio ». */
+function AccueilMap({ invoke, etat, liaison, ouvert, projetLu, pro, aller, prendre, changer, gerer }: {
+  invoke: Invoke; etat: string; liaison: Liaison; ouvert: string | null; projetLu: boolean; pro: boolean
+  aller: (s: Section) => void; prendre: (n: number) => void; changer: () => void; gerer: () => void
+}) {
+  const app = useApp()
+  const m = app.map!
+  const [occupe, setOccupe] = useState<string | null>(null)
+  const studios = (app.me?.studios ?? []).filter(s => ['member', 'admin', 'owner'].includes(s.role))
+  const maps = studios.flatMap(s => s.maps.map(x => ({ id: x.id, nom: x.name, studio: studioName(s) })))
+  const liens = liaison && memeServeur(liaison.serveur, location.origin) ? liaison.liens ?? [] : []
+  const projetDe = (nom: string) => liens.find(l => l.map.toLowerCase() === nom.toLowerCase())?.projet
+  const ouvrirUefn = async (_: number, projet: string) => {
+    setOccupe('uefn')
+    try { app.toast(await invoke<string>('ouvrir_uefn', { projet })) } catch (e: any) { app.toast(String(e?.message ?? e), true) } finally { setOccupe(null) }
+  }
+  const { data: vue, reload } = useLoad<any>(`/api/maps/${m.id}/overview`, [m.id])
+  const { data: taches, reload: relireTaches } = useLoad<any[]>(`/api/maps/${m.id}/tasks`, [m.id])
+  const { data: guide, reload: relireGuide } = useLoad<any>(pro ? `/api/maps/${m.id}/guide` : null, [m.id, pro])
+  useLive(['tasks', 'plan'], () => { reload(); relireTaches(); relireGuide() })
+  const aujourdhui = new Date().toISOString().slice(0, 10)
+  const jalons: any[] = vue?.milestones ?? []
+  const prochain = jalons.find(j => j.date >= aujourdhui)
+  const enCours = (taches ?? []).filter((t: any) => t.status === 'doing' || t.status === 'blocked')
+  const aFaire = (taches ?? []).filter((t: any) => t.status === 'todo')
+  const studioDe = maps.find(x => x.id === m.id)?.studio
+  const ligneTache = (t: any) => <div key={t.id} className="li">
+    <span aria-hidden="true" className="forge-point" style={{ background: t.status === 'blocked' ? 'var(--red)' : t.status === 'doing' ? 'var(--tg)' : 'var(--text3)' }} />
+    <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', lineHeight: 1.35 }}>
+      <span>#{t.number} {t.title}</span>
+      <span className="small muted">{t.status === 'doing' ? tr("En cours") : t.status === 'blocked' ? tr("Bloquée") : tr("À faire")}{t.assignee_name ? ' · ' + t.assignee_name : ''}</span>
+    </span>
+    {pro && t.status === 'todo' && <button className="btn" onClick={() => prendre(t.number)}>{tr("Prendre")}</button>}
+  </div>
+  return <div className="stack" style={{ gap: 30 }}>
+    <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <h1 className="forge-h1" style={{ margin: 0 }}>{m.name}</h1>
+        {studioDe && <span className="small muted">{studioDe}</span>}
+      </div>
+      <div className="row" style={{ gap: 8 }}>
+        <button className="btn" onClick={changer}>{tr("Changer de projet")}</button>
+        <button className="btn" onClick={gerer}>{tr("Gérer mes maps et mon studio")}</button>
+      </div>
+    </div>
+    <ActionsContexte pro={pro} etat={etat} ouvert={ouvert} projetsLus={projetLu} maps={maps} projetDe={projetDe} ouvrirUefn={ouvrirUefn} occupe={occupe} aller={aller} prendre={prendre} mapId={m.id} versMaps={changer} />
+    <section className="stack" style={{ gap: 10 }} aria-label={tr("Feuille de route")}>
+      <h2 className="forge-h2" style={{ margin: 0 }}>{tr("Feuille de route")}</h2>
+      {guide?.pace && <p className="small" style={{ margin: 0, color: guide.pace.on_track ? 'var(--text2)' : 'var(--red)' }}>{guide.pace.on_track
+        ? tr("Objectif « {0} » le {1} : {2} tâche(s) à finir, dans les temps.", [guide.pace.title, guide.pace.date, guide.pace.remaining])
+        : tr("Objectif « {0} » le {1} : {2} tâche(s) à finir, en retard sur le rythme actuel.", [guide.pace.title, guide.pace.date, guide.pace.remaining])}</p>}
+      {!vue ? <p className="small muted" style={{ margin: 0 }}>{tr("Chargement…")}</p> : jalons.length === 0 ? <p className="small muted" style={{ margin: 0 }}>{tr("Aucun jalon : planifiez la map pour avoir une feuille de route.")}</p>
+        : <div className="forge-jalons">{jalons.map(j => <div key={j.id} className={'forge-jalon' + (j === prochain ? ' prochain' : j.date < aujourdhui ? ' passe' : '')}>
+          <span className="small muted">{j.date}</span><span>{j.title}</span>
+        </div>)}</div>}
+      {vue?.tiles && <p className="small muted" style={{ margin: 0 }}>{tr("{0} tâche(s) faite(s) sur {1}.", [vue.tiles.done, vue.tiles.total])}</p>}
+    </section>
+    <section className="stack" style={{ gap: 6 }} aria-label={tr("Tâches")}>
+      <div className="row" style={{ justifyContent: 'space-between' }}>
+        <h2 className="forge-h2" style={{ margin: 0 }}>{tr("Tâches en cours et à faire")}</h2>
+        <button className="linkbtn" title={tr("S'ouvre dans le navigateur")} onClick={() => ouvrirPOP(`/map/${m.id}/taches`)}>{tr("Toutes les tâches")}</button>
+      </div>
+      {!taches ? <p className="small muted" style={{ margin: 0 }}>{tr("Chargement…")}</p> : enCours.length + aFaire.length === 0 ? <p className="small muted" style={{ margin: 0 }}>{tr("Aucune tâche en cours ni à faire.")}</p>
+        : <>{enCours.map(ligneTache)}{aFaire.slice(0, Math.max(0, 8 - enCours.length)).map(ligneTache)}</>}
+    </section>
+    <EnCeMoment mapId={m.id} />
+  </div>
 }
 
 /** Les agents de la map et leur tâche (registre #93), avec « Voir dans POP » sur chaque tâche. */

@@ -1311,6 +1311,19 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 .forge .forge-point{width:9px;height:9px;border-radius:50%;flex:none}
 .forge .forge-h1{margin:0;font-size:30px;font-weight:500;letter-spacing:-.02em}
 .forge .forge-h2{margin:0 0 6px;font-size:15px;font-weight:500;color:var(--text2)}
+/* Écran d'ouverture de Forge (#537) : une seule question, centrée, sans barre latérale. */
+.forge-ouverture-app{display:flex !important;align-items:center;justify-content:center;overflow:auto;background:var(--bg)}
+.forge .forge-ouverture{width:min(980px,100%);margin:auto;padding:48px 28px;display:flex;flex-direction:column;align-items:center;gap:28px;box-sizing:border-box}
+.forge .forge-ouverture .forge-cta{width:100%}
+.forge .forge-ouverture .forge-cta-carte{min-height:170px;padding:26px}
+.forge .forge-ouverture-liste{width:min(620px,100%)}
+.forge .forge-ouverture-map{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--surface);color:var(--text);font:inherit;cursor:pointer;border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+.forge .forge-ouverture-map:hover{border-color:var(--text)}
+/* Feuille de route de l'Accueil d'une map (#537). */
+.forge .forge-jalons{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px}
+.forge .forge-jalon{flex:0 0 auto;min-width:150px;display:flex;flex-direction:column;gap:2px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--surface)}
+.forge .forge-jalon.passe{opacity:.55}
+.forge .forge-jalon.prochain{border-color:var(--text);box-shadow:inset 0 0 0 1px var(--text)}
 /* Trois gros boutons d'action de l'Accueil de Forge (#445). */
 .forge .forge-cta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
 .forge .forge-cta-carte{display:flex;flex-direction:column;align-items:flex-start;gap:8px;text-align:left;padding:20px;min-height:132px;border:1px solid var(--border);border-radius:16px;background:var(--surface);color:var(--text);font:inherit;cursor:pointer;transition:border-color .15s,transform .15s}
