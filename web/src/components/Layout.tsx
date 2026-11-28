@@ -93,17 +93,46 @@ export default function Layout() {
   const fold = (k: string) => { const c = navP.collapsed ?? []; saveNav({ ...navP, collapsed: c.includes(k) ? c.filter(x => x !== k) : [...c, k] }) }
   const arranged = showMap ? arrange(mGroups, navP) : []
   const [drag, setDrag] = useState<string | null>(null)
-  const [dragCat, setDragCat] = useState<string | null>(null)
-  /** Dépose l'onglet tiré avant `before` (ou à la fin de la catégorie `cat`). */
-  const drop = (cat: string, before: string | null) => {
-    if (!drag || cat !== dragCat) return
-    const order: Record<string, string[]> = {}
-    for (const [k, , items] of arranged.slice(1)) order[k] = items.map(it => itemKey(it[0])).filter(x => x !== drag)
-    const list = order[cat] ?? []
-    const at = before ? list.indexOf(before) : -1
-    list.splice(at < 0 ? list.length : at, 0, drag)
-    order[cat] = list
+  /** Tri au pointeur (comme Vinteer) : l'onglet suit la souris dans sa catégorie, les autres s'écartent. */
+  const tri = useRef<{ k: string; key: string; els: HTMLElement[]; from: number; to: number; y0: number; pas: number; z: number } | null>(null)
+  const triDebut = (e: React.PointerEvent<HTMLElement>, k: string, key: string) => {
+    if (e.button !== 0) return
+    e.preventDefault(); e.stopPropagation()
+    const a = e.currentTarget.closest('a') as HTMLElement | null
+    if (!a || !a.parentElement) return
+    const els = [...a.parentElement.querySelectorAll<HTMLElement>(':scope > a')]
+    const from = els.indexOf(a)
+    const r0 = els[0].getBoundingClientRect(), r1 = els[1]?.getBoundingClientRect()
+    const pas = r1 ? r1.top - r0.top : r0.height
+    const z = parseFloat(getComputedStyle(document.documentElement).zoom || '1') || 1
+    e.currentTarget.setPointerCapture(e.pointerId)
+    for (const el of els) el.style.transition = el === a ? 'none' : 'transform .18s ease'
+    tri.current = { k, key, els, from, to: from, y0: e.clientY, pas, z }
+    setDrag(key)
+  }
+  const triMove = (e: React.PointerEvent<HTMLElement>) => {
+    const t = tri.current
+    if (!t) return
+    const n = t.els.length
+    const dy = Math.max(-t.from * t.pas, Math.min((n - 1 - t.from) * t.pas, e.clientY - t.y0))
+    t.to = Math.max(0, Math.min(n - 1, t.from + Math.round(dy / t.pas)))
+    t.els.forEach((el, i) => {
+      const d = i === t.from ? dy : t.from < t.to && i > t.from && i <= t.to ? -t.pas : t.to < t.from && i >= t.to && i < t.from ? t.pas : 0
+      el.style.transform = d ? `translateY(${d / t.z}px)` : ''
+    })
+  }
+  const triFin = () => {
+    const t = tri.current
+    tri.current = null
     setDrag(null)
+    if (!t) return
+    for (const el of t.els) { el.style.transition = 'none'; el.style.transform = '' }
+    requestAnimationFrame(() => { for (const el of t.els) el.style.transition = '' })
+    if (t.to === t.from) return
+    const order: Record<string, string[]> = {}
+    for (const [k, , items] of arranged.slice(1)) order[k] = items.map(it => itemKey(it[0]))
+    const list = order[t.k] ?? []
+    list.splice(t.to, 0, ...list.splice(t.from, 1))
     saveNav({ ...navP, order })
   }
   const st = app.studio
@@ -155,15 +184,13 @@ export default function Layout() {
         <MapSwitcher />
         <nav className="nav" aria-label={tr("Sections")}>
           {arranged.map(([k, g, items]) => (
-            <div key={k || 'tete'} className={'nav' + (drag && k && k === dragCat ? ' nav-drop' : '')} onDragOver={k && drag && k === dragCat ? e => e.preventDefault() : undefined} onDrop={k && drag && k === dragCat ? e => { e.preventDefault(); drop(k, null) } : undefined}>
+            <div key={k || 'tete'} className={'nav' + (drag && k && tri.current?.k === k ? ' nav-tri' : '')}>
               {g && <button type="button" className="navsec navsec-btn lbl" aria-expanded={!folded(k)} onClick={() => fold(k)}>{g}<ChevronDown size={14} className={'navsec-chev' + (folded(k) ? ' off' : '')} /></button>}
               {!folded(k) && items.map(([p, l, I]) => <NavLink key={p} to={p} end={p === `/map/${app.map!.id}`} draggable={false}
-                onDragOver={k && drag && k === dragCat ? e => e.preventDefault() : undefined} onDrop={k && drag && k === dragCat ? e => { e.preventDefault(); e.stopPropagation(); drop(k, itemKey(p)) } : undefined}
                 className={({ isActive }) => (isActive ? 'on' : '') + (drag === itemKey(p) ? ' dragging' : '')}><I size={20} strokeWidth={1.5} /><span className="lbl">{l}</span>
-                {k && !rail ? <span className="nav-grip" draggable title={tr('Glisser pour déplacer dans la catégorie')} aria-hidden
+                {k && !rail && items.length > 1 ? <span className="nav-grip" title={tr('Glisser pour déplacer dans la catégorie')} aria-hidden
                   onClick={e => { e.preventDefault(); e.stopPropagation() }}
-                  onDragStart={e => { setDrag(itemKey(p)); setDragCat(k); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', itemKey(p)); const a = (e.currentTarget as HTMLElement).closest('a'); if (a) e.dataTransfer.setDragImage(a, 20, 16) }}
-                  onDragEnd={() => { setDrag(null); setDragCat(null) }}><GripVertical size={14} strokeWidth={1.75} /></span> : null}</NavLink>)}
+                  onPointerDown={e => triDebut(e, k, itemKey(p))} onPointerMove={triMove} onPointerUp={triFin} onPointerCancel={triFin}><GripVertical size={14} strokeWidth={1.75} /></span> : null}</NavLink>)}
             </div>
           ))}
           {st && <div className="nav">

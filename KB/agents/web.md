@@ -2,6 +2,11 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-28 · #506 · barre latérale façon Vinteer
+- Fait : .side 284 px (≈256 affichés avec zoom 0,9), titres de catégorie en capitales ; tri au pointeur dans Layout.tsx (triDebut/triMove/triFin : setPointerCapture sur la poignée, translateY de l'onglet et des voisins, bornes de la catégorie), plus de glisser-déposer HTML5.
+- Piège : clientY est en pixels écran, translateY en pixels CSS : diviser par le zoom.
+- Vérifié : Playwright 1440 px (largeur 255,6 px, capture en cours de glisser, bornes, rechargement).
+
 ### 2026-11-28 · #503 · poignée dans un cadre
 - Fait : .nav-grip en carré bordé arrondi 26 px (comme la capture de l'humain).
 - Vérifié : Playwright 1440 px, capture + glisser dans Organiser.

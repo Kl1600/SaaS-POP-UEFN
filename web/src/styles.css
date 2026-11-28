@@ -1500,8 +1500,6 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 .navsec-chev{margin-left:auto;transition:transform .15s;opacity:.7}
 .navsec-chev.off{transform:rotate(-90deg)}
 .nav a[draggable=true]{cursor:pointer}
-.nav a.dragging{opacity:.4}
-.nav.nav-drop{border-radius:12px;outline:1px dashed rgba(237,117,62,.45);outline-offset:2px}
 .app.collapsed .navsec-chev{display:none}
 }
 /* Didacticiel au premier passage (#496). */
@@ -1513,8 +1511,20 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 
 @layer app{
 .nav a{position:relative}
-.nav-grip{margin-left:auto;display:flex;align-items:center;justify-content:center;width:26px;height:26px;flex:none;border:1px solid rgba(255,255,255,.14);border-radius:7px;color:inherit;opacity:0;cursor:grab;transition:opacity .12s,background .12s}
-.nav a:hover .nav-grip,.nav-grip:focus-visible{opacity:.7}
-.nav-grip:hover{opacity:1;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.24)}
+.nav-grip{margin-left:auto;display:flex;align-items:center;justify-content:center;width:22px;height:26px;flex:none;border-radius:6px;color:rgb(140,140,140);opacity:0;cursor:grab;touch-action:none;transition:opacity .12s,color .12s}
+.nav a:hover .nav-grip{opacity:1}
+.nav-grip:hover{color:rgb(235,235,235)}
+.nav a.dragging{position:relative;z-index:2;background:rgb(22,22,22);border-color:rgb(58,58,58);box-shadow:0 8px 24px rgba(0,0,0,.5);opacity:1}
+.nav a.dragging .nav-grip{opacity:1;cursor:grabbing;color:rgb(235,235,235)}
+.nav-tri{user-select:none}
+.nav-tri a{pointer-events:none}.nav-tri a .nav-grip{pointer-events:auto}
 .nav-grip:active{cursor:grabbing}
+}
+
+@layer app{
+/* #506 : barre latérale façon Vinteer (~256 px affichés avec le zoom 0,9) */
+.side{flex-basis:284px;padding:22px 14px 14px}
+.nav a{height:38px;font-size:15.5px;gap:12px;padding:0 10px 0 12px}
+.nav a svg{width:18px;height:18px}
+.navsec{font-size:12.5px;text-transform:uppercase;letter-spacing:.07em;font-weight:500;padding:16px 12px 4px}
 }
