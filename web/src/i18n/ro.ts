@@ -34,6 +34,8 @@ const ro: Dict = {
       { name: 'Pro', tag: "Cel mai complet", desc: "Tot din Starter, plus analiza: idei de hărți, piață, urmărire Discover.", cta: 'Intră pe listă' },
     ],
     rows: ['Organizare', 'Sarcini de o oră, Kanban, dependențe', 'Asistent integrat (rezumatul zilei, întârzieri)', 'Pagini, tablă albă, planificare și etape', 'Hărți', 'Membri', 'UEFN', 'UEFN Link: proiecte sincronizate', 'Organizator de actori și modificări în masă', 'IA conectate (Claude, Cursor, Codex…)', 'POP Forge: construcție asistată în UEFN', 'Creștere', "Idei de hărți, analiza pieței, urmărire Discover", 'Trenduri video TikTok și YouTube Shorts', 'Schimb de playtesturi și ziua lansării', 'Împărțirea câștigurilor și extrase', 'Discord, GitHub, Lore'],
+    perDay: ["Mai puțin de 0,50 € pe zi", "Mai puțin de 1 € pe zi"],
+    hints: ["", "Harta împărțită în sarcini de o oră, cu ce blochează ce", "În fiecare dimineață: ce e întârziat și cu ce să începi", "Documentația hărții, idei în direct și calendarul", "Câte hărți vrei", "Invită toată echipa fără cost suplimentar", "", "IA-urile tale văd proiectul UEFN real: actori și Verse", "", "Conectează-ți IA prin MCP; orice acțiune poate fi anulată", "Construcție în UEFN pornind de la o cerere", "", "Genurile care atrag jucători și unde mai e loc", "Ce crește acum pe TikTok și YouTube Shorts", "Găsește testeri și pregătește ziua lansării", "Cine primește cât, cu un extras pentru fiecare", "Notificări și linkuri către uneltele tale"],
   },
   faq: {
     eyebrow: 'Întrebări', h2: 'Întrebările pe care le primim.',

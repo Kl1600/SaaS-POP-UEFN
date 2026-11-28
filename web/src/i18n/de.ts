@@ -34,6 +34,8 @@ const de: Dict = {
       { name: 'Pro', tag: "Am vollständigsten", desc: "Alles aus Starter, plus Analyse: Map-Ideen, Markt, Discover-Tracking.", cta: 'Auf die Liste' },
     ],
     rows: ['Organisation', 'Einstündige Aufgaben, Kanban, Abhängigkeiten', 'Integrierter Assistent (Tageszusammenfassung, Verzug)', 'Seiten, Whiteboard, Planung und Meilensteine', 'Maps', 'Mitglieder', 'UEFN', 'UEFN Link: synchronisierte Projekte', 'Actor-Organizer und Massenbearbeitung', 'Verbundene KIs (Claude, Cursor, Codex…)', 'POP Forge: unterstütztes Bauen in UEFN', 'Wachstum', "Map-Ideen, Marktanalyse, Discover-Tracking", 'Videotrends TikTok und YouTube Shorts', 'Playtest-Austausch und Release-Tag', 'Umsatzaufteilung und Abrechnungen', 'Discord, GitHub, Lore'],
+    perDay: ["Weniger als 0,50 € pro Tag", "Weniger als 1 € pro Tag"],
+    hints: ["", "Deine Map in einstündige Aufgaben aufgeteilt, mit dem, was was blockiert", "Jeden Morgen: was im Verzug ist und womit du anfängst", "Map-Doku, Ideen in Echtzeit und der Kalender", "So viele Maps, wie du willst", "Lade das ganze Team ohne Aufpreis ein", "", "Deine KIs sehen das echte UEFN-Projekt: Akteure und Verse", "", "Verbinde deine KI per MCP; jede Aktion ist rückgängig zu machen", "In UEFN bauen aus einer einfachen Anfrage", "", "Genres, die Spieler anziehen, und wo noch Platz ist", "Was gerade auf TikTok und YouTube Shorts steigt", "Tester finden und den Launch-Tag vorbereiten", "Wer wie viel bekommt, mit einer Abrechnung für jeden", "Benachrichtigungen und Links zu deinen Tools"],
   },
   faq: {
     eyebrow: 'FAQ', h2: 'Fragen, die uns gestellt werden.',

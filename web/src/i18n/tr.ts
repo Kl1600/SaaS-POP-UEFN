@@ -34,6 +34,8 @@ const tr: Dict = {
       { name: 'Pro', tag: "En kapsamlı", desc: "Starter’daki her şey, artı analiz: harita fikirleri, pazar, Discover takibi.", cta: 'Listeye katıl' },
     ],
     rows: ['Organizasyon', 'Bir saatlik görevler, Kanban, bağımlılıklar', 'Yerleşik asistan (günün özeti, gecikmeler)', 'Sayfalar, beyaz tahta, planlama ve kilometre taşları', 'Haritalar', 'Üyeler', 'UEFN', 'UEFN Link: senkronize projeler', 'Aktör düzenleyici ve toplu düzenleme', 'Bağlı yapay zekâlar (Claude, Cursor, Codex…)', 'POP Forge: UEFN’de destekli inşa', 'Büyüme', "Harita fikirleri, pazar analizi, Discover takibi", 'TikTok ve YouTube Shorts video trendleri', 'Playtest takası ve çıkış günü', 'Gelir paylaşımı ve dökümler', 'Discord, GitHub, Lore'],
+    perDay: ["Günde 0,50 €’dan az", "Günde 1 €’dan az"],
+    hints: ["", "Haritanız bir saatlik görevlere bölünür, neyin neyi engellediğiyle birlikte", "Her sabah: neyin geciktiği ve nereden başlanacağı", "Harita belgeleri, canlı fikirler ve takvim", "İstediğiniz kadar harita", "Tüm ekibi ek ücret olmadan davet edin", "", "Yapay zekâlarınız gerçek UEFN projesini görür: aktörler ve Verse", "", "Yapay zekânızı MCP ile bağlayın; her işlem geri alınabilir", "Basit bir istekten UEFN’de inşa", "", "Oyuncu çeken türler ve hâlâ yer olan alanlar", "Şu anda TikTok ve YouTube Shorts’ta yükselenler", "Test edenler bulun ve çıkış gününe hazırlanın", "Kimin ne kadar aldığı, herkese ayrı bir dökümle", "Bildirimler ve araçlarınıza bağlantılar"],
   },
   faq: {
     eyebrow: 'SSS', h2: 'Bize sorulan sorular.',

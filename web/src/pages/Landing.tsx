@@ -227,13 +227,14 @@ export default function Landing() {
       <div className="lplans" data-reveal>{PLANS.map((p, i) => { const tx = P.plans[i]; return <div key={p.id} className={'lplan' + (p.best ? ' best' : '')}>
         <div className="mrow" style={{ justifyContent: 'space-between' }}><h3>{tx.name}</h3><span className={'ltag' + ((p as any).soon ? " soon" : "")}>{tx.tag}</span></div>
         <div className="lprice"><b>{p.price}</b><span>{p.per ? P.perMonth : ''}</span></div>
+        <div className="lperday">{P.perDay[i]}</div>
         <p>{tx.desc}</p>
         <button className={'lbtn' + (p.best ? ' pri' : '')} onClick={signup}>{tx.cta} <ArrowRight size={16} /></button>
       </div> })}</div>
       <div className="ltable" data-reveal><table>
         <thead><tr><th>{P.compare}</th>{P.plans.map(p => <th key={p.name}>{p.name}</th>)}</tr></thead>
         <tbody>{ROWS.map((vals, r) => r === ORGANISEUR_ROW ? null : vals.length === 0 ? <tr key={r} className="grp"><td colSpan={3}>{P.rows[r]}</td></tr> :
-          <tr key={r}><td>{P.rows[r]}</td>{vals.map((v, i) => <td key={i}>{cell(v)}</td>)}</tr>)}</tbody>
+          <tr key={r}><td>{P.rows[r]}{P.hints[r] && <small className="lhint">{P.hints[r]}</small>}</td>{vals.map((v, i) => <td key={i}>{cell(v)}</td>)}</tr>)}</tbody>
       </table></div>
     </section>
 

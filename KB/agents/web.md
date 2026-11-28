@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-28 · #519 · vitrine : prix par jour et explications du comparatif
+- Fait : pricing.perDay et pricing.hints (alignés sur pricing.rows, '' pour les titres de groupe) dans les 16 dictionnaires ; Landing.tsx les affiche (.lperday, small.lhint).
+- Vérifié : captures FR, EN, AR (droite à gauche).
+
 ### 2026-11-28 · #516 · abonnement : prix par jour, annuel, fin d'essai
 - Fait : Billing.tsx : « moins de 0,50 € / d'1 € par jour », choix Mensuel / Annuel (2 mois offerts, 129,90 € et 249,90 €), réassurance ; écran de fin d'essai plus doux. stripe.rs : STRIPE_PRICE_STARTER_ANNUAL / STRIPE_PRICE_PRO_ANNUAL facultatifs (choix affiché si les deux existent), reconnus par le webhook ; checkout { kind, annuel }.
 - Reste à faire par l'humain ou benybens : créer les deux prix annuels dans Stripe et les mettre dans /opt/pop/.env.

@@ -34,6 +34,8 @@ const en: Dict = {
       { name: 'Pro', tag: "Most complete", desc: "Everything in Starter, plus analytics: map ideas, market, Discover tracking.", cta: 'Join the list' },
     ],
     rows: ['Organization', 'One-hour tasks, Kanban, dependencies', 'Built-in assistant (daily summary, delays)', 'Pages, whiteboard, planning and milestones', 'Maps', 'Members', 'UEFN', 'UEFN Link: synced projects', 'Actor organizer and bulk edits', 'Connected AIs (Claude, Cursor, Codex…)', 'POP Forge: assisted building in UEFN', 'Growth', "Map ideas, market analysis, Discover tracking", 'TikTok and YouTube Shorts video trends', 'Playtest exchange and launch day', 'Revenue sharing and statements', 'Discord, GitHub, Lore'],
+    perDay: ["Less than €0.50 a day", "Less than €1 a day"],
+    hints: ["", "Your map split into one-hour tasks, with what blocks what", "Every morning: what’s late and where to start", "Map docs, live ideas and the calendar", "As many maps as you want", "Invite the whole team at no extra cost", "", "Your AIs see the real UEFN project: actors and Verse", "", "Plug in your AI over MCP; every action can be undone", "Build in UEFN from a simple request", "", "Genres that draw players and where there’s still room", "What’s rising right now on TikTok and YouTube Shorts", "Find testers and prepare launch day", "Who gets what, with a statement for each person", "Notifications and links to your tools"],
   },
   faq: {
     eyebrow: 'FAQ', h2: 'Questions we get asked.',

@@ -34,6 +34,8 @@ const nl: Dict = {
       { name: 'Pro', tag: "Meest compleet", desc: "Alles van Starter, plus analyse: map-ideeën, markt, Discover-tracking.", cta: 'Op de lijst' },
     ],
     rows: ['Organisatie', 'Taken van een uur, Kanban, afhankelijkheden', 'Ingebouwde assistent (dagoverzicht, vertraging)', 'Pagina’s, whiteboard, planning en mijlpalen', 'Maps', 'Leden', 'UEFN', 'UEFN Link: gesynchroniseerde projecten', 'Actor-organizer en bulkbewerking', 'Gekoppelde AI’s (Claude, Cursor, Codex…)', 'POP Forge: ondersteund bouwen in UEFN', 'Groei', "Map-ideeën, marktanalyse, Discover-tracking", 'Videotrends TikTok en YouTube Shorts', 'Playtest-uitwisseling en lanceerdag', 'Verdeling van inkomsten en overzichten', 'Discord, GitHub, Lore'],
+    perDay: ["Minder dan € 0,50 per dag", "Minder dan € 1 per dag"],
+    hints: ["", "Je map opgedeeld in taken van een uur, met wat wat blokkeert", "Elke ochtend: wat achterloopt en waar je begint", "De documentatie van de map, live ideeën en de kalender", "Zoveel maps als je wilt", "Nodig het hele team uit zonder meerkosten", "", "Je AI’s zien het echte UEFN-project: actors en Verse", "", "Koppel je AI via MCP; elke actie is ongedaan te maken", "Bouwen in UEFN vanuit een simpele vraag", "", "Genres die spelers trekken en waar nog ruimte is", "Wat nu stijgt op TikTok en YouTube Shorts", "Vind testers en bereid de lanceerdag voor", "Wie hoeveel krijgt, met een overzicht voor iedereen", "Meldingen en links naar je tools"],
   },
   faq: {
     eyebrow: 'FAQ', h2: 'Vragen die we krijgen.',

@@ -253,3 +253,7 @@
 @media (max-width:1100px){.lmega-cols{grid-template-columns:repeat(2,1fr)}}
 .lp .lfeat[id],.lp #ia{scroll-margin-top:90px}
 .lp[dir=rtl] .lmega-foot a svg{transform:scaleX(-1)}
+
+/* #519 : prix par jour et explication sous chaque ligne du comparatif */
+.lp .lperday{font-size:13px;color:var(--t3);margin:-6px 0 10px}
+.lp .ltable td small.lhint{display:block;font-size:12.5px;line-height:1.4;color:var(--t3);margin-top:3px;font-weight:400}
