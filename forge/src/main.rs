@@ -144,6 +144,7 @@ fn autoriser(app: &AppHandle, u: &Url) {
         .permission("allow-blender-etat")
         .permission("allow-blender-installer")
         .permission("allow-blender-tester")
+        .permission("allow-texte-creer")
         .permission("allow-importer")
         .permission("allow-projet-ouvert")
         .permission("allow-liaison")
@@ -838,6 +839,64 @@ async fn blender_tester(script: String) -> Result<serde_json::Value, String> {
     }))
 }
 
+/// Outil Texte 3D/2D (#324) : Blender fait le mesh (FBX) ou l'image (PNG) ; le fichier est gardé dans
+/// « POP Forge\creations », avec la licence de sa police, prêt à importer dans UEFN.
+#[tauri::command]
+async fn texte_creer(reglages: pop_link::texte3d::Params) -> Result<serde_json::Value, String> {
+    use base64::Engine;
+    let (script, entrees, ext) = pop_link::texte3d::script(&reglages).map_err(|e| e.to_string())?;
+    let r = pop_link::blender::lancer(&script, entrees, pop_link::blender::DELAI)
+        .await
+        .map_err(|e| format!("{e:#}"))?;
+    let (_, data) = r
+        .autres
+        .iter()
+        .find(|(n, _)| n == &format!("sortie.{ext}"))
+        .ok_or("Blender n'a pas produit le fichier attendu.")?;
+    let base: String = reglages
+        .texte
+        .trim()
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+        .take(30)
+        .collect();
+    let quand = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let nom = format!(
+        "Texte{}_{}_{quand}",
+        reglages.mode.to_uppercase(),
+        base.trim_matches('_')
+    );
+    let dossier = pop_link::blender::dossier()
+        .parent()
+        .map(|p| p.join("creations"))
+        .ok_or("Dossier de Forge introuvable.")?;
+    std::fs::create_dir_all(&dossier).map_err(|e| e.to_string())?;
+    let chemin = dossier.join(format!("{nom}.{ext}"));
+    std::fs::write(&chemin, data).map_err(|e| e.to_string())?;
+    let licence = pop_link::texte3d::licence(&reglages.police);
+    std::fs::write(
+        dossier.join(format!("{nom}.licence.txt")),
+        format!("Police : {licence}\n"),
+    )
+    .map_err(|e| e.to_string())?;
+    let b64 = base64::engine::general_purpose::STANDARD;
+    let apercu = if ext == "png" {
+        b64.encode(data)
+    } else {
+        b64.encode(&r.apercu)
+    };
+    Ok(serde_json::json!({
+        "chemin": chemin.to_string_lossy(),
+        "nom": format!("{nom}.{ext}"),
+        "apercu": apercu,
+        "triangles": r.triangles,
+        "licence": licence,
+    }))
+}
+
 #[tauri::command]
 fn direct_fermer(d: tauri::State<'_, direct::Directs>, agent: i64) {
     direct::fermer(&d, agent)
@@ -1050,7 +1109,8 @@ fn main() {
             dictee::dictee_partiel,
             blender_etat,
             blender_installer,
-            blender_tester
+            blender_tester,
+            texte_creer
         ])
         .setup(|app| {
             let h = app.handle().clone();

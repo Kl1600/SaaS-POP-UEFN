@@ -3,6 +3,9 @@
 Une entrée par version de `forge/tauri.conf.json` (#437) : `## version · date`, puis 1 à 5 lignes en français.
 Le workflow « relais Windows » en tire les notes de la mise à jour ; le CI refuse une version sans entrée.
 
+## 0.3.16 · 28/11/2026
+- Outils → Texte 3D et 2D : un titre, un panneau ou un logo en mesh 3D (FBX) ou en image transparente (PNG), fait par Blender sur votre PC, avec aperçu, puis importé dans UEFN en un clic.
+
 ## 0.3.15 · 28/11/2026
 - Outils → Blender : installez Blender (logiciel libre) une seule fois, si vous le voulez ; il servira aux outils 3D. Ses scripts tournent isolés : sans Internet, sans accès à vos fichiers, 2 minutes au plus.
 

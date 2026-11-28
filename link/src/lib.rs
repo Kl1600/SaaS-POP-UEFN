@@ -9,6 +9,7 @@ mod digest;
 mod files;
 mod mcpdriver;
 pub mod poste;
+pub mod texte3d;
 
 use anyhow::{anyhow, bail, Context, Result};
 use futures::{SinkExt, StreamExt};

@@ -207,6 +207,9 @@ pub struct Resultat {
     pub apercu: Vec<u8>,
     pub triangles: u64,
     pub objets: u64,
+    /// Autres fichiers produits par le script (`sortie.fbx`, `sortie.png`…), par nom.
+    #[serde(skip)]
+    pub autres: Vec<(String, Vec<u8>)>,
 }
 
 /// Script ajouté autour de celui de l'IA ou de l'outil : journal dans le dossier de travail, export glTF si le script
@@ -386,7 +389,18 @@ async fn lancer_dans(
         );
     }
     let infos: serde_json::Value = serde_json::from_str(&lire("infos.json")).unwrap_or_default();
+    let mut autres = vec![];
+    for e in std::fs::read_dir(travail)?.flatten() {
+        let nom = e.file_name().to_string_lossy().into_owned();
+        if nom.starts_with("sortie.")
+            && nom != "sortie.glb"
+            && e.metadata().map(|m| m.len() <= SORTIE_MAX).unwrap_or(false)
+        {
+            autres.push((nom, std::fs::read(e.path())?));
+        }
+    }
     Ok(Resultat {
+        autres,
         glb: std::fs::read(&glb)?,
         apercu: std::fs::read(travail.join("apercu.png")).unwrap_or_default(),
         triangles: infos["triangles"].as_u64().unwrap_or(0),
