@@ -47,7 +47,7 @@ pub const POP: &[(&str, &str, &str)] = &[
     ),
     (
         "studio3d",
-        "Faire un modèle 3D avec Blender (3D Studio)",
+        "Faire un modèle 3D avec Blender",
         include_str!("../skills/studio3d.md"),
     ),
 ];

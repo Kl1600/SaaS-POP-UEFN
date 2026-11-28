@@ -1,18 +1,19 @@
 //! Outil Texte 3D et 2D (#324) : un titre de map, un panneau ou un logo, fait par Blender (#351).
 //! - 3D : lettres extrudées et biseautées, converties en mesh, exportées en FBX (le format d'import vérifié, #90).
 //! - 2D : rendu PNG transparent, de face, à la couleur choisie.
-//! Polices libres seulement (licence OFL) : Inter (police intégrée à Blender) et Poppins.
+//! Polices libres seulement (licence OFL) : Poppins et Anton, les mêmes fichiers que l'aperçu 3D de Forge (#514).
 use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 
 const POPPINS: &[u8] = include_bytes!("../../server/assets/polices/Poppins-Bold.ttf");
+const ANTON: &[u8] = include_bytes!("../../server/assets/polices/Anton-Regular.ttf");
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct Params {
     pub texte: String,
     /// « 3d » ou « 2d ».
     pub mode: String,
-    /// « inter » ou « poppins ».
+    /// « poppins » ou « anton ».
     pub police: String,
     /// Hauteur des lettres, en mètres.
     pub taille: f64,
@@ -27,8 +28,8 @@ pub struct Params {
 /// Police et licence, à noter avec l'asset.
 pub fn licence(police: &str) -> &'static str {
     match police {
-        "poppins" => "Poppins (Indian Type Foundry), SIL Open Font License 1.1",
-        _ => "Inter (Rasmus Andersson), police intégrée à Blender, SIL Open Font License 1.1",
+        "anton" => "Anton (The Anton Project Authors), SIL Open Font License 1.1",
+        _ => "Poppins (Indian Type Foundry), SIL Open Font License 1.1",
     }
 }
 
@@ -60,7 +61,7 @@ pub fn script(p: &Params) -> Result<(String, Vec<(String, Vec<u8>)>, &'static st
         "2d" => "png",
         _ => bail!("Mode inconnu : 3d ou 2d."),
     };
-    if !["inter", "poppins"].contains(&p.police.as_str()) {
+    if !["poppins", "anton"].contains(&p.police.as_str()) {
         bail!("Police inconnue.");
     }
     let rgb =
@@ -78,9 +79,10 @@ pub fn script(p: &Params) -> Result<(String, Vec<(String, Vec<u8>)>, &'static st
         "reglages.json".to_string(),
         reglages.to_string().into_bytes(),
     )];
-    if p.police == "poppins" {
-        entrees.push(("police.ttf".into(), POPPINS.to_vec()));
-    }
+    entrees.push((
+        "police.ttf".into(),
+        if p.police == "anton" { ANTON } else { POPPINS }.to_vec(),
+    ));
     Ok((SCRIPT.to_string(), entrees, ext))
 }
 
@@ -91,14 +93,14 @@ P = json.load(open(os.path.join(TRAVAIL, "reglages.json"), encoding="utf-8"))
 d3 = P["mode"] == "3d"
 cu = bpy.data.curves.new("Texte", "FONT")
 cu.body = P["texte"]
-if P["police"] == "poppins":
-    cu.font = bpy.data.fonts.load(os.path.join(TRAVAIL, "police.ttf"))
+cu.font = bpy.data.fonts.load(os.path.join(TRAVAIL, "police.ttf"))
 cu.align_x = "CENTER"
 cu.align_y = "CENTER"
 cu.size = P["taille"]
 cu.resolution_u = 6
-cu.extrude = P["epaisseur"] / 2 if d3 else 0
-cu.bevel_depth = P["biseau"] if d3 else 0
+# Même forme que l'aperçu de Forge (#514) : épaisseur totale = épaisseur, biseau compris.
+cu.bevel_depth = min(P["biseau"], P["epaisseur"] / 2) if d3 else 0
+cu.extrude = max(P["epaisseur"] / 2 - cu.bevel_depth, 0) if d3 else 0
 cu.bevel_resolution = 3
 o = bpy.data.objects.new("Texte", cu)
 bpy.context.scene.collection.objects.link(o)
@@ -190,9 +192,11 @@ mod tests {
         assert!(script(&x).is_err());
         let mut x = p();
         x.mode = "2d".into();
-        x.police = "inter".into();
+        x.police = "anton".into();
         let (_, e, ext) = script(&x).unwrap();
-        assert_eq!((ext, e.len()), ("png", 1));
+        assert_eq!((ext, e.len()), ("png", 2));
+        x.police = "inter".into();
+        assert!(script(&x).is_err());
         assert!(licence("poppins").contains("Open Font License"));
     }
 }
