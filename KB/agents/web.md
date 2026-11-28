@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-28 · #539 · menus de la barre latérale ouverts à droite
+- Fait : MapSwitcher.tsx (position fixe à droite de .side, alignée sur le haut du bouton) et menu du compte dans Layout.tsx (fixe, aligné sur le bas du bouton) ; retour au placement d'avant si la place manque (mobile).
+- Vérifié : Playwright 1440 px (menu des maps x=263 / haut 118, menu du compte bas 847 = bas du bouton, fermeture au clic à côté).
+
 ### 2026-11-28 · #533 · didacticiel : flou, défilement, centrage
 - Fait : Didacticiel.tsx : voile flouté (.tuto-voile, backdrop-filter) percé par clip-path path(evenodd) autour de la zone ; contour à 8 px de chaque côté, gardé dans l'écran ; défilement automatique (scrollIntoView center/start) si la zone est coupée ; molette, tactile et touches de défilement bloquées pendant le didacticiel ; Précédent toujours visible, ← → Échap ; points de progression.
 - Vérifié : Playwright 1440×760 sur le Dashboard (écarts 8 px, molette sans effet, défilement auto à l'étape 3, page libre à la fin).

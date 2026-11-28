@@ -1,6 +1,7 @@
 import { OuvrirForge } from './OuvrirForge'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { cssRect } from '../zoom'
 import { Target,
   Home, FileText, PenTool, CalendarDays, KanbanSquare, Rocket, Coins, Users, Settings, LifeBuoy, PanelLeft,
   Search, Bell, Plus, ChevronDown, Hexagon, LogOut, ListTree, Bot, ChartNoAxesCombined, Layers, Lock, Sun, Moon, GripVertical, Wrench } from '../icons'
@@ -76,6 +77,15 @@ export default function Layout() {
   const rail = phone ? !drawer : collapsed
   const [acct, setAcct] = useState(false)
   const acctBox = useOutside(acct, () => setAcct(false))
+  // Menu du compte ouvert à droite de la barre latérale, aligné sur le bas du bouton (#539).
+  const [acctPos, setAcctPos] = useState<React.CSSProperties | undefined>()
+  useLayoutEffect(() => {
+    const b = acctBox.current
+    if (!acct || !b) { setAcctPos(undefined); return }
+    const r = cssRect(b), side = b.closest('.side'), sr = side ? cssRect(side) : null
+    const vw = window.innerWidth / r.k, vh = window.innerHeight / r.k
+    setAcctPos(sr && sr.right + 8 + 280 <= vw - 8 ? { position: 'fixed', left: sr.right + 8, right: 'auto', top: 'auto', bottom: Math.max(8, vh - r.bottom), width: 280 } : undefined)
+  }, [acct])
   const [newTask, setNewTask] = useState(false)
   const [guide, setGuide] = useState<false | { ask?: string }>(false)
   useEffect(() => { const h = (e: Event) => setGuide({ ask: (e as CustomEvent).detail ?? '' }); window.addEventListener('boussole', h); return () => window.removeEventListener('boussole', h) }, [])
@@ -215,7 +225,7 @@ export default function Layout() {
             <ChevronDown size={16} strokeWidth={1.75} className="acct-chev" />
           </button>
           {acct && (
-            <div className="menu acct-menu">
+            <div className="menu acct-menu" style={acctPos}>
               <div className="small muted acct-mail" title={app.me?.user.email}>{app.me?.user.email}</div>
               <div className="acct-plan small">{app.me?.trial_until ? tr("Essai Pro jusqu’au {0}", [new Date(app.me.trial_until.replace(' ', 'T') + 'Z').toLocaleDateString(LOCALE, { day: 'numeric', month: 'long' })]) : app.me?.plan === 'pro' ? tr("Plan Pro") : tr("Plan Starter")}</div>
               <button onClick={() => { setAcct(false); nav('/parametres') }}><Settings size={16} />{tr("Paramètres")}</button>

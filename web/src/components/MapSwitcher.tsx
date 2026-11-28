@@ -32,8 +32,13 @@ export function MapSwitcher() {
   const [pos, setPos] = useState({ top: 0, left: 0, width: 280 })
   useLayoutEffect(() => {
     if (!open || !btn.current) return
+    // Comme Vinteer (#539) : le menu s'ouvre à droite de la barre latérale, aligné sur le haut du bouton.
     const r = cssRect(btn.current)
-    setPos({ top: r.bottom + 6, left: r.left, width: Math.max(280, r.width) })
+    const side = btn.current.closest('.side')
+    const sr = side ? cssRect(side) : null
+    const vw = window.innerWidth / r.k, vh = window.innerHeight / r.k, w = Math.max(320, r.width)
+    if (sr && sr.right + 8 + w <= vw - 8) setPos({ top: Math.max(8, Math.min(r.top, vh - 540)), left: sr.right + 8, width: w })
+    else setPos({ top: r.bottom + 6, left: r.left, width: Math.max(280, r.width) })
   }, [open])
   useEffect(() => {
     if (!open) return
