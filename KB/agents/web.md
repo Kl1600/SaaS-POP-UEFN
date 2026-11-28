@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-28 · #546 · panneau de Léo en bas à droite
+- Fait : .drawer.gdrawer ancré au-dessus du bouton (right 28, bottom 96, 410 × 620 max), animation depuis le coin bas droit, voile transparent (.gscrim) ; plein largeur sur mobile.
+- Vérifié : capture Playwright 1440 px.
+
 ### 2026-11-28 · #543 · Popy devient Léo
 - Fait : components/LeoVisage.tsx (carré sombre, yeux orange qui clignent, regardent la souris ou au hasard ; coupé si prefers-reduced-motion) sur le bouton flottant et l'en-tête du panneau ; tous les textes « Popy » → « Léo » (FR, EN, serveur guide.rs / mcp.rs). Les identifiants (popy-fab, guide) restent.
 - Nom choisi par l'humain : « Léo » (pas « Léon », nom de l'assistant de Vinteer).
