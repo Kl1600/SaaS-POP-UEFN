@@ -100,7 +100,9 @@ pub async fn construire(
         "triangles": triangles,
         "objects": r["objects"],
         "too_heavy": triangles > TRIANGLES_LOURD,
-        "message": "Modèle proposé à l'humain dans POP Forge (Outils → 3D Studio) : rien n'est importé tant qu'il ne clique pas « Accepter ». S'il est trop lourd, réduisez-le dans le script, ou l'humain utilisera Low Mesh.",
+        "local_path": chemin,
+        "filename": fichier,
+        "message": "Modèle construit ; le FBX est sur le PC du créateur (local_path). Décrivez-le à l'humain ; s'il le veut, importez-le avec import_asset (local_path, folder) : journalisé et annulable. S'il est trop lourd, simplifiez le script, ou l'humain utilisera Forge → Outils → Low Mesh.",
     }))
 }
 

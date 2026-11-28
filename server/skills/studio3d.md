@@ -1,8 +1,9 @@
-# Faire un modèle 3D avec Blender (3D Studio)
+# Faire un modèle 3D avec Blender
 
-L'humain décrit un objet dans POP Forge (Outils → 3D Studio). Vous écrivez un **script Python pour Blender** (bpy) qui
-le construit, et vous l'envoyez avec `blender_build` (name : nom court, script : le code). Forge l'exécute sur le PC
-de l'humain et lui montre l'aperçu ; **rien n'est importé dans UEFN tant qu'il ne clique pas « Accepter »**.
+L'humain vous demande un objet 3D (dans son terminal Forge ou son chat). Vous écrivez un **script Python pour Blender**
+(bpy) qui le construit, et vous l'envoyez avec `blender_build` (name : nom court, script : le code). Forge l'exécute
+sur le PC de l'humain (Blender doit être installé : Forge → Outils → Blender) et garde le FBX (`local_path`).
+**N'importez dans UEFN que si l'humain le veut** : `import_asset` avec `local_path` et `folder` (journalisé, annulable).
 
 1. **Scène vide** au départ ; construisez le modèle avec des primitives, des modificateurs (Bevel, Array, Mirror,
    Solidify, Boolean…) et `bmesh`. Pas d'add-on, pas de fichier à charger.
@@ -16,4 +17,4 @@ de l'humain et lui montre l'aperçu ; **rien n'est importé dans UEFN tant qu'il
 5. **Couleurs** : un matériau Principled BSDF par couleur (Base Color) ; pas de texture image.
 6. Pas d'export à faire : POP exporte le FBX lui-même. En cas d'erreur, `blender_build` rend le message de Blender :
    corrigez et renvoyez.
-7. Dites à l'humain ce que vous avez fait avec `send_message` canal « studio3d ».
+7. Dites à l'humain ce que vous avez fait (taille, triangles) et demandez-lui s'il veut l'importer.

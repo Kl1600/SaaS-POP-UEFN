@@ -1,5 +1,5 @@
-// Outil Texte 3D et 2D (#324) : un titre de map, un panneau ou un logo, fait par Blender sur le PC (#351), aperçu,
-// puis import dans le projet UEFN (action journalisée et annulable, #90).
+// Outil Texte 2D (#324, #514) : un titre de map ou un logo en image transparente (PNG), fait par Blender sur le PC
+// (#351), aperçu, puis import dans le projet UEFN (action journalisée et annulable, #90). Le Texte 3D est à part.
 import { useEffect, useState } from 'react'
 import { Type, Upload } from '../icons'
 import { api } from '../api'
@@ -12,7 +12,7 @@ type Cree = { chemin: string; nom: string; apercu: string; triangles: number; li
 export function ForgeTexte({ invoke, mapId, retour, allerBlender }: { invoke: Invoke | null; mapId: number; retour: () => void; allerBlender: () => void }) {
   const app = useApp()
   const [installe, setInstalle] = useState<boolean | null>(null)
-  const [r, setR] = useState({ texte: '', mode: '3d', police: 'poppins', taille: 2, epaisseur: 0.4, biseau: 0.03, couleur: '#ffcc00' })
+  const [r, setR] = useState({ texte: '', mode: '2d', police: 'poppins', taille: 2, epaisseur: 0, biseau: 0, couleur: '#ffcc00' })
   const [cree, setCree] = useState<Cree | null>(null)
   const [dossier, setDossier] = useState('')
   const [occupe, setOccupe] = useState<'' | 'creer' | 'importer'>('')
@@ -33,11 +33,10 @@ export function ForgeTexte({ invoke, mapId, retour, allerBlender }: { invoke: In
     } catch (er: any) { setErreur(er.message ?? String(er)) }
     setOccupe('')
   }
-  const d3 = r.mode === '3d'
   return <div className="stack" style={{ gap: 16, maxWidth: 900 }}>
     <div className="row" style={{ gap: 10, alignItems: 'center' }}>
       <button className="btn" onClick={retour}>{tr("← Outils")}</button>
-      <h1 className="forge-h1" style={{ margin: 0 }}>{tr("Texte 3D et 2D")}</h1>
+      <h1 className="forge-h1" style={{ margin: 0 }}>{tr("Texte 2D")}</h1>
     </div>
     {!invoke ? <p className="muted">{tr("Cet outil tourne dans POP Forge, sur votre PC.")}</p>
       : installe === false ? <section className="card stack" style={{ gap: 10 }}>
@@ -48,23 +47,15 @@ export function ForgeTexte({ invoke, mapId, retour, allerBlender }: { invoke: In
         <form className="card stack" style={{ gap: 10, flex: '1 1 340px' }} onSubmit={creer}>
           <label className="stack" style={{ gap: 4 }}><span className="small">{tr("Texte")}</span>
             <input className="field" value={r.texte} maxLength={60} placeholder={tr("Nom de la map, panneau…")} onChange={e => maj('texte', e.target.value)} /></label>
-          <div className="row" style={{ gap: 6 }} role="radiogroup" aria-label={tr("Type")}>
-            {[['3d', tr("Mesh 3D (FBX)")], ['2d', tr("Image 2D (PNG transparent)")]].map(([v, l]) =>
-              <button key={v} type="button" role="radio" aria-checked={r.mode === v} className={'btn' + (r.mode === v ? ' pri' : '')} onClick={() => maj('mode', v)}>{l}</button>)}
-          </div>
           <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
             <label className="stack" style={{ gap: 4 }}><span className="small">{tr("Police")}</span>
               <select className="field" value={r.police} onChange={e => maj('police', e.target.value)}>
-                <option value="poppins">Poppins</option><option value="inter">Inter</option>
+                <option value="poppins">Poppins</option><option value="anton">Anton</option>
               </select></label>
             <label className="stack" style={{ gap: 4 }}><span className="small">{tr("Couleur")}</span>
               <input type="color" className="field" style={{ width: 70, padding: 2 }} value={r.couleur} onChange={e => maj('couleur', e.target.value)} /></label>
             <label className="stack" style={{ gap: 4 }}><span className="small">{tr("Hauteur (m)")}</span>
               <input type="number" className="field" style={{ width: 90 }} min={0.2} max={20} step={0.1} value={r.taille} onChange={e => maj('taille', e.target.value)} /></label>
-            {d3 && <label className="stack" style={{ gap: 4 }}><span className="small">{tr("Épaisseur (m)")}</span>
-              <input type="number" className="field" style={{ width: 90 }} min={0} max={2} step={0.05} value={r.epaisseur} onChange={e => maj('epaisseur', e.target.value)} /></label>}
-            {d3 && <label className="stack" style={{ gap: 4 }}><span className="small">{tr("Biseau (m)")}</span>
-              <input type="number" className="field" style={{ width: 90 }} min={0} max={0.2} step={0.01} value={r.biseau} onChange={e => maj('biseau', e.target.value)} /></label>}
           </div>
           <div className="row" style={{ justifyContent: 'flex-end' }}>
             <button className="btn pri" disabled={!!occupe || !r.texte.trim() || installe == null}><Type size={16} strokeWidth={1.6} />{occupe === 'creer' ? tr("Blender travaille…") : tr("Créer l’aperçu")}</button>
@@ -73,7 +64,7 @@ export function ForgeTexte({ invoke, mapId, retour, allerBlender }: { invoke: In
         <section className="card stack" style={{ gap: 10, flex: '1 1 340px' }} aria-label={tr("Aperçu")}>
           {cree ? <>
             <img src={`data:image/png;base64,${cree.apercu}`} alt={tr("Aperçu de {0}", [cree.nom])} style={{ width: '100%', maxHeight: 320, objectFit: 'contain', borderRadius: 12, background: 'repeating-conic-gradient(#e8e8e8 0 25%, #fff 0 50%) 0 0 / 16px 16px' }} />
-            <span className="small muted">{cree.nom}{d3 ? ' · ' + tr("{0} triangles", [cree.triangles]) : ''}</span>
+            <span className="small muted">{cree.nom}</span>
             <span className="small muted">{tr("Police : {0}", [cree.licence])}</span>
             <label className="stack" style={{ gap: 4 }}><span className="small">{tr("Dossier du Content Browser (facultatif)")}</span>
               <input className="field" value={dossier} placeholder="/MonProjet/POP/Textes" onChange={e => setDossier(e.target.value)} /></label>

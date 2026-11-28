@@ -3,6 +3,11 @@
 Une entrée par version de `forge/tauri.conf.json` (#437) : `## version · date`, puis 1 à 5 lignes en français.
 Le workflow « relais Windows » en tire les notes de la mise à jour ; le CI refuse une version sans entrée.
 
+## 0.3.20 · 28/11/2026
+- Outils → Texte 3D : une vraie 3D qu'on tourne à la souris ; épaisseur, biseau, hauteur, couleur et police changent en direct, puis import dans UEFN aux mêmes réglages.
+- Outils → Texte 2D : à part, en image transparente. Nouvelle police libre : Anton.
+- 3D Studio retiré des Outils : demandez un modèle 3D directement aux agents du projet.
+
 ## 0.3.19 · 28/11/2026
 - Sécurité : la décompression de Blender utilise une version corrigée de la bibliothèque zip.
 

@@ -2,12 +2,12 @@
 // (#306), s'inspire de la bibliothèque et fait dessiner la miniature par POP (#307), puis la rend (submit_thumbnail).
 // Forge montre la miniature, « Conforme Discover », et « Utiliser », « Refaire », « Modifier ». Le site montre les
 // versions choisies (`versions`).
-import { useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { Box, Minimize2, Shapes, Type, Check, Download, ImagePlus, RefreshCw, Pencil, Paperclip, X } from '../icons'
 import { ForgeBlender } from './ForgeBlender'
 import { ForgeTexte } from './ForgeTexte'
 import { ForgeLowMesh } from './ForgeLowMesh'
-import { ForgeStudio3D } from './ForgeStudio3D'
+const ForgeTexte3D = lazy(() => import('./ForgeTexte3D').then(m => ({ default: m.ForgeTexte3D })))
 import { ago, api } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { tr } from '../i18n/t'
@@ -138,10 +138,10 @@ function Composer({ occupe, base, annulerBase, envoyer }: { occupe: boolean; bas
 
 /** Onglet Outils de Forge (#468) : une carte par outil. */
 export function ForgeOutils({ mapId, allerAgents, invoke }: { mapId: number; allerAgents: () => void; invoke: any }) {
-  const [outil, setOutil] = useState<'' | 'miniature' | 'blender' | 'texte' | 'lowmesh' | 'studio3d'>('')
+  const [outil, setOutil] = useState<'' | 'miniature' | 'blender' | 'texte' | 'texte3d' | 'lowmesh'>('')
   if (outil === 'miniature') return <ForgeMiniature mapId={mapId} retour={() => setOutil('')} allerAgents={allerAgents} />
   if (outil === 'blender') return <ForgeBlender invoke={invoke} retour={() => setOutil('')} />
-  if (outil === 'studio3d') return <ForgeStudio3D invoke={invoke} mapId={mapId} retour={() => setOutil('')} allerAgents={allerAgents} allerBlender={() => setOutil('blender')} allerLowMesh={() => setOutil('lowmesh')} />
+  if (outil === 'texte3d') return <Suspense fallback={null}><ForgeTexte3D invoke={invoke} mapId={mapId} retour={() => setOutil('')} allerBlender={() => setOutil('blender')} /></Suspense>
   if (outil === 'lowmesh') return <ForgeLowMesh invoke={invoke} mapId={mapId} retour={() => setOutil('')} allerBlender={() => setOutil('blender')} />
   if (outil === 'texte') return <ForgeTexte invoke={invoke} mapId={mapId} retour={() => setOutil('')} allerBlender={() => setOutil('blender')} />
   return <div className="stack" style={{ gap: 18 }}>
@@ -152,15 +152,15 @@ export function ForgeOutils({ mapId, allerAgents, invoke }: { mapId: number; all
         <b>{tr("Miniature")}</b>
         <span className="small muted">{tr("Décrivez la miniature à votre IA : elle prend des photos de l'île et POP la dessine, conforme aux règles d'Epic.")}</span>
       </button>
-      <button className="card outil-carte" onClick={() => setOutil('studio3d')}>
+      <button className="card outil-carte" onClick={() => setOutil('texte3d')}>
         <Shapes size={22} strokeWidth={1.5} />
-        <b>{tr("3D Studio")}</b>
-        <span className="small muted">{tr("Décrivez un objet à votre IA : elle le construit avec Blender sur votre PC ; vous l'acceptez avant tout import.")}</span>
+        <b>{tr("Texte 3D")}</b>
+        <span className="small muted">{tr("Un titre ou un panneau en vraie 3D : tournez-le, réglez l'épaisseur et le biseau en direct, puis importez-le dans le projet.")}</span>
       </button>
       <button className="card outil-carte" onClick={() => setOutil('texte')}>
         <Type size={22} strokeWidth={1.5} />
-        <b>{tr("Texte 3D et 2D")}</b>
-        <span className="small muted">{tr("Titre de map, panneau ou logo de lobby, en mesh 3D ou en image transparente, importé dans le projet en un clic.")}</span>
+        <b>{tr("Texte 2D")}</b>
+        <span className="small muted">{tr("Un titre ou un logo en image transparente (PNG), importé dans le projet en un clic.")}</span>
       </button>
       <button className="card outil-carte" onClick={() => setOutil('lowmesh')}>
         <Minimize2 size={22} strokeWidth={1.5} />
