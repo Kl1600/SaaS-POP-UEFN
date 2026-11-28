@@ -150,7 +150,7 @@ export default function Forge() {
           : section === 'verifier' ? (app.map ? <div className="stack" style={{ gap: 18 }}><ForgeVerifications mapId={app.map.id} ouvrir={ouvrirPOP} /><ForgeScenarios mapId={app.map.id} capturer={() => captureJeu(invoke)} /></div> : <p className="muted">{tr("Choisissez une map.")}</p>)
           : section === 'plan' ? (app.map ? <Plan2D /> : <p className="muted">{tr("Choisissez une map.")}</p>)
           : section === 'bibliotheque' ? <Bibliotheque mapId={app.map?.id ?? null} studioId={app.studio?.id ?? null} />
-          : section === 'outils' ? (app.map ? <ForgeOutils mapId={app.map.id} allerAgents={() => setSection('agents')} /> : <p className="muted">{tr("Choisissez une map.")}</p>)
+          : section === 'outils' ? (app.map ? <ForgeOutils mapId={app.map.id} allerAgents={() => setSection('agents')} invoke={invoke} /> : <p className="muted">{tr("Choisissez une map.")}</p>)
             : <AVenir section={section} titre={titre ?? ''} />}
       </main>
       </div>

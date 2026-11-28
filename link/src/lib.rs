@@ -4,6 +4,7 @@
 //! relais dans son propre processus : [`start`] démarre le relais et rend une [`Handle`] (état, journal, arrêt).
 //!
 //! `pop-link.exe` (téléchargeable sur le site) est recompilé sous Windows par le workflow « relais Windows » (#358).
+pub mod blender;
 mod digest;
 mod files;
 mod mcpdriver;
@@ -332,6 +333,31 @@ impl Link {
                 let (id, list) = self.mcp.island_settings().await?;
                 out["id"] = json!(id);
                 out["settings"] = list;
+            }
+            "blender_run" => {
+                // Script Blender isolé sur le PC (#351) : rend le modèle glTF, l'aperçu PNG et le nombre de triangles.
+                use base64::Engine;
+                let b64 = base64::engine::general_purpose::STANDARD;
+                let script = a["script"].as_str().unwrap_or("");
+                if script.trim().is_empty() {
+                    bail!("Script Blender vide.");
+                }
+                let mut entrees = vec![];
+                for f in a["files"].as_array().cloned().unwrap_or_default() {
+                    let data = b64
+                        .decode(f["data"].as_str().unwrap_or(""))
+                        .context("Fichier d'entrée illisible (base64).")?;
+                    entrees.push((f["name"].as_str().unwrap_or("").to_string(), data));
+                }
+                let delai = a["timeout_s"]
+                    .as_u64()
+                    .map(|s| Duration::from_secs(s.clamp(5, 600)))
+                    .unwrap_or(blender::DELAI);
+                let r = blender::lancer(script, entrees, delai).await?;
+                out["glb"] = json!(b64.encode(&r.glb));
+                out["preview"] = json!(b64.encode(&r.apercu));
+                out["triangles"] = json!(r.triangles);
+                out["objects"] = json!(r.objets);
             }
             "asset_import" => {
                 self.need_uefn()?;

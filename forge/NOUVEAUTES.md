@@ -3,6 +3,9 @@
 Une entrée par version de `forge/tauri.conf.json` (#437) : `## version · date`, puis 1 à 5 lignes en français.
 Le workflow « relais Windows » en tire les notes de la mise à jour ; le CI refuse une version sans entrée.
 
+## 0.3.15 · 28/11/2026
+- Outils → Blender : installez Blender (logiciel libre) une seule fois, si vous le voulez ; il servira aux outils 3D. Ses scripts tournent isolés : sans Internet, sans accès à vos fichiers, 2 minutes au plus.
+
 ## 0.3.14 · 28/11/2026
 - Dictée : le texte n'est plus perdu (la transcription rendait souvent un texte vide) ; le texte provisoire est gardé.
 - Dictée : niveau et nom du micro affichés pendant qu'on parle ; si le micro ne capte rien, Forge dit quoi régler dans Windows.
