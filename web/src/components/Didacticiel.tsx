@@ -49,6 +49,38 @@ const ETAPES = (): Record<string, Etape[]> => ({
     { sel: 'section.tiles', titre: tr("Le mois en cours"), texte: tr("Ce qui a été versé, les montants fixes et la part en pourcentage.") },
     { sel: '.two', titre: tr("Règles et relevés"), texte: tr("Fixez les règles de partage, puis envoyez à chacun son relevé. POP calcule, il ne transfère jamais d’argent.") },
   ],
+  // Écrans de POP Forge (#522), même style.
+  'forge-accueil': [
+    { sel: '.forge-h1', titre: tr("Bienvenue dans POP Forge"), texte: tr("Vos maps et leur projet UEFN : reliez une map à son projet pour que POP et vos IA pilotent UEFN.") },
+    { sel: '@.forge .side nav[aria-label="Forge"]', titre: tr("Les écrans de Forge"), texte: tr("Agents, Plan 2D, Outils, Vérifications, Bibliothèque. Repliez une catégorie au clic sur son titre ; réordonnez en tenant les points ⋮⋮.") },
+    { sel: '@.forge .top .badge', titre: tr("L’état du relais"), texte: tr("Vert : UEFN est relié et POP peut agir. Rouge : ouvrez UEFN et son serveur MCP, puis reliez le projet.") },
+  ],
+  'forge-agents': [
+    { sel: '.term-haut', titre: tr("Vos agents"), texte: tr("Chaque terminal est une de vos IA connectées qui travaille sur la map : tâches, UEFN, Verse.") },
+    { sel: '.term-haut button', titre: tr("+ Terminal"), texte: tr("Ouvrez le terminal d’une IA connectée. Claude répond tout de suite quand il tourne sur ce PC.") },
+    { sel: '.term-grille', titre: tr("Les terminaux"), texte: tr("Écrivez à un agent en bas de son terminal ; ouvrez-le dans une fenêtre à part si vous voulez.") },
+  ],
+  'forge-terminal': [
+    { sel: '@.term-corps', titre: tr("Le terminal de l’agent"), texte: tr("Ce que l’agent fait et vous répond, en direct.") },
+    { sel: '@.term-invite', titre: tr("Lui écrire"), texte: tr("Tapez votre demande et Entrée. Ctrl+Espace pour dicter.") },
+  ],
+  'forge-verifier': [
+    { sel: '.forge-h1, .forge-contenu > .stack > .stack > .card', titre: tr("Les vérifications"), texte: tr("POP contrôle le niveau UEFN : ce qui bloque la publication et ce qu’il vaut mieux corriger.") },
+    { sel: '.verif-bloq, .verif-erreurs, .forge-contenu > .stack > .stack', titre: tr("Ce qui bloque"), texte: tr("Cliquez un problème pour le voir dans UEFN ou le confier à un agent.") },
+    { sel: '.card.stack', titre: tr("Les scénarios de test"), texte: tr("Des parcours de joueur que vos agents rejouent pour vérifier la map.") },
+  ],
+  'forge-plan': [
+    { sel: '.p2', titre: tr("Le plan 2D"), texte: tr("Le niveau UEFN vu de dessus : acteurs, zones et mesures.") },
+    { sel: '.p2-apercu, .p2 canvas, .p2 svg', titre: tr("Choisir un acteur"), texte: tr("Cliquez un acteur pour voir son nom et ses réglages ; molette pour zoomer.") },
+  ],
+  'forge-bibliotheque': [
+    { sel: '.forge-h1, .forge-contenu > .stack', titre: tr("La bibliothèque"), texte: tr("Ce que le studio réutilise : modules Verse, assets 3D, images et sons.") },
+    { sel: '.tabs', titre: tr("Public ou à vous"), texte: tr("Les créations publiques de la communauté, et les vôtres.") },
+  ],
+  'forge-outils': [
+    { sel: '.outils-grille', titre: tr("Les outils"), texte: tr("Miniature, Texte 3D, Texte 2D, Low Mesh : des outils qui préparent les assets de la map sur votre PC.") },
+    { sel: '.outil-carte', titre: tr("Ouvrir un outil"), texte: tr("Cliquez une carte. Rien n’est importé dans UEFN sans votre accord, et chaque import s’annule depuis le journal.") },
+  ],
   analyse: [
     { sel: '.afaire-start, .phead', titre: tr("Maps à faire"), texte: tr("POP cherche les genres qui attirent les joueurs et où il reste de la place.") },
     { sel: '.afaire-srcs', titre: tr("Les sources"), texte: tr("Connectez YouTube, TikTok, X ou Reddit pour voir aussi ce qui buzze en vidéo. Facultatif.") },

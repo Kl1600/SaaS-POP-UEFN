@@ -3,6 +3,11 @@
 Une entrée par version de `forge/tauri.conf.json` (#437) : `## version · date`, puis 1 à 5 lignes en français.
 Le workflow « relais Windows » en tire les notes de la mise à jour ; le CI refuse une version sans entrée.
 
+## 0.3.21 · 28/11/2026
+- Même thème que le site : barre latérale avec catégories repliables, onglets à réordonner en tenant ⋮⋮.
+- Didacticiel à la première visite de chaque écran de Forge (Accueil, Agents, Terminal, Outils, Vérifications, Plan 2D, Bibliothèque).
+- Offre Pro présentée comme sur le site : prix par jour, choix annuel, réassurance.
+
 ## 0.3.20 · 28/11/2026
 - Outils → Texte 3D : une vraie 3D qu'on tourne à la souris ; épaisseur, biseau, hauteur, couleur et police changent en direct, puis import dans UEFN aux mêmes réglages.
 - Outils → Texte 2D : à part, en image transparente. Nouvelle police libre : Anton.
