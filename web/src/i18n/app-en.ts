@@ -1828,6 +1828,7 @@ const EN: Record<string, string> = {
  "Ctrl/Cmd+clic : ajouter · Maj+clic : plage · Ctrl+Z : annuler": "Ctrl/Cmd+click: add · Shift+click: range · Ctrl+Z: undo",
  "Détails": "Details",
  "Vue du dessus": "Top view",
+ "Les mêmes que dans POP : clés, lecture seule": "Same as in POP: keys, read-only",
  "{0} agent(s) dans Forge": "{0} agent(s) in Forge",
  "Demande Claude Code installé et connecté sur ce PC.": "Needs Claude Code installed and signed in on this PC.",
  "Claude Code n’est pas connecté à votre compte Claude.": "Claude Code isn't signed in to your Claude account.",

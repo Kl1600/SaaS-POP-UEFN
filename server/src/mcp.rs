@@ -3377,8 +3377,17 @@ mod tests_compte {
             crate::orchestre::de_la_map(&m.st, m.equipe).await.unwrap(),
             Some(premier)
         );
-        // Choix d'un humain : le Codex devient Orchestrateur.
+        // #490 : plus de rôle choisi ; sans Claude actif, c'est l'autre IA (Codex) qui orchestre.
         sqlx::query("UPDATE api_tokens SET role = 'orchestrateur' WHERE name = 'Codex'")
+            .execute(&m.st.db)
+            .await
+            .unwrap();
+        assert_eq!(
+            crate::orchestre::de_la_map(&m.st, m.equipe).await.unwrap(),
+            Some(premier),
+            "un rôle posé à la main ne compte plus"
+        );
+        sqlx::query("UPDATE api_tokens SET last_used = datetime('now', '-3 hours'), created_at = datetime('now', '-3 hours') WHERE kind LIKE 'claude%'")
             .execute(&m.st.db)
             .await
             .unwrap();

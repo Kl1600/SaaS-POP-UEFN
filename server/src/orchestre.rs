@@ -20,23 +20,16 @@ pub const OUTILS: &[&str] = &["plan_tasks", "assign_task"];
 
 /// Identifiant de l'agent Orchestrateur de la map, s'il y en a un.
 pub async fn de_la_map(st: &AppState, mid: i64) -> Result<Option<i64>, AppError> {
-    let choisi: Option<i64> = sqlx::query_scalar(
-        "SELECT id FROM api_tokens WHERE map_id = ? AND role = 'orchestrateur'
-           AND COALESCE(last_used, created_at) >= datetime('now', ?)
-         ORDER BY last_used DESC, id DESC LIMIT 1",
-    )
-    .bind(mid)
-    .bind(crate::agents::SILENCE)
-    .fetch_optional(&st.db)
-    .await?;
-    if choisi.is_some() {
-        return Ok(choisi);
-    }
-    // Par défaut : le premier Claude lancé, sans autre rôle que le sien (un Codeur Verse reste Codeur Verse).
+    // Plus de rôle choisi (#490) : Claude orchestre quand il est là (l'IA connectée par l'humain avant les agents
+    // ouverts dans Forge, puis le premier arrivé) ; sans Claude, l'IA active la plus récente.
     Ok(sqlx::query_scalar(
-        "SELECT id FROM api_tokens WHERE map_id = ? AND kind LIKE 'claude%' AND role IS NULL
+        "SELECT id FROM api_tokens WHERE map_id = ? AND COALESCE(role, '') <> 'relecteur'
            AND COALESCE(last_used, created_at) >= datetime('now', ?)
-         ORDER BY created_at, id LIMIT 1",
+         ORDER BY (kind LIKE 'claude%' OR lower(name) LIKE '%claude%') DESC,
+                  CASE WHEN kind LIKE 'claude%' OR lower(name) LIKE '%claude%' THEN forge END,
+                  CASE WHEN kind LIKE 'claude%' OR lower(name) LIKE '%claude%' THEN created_at END,
+                  COALESCE(last_used, created_at) DESC, id
+         LIMIT 1",
     )
     .bind(mid)
     .bind(crate::agents::SILENCE)
