@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import NOUVEAUTES from '../../../forge/NOUVEAUTES.md?raw'
 import { useNavigate } from 'react-router-dom'
-import { Bell, Bot, Building2, Check, ChevronsUpDown, ExternalLink, Home, Library, Minus, Moon, RefreshCw, ShieldCheck, Grid3x3, Square, Sun, User, Wrench, X } from '../icons'
+import { Bell, Bot, Building2, Check, ChevronDown, ChevronsUpDown, ExternalLink, GripVertical, Home, Library, Minus, Moon, RefreshCw, ShieldCheck, Grid3x3, Square, Sun, User, Wrench, X } from '../icons'
 import LangPicker from '../components/LangPicker'
 import { ForgeAgents } from '../components/ForgeAgents'
 import { ForgeOutils } from '../components/ForgeMiniature'
@@ -56,6 +56,22 @@ const SECTIONS: [Section, string, any][] = [
   ['bibliotheque', tr("Bibliothèque"), Library],
   ['outils', tr("Outils"), Wrench],
 ]
+/** Catégories de la barre latérale (#521), comme sur le site : Accueil seul en tête, puis des catégories
+ * repliables dont on peut réordonner les onglets. */
+const GROUPES: [string, string, Section[]][] = [
+  ['', '', ['accueil']],
+  ['construire', tr("Construire"), ['agents', 'plan', 'outils']],
+  ['projet', tr("Projet"), ['verifier', 'bibliotheque']],
+]
+type NavForge = { order?: Record<string, string[]>; collapsed?: string[] }
+/** Ordre choisi par le compte, puis les onglets absents des préférences (nouveaux) à leur place d'origine. */
+function ranger(p: NavForge): [string, string, Section[]][] {
+  return GROUPES.map(([k, t, items]) => {
+    if (!k) return [k, t, items]
+    const choisis = (p.order?.[k] ?? []).filter((x): x is Section => items.includes(x as Section))
+    return [k, t, [...choisis, ...items.filter(x => !choisis.includes(x))]]
+  })
+}
 // Écrans encore vides : ce qu'ils feront et les issues qui les rempliront (critère 7 de #78).
 const A_VENIR: Partial<Record<Section, [string, string]>> = {
   bibliotheque: [tr("Tout ce que le studio réutilise : modules Verse, 3D, images et sons, installés en un clic."), '#86, #92, #382'],
@@ -117,13 +133,7 @@ export default function Forge() {
         <span style={{ fontSize: 12, letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgb(163,163,163)' }}>Forge</span>
       </div>
       <MapPicker />
-      <nav className="nav" aria-label="Forge">
-        {SECTIONS.map(([k, label, Icon]) =>
-          <a key={k} href="#" className={section === k ? 'on' : ''} aria-current={section === k ? 'page' : undefined} onClick={e => { e.preventDefault(); setSection(k) }}>
-            <Icon size={20} strokeWidth={1.5} /><span className="lbl">{label}</span>
-            {!pro && k !== 'accueil' && <span className="small" style={{ marginLeft: 'auto', color: 'rgb(163,163,163)' }}>Pro</span>}
-          </a>)}
-      </nav>
+      <NavForge section={section} aller={setSection} pro={pro} />
       <div style={{ flex: 1 }} />
       <nav className="nav">
         <a href="/" title={tr("S'ouvre dans le navigateur")} onClick={e => { e.preventDefault(); ouvrirPOP(app.map ? `/map/${app.map.id}` : '/') }}><ExternalLink size={20} strokeWidth={1.5} /><span className="lbl">{tr("Ouvrir POP")}</span></a>
@@ -659,4 +669,78 @@ async function captureJeu(invoke: Invoke): Promise<Blob> {
   const o = new Uint8Array(bin.length)
   for (let i = 0; i < bin.length; i++) o[i] = bin.charCodeAt(i)
   return new Blob([o], { type: 'image/png' })
+}
+
+/** Barre latérale de Forge (#521), comme celle du site (#493, #506) : titres de catégorie en petites capitales,
+ * repliables au clic ; au survol, des points ⋮⋮ à droite d'un onglet ; en les tenant, l'onglet suit la souris dans sa
+ * catégorie et les autres s'écartent. Ordre et catégories repliées gardés sur le compte (ui_prefs.forge_nav). */
+function NavForge({ section, aller, pro }: { section: Section; aller: (s: Section) => void; pro: boolean }) {
+  const app = useApp()
+  const [p, setP] = useState<NavForge>(() => app.me?.ui_prefs?.forge_nav ?? {})
+  useEffect(() => { setP(app.me?.ui_prefs?.forge_nav ?? {}) }, [app.me?.user.id])
+  const garder = (n: NavForge) => {
+    setP(n)
+    const all = { ...(app.me?.ui_prefs ?? {}), forge_nav: n }
+    if (app.me) app.me.ui_prefs = all
+    api.put('/api/me/ui-prefs', all).catch(() => {})
+  }
+  const replie = (k: string) => (p.collapsed ?? []).includes(k)
+  const plier = (k: string) => { const c = p.collapsed ?? []; garder({ ...p, collapsed: c.includes(k) ? c.filter(x => x !== k) : [...c, k] }) }
+  const groupes = ranger(p)
+  const [tire, setTire] = useState<string | null>(null)
+  const tri = useRef<{ k: string; els: HTMLElement[]; from: number; to: number; y0: number; pas: number; z: number } | null>(null)
+  const debut = (e: React.PointerEvent<HTMLElement>, k: string, s: Section) => {
+    if (e.button !== 0) return
+    e.preventDefault(); e.stopPropagation()
+    const a = e.currentTarget.closest('a') as HTMLElement | null
+    if (!a || !a.parentElement) return
+    const els = [...a.parentElement.querySelectorAll<HTMLElement>(':scope > a')]
+    const from = els.indexOf(a)
+    const r0 = els[0].getBoundingClientRect(), r1 = els[1]?.getBoundingClientRect()
+    const z = parseFloat(getComputedStyle(document.documentElement).zoom || '1') || 1
+    e.currentTarget.setPointerCapture(e.pointerId)
+    for (const el of els) el.style.transition = el === a ? 'none' : 'transform .18s ease'
+    tri.current = { k, els, from, to: from, y0: e.clientY, pas: r1 ? r1.top - r0.top : r0.height, z }
+    setTire(s)
+  }
+  const bouge = (e: React.PointerEvent<HTMLElement>) => {
+    const t = tri.current
+    if (!t) return
+    const n = t.els.length
+    const dy = Math.max(-t.from * t.pas, Math.min((n - 1 - t.from) * t.pas, e.clientY - t.y0))
+    t.to = Math.max(0, Math.min(n - 1, t.from + Math.round(dy / t.pas)))
+    t.els.forEach((el, i) => {
+      const d = i === t.from ? dy : t.from < t.to && i > t.from && i <= t.to ? -t.pas : t.to < t.from && i >= t.to && i < t.from ? t.pas : 0
+      el.style.transform = d ? `translateY(${d / t.z}px)` : ''
+    })
+  }
+  const fin = () => {
+    const t = tri.current
+    tri.current = null
+    setTire(null)
+    if (!t) return
+    for (const el of t.els) { el.style.transition = 'none'; el.style.transform = '' }
+    requestAnimationFrame(() => { for (const el of t.els) el.style.transition = '' })
+    if (t.to === t.from) return
+    const order: Record<string, string[]> = {}
+    for (const [k, , items] of groupes) if (k) order[k] = [...items]
+    const l = order[t.k]
+    l.splice(t.to, 0, ...l.splice(t.from, 1))
+    garder({ ...p, order })
+  }
+  return <nav className="nav" aria-label="Forge">
+    {groupes.map(([k, titre, items]) => <div key={k || 'tete'} className={'nav' + (tire && k && tri.current?.k === k ? ' nav-tri' : '')}>
+      {titre && <button type="button" className="navsec navsec-btn lbl" aria-expanded={!replie(k)} onClick={() => plier(k)}>{titre}<ChevronDown size={14} className={'navsec-chev' + (replie(k) ? ' off' : '')} /></button>}
+      {!replie(k) && items.map(s => {
+        const [, label, Icon] = SECTIONS.find(x => x[0] === s)!
+        return <a key={s} href="#" draggable={false} className={(section === s ? 'on' : '') + (tire === s ? ' dragging' : '')} aria-current={section === s ? 'page' : undefined} onClick={e => { e.preventDefault(); aller(s) }}>
+          <Icon size={20} strokeWidth={1.5} /><span className="lbl">{label}</span>
+          {!pro && s !== 'accueil' && <span className="small" style={{ marginLeft: 'auto', color: 'rgb(163,163,163)' }}>Pro</span>}
+          {k && items.length > 1 ? <span className="nav-grip" title={tr('Glisser pour déplacer dans la catégorie')} aria-hidden
+            onClick={e => { e.preventDefault(); e.stopPropagation() }}
+            onPointerDown={e => debut(e, k, s)} onPointerMove={bouge} onPointerUp={fin} onPointerCancel={fin}><GripVertical size={14} strokeWidth={1.75} /></span> : null}
+        </a>
+      })}
+    </div>)}
+  </nav>
 }
