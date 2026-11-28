@@ -328,3 +328,12 @@ Fait : contexteForge (relais, fermé, concept, dev, prête), 3 cartes en haut de
 Reste : rien ; #528 (Auto Start Server non détecté) ouverte
 Bloque : rien
 ```
+
+```
+FAIT | #531 CI rouge sur main : web/dist construit depuis des sources en CRLF (régression de #445) | 28/11
+Owner : benybens | Sur la tâche : Claude Code, pour benybens
+Fait : web/dist reconstruit depuis une copie en LF ; mêmes noms d'assets que le CI
+Reste : rien
+Piège : sous Windows (core.autocrlf=true), un fichier réécrit en CRLF change les empreintes de Vite : construire web/dist
+        depuis une copie en LF (git -c core.autocrlf=false worktree add …), sinon le CI de main passe au rouge.
+```
