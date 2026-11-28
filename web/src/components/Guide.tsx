@@ -110,7 +110,7 @@ function GuideChat({ initial, onNavigate }: { initial?: string; onNavigate?: () 
 export function GuideDrawer({ onClose, ask: initial }: { onClose: () => void; ask?: string }) {
   const dlg = useDialog(onClose)
   return <>
-    <div className="scrim" onClick={onClose} />
+    <div className="scrim gscrim" onClick={onClose} />
     <aside ref={dlg as any} tabIndex={-1} aria-modal="true" className="drawer gdrawer" role="dialog" aria-label={tr("Léo")}>
       <div className="row" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
         <div className="row" style={{ gap: 10 }}>
