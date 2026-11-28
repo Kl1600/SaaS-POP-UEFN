@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-28 · #543 · Popy devient Léo
+- Fait : components/LeoVisage.tsx (carré sombre, yeux orange qui clignent, regardent la souris ou au hasard ; coupé si prefers-reduced-motion) sur le bouton flottant et l'en-tête du panneau ; tous les textes « Popy » → « Léo » (FR, EN, serveur guide.rs / mcp.rs). Les identifiants (popy-fab, guide) restent.
+- Nom choisi par l'humain : « Léo » (pas « Léon », nom de l'assistant de Vinteer).
+
 ### 2026-11-28 · #539 · menus de la barre latérale ouverts à droite
 - Fait : MapSwitcher.tsx (position fixe à droite de .side, alignée sur le haut du bouton) et menu du compte dans Layout.tsx (fixe, aligné sur le bas du bouton) ; retour au placement d'avant si la place manque (mobile).
 - Vérifié : Playwright 1440 px (menu des maps x=263 / haut 118, menu du compte bas 847 = bas du bouton, fermeture au clic à côté).

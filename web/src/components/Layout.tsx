@@ -2,6 +2,7 @@ import { OuvrirForge } from './OuvrirForge'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { cssRect } from '../zoom'
+import { LeoVisage } from './LeoVisage'
 import { Target,
   Home, FileText, PenTool, CalendarDays, KanbanSquare, Rocket, Coins, Users, Settings, LifeBuoy, PanelLeft,
   Search, Bell, Plus, ChevronDown, Hexagon, LogOut, ListTree, Bot, ChartNoAxesCombined, Layers, Lock, Sun, Moon, GripVertical, Wrench } from '../icons'
@@ -252,7 +253,7 @@ export default function Layout() {
         </header>
         <div className="scroll" id="contenu" tabIndex={-1}>{app.me?.announcement && <Announcement a={app.me.announcement} />}{app.me?.email_verified === false && <VerifyBanner email={app.me.user.email} />}<Outlet /></div>
       </div>
-      {app.map && <button className="popy-fab" aria-label={tr("Popy, assistant intégré")} data-tip={tr("Popy, votre assistant")} onClick={() => setGuide({})}><Sparkles size={24} strokeWidth={1.75} /></button>}
+      {app.map && <button className="popy-fab" aria-label={tr("Léo, assistant intégré")} data-tip={tr("Léo, votre assistant")} onClick={() => setGuide({})}><LeoVisage size={56} /></button>}
       {guide && <GuideDrawer key={guide.ask ?? 'day'} ask={guide.ask} onClose={() => setGuide(false)} />}
       {newTask && <NewTaskModal onClose={() => setNewTask(false)} />}
       <CreateHost />
