@@ -1510,3 +1510,11 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 .tuto b{font-weight:600;font-size:16px;display:block;margin-top:4px}
 .tuto-zone{position:fixed;z-index:119;border-radius:14px;box-shadow:0 0 0 2px #ED753E,0 0 0 9999px rgba(0,0,0,.35);pointer-events:none;transition:all .2s}
 }
+
+@layer app{
+.nav a{position:relative}
+.nav-grip{margin-left:auto;display:flex;align-items:center;padding:2px;border-radius:6px;color:inherit;opacity:0;cursor:grab;transition:opacity .12s}
+.nav a:hover .nav-grip,.nav-grip:focus-visible{opacity:.55}
+.nav-grip:hover{opacity:1;background:rgba(255,255,255,.08)}
+.nav-grip:active{cursor:grabbing}
+}

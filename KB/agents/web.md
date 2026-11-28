@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-28 · #499 · poignée de déplacement des onglets
+- Fait : Layout.tsx : poignée ⋮⋮ (GripVertical) à droite de l'onglet, visible au survol ; seule elle est draggable (setDragImage sur le lien entier) ; dépôt accepté seulement dans la catégorie d'origine (dragCat).
+- Vérifié : Playwright 1440 px (poignée, texte, autre catégorie, rechargement).
+
 ### 2026-11-28 · #496 · didacticiel au premier passage
 - Fait : components/Didacticiel.tsx : 2 à 4 bulles par onglet (Dashboard, Planifier, Tâches, Pages, Tableau blanc, Lancer et suivre, Rémunérer, Maps à faire), zone visée entourée, Précédent / Suivant / Passer ; onglets vus dans ui_prefs.tours ; Paramètres → Affichage → « Revoir les didacticiels ». Piège : html { zoom: .9 } sur grand écran, il faut diviser getBoundingClientRect et innerWidth par le zoom pour placer un élément fixe.
 - Vérifié : navigateur 1440 px, les 8 onglets.

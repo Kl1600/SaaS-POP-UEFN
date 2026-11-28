@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import { Target,
   Home, FileText, PenTool, CalendarDays, KanbanSquare, Rocket, Coins, Users, Settings, LifeBuoy, PanelLeft,
-  Search, Bell, Plus, ChevronDown, Hexagon, LogOut, ListTree, Bot, ChartNoAxesCombined, Layers, Lock, Sun, Moon } from 'lucide-react'
+  Search, Bell, Plus, ChevronDown, Hexagon, LogOut, ListTree, Bot, ChartNoAxesCombined, Layers, Lock, Sun, Moon, GripVertical } from 'lucide-react'
 import { useApp, studioName } from '../state'
 import { ago, api } from '../api'
 import { Avatar } from './ui'
@@ -93,9 +93,10 @@ export default function Layout() {
   const fold = (k: string) => { const c = navP.collapsed ?? []; saveNav({ ...navP, collapsed: c.includes(k) ? c.filter(x => x !== k) : [...c, k] }) }
   const arranged = showMap ? arrange(mGroups, navP) : []
   const [drag, setDrag] = useState<string | null>(null)
+  const [dragCat, setDragCat] = useState<string | null>(null)
   /** Dépose l'onglet tiré avant `before` (ou à la fin de la catégorie `cat`). */
   const drop = (cat: string, before: string | null) => {
-    if (!drag) return
+    if (!drag || cat !== dragCat) return
     const order: Record<string, string[]> = {}
     for (const [k, , items] of arranged.slice(1)) order[k] = items.map(it => itemKey(it[0])).filter(x => x !== drag)
     const list = order[cat] ?? []
@@ -154,11 +155,15 @@ export default function Layout() {
         <MapSwitcher />
         <nav className="nav" aria-label={tr("Sections")}>
           {arranged.map(([k, g, items]) => (
-            <div key={k || 'tete'} className={'nav' + (drag && k ? ' nav-drop' : '')} onDragOver={k && drag ? e => e.preventDefault() : undefined} onDrop={k && drag ? e => { e.preventDefault(); drop(k, null) } : undefined}>
+            <div key={k || 'tete'} className={'nav' + (drag && k && k === dragCat ? ' nav-drop' : '')} onDragOver={k && drag && k === dragCat ? e => e.preventDefault() : undefined} onDrop={k && drag && k === dragCat ? e => { e.preventDefault(); drop(k, null) } : undefined}>
               {g && <button type="button" className="navsec navsec-btn lbl" aria-expanded={!folded(k)} onClick={() => fold(k)}>{g}<ChevronDown size={14} className={'navsec-chev' + (folded(k) ? ' off' : '')} /></button>}
-              {!folded(k) && items.map(([p, l, I]) => <NavLink key={p} to={p} end={p === `/map/${app.map!.id}`} draggable={!!k && !rail} onDragStart={k ? e => { setDrag(itemKey(p)); e.dataTransfer.effectAllowed = 'move' } : undefined} onDragEnd={() => setDrag(null)}
-                onDragOver={k && drag ? e => e.preventDefault() : undefined} onDrop={k && drag ? e => { e.preventDefault(); e.stopPropagation(); drop(k, itemKey(p)) } : undefined}
-                className={({ isActive }) => (isActive ? 'on' : '') + (drag === itemKey(p) ? ' dragging' : '')}><I size={20} strokeWidth={1.5} /><span className="lbl">{l}</span></NavLink>)}
+              {!folded(k) && items.map(([p, l, I]) => <NavLink key={p} to={p} end={p === `/map/${app.map!.id}`} draggable={false}
+                onDragOver={k && drag && k === dragCat ? e => e.preventDefault() : undefined} onDrop={k && drag && k === dragCat ? e => { e.preventDefault(); e.stopPropagation(); drop(k, itemKey(p)) } : undefined}
+                className={({ isActive }) => (isActive ? 'on' : '') + (drag === itemKey(p) ? ' dragging' : '')}><I size={20} strokeWidth={1.5} /><span className="lbl">{l}</span>
+                {k && !rail ? <span className="nav-grip" draggable title={tr('Glisser pour déplacer dans la catégorie')} aria-hidden
+                  onClick={e => { e.preventDefault(); e.stopPropagation() }}
+                  onDragStart={e => { setDrag(itemKey(p)); setDragCat(k); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', itemKey(p)); const a = (e.currentTarget as HTMLElement).closest('a'); if (a) e.dataTransfer.setDragImage(a, 20, 16) }}
+                  onDragEnd={() => { setDrag(null); setDragCat(null) }}><GripVertical size={16} strokeWidth={1.75} /></span> : null}</NavLink>)}
             </div>
           ))}
           {st && <div className="nav">

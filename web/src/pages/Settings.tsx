@@ -36,7 +36,7 @@ function Affichage() {
   const nav = me?.ui_prefs?.nav
   const perso = !!nav && ((nav.collapsed ?? []).length > 0 || Object.keys(nav.order ?? {}).length > 0)
   return <section className="card">
-    <CardHead icon={<PanelLeft size={18} />} title={tr("Affichage")} sub={tr("Repliez une catégorie de la barre latérale en cliquant son titre ; glissez un onglet pour le déplacer. Les didacticiels ne s’affichent qu’une fois par onglet.")} />
+    <CardHead icon={<PanelLeft size={18} />} title={tr("Affichage")} sub={tr("Repliez une catégorie de la barre latérale en cliquant son titre ; pour déplacer un onglet dans sa catégorie, survolez-le et glissez la poignée ⋮⋮. Les didacticiels ne s’affichent qu’une fois par onglet.")} />
     <button className="btn" disabled={!perso} onClick={async () => {
       const all = { ...(me?.ui_prefs ?? {}) }; delete all.nav
       try { await api.put('/api/me/ui-prefs', all); await reload(); toast(tr("Barre latérale rétablie.")) } catch (e: any) { toast(e.message, true) }
