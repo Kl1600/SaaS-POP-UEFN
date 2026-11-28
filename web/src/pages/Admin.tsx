@@ -559,6 +559,14 @@ function AnnounceAdmin() {
 
 const pct = (v?: number | null) => v == null ? '—' : `${Math.round(v * 100)} %`
 
+/** Noms des signaux du modèle « chance de percer » (#71). */
+const SIGNAL: Record<string, string> = {
+  players: tr("Joueurs des premiers jours"), minutes: tr("Temps de jeu"), d1: tr("Retour le lendemain (J+1)"), growth: tr("Progression des premiers jours"),
+  no_d1: tr("J+1 inconnu"), plays_pp: tr("Parties par joueur"), fav_pp: tr("Favoris par joueur"), rec_pp: tr("Recommandations par joueur"),
+  d7: tr("Retour une semaine après (J+7)"), no_d7: tr("J+7 inconnu"), creator: tr("Le créateur a déjà percé"), weekend: tr("Sortie en fin de semaine"),
+  genre: tr("Réussite du genre"), hourly: tr("Montée heure par heure"), updates: tr("Mises à jour de la map"),
+}
+
 /** Apprentissage de l'IA (#70) : versions du modèle « chance de percer », précision mesurée sur des maps qu'il n'a
  * jamais vues, et prédictions vérifiées après les 14 jours de test d'Epic. */
 function Learning() {
@@ -586,6 +594,17 @@ function Learning() {
           {models.length > 0 && <><text x={P} y={H - 6} fontSize="11" fill="var(--text2)">{frDate(models[0].at)}</text><text x={W - P} y={H - 6} fontSize="11" fill="var(--text2)" textAnchor="end">{frDate(models[models.length - 1].at)}</text></>}
         </svg>}
     </section>
+    {(data.signaux?.length > 0 || data.poids?.length > 0) && <section className="card">
+      <CardHead title={tr("Signaux utilisés")} sub={tr("Chaque signal n’est gardé que s’il améliore la précision sur l’avenir (base : {0}).", [pct(data.auc_base)])} />
+      <div className="grid2">
+        <div><b className="small">{tr("Retenus, avec leur poids")}</b>
+          <table className="tbl"><tbody>{(data.poids ?? []).map((p: any) => <tr key={p.key}><td>{SIGNAL[p.key] ?? p.key}</td><td style={{ textAlign: 'right' }}>{p.weight > 0 ? '+' : ''}{p.weight.toFixed(2)}</td></tr>)}</tbody></table></div>
+        <div><b className="small">{tr("Essayés")}</b>
+          <table className="tbl"><tbody>{(data.signaux ?? []).map((c: any) => <tr key={c.key}><td>{SIGNAL[c.key] ?? c.key}</td>
+            <td>{c.kept ? <span className="badge b-g">{tr("Retenu")}</span> : <span className="badge" title={c.why}>{tr("Écarté")}</span>}</td>
+            <td className="small muted" style={{ textAlign: 'right' }}>{c.gain == null ? (c.why ?? '') : `${c.gain > 0 ? '+' : ''}${(c.gain * 100).toFixed(1)} pt`}</td></tr>)}</tbody></table></div>
+      </div>
+    </section>}
     <div className="grid2">
       <section className="card"><CardHead title={tr("Prédictions vérifiées, par semaine")} sub={tr("Chance annoncée au 3e jour de la map, comparée à ce qui s’est passé.")} />
         {data.weeks.length === 0 ? <p className="small muted">{tr("Les premières prédictions seront vérifiées 15 jours après leur enregistrement.")}</p> :

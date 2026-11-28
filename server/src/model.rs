@@ -14,7 +14,53 @@ use std::collections::HashMap;
 
 /// Seuil de réussite pour « percer » pendant le test d'Epic.
 pub const BREAKOUT: i64 = 1000;
-const FEATURES: &[&str] = &["players", "minutes", "d1", "growth", "no_d1"];
+/// Tous les signaux connus (#71), dans cet ordre. Les 5 premiers sont la base ; les autres ne sont gardés que s'ils
+/// améliorent la précision mesurée sur les maps les plus récentes.
+pub const SIGNAUX: &[&str] = &[
+    "players", "minutes", "d1", "growth", "no_d1", "plays_pp", "fav_pp", "rec_pp", "d7", "no_d7",
+    "creator", "weekend", "genre",
+];
+const BASE: usize = 5;
+/// Signaux candidats, par groupe (un groupe est gardé ou écarté d'un bloc).
+const CANDIDATS: &[(&str, &[usize])] = &[
+    ("plays_pp", &[5]),
+    ("fav_pp", &[6]),
+    ("rec_pp", &[7]),
+    ("d7", &[8, 9]),
+    ("creator", &[10]),
+    ("weekend", &[11]),
+    ("genre", &[12]),
+];
+/// Signaux demandés mais sans donnée pour les maps d'apprentissage : notés comme écartés.
+const SANS_DONNEE: &[(&str, &str)] = &[
+    ("hourly", "Mesurée seulement pour les maps reliées à POP."),
+    ("updates", "Connues seulement pour les maps reliées à POP."),
+];
+/// Gain minimal de précision (AUC) pour garder un signal.
+const GAIN_MIN: f64 = 0.002;
+
+/// Chiffres d'un jour de la map (âge = jours depuis la sortie).
+#[derive(Default, Clone, Debug)]
+pub struct Jour {
+    pub players: Option<i64>,
+    pub minutes: Option<f64>,
+    pub d1: Option<f64>,
+    pub d7: Option<f64>,
+    pub plays: Option<i64>,
+    pub favorites: Option<i64>,
+    pub recommends: Option<i64>,
+}
+
+/// Ce qu'on sait de la map hors de ses chiffres.
+#[derive(Default, Clone, Debug)]
+pub struct Contexte {
+    /// Une map précédente du même créateur a-t-elle percé ?
+    pub createur_a_perce: bool,
+    /// Sortie un vendredi, samedi ou dimanche.
+    pub weekend: bool,
+    /// Taux de réussite des maps du même genre sorties avant (lissé).
+    pub genre: f64,
+}
 
 /// Une fois par jour : vérification des niches et entraînement du modèle de lancement.
 pub async fn daily(st: &AppState) {
@@ -196,81 +242,239 @@ async fn calibrate(st: &AppState) -> Result<(), sqlx::Error> {
     Ok(())
 }
 
-/// Caractéristiques des premiers jours d'une map (âges 0 à 2) : joueurs, temps de jeu, retour à J+1, progression.
-pub fn features(
-    by_age: &HashMap<i64, (Option<i64>, Option<f64>, Option<f64>)>,
-) -> Option<[f64; 5]> {
-    let early: Vec<(i64, &(Option<i64>, Option<f64>, Option<f64>))> = {
-        let mut v: Vec<_> = by_age
-            .iter()
-            .filter(|(a, _)| (0..=2).contains(*a))
-            .map(|(a, x)| (*a, x))
-            .collect();
-        v.sort_by_key(|x| x.0);
-        v
-    };
-    let players: Vec<i64> = early.iter().filter_map(|x| x.1 .0).collect();
+/// Signaux d'une map (#71), dans l'ordre de SIGNAUX : premiers jours (âges 0 à 2), J+7 s'il existe (âges 0 à 7),
+/// et contexte. `None` sans aucun chiffre de joueurs.
+pub fn signaux(by_age: &HashMap<i64, Jour>, c: &Contexte) -> Option<Vec<f64>> {
+    let mut early: Vec<(i64, &Jour)> = by_age
+        .iter()
+        .filter(|(a, _)| (0..=2).contains(*a))
+        .map(|(a, j)| (*a, j))
+        .collect();
+    early.sort_by_key(|x| x.0);
+    let players: Vec<i64> = early.iter().filter_map(|x| x.1.players).collect();
     if players.is_empty() {
         return None;
     }
     let p = *players.iter().max().unwrap();
+    let total: i64 = players.iter().sum();
     let mins = early
         .iter()
         .rev()
-        .find_map(|x| x.1 .1)
+        .find_map(|x| x.1.minutes)
         .unwrap_or(0.0)
         .min(120.0);
     let d1 = by_age
         .iter()
         .filter(|(a, _)| (0..=3).contains(*a))
-        .filter_map(|(_, x)| x.2)
+        .filter_map(|(_, x)| x.d1)
         .last();
     let growth = match (players.first(), players.last()) {
         (Some(a), Some(b)) if players.len() >= 2 => ((*b as f64 + 1.0) / (*a as f64 + 1.0)).ln(),
         _ => 0.0,
     };
-    Some([
+    let somme =
+        |f: fn(&Jour) -> Option<i64>| early.iter().filter_map(|x| f(x.1)).sum::<i64>() as f64;
+    let par_joueur = |v: f64| if total > 0 { v / total as f64 } else { 0.0 };
+    let d7 = by_age
+        .iter()
+        .filter(|(a, _)| (0..=7).contains(*a))
+        .filter_map(|(_, x)| x.d7)
+        .last();
+    Some(vec![
         (p as f64).ln_1p(),
         mins / 30.0,
         d1.unwrap_or(0.0),
         growth,
         if d1.is_none() { 1.0 } else { 0.0 },
+        par_joueur(somme(|j| j.plays)).ln_1p(),
+        par_joueur(somme(|j| j.favorites)) * 100.0,
+        par_joueur(somme(|j| j.recommends)) * 100.0,
+        d7.unwrap_or(0.0),
+        if d7.is_none() { 1.0 } else { 0.0 },
+        if c.createur_a_perce { 1.0 } else { 0.0 },
+        if c.weekend { 1.0 } else { 0.0 },
+        c.genre,
     ])
+}
+
+/// Genre d'une map : sa catégorie, sinon son premier tag.
+fn genre_de(category: &str, tags: &str) -> String {
+    if !category.trim().is_empty() {
+        return category.trim().to_lowercase();
+    }
+    serde_json::from_str::<Vec<String>>(tags)
+        .ok()
+        .and_then(|t| t.into_iter().next())
+        .unwrap_or_default()
+        .to_lowercase()
+}
+
+/// Les maps suivies, avec leurs jours et leur contexte. `depuis`/`jusqu` bornent la date de sortie (SQLite).
+/// Le contexte n'utilise que des maps sorties avant chacune (pas de triche sur l'avenir).
+async fn maps_suivies(
+    st: &AppState,
+    depuis: &str,
+    jusqu: &str,
+    code: Option<&str>,
+) -> Result<Vec<(String, String, i64, HashMap<i64, Jour>, Contexte)>, sqlx::Error> {
+    // Historique complet (sortie, créateur, genre, meilleur score des 14 jours) pour le contexte.
+    let hist: Vec<(String, String, String, String, String, Option<i64>)> = sqlx::query_as(
+        "SELECT i.code, i.first_seen, i.creator, i.category, i.tags,
+                (SELECT MAX(m.unique_players) FROM fn_metrics m WHERE m.code = i.code AND m.day BETWEEN date(i.first_seen) AND date(i.first_seen, '+14 days'))
+         FROM fn_islands i WHERE i.seen_new = 1 AND i.code NOT LIKE 'playlist_%' ORDER BY i.first_seen",
+    )
+    .fetch_all(&st.db)
+    .await?;
+    let rows: Vec<(String, String, i64, i64, Option<i64>, Option<f64>, Option<f64>, Option<f64>, Option<i64>, Option<i64>, Option<i64>)> = sqlx::query_as(
+        "SELECT m.code, i.first_seen, CAST(julianday('now') - julianday(date(i.first_seen)) AS INTEGER),
+                CAST(julianday(m.day) - julianday(date(i.first_seen)) AS INTEGER),
+                m.unique_players, m.avg_minutes, m.d1, m.d7, m.plays, m.favorites, m.recommends
+         FROM fn_metrics m JOIN fn_islands i ON i.code = m.code
+         WHERE i.seen_new = 1 AND i.code NOT LIKE 'playlist_%' AND i.first_seen > datetime('now', ?) AND i.first_seen < datetime('now', ?)
+           AND (? IS NULL OR i.code = ?)
+           AND m.day BETWEEN date(i.first_seen) AND date(i.first_seen, '+14 days')",
+    )
+    .bind(depuis)
+    .bind(jusqu)
+    .bind(code)
+    .bind(code)
+    .fetch_all(&st.db)
+    .await?;
+    let mut by: HashMap<String, (String, i64, HashMap<i64, Jour>)> = HashMap::new();
+    for (c, first, age, a, p, mi, d1, d7, pl, fa, re) in rows {
+        by.entry(c)
+            .or_insert_with(|| (first, age, HashMap::new()))
+            .2
+            .insert(
+                a,
+                Jour {
+                    players: p,
+                    minutes: mi,
+                    d1,
+                    d7,
+                    plays: pl,
+                    favorites: fa,
+                    recommends: re,
+                },
+            );
+    }
+    let mut out = vec![];
+    for (c, (first, age, jours)) in by {
+        let date = first.get(..10).unwrap_or(&first).to_string();
+        let mut ctx = Contexte::default();
+        let mine = hist.iter().find(|h| h.0 == c);
+        let (createur, genre) = mine
+            .map(|h| (h.2.trim().to_lowercase(), genre_de(&h.3, &h.4)))
+            .unwrap_or_default();
+        // Maps sorties avant, dont le test d'Epic (14 jours) était fini à la sortie de celle-ci.
+        let fini = |h: &(String, String, String, String, String, Option<i64>)| {
+            h.0 != c
+                && h.1
+                    .get(..10)
+                    .map(|d| jour_plus(d, 15) <= date)
+                    .unwrap_or(false)
+        };
+        ctx.createur_a_perce = !createur.is_empty()
+            && hist.iter().any(|h| {
+                fini(h) && h.2.trim().to_lowercase() == createur && h.5.unwrap_or(0) >= BREAKOUT
+            });
+        let (mut n, mut r) = (0.0, 0.0);
+        if !genre.is_empty() {
+            for h in hist
+                .iter()
+                .filter(|h| fini(h) && genre_de(&h.3, &h.4) == genre)
+            {
+                n += 1.0;
+                if h.5.unwrap_or(0) >= BREAKOUT {
+                    r += 1.0;
+                }
+            }
+        }
+        // Lissage vers un taux de base de 10 % (5 maps fictives).
+        ctx.genre = (r + 0.5) / (n + 5.0);
+        ctx.weekend = chrono::NaiveDate::parse_from_str(&date, "%Y-%m-%d")
+            .map(|d| {
+                matches!(
+                    chrono::Datelike::weekday(&d),
+                    chrono::Weekday::Fri | chrono::Weekday::Sat | chrono::Weekday::Sun
+                )
+            })
+            .unwrap_or(false);
+        out.push((c, first, age, jours, ctx));
+    }
+    Ok(out)
+}
+
+/// « AAAA-MM-JJ » + n jours.
+fn jour_plus(d: &str, n: i64) -> String {
+    chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d")
+        .map(|x| (x + chrono::Duration::days(n)).to_string())
+        .unwrap_or_default()
+}
+
+/// Régression logistique sur les colonnes `cols` (centrées-réduites), lignes `idx`.
+fn ajuster(z: &[Vec<f64>], y: &[f64], cols: &[usize], idx: &[usize]) -> (Vec<f64>, f64) {
+    let k = cols.len();
+    let (mut w, mut b) = (vec![0.0; k], 0.0);
+    let m = idx.len().max(1) as f64;
+    for _ in 0..800 {
+        let mut gw = vec![0.0; k];
+        let mut gb = 0.0;
+        for &i in idx {
+            let v: f64 = cols.iter().zip(&w).map(|(c, wk)| z[i][*c] * wk).sum();
+            let e = sigmoid(b + v) - y[i];
+            for (j, c) in cols.iter().enumerate() {
+                gw[j] += e * z[i][*c]
+            }
+            gb += e;
+        }
+        for j in 0..k {
+            w[j] -= 0.3 * (gw[j] / m + 0.01 * w[j])
+        }
+        b -= 0.3 * gb / m;
+    }
+    (w, b)
+}
+
+/// Précision sur l'avenir d'un jeu de colonnes : appris sur les 3/4 les plus anciens, testé sur le quart récent.
+fn precision(z: &[Vec<f64>], y: &[f64], cols: &[usize]) -> (f64, f64, Option<f64>, usize) {
+    let (tr_i, te_i) = temporal_split(z.len());
+    let (w, b) = ajuster(z, y, cols, &tr_i);
+    let probs: Vec<f64> = te_i
+        .iter()
+        .map(|&i| {
+            sigmoid(
+                b + cols
+                    .iter()
+                    .zip(&w)
+                    .map(|(c, wk)| z[i][*c] * wk)
+                    .sum::<f64>(),
+            )
+        })
+        .collect();
+    let ys: Vec<f64> = te_i.iter().map(|&i| y[i]).collect();
+    (
+        auc(&probs, &ys),
+        brier(&probs, &ys),
+        hit_rate(&probs, &ys),
+        te_i.len(),
+    )
 }
 
 async fn train(st: &AppState) -> Result<(), sqlx::Error> {
     sqlx::query("UPDATE idea_model SET trained_at = datetime('now') WHERE id = 1")
         .execute(&st.db)
         .await?;
-    let rows: Vec<(String, String, i64, Option<i64>, Option<f64>, Option<f64>)> = sqlx::query_as(
-        "SELECT m.code, i.first_seen, CAST(julianday(m.day) - julianday(date(i.first_seen)) AS INTEGER), m.unique_players, m.avg_minutes, m.d1
-         FROM fn_metrics m JOIN fn_islands i ON i.code = m.code
-         WHERE i.seen_new = 1 AND i.first_seen > datetime('now', '-200 days') AND i.first_seen < datetime('now', '-15 days')
-           AND m.day BETWEEN date(i.first_seen) AND date(i.first_seen, '+14 days')").fetch_all(&st.db).await?;
-    let mut by: HashMap<
-        String,
-        (
-            String,
-            HashMap<i64, (Option<i64>, Option<f64>, Option<f64>)>,
-        ),
-    > = HashMap::new();
-    for (c, first, a, p, m, d) in rows {
-        by.entry(c)
-            .or_insert_with(|| (first, HashMap::new()))
-            .1
-            .insert(a, (p, m, d));
-    }
-    // Rangées de la plus ancienne à la plus récente : la vérification se fait sur les plus récentes.
-    let mut maps: Vec<&(
-        String,
-        HashMap<i64, (Option<i64>, Option<f64>, Option<f64>)>,
-    )> = by.values().collect();
-    maps.sort_by(|a, b| a.0.cmp(&b.0));
-    let mut x: Vec<[f64; 5]> = vec![];
+    let mut maps = maps_suivies(st, "-200 days", "-15 days", None).await?;
+    // De la plus ancienne à la plus récente : la vérification se fait sur les plus récentes.
+    maps.sort_by(|a, b| a.1.cmp(&b.1));
+    let mut x: Vec<Vec<f64>> = vec![];
     let mut y: Vec<f64> = vec![];
-    for (_, ages) in maps {
-        let Some(f) = features(ages) else { continue };
-        let best = ages.values().filter_map(|v| v.0).max().unwrap_or(0);
+    for (_, _, _, jours, ctx) in &maps {
+        let Some(f) = signaux(jours, ctx) else {
+            continue;
+        };
+        let best = jours.values().filter_map(|v| v.players).max().unwrap_or(0);
         x.push(f);
         y.push(if best >= BREAKOUT { 1.0 } else { 0.0 });
     }
@@ -283,64 +487,60 @@ async fn train(st: &AppState) -> Result<(), sqlx::Error> {
             .await?;
         return Ok(());
     }
-    // Centrage-réduction puis régression logistique (descente de gradient, légère régularisation).
-    let mean: Vec<f64> = (0..5)
+    let d = SIGNAUX.len();
+    let mean: Vec<f64> = (0..d)
         .map(|k| x.iter().map(|r| r[k]).sum::<f64>() / n as f64)
         .collect();
-    let std: Vec<f64> = (0..5)
+    let std: Vec<f64> = (0..d)
         .map(|k| {
-            let v = x.iter().map(|r| (r[k] - mean[k]).powi(2)).sum::<f64>() / n as f64;
-            v.sqrt().max(1e-6)
+            (x.iter().map(|r| (r[k] - mean[k]).powi(2)).sum::<f64>() / n as f64)
+                .sqrt()
+                .max(1e-6)
         })
         .collect();
     let z: Vec<Vec<f64>> = x
         .iter()
-        .map(|r| (0..5).map(|k| (r[k] - mean[k]) / std[k]).collect())
+        .map(|r| (0..d).map(|k| (r[k] - mean[k]) / std[k]).collect())
         .collect();
-    let fit = |idx: &[usize]| -> (Vec<f64>, f64) {
-        let (mut w, mut b) = (vec![0.0; 5], 0.0);
-        let m = idx.len().max(1) as f64;
-        for _ in 0..800 {
-            let mut gw = vec![0.0; 5];
-            let mut gb = 0.0;
-            for &i in idx {
-                let p = 1.0
-                    / (1.0 + (-(b + z[i].iter().zip(&w).map(|(a, c)| a * c).sum::<f64>())).exp());
-                let e = p - y[i];
-                for k in 0..5 {
-                    gw[k] += e * z[i][k]
-                }
-                gb += e;
-            }
-            for k in 0..5 {
-                w[k] -= 0.3 * (gw[k] / m + 0.01 * w[k])
-            }
-            b -= 0.3 * gb / m;
+    // Choix des signaux (#71) : on part de la base ; chaque candidat n'est gardé que s'il améliore la précision sur
+    // l'avenir. Un signal qui ne varie pas (aucune donnée) est écarté d'office.
+    let mut cols: Vec<usize> = (0..BASE).collect();
+    let (auc_base, ..) = precision(&z, &y, &cols);
+    let mut meilleure = auc_base;
+    let mut choix: Vec<Value> = vec![];
+    for (nom, groupe) in CANDIDATS {
+        if groupe.iter().all(|k| std[*k] <= 1e-6) {
+            choix.push(json!({ "key": nom, "kept": false, "gain": null, "why": "Pas de donnée pour ces maps." }));
+            continue;
         }
-        (w, b)
-    };
-    // Fiabilité mesurée comme pour l'avenir (#70) : on apprend sur les 3/4 les plus anciens et on vérifie sur le
-    // quart le plus récent, jamais vu.
-    let (train_i, test_i) = temporal_split(n);
-    let (wt, bt) = fit(&train_i);
-    let probs: Vec<f64> = test_i
-        .iter()
-        .map(|&i| sigmoid(bt + z[i].iter().zip(&wt).map(|(a, c)| a * c).sum::<f64>()))
-        .collect();
-    let ys: Vec<f64> = test_i.iter().map(|&i| y[i]).collect();
-    let (auc, brier, hit) = (auc(&probs, &ys), brier(&probs, &ys), hit_rate(&probs, &ys));
+        let essai: Vec<usize> = cols.iter().chain(groupe.iter()).copied().collect();
+        let (a, ..) = precision(&z, &y, &essai);
+        let gain = a - meilleure;
+        if gain > GAIN_MIN {
+            cols = essai;
+            meilleure = a;
+            choix.push(json!({ "key": nom, "kept": true, "gain": gain }));
+        } else {
+            choix.push(json!({ "key": nom, "kept": false, "gain": gain, "why": "N'améliore pas la précision sur l'avenir." }));
+        }
+    }
+    for (nom, why) in SANS_DONNEE {
+        choix.push(json!({ "key": nom, "kept": false, "gain": null, "why": why }));
+    }
+    let (auc, brier, hit, test_n) = precision(&z, &y, &cols);
     let all: Vec<usize> = (0..n).collect();
-    let (w, b) = fit(&all);
-    let params = json!({ "mean": mean, "std": std, "w": w, "b": b, "features": FEATURES });
+    let (w, b) = ajuster(&z, &y, &cols, &all);
+    let noms: Vec<&str> = cols.iter().map(|k| SIGNAUX[*k]).collect();
+    let mean_c: Vec<f64> = cols.iter().map(|k| mean[*k]).collect();
+    let std_c: Vec<f64> = cols.iter().map(|k| std[*k]).collect();
+    let params = json!({ "mean": mean_c, "std": std_c, "w": w, "b": b, "features": noms, "signaux": choix, "auc_base": auc_base });
     let model_id: i64 = sqlx::query_scalar("INSERT INTO ia_models (n, positives, test_n, auc, brier, hit_rate, params) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id")
-        .bind(n as i64).bind(pos as i64).bind(test_i.len() as i64).bind(auc).bind(brier).bind(hit).bind(params.to_string())
+        .bind(n as i64).bind(pos as i64).bind(test_n as i64).bind(auc).bind(brier).bind(hit).bind(params.to_string())
         .fetch_one(&st.db).await?;
     sqlx::query("UPDATE idea_model SET launch = ? WHERE id = 1")
-        .bind(json!({ "ready": true, "n": n, "positives": pos, "mean": mean, "std": std, "w": w, "b": b, "auc": auc, "brier": brier, "threshold": BREAKOUT, "model_id": model_id }).to_string()).execute(&st.db).await?;
-    tracing::info!(
-        "modèle de lancement : {n} maps, {pos} ont percé, AUC {:.2}",
-        auc
-    );
+        .bind(json!({ "ready": true, "n": n, "positives": pos, "mean": mean_c, "std": std_c, "w": w, "b": b, "features": noms, "signaux": choix,
+            "auc": auc, "auc_base": auc_base, "brier": brier, "threshold": BREAKOUT, "model_id": model_id }).to_string()).execute(&st.db).await?;
+    tracing::info!("modèle de lancement : {n} maps, {pos} ont percé, AUC {auc:.2} (base {auc_base:.2}), signaux {noms:?}");
     Ok(())
 }
 
@@ -405,20 +605,33 @@ pub fn hit_rate(probs: &[f64], ys: &[f64]) -> Option<f64> {
     (!strong.is_empty()).then(|| strong.iter().sum::<f64>() / strong.len() as f64)
 }
 
-/// Probabilité donnée par les paramètres d'un modèle (`launch`), et la part de chaque signal.
-fn score(m: &Value, f: &[f64; 5]) -> Option<(f64, Vec<f64>)> {
+/// Probabilité donnée par les paramètres d'un modèle (`launch`), et la part de chaque signal utilisé, par nom.
+/// `f` suit l'ordre de SIGNAUX ; un ancien modèle sans liste de signaux utilise la base.
+fn score(m: &Value, f: &[f64]) -> Option<(f64, Vec<(&'static str, f64)>)> {
     let g = |k: &str| {
         m[k].as_array()
             .map(|a| a.iter().filter_map(|v| v.as_f64()).collect::<Vec<f64>>())
             .unwrap_or_default()
     };
     let (mean, std, w) = (g("mean"), g("std"), g("w"));
-    if mean.len() != 5 || std.len() != 5 || w.len() != 5 {
+    let noms: Vec<String> = m["features"]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        })
+        .unwrap_or_else(|| SIGNAUX[..BASE].iter().map(|s| s.to_string()).collect());
+    if mean.len() != noms.len() || std.len() != noms.len() || w.len() != noms.len() {
         return None;
     }
-    let contrib: Vec<f64> = (0..5).map(|k| w[k] * (f[k] - mean[k]) / std[k]).collect();
+    let mut contrib = vec![];
+    for (j, nom) in noms.iter().enumerate() {
+        let k = SIGNAUX.iter().position(|s| s == nom)?;
+        contrib.push((SIGNAUX[k], w[j] * (f.get(k)? - mean[j]) / std[j]));
+    }
     Some((
-        sigmoid(m["b"].as_f64().unwrap_or(0.0) + contrib.iter().sum::<f64>()),
+        sigmoid(m["b"].as_f64().unwrap_or(0.0) + contrib.iter().map(|c| c.1).sum::<f64>()),
         contrib,
     ))
 }
@@ -440,26 +653,13 @@ async fn record_predictions(st: &AppState) -> Result<usize, sqlx::Error> {
     if m["ready"].as_bool() != Some(true) {
         return Ok(0);
     }
-    let rows: Vec<(String, i64, i64, Option<i64>, Option<f64>, Option<f64>)> = sqlx::query_as(
-        "SELECT m.code, CAST(julianday('now') - julianday(date(i.first_seen)) AS INTEGER),
-                CAST(julianday(m.day) - julianday(date(i.first_seen)) AS INTEGER), m.unique_players, m.avg_minutes, m.d1
-         FROM fn_metrics m JOIN fn_islands i ON i.code = m.code
-         WHERE i.seen_new = 1 AND i.code NOT LIKE 'playlist_%' AND i.first_seen > datetime('now', '-14 days')
-           AND m.day BETWEEN date(i.first_seen) AND date('now')",
-    )
-    .fetch_all(&st.db)
-    .await?;
-    let mut by: HashMap<String, (i64, HashMap<i64, (Option<i64>, Option<f64>, Option<f64>)>)> =
-        HashMap::new();
-    for (c, age, a, p, mi, d) in rows {
-        by.entry(c)
-            .or_insert_with(|| (age, HashMap::new()))
-            .1
-            .insert(a, (p, mi, d));
-    }
     let mut n = 0;
-    for (code, (age, ages)) in by {
-        let Some(f) = features(&ages) else { continue };
+    for (code, _, age, jours, ctx) in maps_suivies(st, "-14 days", "+1 days", None).await? {
+        // Les jours pas encore arrivés ne comptent pas.
+        let jours: HashMap<i64, Jour> = jours.into_iter().filter(|(a, _)| *a <= age).collect();
+        let Some(f) = signaux(&jours, &ctx) else {
+            continue;
+        };
         let Some((p, _)) = score(&m, &f) else {
             continue;
         };
@@ -519,8 +719,20 @@ pub async fn admin_learning(
     )
     .fetch_one(&st.db)
     .await?;
+    let l = launch_model(&st).await;
+    let poids: Vec<Value> = l["features"]
+        .as_array()
+        .zip(l["w"].as_array())
+        .map(|(f, w)| {
+            f.iter()
+                .zip(w)
+                .map(|(k, v)| json!({ "key": k, "weight": v }))
+                .collect()
+        })
+        .unwrap_or_default();
     Ok(axum::Json(json!({
         "threshold": BREAKOUT,
+        "signaux": l["signaux"], "poids": poids, "auc_base": l["auc_base"],
         "predictions": counts.0, "graded": counts.1,
         "models": models.into_iter().map(|r| json!({ "id": r.0, "at": r.1, "n": r.2, "positives": r.3, "test_n": r.4, "auc": r.5, "brier": r.6, "hit_rate": r.7 })).collect::<Vec<_>>(),
         "weeks": weeks.iter().map(|(w, p, y)| json!({ "week": w, "n": p.len(),
@@ -531,12 +743,15 @@ pub async fn admin_learning(
     })))
 }
 
-/// Chance de percer d'une map d'après ses premiers jours, avec ce qui la fait monter ou baisser.
-pub async fn predict(
-    st: &AppState,
-    by_age: &HashMap<i64, (Option<i64>, Option<f64>, Option<f64>)>,
-) -> Value {
-    let Some(f) = features(by_age) else {
+/// Chance de percer d'une île d'après ses premiers jours, avec les signaux qui la font monter ou baisser (#71).
+pub async fn predict(st: &AppState, code: &str) -> Value {
+    let Ok(mut l) = maps_suivies(st, "-400 days", "+1 days", Some(code)).await else {
+        return Value::Null;
+    };
+    let Some((_, _, _, jours, ctx)) = l.pop() else {
+        return Value::Null;
+    };
+    let Some(f) = signaux(&jours, &ctx) else {
         return Value::Null;
     };
     let m = launch_model(st).await;
@@ -546,16 +761,15 @@ pub async fn predict(
     let Some((p, contrib)) = score(&m, &f) else {
         return Value::Null;
     };
-    let mut factors: Vec<(usize, f64)> = contrib
-        .iter()
-        .copied()
-        .enumerate()
-        .filter(|(k, c)| *k != 4 && c.abs() >= 0.15)
+    // Les drapeaux « pas de donnée » ne s'expliquent pas à l'utilisateur.
+    let mut factors: Vec<(&str, f64)> = contrib
+        .into_iter()
+        .filter(|(k, c)| !k.starts_with("no_") && c.abs() >= 0.15)
         .collect();
     factors.sort_by(|a, b| b.1.abs().partial_cmp(&a.1.abs()).unwrap());
     json!({
         "ready": true, "prob": (p * 100.0).round(), "threshold": BREAKOUT, "n": m["n"], "positives": m["positives"], "auc": m["auc"],
-        "factors": factors.into_iter().take(3).map(|(k, c)| json!({ "key": FEATURES[k], "effect": if c > 0.0 { "plus" } else { "moins" } })).collect::<Vec<_>>(),
+        "factors": factors.into_iter().take(4).map(|(k, c)| json!({ "key": k, "effect": if c > 0.0 { "plus" } else { "moins" } })).collect::<Vec<_>>(),
     })
 }
 
@@ -636,6 +850,77 @@ mod tests {
                 .bind(if strong { 25.0 } else { 8.0 }).bind(if strong { 0.3 } else { 0.08 })
                 .execute(&st.db).await.unwrap();
         }
+    }
+
+    /// #71 : un signal utile (le créateur a déjà percé) est gardé et cité ; un signal sans lien (genre tiré au
+    /// hasard) est écarté ; la précision n'est jamais en dessous de la base.
+    #[tokio::test]
+    async fn garde_seulement_les_signaux_utiles() {
+        let st = crate::test_state().await;
+        for k in 0..120i64 {
+            let star = k % 3 == 0;
+            let code = format!("3000-0000-{k:04}");
+            let days_ago = 20 + k;
+            sqlx::query("INSERT INTO fn_islands (code, title, creator, category, first_seen, seen_new) VALUES (?, 'M', ?, ?, datetime('now', ?), 1)")
+                .bind(&code).bind(if star { "Star" } else { "Autre" }).bind(if k % 2 == 0 { "a" } else { "b" })
+                .bind(format!("-{days_ago} days")).execute(&st.db).await.unwrap();
+            for age in 0..=14i64 {
+                if days_ago - age < 1 {
+                    break;
+                }
+                // Premiers jours semblables pour tous : seules les maps du créateur « Star » percent ensuite.
+                let players = if star && age >= 6 {
+                    1500
+                } else {
+                    100 + (k * 7 + age * 3) % 40
+                };
+                sqlx::query("INSERT INTO fn_metrics (code, day, unique_players, avg_minutes, d1) VALUES (?, date('now', ?), ?, 10, 0.1)")
+                    .bind(&code).bind(format!("-{} days", days_ago - age)).bind(players).execute(&st.db).await.unwrap();
+            }
+        }
+        train(&st).await.unwrap();
+        let l = launch_model(&st).await;
+        assert_eq!(l["ready"], true, "{l}");
+        let choix = l["signaux"].as_array().unwrap();
+        let garde = |k: &str| {
+            choix
+                .iter()
+                .find(|c| c["key"] == k)
+                .map(|c| c["kept"] == true)
+                .unwrap()
+        };
+        assert!(
+            garde("creator"),
+            "le créateur prédit la réussite : {choix:?}"
+        );
+        assert!(!garde("genre"), "le genre est tiré au hasard : {choix:?}");
+        assert!(
+            choix
+                .iter()
+                .any(|c| c["key"] == "hourly" && c["kept"] == false),
+            "les signaux sans donnée sont notés"
+        );
+        assert!(l["auc"].as_f64().unwrap() >= l["auc_base"].as_f64().unwrap());
+        assert!(l["features"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|f| f == "creator"));
+        // La chance de percer d'une nouvelle map du créateur « Star » cite ce signal.
+        sqlx::query("INSERT INTO fn_islands (code, title, creator, first_seen, seen_new) VALUES ('4000-0000-0001', 'N', 'Star', datetime('now', '-2 days'), 1)").execute(&st.db).await.unwrap();
+        for age in 0..2 {
+            sqlx::query("INSERT INTO fn_metrics (code, day, unique_players, avg_minutes, d1) VALUES ('4000-0000-0001', date('now', ?), 110, 10, 0.1)")
+                .bind(format!("-{} days", 2 - age)).execute(&st.db).await.unwrap();
+        }
+        let p = predict(&st, "4000-0000-0001").await;
+        assert!(
+            p["factors"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|f| f["key"] == "creator" && f["effect"] == "plus"),
+            "{p}"
+        );
     }
 
     #[tokio::test]
