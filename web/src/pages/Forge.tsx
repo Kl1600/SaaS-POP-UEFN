@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import NOUVEAUTES from '../../../forge/NOUVEAUTES.md?raw'
 import { useNavigate } from 'react-router-dom'
-import { Bell, Bot, Building2, Check, ChevronDown, ChevronsUpDown, ExternalLink, GripVertical, Home, Library, Minus, Moon, RefreshCw, ShieldCheck, Grid3x3, Square, Sun, User, Wrench, X } from '../icons'
+import { Bell, Bot, Building2, CalendarDays, Check, ChevronDown, ChevronsUpDown, ClipboardCheck, ExternalLink, FolderOpen, Grid3x3, GripVertical, Home, Library, Lightbulb, ListChecks, Minus, Moon, Play, Plus, RefreshCw, Rocket, ShieldCheck, Square, Sun, User, Users, Wrench, X } from '../icons'
 import LangPicker from '../components/LangPicker'
 import { ForgeAgents } from '../components/ForgeAgents'
 import { ForgeOutils } from '../components/ForgeMiniature'
@@ -93,6 +93,8 @@ export default function Forge() {
   // Lien « Ouvrir dans Forge » du site (#297) : Forge arrive sur /forge?map=…&tache=….
   const [lien] = useState(() => { const q = new URLSearchParams(location.search); return { map: Number(q.get('map')) || null, tache: Number(q.get('tache')) || null } })
   const [section, setSection] = useState<Section>(lien.map ? 'agents' : 'accueil')
+  // « Prendre la prochaine tâche » (#445) : l'écran Agents s'ouvre avec cette tâche choisie.
+  const [tacheCible, setTacheCible] = useState<number | null>(null)
   useEffect(() => {
     if (!lien.map) return
     app.setMapId(lien.map)
@@ -157,9 +159,9 @@ export default function Forge() {
         {!reserve && section !== 'reglages' && <Didacticiel page={'forge-' + section} />}
         {app.map && section !== 'reglages' && !reserve && <Bandeau mapId={app.map.id} etat={etat} aller={setSection} />}
         {reserve ? <ForgePro />
-          : section === 'accueil' ? <Accueil invoke={invoke} etat={etat} liaison={liaison} relie={relie} relire={lire} />
+          : section === 'accueil' ? <Accueil invoke={invoke} etat={etat} liaison={liaison} relie={relie} relire={lire} pro={pro} aller={setSection} prendre={n => { setTacheCible(n); setSection('agents') }} />
           : section === 'reglages' ? <Reglages invoke={invoke} />
-          : section === 'agents' ? (app.map ? <ForgeAgents mapId={app.map.id} tache={app.map.id === lien.map ? lien.tache : null} invoke={invoke} /> : <p className="muted">{tr("Choisissez une map.")}</p>)
+          : section === 'agents' ? (app.map ? <ForgeAgents mapId={app.map.id} tache={tacheCible ?? (app.map.id === lien.map ? lien.tache : null)} invoke={invoke} /> : <p className="muted">{tr("Choisissez une map.")}</p>)
           : section === 'verifier' ? (app.map ? <div className="stack" style={{ gap: 18 }}><ForgeVerifications mapId={app.map.id} ouvrir={ouvrirPOP} /><ForgeScenarios mapId={app.map.id} capturer={() => captureJeu(invoke)} /></div> : <p className="muted">{tr("Choisissez une map.")}</p>)
           : section === 'plan' ? (app.map ? <Plan2D /> : <p className="muted">{tr("Choisissez une map.")}</p>)
           : section === 'bibliotheque' ? <Bibliotheque mapId={app.map?.id ?? null} studioId={app.studio?.id ?? null} />
@@ -362,7 +364,7 @@ function Reglages({ invoke }: { invoke: Invoke | null }) {
  * relier une map à un projet trouvé tout seul (Documents, projets récents d'UEFN, projet ouvert) ou choisi avec
  * « Parcourir… » ; plusieurs projets reliés à la fois. Forge ne crée pas de map : « Créer la map dans POP » ouvre le
  * site (critère 7 de #78). */
-function Accueil({ invoke, etat, liaison, relire }: { invoke: Invoke; etat: string; liaison: Liaison; relie: boolean; relire: () => Promise<void> }) {
+function Accueil({ invoke, etat, liaison, relire, pro, aller, prendre }: { invoke: Invoke; etat: string; liaison: Liaison; relie: boolean; relire: () => Promise<void>; pro: boolean; aller: (s: Section) => void; prendre: (n: number) => void }) {
   const app = useApp()
   const [ouvert, setOuvert] = useState<string | null>(null)
   const [projets, setProjets] = useState<string[]>([])
@@ -437,9 +439,10 @@ function Accueil({ invoke, etat, liaison, relire }: { invoke: Invoke; etat: stri
 
   return <div className="stack" style={{ gap: 32 }}>
     <h1 className="forge-h1">{tr("Bonjour")} {app.me?.user.name}</h1>
+    <ActionsContexte pro={pro} etat={etat} ouvert={ouvert} maps={maps} projetDe={projetDe} ouvrirUefn={ouvrirUefn} occupe={occupe} aller={aller} prendre={prendre} />
     <ForgeAssistant invoke={invoke} liens={liens} etat={etat} />
 
-    <section className="stack" style={{ gap: 10 }}>
+    <section id="forge-vos-maps" className="stack" style={{ gap: 10 }}>
       <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
         <h2 className="forge-h2" style={{ margin: 0 }}>{tr("Vos maps et leurs projets UEFN")}</h2>
         <div className="row" style={{ gap: 8 }}>
@@ -503,6 +506,80 @@ function Accueil({ invoke, etat, liaison, relire }: { invoke: Invoke; etat: stri
 
     {app.map && <EnCeMoment mapId={app.map.id} />}
   </div>
+}
+
+/** Où en est le créateur (#445), dans cet ordre : sans Pro, Forge n'est que le relais ; UEFN fermé (ou aucun projet
+ * relié ouvert) ; map ouverte sans aucune tâche (concept à poser) ; tâches restant à faire (développement) ; toutes les
+ * tâches faites (prête à publier). */
+export type ContexteForge = 'relais' | 'ferme' | 'concept' | 'dev' | 'prete'
+export function contexteForge(c: { pro: boolean; mapOuverte: boolean; total: number; restantes: number }): ContexteForge {
+  if (!c.pro) return 'relais'
+  if (!c.mapOuverte) return 'ferme'
+  if (c.total === 0) return 'concept'
+  return c.restantes > 0 ? 'dev' : 'prete'
+}
+
+type Action = { titre: string; texte: string; Icon: any; faire: () => void; off?: string }
+
+/** Trois gros boutons en haut de l'Accueil (#445) : quoi faire maintenant, selon le contexte. Ils mènent à ce qui existe
+ * déjà : ouvrir UEFN (#402), les écrans de Forge, la tâche conseillée par POP lancée avec son IA (#420), le site. */
+function ActionsContexte({ pro, etat, ouvert, maps, projetDe, ouvrirUefn, occupe, aller, prendre }: {
+  pro: boolean; etat: string; ouvert: string | null; maps: { id: number; nom: string; studio: string }[]
+  projetDe: (nom: string) => string | undefined; ouvrirUefn: (mapId: number, projet: string) => void; occupe: string | null
+  aller: (s: Section) => void; prendre: (n: number) => void
+}) {
+  const app = useApp()
+  const reliees = maps.filter(m => projetDe(m.nom))
+  // Map ouverte dans UEFN : celle dont le projet relié est le projet ouvert.
+  const ouverteMap = etat === 'UEFN connecté' && ouvert ? reliees.find(m => projetDe(m.nom)!.toLowerCase() === ouvert.toLowerCase()) : undefined
+  // Dernière map travaillée : la map courante si elle est reliée, sinon la première reliée.
+  const derniere = reliees.find(m => m.id === app.map?.id) ?? reliees[0]
+  const cible = ouverteMap ?? derniere
+  const { data: taches, reload: relireTaches } = useLoad<any[]>(ouverteMap ? `/api/maps/${ouverteMap.id}/tasks` : null, [ouverteMap?.id])
+  const { data: guide, reload: relireGuide } = useLoad<any>(ouverteMap && pro ? `/api/maps/${ouverteMap.id}/guide` : null, [ouverteMap?.id, pro])
+  useLive(['tasks', 'plan'], () => { relireTaches(); relireGuide() })
+  const total = taches?.length ?? 0
+  const restantes = (taches ?? []).filter((t: any) => t.status !== 'done').length
+  const ctx = contexteForge({ pro, mapOuverte: !!ouverteMap, total, restantes })
+  // Tant que les tâches de la map ouverte ne sont pas lues, on ne devine pas le contexte.
+  if (ouverteMap && pro && !taches) return null
+  const versMaps = () => document.getElementById('forge-vos-maps')?.scrollIntoView({ behavior: 'smooth' })
+  const suivante = guide?.suggestions?.[0]
+  const reprendre: Action = {
+    titre: tr("Reprendre là où j'en étais"),
+    texte: cible ? tr("Ouvre {0} dans UEFN.", [cible.nom]) : tr("Reliez d'abord une map à son projet UEFN."),
+    Icon: Play, off: cible ? undefined : tr("Aucune map reliée"),
+    faire: () => { if (cible) ouvrirUefn(cible.id, projetDe(cible.nom)!) },
+  }
+  const ouvrir: Action = { titre: tr("Ouvrir une map"), texte: tr("Choisissez une de vos maps et ouvrez-la dans UEFN."), Icon: FolderOpen, faire: versMaps }
+  const creer: Action = { titre: tr("Créer une nouvelle map"), texte: tr("Dans POP, puis reliez son projet UEFN ici."), Icon: Plus, faire: () => ouvrirPOP('/') }
+  const m = ouverteMap
+  const actions: Action[] = ctx === 'relais' || ctx === 'ferme' ? [reprendre, ouvrir, creer]
+    : ctx === 'concept' ? [
+      { titre: tr("Travailler le concept"), texte: tr("Répondez aux questions de POP sur {0} avec votre IA.", [m!.nom]), Icon: Lightbulb, faire: () => ouvrirPOP(`/map/${m!.id}`) },
+      { titre: tr("Planifier la map"), texte: tr("Étapes, tâches et jalons jusqu'à la sortie."), Icon: CalendarDays, faire: () => ouvrirPOP(`/map/${m!.id}/planifier`) },
+      { titre: tr("Voir le plan 2D"), texte: tr("Le niveau étage par étage, à l'échelle."), Icon: Grid3x3, faire: () => aller('plan') },
+    ]
+    : ctx === 'dev' ? [
+      { titre: tr("Prendre la prochaine tâche"), texte: suivante ? `#${suivante.number} ${suivante.title}` : tr("Toutes les tâches sont prises : voyez l'avancement."), Icon: Play, off: suivante ? undefined : tr("Rien à prendre"), faire: () => { if (suivante) prendre(suivante.number) } },
+      { titre: tr("Tester la map"), texte: tr("Vérifications et scénarios de test dans UEFN."), Icon: ClipboardCheck, faire: () => aller('verifier') },
+      { titre: tr("Voir l'avancement"), texte: guide?.pace ? tr("{0} : {1} tâche(s) à finir.", [guide.pace.title, guide.pace.remaining]) : tr("{0} tâche(s) à finir sur {1}.", [restantes, total]), Icon: ListChecks, faire: () => ouvrirPOP(`/map/${m!.id}/taches`) },
+    ]
+    : [
+      { titre: tr("Préparer la publication"), texte: tr("Toutes les tâches sont faites : « Prête à publier ? »."), Icon: Rocket, faire: () => aller('verifier') },
+      { titre: tr("Lancer un test à plusieurs"), texte: tr("Scénarios de test joués par des playtesteurs."), Icon: Users, faire: () => aller('verifier') },
+      { titre: tr("Voir les nouveautés à faire"), texte: tr("Prochaine mise à jour : planifiez la suite."), Icon: CalendarDays, faire: () => ouvrirPOP(`/map/${m!.id}/planifier`) },
+    ]
+  return <section aria-label={tr("Que faire maintenant")} className="stack" style={{ gap: 10 }}>
+    <h2 className="forge-h2" style={{ margin: 0 }}>{m && ctx !== 'relais' ? tr("Que faire maintenant sur {0}", [m.nom]) : tr("Que faire maintenant")}</h2>
+    <div className="forge-cta" data-contexte={ctx}>
+      {actions.map(a => <button key={a.titre} className="forge-cta-carte" disabled={!!a.off || occupe !== null} title={a.off} onClick={a.faire}>
+        <a.Icon size={26} strokeWidth={1.5} aria-hidden="true" />
+        <span className="forge-cta-titre">{a.titre}</span>
+        <span className="forge-cta-texte small muted">{a.texte}</span>
+      </button>)}
+    </div>
+  </section>
 }
 
 /** Les agents de la map et leur tâche (registre #93), avec « Voir dans POP » sur chaque tâche. */
