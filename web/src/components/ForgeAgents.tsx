@@ -71,7 +71,7 @@ export function ForgeAgents({ mapId, tache, invoke }: { mapId: number; tache?: n
   const { cols, rows } = grille(affiches.length)
   return <div className="term-page">
     <div className="term-haut">
-      {app.canEdit && <PlusTerminal connectees={connectees} directs={directs} ouvrir={ouvrir} mapId={mapId} invoke={invoke} lance={id => { relireDirects(); changer([...affiches.map(a => a.id), id]); reload() }} />}
+      {app.canEdit && <PlusTerminal connectees={connectees} directs={directs} ouvrir={ouvrir} />}
       <h1 className="forge-h1" style={{ margin: 0, fontSize: 20 }}>{tr("Agents")}</h1>
       {res?.equipe?.phrase && <span className="muted small">{res.equipe.phrase}</span>}
       <div style={{ flex: 1 }} />
@@ -273,16 +273,13 @@ function Equipe({ mapId }: { mapId: number }) {
 }
 
 /** « + Terminal » (#451, #481), en haut à gauche de la page Agents : une ligne par IA connectée à POP (Claude, Codex…).
- * Claude s'ouvre en direct si Claude Code est installé sur le PC (#466), sinon dans le terminal de l'IA connectée. */
-function PlusTerminal({ connectees, directs, ouvrir, mapId, invoke, lance }: { connectees: any[]; directs: number[]; ouvrir: (id: number) => void; mapId: number; invoke?: Invoke; lance: (id: number) => void }) {
+ * Seules les IA connectées par l'utilisateur y figurent (#495) : pas de Claude Code lancé par Forge. */
+function PlusTerminal({ connectees, directs, ouvrir }: { connectees: any[]; directs: number[]; ouvrir: (id: number) => void }) {
   const app = useApp()
   const [ouvert, setOuvert] = useState(false)
-  const [claudeCode, setClaudeCode] = useState(false)
-  const [occupe, setOccupe] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (!ouvert) return
-    invoke?.('outils_ia').then((l: any[]) => setClaudeCode(!!l?.find(o => o.id === 'claude_code' && o.lancable))).catch(() => setClaudeCode(false))
     const f = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOuvert(false) }
     const k = (e: KeyboardEvent) => { if (e.key === 'Escape') setOuvert(false) }
     document.addEventListener('mousedown', f); document.addEventListener('keydown', k)
@@ -294,37 +291,21 @@ function PlusTerminal({ connectees, directs, ouvrir, mapId, invoke, lance }: { c
     const f = familles.find(x => x.nom === famille(a))
     if (f) f.agents.push(a); else familles.push({ nom: famille(a), agents: [a] })
   }
-  const enDirect = async () => {
-    setOccupe(true)
-    let cle: { id: number; token: string } | null = null
-    try {
-      cle = await api.post('/api/me/tokens', { name: 'Claude', kind: 'claude_code', scope: 'write', map: mapId, forge: true })
-      await invoke!('direct_ouvrir', { outil: 'claude_code', token: cle!.token, map: app.map?.name ?? '', agent: cle!.id })
-      lance(cle!.id)
-    } catch (e: any) {
-      if (cle) await api.del(`/api/tokens/${cle.id}`).catch(() => {})
-      app.toast(/not allowed|not found|unknown/i.test(String(e?.message ?? e)) ? tr("Mettez Forge à jour (pop-uefn.com/forge) pour ouvrir un terminal en direct.") : (e?.message ?? String(e)), true)
-    }
-    setOccupe(false)
-  }
   const choisir = async (f: { nom: string; agents: any[] }) => {
     setOuvert(false)
     const vivant = f.agents.find(a => directs.includes(a.id))
     if (vivant) return ouvrir(vivant.id)
-    // Claude = l'IA que l'utilisateur a connectée (#487) ; Claude Code en direct seulement si on le choisit.
+    // Claude = l'IA que l'utilisateur a connectée (#487).
     ouvrir(f.agents[0].id)
   }
   return <div ref={ref} style={{ position: 'relative' }}>
-    <button className="btn pri" aria-haspopup="dialog" aria-expanded={ouvert} disabled={occupe} onClick={() => setOuvert(o => !o)}><Plus size={15} strokeWidth={2} />{occupe ? tr("Démarrage…") : tr("Terminal")}</button>
+    <button className="btn pri" aria-haspopup="dialog" aria-expanded={ouvert} onClick={() => setOuvert(o => !o)}><Plus size={15} strokeWidth={2} />{tr("Terminal")}</button>
     {ouvert && <div className="term-menu card" role="dialog" aria-label={tr("Ouvrir un terminal")}>
       {familles.length ? <div className="stack" style={{ gap: 4 }}>{familles.map(f => <button key={f.nom} className="term-choix" onClick={() => choisir(f)}>
         <span className="forge-point" style={{ background: f.agents.some(a => actif(a.last_used)) ? 'var(--tg)' : '#6b6b6b' }} aria-hidden="true" />
         <b style={{ fontWeight: 500 }}>{f.nom}</b>
       </button>)}
-        {invoke && claudeCode && <button className="term-choix" onClick={() => { setOuvert(false); enDirect() }} title={tr("Demande Claude Code installé et connecté sur ce PC.")}>
-          <span className="forge-point" style={{ background: '#6b6b6b' }} aria-hidden="true" />
-          <b style={{ fontWeight: 500 }}>{tr("Claude Code")}</b><span className="term-direct">{tr("direct")}</span>
-        </button>}</div> : <p className="small muted" style={{ margin: 0 }}>{tr("Aucune IA connectée à POP. Connectez Claude ou Codex (POP → IA connectées), puis revenez ici.")}</p>}
+</div> : <p className="small muted" style={{ margin: 0 }}>{tr("Aucune IA connectée à POP. Connectez Claude ou Codex (POP → IA connectées), puis revenez ici.")}</p>}
     </div>}
   </div>
 }
