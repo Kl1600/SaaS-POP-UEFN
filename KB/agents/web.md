@@ -320,3 +320,11 @@ Bloque : rien
 ### 2026-11-24 · #78 · retours de Kl1600 sur Forge (test Windows)
 - Fait : la fenêtre de Forge n'a plus le cadre ni le menu de Windows (`decorations(false)`) ; barre de titre dessinée par la page (`TitleBar` dans Forge.tsx, `.barre` dans forge/ui/index.html) : glisser = déplacer, double-clic = agrandir, réduire / agrandir / fermer par la commande `fenetre` ; l'ancien menu (état du relais, changer l'adresse, recharger, F5) est dans le menu du profil par `action_forge`. Sélecteur de map sur le modèle de `MapSwitcher` du site (classes `mapsw-*`), sans gestion des maps (renvoi vers POP). Un compte sans map n'a plus l'écran de bienvenue du site (« Télécharger UEFN Link ») dans Forge.
 - Vérifié : Chrome sans tête avec un pont Tauri simulé (appels `fenetre` et `action_forge`, choix de map), `cargo test` de forge sous Linux ; reste à voir dans la vraie fenêtre Windows.
+
+```
+FAIT | #445 Forge · Accueil : trois gros boutons d'action selon le contexte | 28/11
+Owner : benybens | Sur la tâche : Claude Code, pour benybens
+Fait : contexteForge (relais, fermé, concept, dev, prête), 3 cartes en haut de l'Accueil, « Ouvrir UEFN » dans le bandeau UEFN fermé ; testé dans une Forge isolée avec le vrai UEFN (TestPopHub)
+Reste : rien ; #528 (Auto Start Server non détecté) ouverte
+Bloque : rien
+```
