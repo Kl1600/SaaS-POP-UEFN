@@ -3,9 +3,10 @@
 // Forge montre la miniature, « Conforme Discover », et « Utiliser », « Refaire », « Modifier ». Le site montre les
 // versions choisies (`versions`).
 import { useEffect, useRef, useState } from 'react'
-import { Box, Type, Check, Download, ImagePlus, RefreshCw, Pencil, Paperclip, X } from 'lucide-react'
+import { Box, Minimize2, Type, Check, Download, ImagePlus, RefreshCw, Pencil, Paperclip, X } from 'lucide-react'
 import { ForgeBlender } from './ForgeBlender'
 import { ForgeTexte } from './ForgeTexte'
+import { ForgeLowMesh } from './ForgeLowMesh'
 import { ago, api } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { tr } from '../i18n/t'
@@ -136,9 +137,10 @@ function Composer({ occupe, base, annulerBase, envoyer }: { occupe: boolean; bas
 
 /** Onglet Outils de Forge (#468) : une carte par outil. */
 export function ForgeOutils({ mapId, allerAgents, invoke }: { mapId: number; allerAgents: () => void; invoke: any }) {
-  const [outil, setOutil] = useState<'' | 'miniature' | 'blender' | 'texte'>('')
+  const [outil, setOutil] = useState<'' | 'miniature' | 'blender' | 'texte' | 'lowmesh'>('')
   if (outil === 'miniature') return <ForgeMiniature mapId={mapId} retour={() => setOutil('')} allerAgents={allerAgents} />
   if (outil === 'blender') return <ForgeBlender invoke={invoke} retour={() => setOutil('')} />
+  if (outil === 'lowmesh') return <ForgeLowMesh invoke={invoke} mapId={mapId} retour={() => setOutil('')} allerBlender={() => setOutil('blender')} />
   if (outil === 'texte') return <ForgeTexte invoke={invoke} mapId={mapId} retour={() => setOutil('')} allerBlender={() => setOutil('blender')} />
   return <div className="stack" style={{ gap: 18 }}>
     <h1 className="forge-h1">{tr("Outils")}</h1>
@@ -152,6 +154,11 @@ export function ForgeOutils({ mapId, allerAgents, invoke }: { mapId: number; all
         <Type size={22} strokeWidth={1.5} />
         <b>{tr("Texte 3D et 2D")}</b>
         <span className="small muted">{tr("Titre de map, panneau ou logo de lobby, en mesh 3D ou en image transparente, importé dans le projet en un clic.")}</span>
+      </button>
+      <button className="card outil-carte" onClick={() => setOutil('lowmesh')}>
+        <Minimize2 size={22} strokeWidth={1.5} />
+        <b>{tr("Low Mesh")}</b>
+        <span className="small muted">{tr("Allégez un modèle 3D (FBX, OBJ, GLB) avant de l'importer : triangles avant et après, aperçu, import en un clic.")}</span>
       </button>
       <button className="card outil-carte" onClick={() => setOutil('blender')}>
         <Box size={22} strokeWidth={1.5} />

@@ -3,6 +3,9 @@
 Une entrée par version de `forge/tauri.conf.json` (#437) : `## version · date`, puis 1 à 5 lignes en français.
 Le workflow « relais Windows » en tire les notes de la mise à jour ; le CI refuse une version sans entrée.
 
+## 0.3.17 · 28/11/2026
+- Outils → Low Mesh : allégez un modèle 3D (FBX, OBJ, GLB) avant import, avec aperçu et nombre de triangles avant et après ; Forge prévient au-delà de 30 000 sommets.
+
 ## 0.3.16 · 28/11/2026
 - Outils → Texte 3D et 2D : un titre, un panneau ou un logo en mesh 3D (FBX) ou en image transparente (PNG), fait par Blender sur votre PC, avec aperçu, puis importé dans UEFN en un clic.
 
