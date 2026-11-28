@@ -1551,3 +1551,16 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 .bsure{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:14px;font-size:13px;color:var(--text2)}
 .bsure span{display:inline-flex;align-items:center;gap:6px}
 }
+
+@layer app{
+/* #543 : Léo, l'assistant (bonhomme aux yeux qui bougent) */
+.leo{display:block;flex:none;overflow:visible}
+.leo-tete{fill:rgb(20,20,20);stroke:rgba(255,255,255,.14);stroke-width:1}
+.leo-yeux{transition:transform .35s cubic-bezier(.3,.7,.3,1)}
+.leo-oeil{fill:#F27A2F;filter:drop-shadow(0 0 3px rgba(242,122,47,.7));transform-box:fill-box;transform-origin:center;animation:leo-cligne 4.6s infinite}
+.leo-oeil+.leo-oeil{animation-delay:.03s}
+@keyframes leo-cligne{0%,92%,100%{transform:scaleY(1)}95%{transform:scaleY(.12)}}
+@media (prefers-reduced-motion:reduce){.leo-oeil{animation:none}.leo-yeux{transition:none}}
+.popy-fab{background:none!important;border-radius:16px!important;padding:0;overflow:visible;box-shadow:0 10px 28px rgba(0,0,0,.35)!important}
+.popy-fab .leo-tete{stroke:rgba(242,122,47,.45)}
+}

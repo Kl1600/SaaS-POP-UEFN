@@ -1,4 +1,4 @@
-// Popy : assistant intégré (calculs côté serveur sur les données de la map + guide de POP, rien ne sort de POP).
+// Léo : assistant intégré (calculs côté serveur sur les données de la map + guide de POP, rien ne sort de POP).
 import { useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Compass, Play, ArrowRight, X, Send } from '../icons'
@@ -8,6 +8,7 @@ import { useApp, useLive, useLoad } from '../state'
 import { tr, LANG } from '../i18n/t'
 import { useNav } from '../routes'
 import { useDialog } from './ui'
+import { LeoVisage } from './LeoVisage'
 
 /** /map/12/taches → /taches ; /studio/3/equipe → /equipe (pages des fiches d’aide). */
 const shortPath = (p: string) => p.replace(/^\/map\/\d+/, '').replace(/^\/studio\/\d+\/(integrations|maps)/, '/equipe').replace(/^\/studio\/\d+\/marche/, '/analyse/marche').replace(/^\/analyse\/videos/, '/analyse/tiktok').replace(/^\/studio\/\d+/, '') || '/'
@@ -43,7 +44,7 @@ function Recap({ onNavigate }: { onNavigate?: () => void }) {
 
 type Msg = { who: 'me' | 'bot'; recap?: boolean; text?: string; f?: Fiche; others?: Fiche[]; today?: boolean; items?: { label: string; link: string; kind?: string }[]; typing?: boolean }
 
-/** Questions-réponses : Popy guide l'utilisateur dans POP (base de fiches locale, pas d'IA). */
+/** Questions-réponses : Léo guide l'utilisateur dans POP (base de fiches locale, pas d'IA). */
 function GuideChat({ initial, onNavigate }: { initial?: string; onNavigate?: () => void }) {
   const nav = useNav()
   const loc = useLocation()
@@ -100,7 +101,7 @@ function GuideChat({ initial, onNavigate }: { initial?: string; onNavigate?: () 
     </div>
     {msgs.length <= 1 && <div className="gothers gsugs">{suggested(shortPath(loc.pathname)).slice(0, 3).map(f => <button key={f.id} className="chip" onClick={() => pick(f)}>{f.q}</button>)}</div>}
     <form className="gask gask-main" onSubmit={e => { e.preventDefault(); send(q) }}>
-      <input className="field" value={q} onChange={e => setQ(e.target.value)} placeholder={tr("Posez votre question à Popy…")} aria-label={tr("Votre question")} />
+      <input className="field" value={q} onChange={e => setQ(e.target.value)} placeholder={tr("Posez votre question à Léo…")} aria-label={tr("Votre question")} />
       <button className="btn pri" aria-label={tr("Envoyer")}><Send size={16} /></button>
     </form>
   </div>
@@ -110,11 +111,11 @@ export function GuideDrawer({ onClose, ask: initial }: { onClose: () => void; as
   const dlg = useDialog(onClose)
   return <>
     <div className="scrim" onClick={onClose} />
-    <aside ref={dlg as any} tabIndex={-1} aria-modal="true" className="drawer gdrawer" role="dialog" aria-label={tr("Popy")}>
+    <aside ref={dlg as any} tabIndex={-1} aria-modal="true" className="drawer gdrawer" role="dialog" aria-label={tr("Léo")}>
       <div className="row" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
         <div className="row" style={{ gap: 10 }}>
-          <span className="guide-ico"><Compass size={18} strokeWidth={1.75} /></span>
-          <div><div className="guide-name">{tr("Popy")}</div><div className="small muted">{tr("Assistant intégré · tout reste dans POP")}</div></div>
+          <LeoVisage size={40} />
+          <div><div className="guide-name">{tr("Léo")}</div><div className="small muted">{tr("Assistant intégré · tout reste dans POP")}</div></div>
         </div>
         <button className="iconbtn" aria-label={tr("Fermer")} onClick={onClose}><X size={18} /></button>
       </div>

@@ -15,7 +15,7 @@ const ETAPES = (): Record<string, Etape[]> => ({
     { sel: '.phead', titre: tr("Le Dashboard de la map"), texte: tr("L’état de la map en un coup d’œil : ce qui avance, ce qui bloque, le prochain objectif.") },
     { sel: 'section.tiles', titre: tr("Les chiffres clés"), texte: tr("Tâches en cours, bloquées, finies, prochain objectif, gains et joueurs du dernier playtest.") },
     { sel: '.two', titre: tr("À faire aujourd’hui"), texte: tr("Vos tâches du jour et les prochains objectifs de la map.") },
-    { sel: '@.popy-fab', titre: tr("Popy, l’assistant"), texte: tr("Une question sur POP ? Cliquez ici : Popy répond et vous dit par où commencer.") },
+    { sel: '@.popy-fab', titre: tr("Léo, l’assistant"), texte: tr("Une question sur POP ? Cliquez ici : Léo répond et vous dit par où commencer.") },
   ],
   planifier: [
     { sel: '.phead', titre: tr("Planifier"), texte: tr("Objectifs, tâches et dates Fortnite sur un même calendrier.") },

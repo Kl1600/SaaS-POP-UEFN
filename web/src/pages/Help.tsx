@@ -17,7 +17,7 @@ const SECTIONS: [string, string[]][] = [
 export default function Help() {
   return <main className="content help">
     <PageHead title={tr("Aide et support")} help={tr("Comment utiliser chaque partie de POP.")}>
-      <button className="btn pri" onClick={() => window.dispatchEvent(new CustomEvent('boussole', { detail: '' }))}>{tr("Demander à Popy")}</button>
+      <button className="btn pri" onClick={() => window.dispatchEvent(new CustomEvent('boussole', { detail: '' }))}>{tr("Demander à Léo")}</button>
     </PageHead>
     <div className="grid2">
       {SECTIONS.map(([t, ps]) => <section key={t} className="card"><h3>{t}</h3>{ps.map((p, i) => <p key={i} style={{ margin: '6px 0' }}>{p}</p>)}</section>)}
