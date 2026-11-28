@@ -1,7 +1,10 @@
-import{l as _,r as u,j as e,a9 as Pe,t as s,N as Ye,aa as Se,p as V,n as Me,ab as Ze,ac as Ke,ad as Qe,a5 as es,o as $,V as Ae,ae as ss,af as fe,ag as ae,s as je,Y as me,k as ts,ah as We,ai as as,$ as ns,J as rs,X as qe,aj as ls,Z as ve,ak as is,al as os,am as $e,M as De,w as cs,u as Re,an as us,B as ds,ao as ms,ap as ps,aq as hs,ar as xs,a8 as gs,as as ie,at as Ue,au as fs,av as js,C as vs,aw as bs,L as ys}from"./index-BLBc7EmP.js";import{S as ce,F as Ns}from"./ForgeAgents-AGUbMptr.js";import{M as ws,G as ks,P as Cs,a as Ps,B as Ss,F as Es,O as Ee,C as Fs,b as zs,c as Ls,H as Os,R as Ms,d as As,e as Ws,f as qs,L as $s,W as Ds}from"./wrench-CcfvRkrX.js";const Rs=`# Nouveautés de POP Forge
+import{l as _,r as u,j as e,a9 as Pe,t as s,N as Ye,aa as Se,p as V,n as Me,ab as Ze,ac as Ke,ad as Qe,a5 as es,o as $,V as Ae,ae as ss,af as fe,ag as ae,s as je,Y as me,k as ts,ah as We,ai as as,$ as ns,J as rs,X as qe,aj as ls,Z as ve,ak as is,al as os,am as $e,M as De,w as cs,u as Re,an as us,B as ds,ao as ms,ap as ps,aq as hs,ar as xs,a8 as gs,as as ie,at as Ue,au as fs,av as js,C as vs,aw as bs,L as ys}from"./index-00lXTHcb.js";import{S as ce,F as Ns}from"./ForgeAgents-DuFvX6PS.js";import{M as ws,G as ks,P as Cs,a as Ps,B as Ss,F as Es,O as Ee,C as Fs,b as zs,c as Ls,H as Os,R as Ms,d as As,e as Ws,f as qs,L as $s,W as Ds}from"./wrench-DzbaBTPu.js";const Rs=`# Nouveautés de POP Forge
 
 Une entrée par version de \`forge/tauri.conf.json\` (#437) : \`## version · date\`, puis 1 à 5 lignes en français.
 Le workflow « relais Windows » en tire les notes de la mise à jour ; le CI refuse une version sans entrée.
+
+## 0.3.19 · 28/11/2026
+- Sécurité : la décompression de Blender utilise une version corrigée de la bibliothèque zip.
 
 ## 0.3.18 · 28/11/2026
 - Outils → 3D Studio : décrivez un objet à votre IA ; elle le construit avec Blender sur votre PC, vous voyez l'aperçu et vous l'acceptez avant tout import dans UEFN.
