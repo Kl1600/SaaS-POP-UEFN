@@ -700,7 +700,7 @@ fn api() -> Router<AppState> {
             get(money::offers).post(money::add_offer),
         )
         .route("/api/offers/{oid}/sales", put(money::set_sales))
-        // UEFN Link : relais, Organiseur, éditeur Verse, IA, MCP
+        // POP Forge : relais, Organiseur, éditeur Verse, IA, MCP
         .route("/api/maps/{mid}/relay/pair", post(uefn::pair_code))
         .route("/api/maps/{mid}/relay", get(uefn::devices))
         .route("/api/relay-devices/{id}", delete(uefn::delete_device))

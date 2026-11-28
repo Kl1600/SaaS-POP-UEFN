@@ -3,7 +3,7 @@ import { api } from './api'
 import { useApp } from './state'
 import { tr } from './i18n/t'
 
-/** État du relais UEFN Link pour la map courante, tenu à jour par le WebSocket. */
+/** État du relais POP Forge pour la map courante, tenu à jour par le WebSocket. */
 export function useUefnStatus() {
   const { map, subscribe } = useApp()
   const [s, setS] = useState<{ status: string; pending: number; project: string; stale: boolean }>({ status: 'offline', pending: 0, project: '', stale: false })

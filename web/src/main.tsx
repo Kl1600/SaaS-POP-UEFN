@@ -58,7 +58,7 @@ function Gate() {
   // Connecté depuis la page de connexion : on part sur l'accueil (l'adresse ne reste pas « /connexion »).
   if (['/connexion', '/inscription'].includes(loc.pathname)) return <Navigate to="/" replace />
   if (me.studios.length === 0) return <Onboarding />
-  // Forge contient déjà le relais : pas d'écran de bienvenue du site (« Télécharger UEFN Link ») dans Forge, son
+  // Forge contient déjà le relais : pas d'écran de bienvenue du site (« Télécharger POP Forge ») dans Forge, son
   // Accueil relie UEFN lui-même (test de Kl1600 du 24/11).
   if (me.studios.every(s => s.maps.length === 0) && !loc.pathname.startsWith('/forge')) return <Welcome />
   return (

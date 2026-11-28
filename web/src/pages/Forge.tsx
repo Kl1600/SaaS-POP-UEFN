@@ -1,5 +1,5 @@
 // POP Forge (#78) : interface de l'application de bureau, centrée sur la construction avec l'IA (maquettes validées
-// par Kl1600 le 24/11). Servie par POP sur /forge et affichée dans Forge ; elle parle au relais UEFN Link de Forge par
+// par Kl1600 le 24/11). Servie par POP sur /forge et affichée dans Forge ; elle parle au relais POP Forge de Forge par
 // ses commandes (projets, état, liaison). Forge ne reprend aucun écran de gestion du site (décision du 24/11) :
 // « Ouvrir POP » et « Voir dans POP » ouvrent le site dans le navigateur (Forge y renvoie toute page autre que /forge).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'

@@ -1,4 +1,4 @@
-// Léo, l'assistant de POP (#543) : un petit bonhomme dont les yeux clignent et regardent autour (et vers la souris).
+// Léo, l'assistant de POP (#543), rond (#548) : un petit bonhomme dont les yeux clignent et regardent autour (et vers la souris).
 import { useEffect, useRef, useState } from 'react'
 
 const calme = () => typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -29,7 +29,7 @@ export function LeoVisage({ size = 40, suivre = true }: { size?: number; suivre?
     return () => { window.removeEventListener('pointermove', bouge); clearInterval(coup); cancelAnimationFrame(raf) }
   }, [suivre])
   return <svg ref={ref} className="leo" width={size} height={size} viewBox="0 0 40 40" aria-hidden="true">
-    <rect x="1" y="1" width="38" height="38" rx="11" className="leo-tete" />
+    <circle cx="20" cy="20" r="19" className="leo-tete" />
     <g className="leo-yeux" style={{ transform: `translate(${r.x}px, ${r.y}px)` }}>
       <rect className="leo-oeil" x="12" y="13" width="5.5" height="13" rx="2.75" />
       <rect className="leo-oeil" x="22.5" y="13" width="5.5" height="13" rx="2.75" />

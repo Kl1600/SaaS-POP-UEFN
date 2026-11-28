@@ -1239,7 +1239,7 @@ async fn call_as(
             let message = match status {
                 "connected" => "UEFN est ouvert et relié : les actions partent tout de suite.",
                 "closed" => "Le relais tourne mais UEFN est fermé : les actions attendent son ouverture.",
-                "unlinked" => "Aucun projet UEFN n'est relié à cette map : demandez à l'humain de relier son projet (Organiseur → UEFN Link → code d'appairage). Les actions UEFN seront mises en attente.",
+                "unlinked" => "Aucun projet UEFN n'est relié à cette map : demandez à l'humain de relier son projet (Paramètres → POP Forge → code d'appairage). Les actions UEFN seront mises en attente.",
                 _ => "Le relais de cette map est hors ligne : les actions attendent qu'il revienne.",
             };
             Ok(json!({ "status": status, "pending": pending, "message": message }))
@@ -1395,7 +1395,7 @@ async fn call_as(
             prevenir_validation(st, mid, "Une IA connectée demande à supprimer des acteurs : validation requise").await;
             notify(st, mid, json!({ "t": "uefn", "what": "actors" }));
             Ok(
-                json!({ "pending_approval": aid, "message": "Suppression en attente : un membre doit la valider dans POP (Paramètres → UEFN Link) ou dans Forge." }),
+                json!({ "pending_approval": aid, "message": "Suppression en attente : un membre doit la valider dans POP (Paramètres → POP Forge) ou dans Forge." }),
             )
         }
         "list_verse_files" => {
@@ -1495,7 +1495,7 @@ async fn call_as(
                         .bind(m).bind(user.id).bind(undo["action"].as_str()).bind(undo["args"].to_string()).bind(&summary).fetch_one(&st.db).await?;
                     notify(st, mid, json!({ "t": "uefn", "what": "actors" }));
                     prevenir_validation(st, m, "Une IA connectée demande une annulation qui retire des éléments : validation requise").await;
-                    return Ok(json!({ "pending_approval": aid, "message": "Annulation en attente : un membre doit la valider dans POP (Paramètres → UEFN Link) ou dans Forge." }));
+                    return Ok(json!({ "pending_approval": aid, "message": "Annulation en attente : un membre doit la valider dans POP (Paramètres → POP Forge) ou dans Forge." }));
                 }
             }
             crate::uefn::undo(State(st.clone()), user.clone(), Path(id))
