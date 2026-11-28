@@ -373,11 +373,14 @@ function Accueil({ invoke, etat, liaison, relire, pro, aller, prendre }: { invok
   const [choix, setChoix] = useState<Record<number, string>>({})
   const [ouverte, setOuverte] = useState<number | null>(null)
 
+  // Vrai après la première détection du projet ouvert (#445) : avant, les boutons ne devinent pas le contexte.
+  const [projetsLus, setProjetsLus] = useState(false)
   const chercher = useCallback(async () => {
     try {
       const [o, l] = await Promise.all([invoke<string | null>('projet_ouvert'), invoke<string[]>('projets')])
       setOuvert(o); setProjets([...new Set([...(o ? [o] : []), ...l])])
     } catch (e: any) { setMsg({ ok: false, texte: String(e) }) }
+    setProjetsLus(true)
   }, [invoke])
   // Toutes les 30 s : un projet créé dans UEFN apparaît sans « Actualiser » (#153).
   useEffect(() => { chercher(); const t = setInterval(chercher, 30000); return () => clearInterval(t) }, [chercher])
@@ -439,7 +442,7 @@ function Accueil({ invoke, etat, liaison, relire, pro, aller, prendre }: { invok
 
   return <div className="stack" style={{ gap: 32 }}>
     <h1 className="forge-h1">{tr("Bonjour")} {app.me?.user.name}</h1>
-    <ActionsContexte pro={pro} etat={etat} ouvert={ouvert} maps={maps} projetDe={projetDe} ouvrirUefn={ouvrirUefn} occupe={occupe} aller={aller} prendre={prendre} />
+    <ActionsContexte pro={pro} etat={etat} ouvert={ouvert} projetsLus={projetsLus} maps={maps} projetDe={projetDe} ouvrirUefn={ouvrirUefn} occupe={occupe} aller={aller} prendre={prendre} />
     <ForgeAssistant invoke={invoke} liens={liens} etat={etat} />
 
     <section id="forge-vos-maps" className="stack" style={{ gap: 10 }}>
@@ -523,8 +526,8 @@ type Action = { titre: string; texte: string; Icon: any; faire: () => void; off?
 
 /** Trois gros boutons en haut de l'Accueil (#445) : quoi faire maintenant, selon le contexte. Ils mènent à ce qui existe
  * déjà : ouvrir UEFN (#402), les écrans de Forge, la tâche conseillée par POP lancée avec son IA (#420), le site. */
-function ActionsContexte({ pro, etat, ouvert, maps, projetDe, ouvrirUefn, occupe, aller, prendre }: {
-  pro: boolean; etat: string; ouvert: string | null; maps: { id: number; nom: string; studio: string }[]
+function ActionsContexte({ pro, etat, ouvert, projetsLus, maps, projetDe, ouvrirUefn, occupe, aller, prendre }: {
+  pro: boolean; etat: string; ouvert: string | null; projetsLus: boolean; maps: { id: number; nom: string; studio: string }[]
   projetDe: (nom: string) => string | undefined; ouvrirUefn: (mapId: number, projet: string) => void; occupe: string | null
   aller: (s: Section) => void; prendre: (n: number) => void
 }) {
@@ -541,7 +544,9 @@ function ActionsContexte({ pro, etat, ouvert, maps, projetDe, ouvrirUefn, occupe
   const total = taches?.length ?? 0
   const restantes = (taches ?? []).filter((t: any) => t.status !== 'done').length
   const ctx = contexteForge({ pro, mapOuverte: !!ouverteMap, total, restantes })
-  // Tant que les tâches de la map ouverte ne sont pas lues, on ne devine pas le contexte.
+  // Tant que le projet ouvert dans UEFN ou les tâches de sa map ne sont pas lus, on ne devine pas le contexte
+  // (sinon « UEFN fermé » s'afficherait quelques secondes alors qu'UEFN est connecté).
+  if (etat === 'UEFN connecté' && !projetsLus) return null
   if (ouverteMap && pro && !taches) return null
   const versMaps = () => document.getElementById('forge-vos-maps')?.scrollIntoView({ behavior: 'smooth' })
   const suivante = guide?.suggestions?.[0]

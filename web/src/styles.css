@@ -1315,7 +1315,7 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 .forge .forge-cta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
 .forge .forge-cta-carte{display:flex;flex-direction:column;align-items:flex-start;gap:8px;text-align:left;padding:20px;min-height:132px;border:1px solid var(--border);border-radius:16px;background:var(--surface);color:var(--text);font:inherit;cursor:pointer;transition:border-color .15s,transform .15s}
 .forge .forge-cta-carte:first-child{background:var(--text);color:var(--surface);border-color:var(--text)}
-.forge .forge-cta-carte:first-child .forge-cta-texte{color:inherit;opacity:.75}
+.forge .forge-cta-carte:first-child .forge-cta-texte,.forge.dark .forge-cta-carte:first-child .forge-cta-texte{color:var(--surface) !important;opacity:.8}
 .forge .forge-cta-carte:hover:not(:disabled){border-color:var(--text);transform:translateY(-1px)}
 .forge .forge-cta-carte:focus-visible{outline:2px solid var(--text);outline-offset:2px}
 .forge .forge-cta-carte:disabled{opacity:.5;cursor:not-allowed}
