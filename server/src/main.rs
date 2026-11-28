@@ -374,6 +374,7 @@ fn api() -> Router<AppState> {
             post(analytics::tiktok_refresh),
         )
         .route("/api/me", get(auth::me).delete(manage::delete_me))
+        .route("/api/me/ui-prefs", put(auth::set_ui_prefs))
         .route("/api/me/current-map", put(courante::changer))
         .route("/api/me/export", get(manage::export_me))
         .route(

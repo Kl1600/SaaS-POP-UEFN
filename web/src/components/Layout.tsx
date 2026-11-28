@@ -26,6 +26,27 @@ const mapGroups = (mid: number): [string, Item[]][] => [
   [tr("Créer"), [[`/map/${mid}/pages`, tr("Pages"), FileText], [`/map/${mid}/tableau`, tr("Tableau blanc"), PenTool]]],
   [tr("Publier"), [[`/map/${mid}/lancer`, tr("Lancer et suivre"), Rocket], [`/map/${mid}/remunerer`, tr("Rémunérer"), Coins]]],
 ]
+/** Clés stables des catégories de la map (#493), dans l'ordre de mapGroups sans le premier groupe. */
+const GROUP_KEYS = ['organiser', 'creer', 'publier']
+/** Clé stable d'un onglet de map : la fin de son adresse (« taches », « tableau »…). */
+const itemKey = (p: string) => p.split('/').pop() ?? p
+type NavPrefs = { order?: Record<string, string[]>; collapsed?: string[] }
+
+/** Range les onglets de la map selon les préférences du compte : ordre et catégorie choisis, puis les onglets
+ * absents des préférences (nouveaux) à leur place d'origine. */
+function arrange(groups: [string, Item[]][], prefs: NavPrefs): [string, string, Item[]][] {
+  const head = groups[0]
+  const cats = groups.slice(1).map(([t, items], i) => ({ key: GROUP_KEYS[i], title: t, items }))
+  const byKey = new Map(cats.flatMap(c => c.items.map(it => [itemKey(it[0]), it] as [string, Item])))
+  const used = new Set<string>()
+  const out = cats.map(c => {
+    const keys = (prefs.order?.[c.key] ?? []).filter(k => byKey.has(k) && !used.has(k))
+    keys.forEach(k => used.add(k))
+    return { ...c, items: keys.map(k => byKey.get(k)!) }
+  })
+  cats.forEach((c, i) => c.items.forEach(it => { const k = itemKey(it[0]); if (!used.has(k)) { used.add(k); out[i].items.push(it) } }))
+  return [['', head[0], head[1]], ...out.map(c => [c.key, c.title, c.items] as [string, string, Item[]])]
+}
 /** Catégorie Analyse (plan du compte). */
 const analyseItems = (): Item[] => [
   // Un seul salon (#316) : les pages détaillées restent joignables depuis « Maps à faire ».
@@ -58,6 +79,31 @@ export default function Layout() {
   // Pas d'onglets de map quand le studio ouvert n'a pas cette map (ex. espace perso encore vide).
   const showMap = !!app.map && (!app.studio || app.studio.maps.some(m => m.id === app.map!.id))
   const mGroups = showMap ? mapGroups(app.map!.id) : []
+  // Barre latérale personnalisable (#493) : catégories repliées et ordre des onglets, gardés sur le compte.
+  const [navP, setNavP] = useState<NavPrefs>(() => app.me?.ui_prefs?.nav ?? {})
+  useEffect(() => { setNavP(app.me?.ui_prefs?.nav ?? {}) }, [app.me?.user.id, JSON.stringify(app.me?.ui_prefs?.nav ?? {})])
+  const saveNav = (p: NavPrefs) => {
+    setNavP(p)
+    const all = { ...(app.me?.ui_prefs ?? {}), nav: p }
+    if (app.me) app.me.ui_prefs = all
+    api.put('/api/me/ui-prefs', all).catch(() => {})
+  }
+  const folded = (k: string) => !rail && (navP.collapsed ?? []).includes(k)
+  const fold = (k: string) => { const c = navP.collapsed ?? []; saveNav({ ...navP, collapsed: c.includes(k) ? c.filter(x => x !== k) : [...c, k] }) }
+  const arranged = showMap ? arrange(mGroups, navP) : []
+  const [drag, setDrag] = useState<string | null>(null)
+  /** Dépose l'onglet tiré avant `before` (ou à la fin de la catégorie `cat`). */
+  const drop = (cat: string, before: string | null) => {
+    if (!drag) return
+    const order: Record<string, string[]> = {}
+    for (const [k, , items] of arranged.slice(1)) order[k] = items.map(it => itemKey(it[0])).filter(x => x !== drag)
+    const list = order[cat] ?? []
+    const at = before ? list.indexOf(before) : -1
+    list.splice(at < 0 ? list.length : at, 0, drag)
+    order[cat] = list
+    setDrag(null)
+    saveNav({ ...navP, order })
+  }
   const st = app.studio
   const sLabel = st ? (st.personal ? tr("Mes outils") : st.name) : ''
   const sHome = st ? `/studio/${st.id}/${st.personal ? 'maps' : 'equipe'}` : ''
@@ -105,20 +151,24 @@ export default function Layout() {
         </nav>
         <MapSwitcher />
         <nav className="nav" aria-label={tr("Sections")}>
-          {mGroups.map(([g, items], gi) => (
-            <div key={gi} className="nav">
-              {g && <span className="navsec lbl">{g}</span>}
-              {items.map(([p, l, I]) => <NavLink key={p} to={p} end={p === `/map/${app.map!.id}`} className={({ isActive }) => (isActive ? 'on' : '')}><I size={20} strokeWidth={1.5} /><span className="lbl">{l}</span></NavLink>)}
+          {arranged.map(([k, g, items]) => (
+            <div key={k || 'tete'} className={'nav' + (drag && k ? ' nav-drop' : '')} onDragOver={k && drag ? e => e.preventDefault() : undefined} onDrop={k && drag ? e => { e.preventDefault(); drop(k, null) } : undefined}>
+              {g && <button type="button" className="navsec navsec-btn lbl" aria-expanded={!folded(k)} onClick={() => fold(k)}>{g}<ChevronDown size={14} className={'navsec-chev' + (folded(k) ? ' off' : '')} /></button>}
+              {!folded(k) && items.map(([p, l, I]) => <NavLink key={p} to={p} end={p === `/map/${app.map!.id}`} draggable={!!k && !rail} onDragStart={k ? e => { setDrag(itemKey(p)); e.dataTransfer.effectAllowed = 'move' } : undefined} onDragEnd={() => setDrag(null)}
+                onDragOver={k && drag ? e => e.preventDefault() : undefined} onDrop={k && drag ? e => { e.preventDefault(); e.stopPropagation(); drop(k, itemKey(p)) } : undefined}
+                className={({ isActive }) => (isActive ? 'on' : '') + (drag === itemKey(p) ? ' dragging' : '')}><I size={20} strokeWidth={1.5} /><span className="lbl">{l}</span></NavLink>)}
             </div>
           ))}
           {st && <div className="nav">
-            <span className="navsec lbl">{tr("Studio")}</span>
+            <button type="button" className="navsec navsec-btn lbl" aria-expanded={!folded('studio')} onClick={() => fold('studio')}>{tr("Studio")}<ChevronDown size={14} className={'navsec-chev' + (folded('studio') ? ' off' : '')} /></button>
+            {!folded('studio') && <>
             <NavLink to={sHome} className={onStudio ? 'on' : ''} title={sLabel}>{st.personal ? <Layers size={20} strokeWidth={1.5} /> : <Users size={20} strokeWidth={1.5} />}<span className="lbl">{sLabel}</span></NavLink>
             {sMarket && <NavLink to={sMarket} className={({ isActive }) => (isActive ? 'on' : '')}><ChartNoAxesCombined size={20} strokeWidth={1.5} /><span className="lbl">{tr("Marché")}</span>{!st.analyse && <Lock size={14} className="nav-lock" />}</NavLink>}
+            </>}
           </div>}
           <div className="nav">
-            <span className="navsec lbl">{tr("Analyse")}{locked && <Lock size={12} className="nav-lock" />}</span>
-            {aItems.map(([p, l, I]) => <NavLink key={p} to={p} className={({ isActive }) => (isActive ? 'on' : '') + (locked ? ' locked' : '')}><I size={20} strokeWidth={1.5} /><span className="lbl">{l}</span></NavLink>)}
+            <button type="button" className="navsec navsec-btn lbl" aria-expanded={!folded('analyse')} onClick={() => fold('analyse')}>{tr("Analyse")}{locked && <Lock size={12} className="nav-lock" />}<ChevronDown size={14} className={'navsec-chev' + (folded('analyse') ? ' off' : '')} /></button>
+            {!folded('analyse') && aItems.map(([p, l, I]) => <NavLink key={p} to={p} className={({ isActive }) => (isActive ? 'on' : '') + (locked ? ' locked' : '')}><I size={20} strokeWidth={1.5} /><span className="lbl">{l}</span></NavLink>)}
           </div>
         </nav>
         <div className="side-foot">

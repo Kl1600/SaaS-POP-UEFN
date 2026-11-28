@@ -191,3 +191,7 @@ Bloque : rien
 ### 2026-11-25 · #384 · crédits IA retirés
 - Fait : `aipop.rs` et `aiplan.rs` supprimés (IA de POP payante et plan de production par l'IA) avec leurs routes (`/api/maps/{mid}/ai/plan`, `/api/admin/ai`, don de crédits) ; Stripe : plus de packs (`POP_CREDIT_PACKS` inutile), plus d'achat `kind: credits`, plus de crédit au webhook ; `/api/me` et `/api/billing` ne renvoient plus `ai_credits`. La colonne `ai_credits` et la table `ai_ledger` restent (migrations jamais modifiées). Crédits de playtest inchangés. Décision du 25/11 dans KB/DECISIONS.md, AGENTS.md §5 à jour.
 - Vérifié : cargo test (122 ok) ; serveur local : route du plan IA inconnue (405), plus de `ai_credits`.
+
+### 2026-11-28 · #493 · préférences d'affichage du compte
+- Fait : migration 0068 `users.ui_prefs` (JSON, défaut `{}`) ; `/api/me` renvoie `ui_prefs` ; `PUT /api/me/ui-prefs` remplace l'objet (objet JSON, 8 Ko au plus). Sert à la barre latérale (`nav`) et servira aux didacticiels vus.
+- Vérifié : cargo test (146 ok), aller-retour réel depuis l'interface.
