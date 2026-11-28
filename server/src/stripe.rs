@@ -3,6 +3,8 @@
 //! Variables d'environnement :
 //! - `STRIPE_SECRET_KEY` (sk_live_… ou sk_test_…), `STRIPE_WEBHOOK_SECRET` (whsec_…)
 //! - `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_PRO` : identifiants des prix mensuels (price_…)
+//! - `STRIPE_PRICE_STARTER_ANNUAL`, `STRIPE_PRICE_PRO_ANNUAL` : prix annuels, facultatifs (2 mois offerts, #516) ;
+//!   le choix Mensuel / Annuel n'apparaît que si les deux existent
 //!
 //! Tant que Stripe n'est pas configuré, rien n'est bloqué (bêta).
 //! Accès : un compte « manual » (créé par l'administrateur) n'est jamais bloqué ; un compte en essai l'est
@@ -26,13 +28,19 @@ pub fn configured() -> bool {
 }
 
 fn plan_of_price(price: &str) -> Option<&'static str> {
-    if env("STRIPE_PRICE_PRO").as_deref() == Some(price) {
+    let is = |k: &str| env(k).as_deref() == Some(price);
+    if is("STRIPE_PRICE_PRO") || is("STRIPE_PRICE_PRO_ANNUAL") {
         Some("pro")
-    } else if env("STRIPE_PRICE_STARTER").as_deref() == Some(price) {
+    } else if is("STRIPE_PRICE_STARTER") || is("STRIPE_PRICE_STARTER_ANNUAL") {
         Some("starter")
     } else {
         None
     }
+}
+
+/// Le choix annuel n'est proposé que si les deux prix annuels existent.
+fn annual() -> bool {
+    env("STRIPE_PRICE_STARTER_ANNUAL").is_some() && env("STRIPE_PRICE_PRO_ANNUAL").is_some()
 }
 
 async fn stripe_post(
@@ -99,6 +107,7 @@ pub async fn status(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value>
         "configured": configured(), "state": access_state(&st, u.id).await?,
         "plan": plan, "source": source, "trial_until": trial, "sub_status": sub, "sub_end": end, "has_customer": customer.is_some(),
         "prices": { "starter": "12,99 €", "pro": "24,99 €" },
+        "annual": annual(), "prices_year": { "starter": "129,90 €", "pro": "249,90 €" },
     })))
 }
 
@@ -136,6 +145,8 @@ async fn customer(st: &AppState, u: &AuthUser) -> Result<String, AppError> {
 #[derive(Deserialize)]
 pub struct CheckoutIn {
     kind: String,
+    #[serde(default)]
+    annuel: bool,
 }
 
 /// Page de paiement Stripe (abonnement).
@@ -168,10 +179,11 @@ pub async fn checkout(
             if matches!(sub.as_deref(), Some("active" | "trialing" | "past_due")) {
                 return portal(State(st), u).await;
             }
-            let price = env(if b.kind == "pro" {
-                "STRIPE_PRICE_PRO"
-            } else {
-                "STRIPE_PRICE_STARTER"
+            let price = env(match (b.kind.as_str(), b.annuel && annual()) {
+                ("pro", true) => "STRIPE_PRICE_PRO_ANNUAL",
+                ("pro", false) => "STRIPE_PRICE_PRO",
+                (_, true) => "STRIPE_PRICE_STARTER_ANNUAL",
+                _ => "STRIPE_PRICE_STARTER",
             })
             .ok_or_else(|| bad("Ce plan n’est pas encore en vente."))?;
             form.extend([

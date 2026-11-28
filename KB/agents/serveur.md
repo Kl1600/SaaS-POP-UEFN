@@ -195,3 +195,7 @@ Bloque : rien
 ### 2026-11-28 · #493 · préférences d'affichage du compte
 - Fait : migration 0068 `users.ui_prefs` (JSON, défaut `{}`) ; `/api/me` renvoie `ui_prefs` ; `PUT /api/me/ui-prefs` remplace l'objet (objet JSON, 8 Ko au plus). Sert à la barre latérale (`nav`) et servira aux didacticiels vus.
 - Vérifié : cargo test (146 ok), aller-retour réel depuis l'interface.
+
+### 2026-11-28 · #516 · prix annuels Stripe
+- Fait : stripe.rs : variables facultatives STRIPE_PRICE_STARTER_ANNUAL / STRIPE_PRICE_PRO_ANNUAL ; `annual` et `prices_year` dans /api/billing ; checkout accepte `annuel` ; plan_of_price reconnaît les prix annuels.
+- Vérifié : cargo test (148 ok), faux Stripe local.
