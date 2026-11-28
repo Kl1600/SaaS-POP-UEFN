@@ -40,29 +40,6 @@ function useReveal() {
 
 // ---------- Maquettes (vrais écrans de POP, simplifiés) ----------
 type M = Dict['mock']
-function AppShot({ m }: { m: M }) {
-  return <div className="mock appshot" aria-hidden>
-    <div className="mbar"><i /><i /><i /><span>pop · {m.overview}</span></div>
-    <div className="mbody">
-      <aside className="mside">
-        <img src="/logo.png" alt="" />
-        {m.nav.map((x, i) => <div key={x} className={'mnav' + (i === 0 ? ' on' : '')}>{x}</div>)}
-      </aside>
-      <div className="mmain">
-        <div className="mcard guide">
-          <div className="mrow"><span className="gico"><Compass size={14} /></span><b>{m.hello}</b></div>
-          <p><AlertCircle size={13} className="r" />{m.late}</p>
-          <p><AlertTriangle size={13} className="o" />{m.mile}</p>
-          <div className="msug first"><span><b>#42</b> {m.tasks[0]}</span><em>{m.unlocks}</em><span className="mbtn">{m.take}</span></div>
-          <div className="msug"><span><b>#38</b> {m.tasks[1]}</span><em>{m.today}</em><span className="mbtn ghost">{m.start}</span></div>
-        </div>
-        <div className="mkan">
-          {([[m.todo, ['#44 ' + m.tasks[2], '#45 ' + m.tasks[3]]], [m.doing, ['#42 ' + m.tasks[0]]], [m.done, ['#40 ' + m.tasks[4], '#41 ' + m.tasks[5]]]] as [string, string[]][]).map(([t, cs]) => <div key={t} className="mcol"><span>{t}</span>{cs.map(c => <div key={c} className="mtask">{c}<i>1 h</i></div>)}</div>)}
-        </div>
-      </div>
-    </div>
-  </div>
-}
 function TasksShot({ m }: { m: M }) {
   const cols: [string, string[][]][] = [[m.todo, [['#44', m.tasks[2], m.waits], ['#45', m.tasks[3], '']]], [m.doing, [['#42', m.tasks[0], 'Léa']]], [m.done, [['#40', m.tasks[4], 'Hugo'], ['#41', m.tasks[5], 'Léa']]]]
   return <div className="mock" aria-hidden><div className="mpad">
@@ -184,7 +161,6 @@ export default function Landing() {
         <button className="lbtn" onClick={go('fonctionnalites')}>{t.hero.see}</button>
       </div>
       <p className="lmicro" data-reveal><span className="ldot" /> <b>{t.hero.micro1}</b> · {t.hero.micro2} · {t.hero.micro3}</p>
-      <div className="lshot" data-reveal><AppShot m={t.mock} /></div>
     </header>
 
     <section className="lmarquee" aria-label={t.marquee.label}>

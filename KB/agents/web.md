@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-28 · #554 · vitrine sans maquette du Dashboard
+- Fait : Landing.tsx : AppShot (« pop · Dashboard ») retiré du haut de page, composant supprimé.
+- Vérifié : capture 1440 px.
+
 ### 2026-11-28 · #552 · Léo fait des actions
 - Fait : web/src/leoActions.ts (règles, FR et EN, sans IA externe) : créer une tâche (titre, jour, personne), une page, un tableau blanc, un objectif ; sur « #N » : statut, assigner, déplacer, commenter, ouvrir ; aller sur une page. Guide.tsx : Léo propose l'action, « Confirmer » / « Annuler », puis lien « Voir ». Les « comment… ? » restent aux fiches.
 - Pour ajouter une action : une branche de plus dans comprendre(), avant la navigation.
