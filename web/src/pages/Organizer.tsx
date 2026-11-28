@@ -143,7 +143,7 @@ export default function Organizer() {
     <main className="content">
       <PageHead title={tr("Organiseur")} help={tr("L’outliner d’UEFN dans le navigateur : retrouvez, modifiez et rangez les acteurs du niveau à plusieurs.")}>
         <span className={'badge ' + (st.status === 'connected' ? 'b-g' : st.status === 'closed' ? 'b-o' : st.status === 'unlinked' ? '' : 'b-r')}>{STATUS_LABEL[st.status]}</span>
-        <button className="btn" onClick={() => setShowLink(v => !v)}><Link2 size={16} />UEFN Link</button>
+        <button className="btn" onClick={() => setShowLink(v => !v)}><Link2 size={16} />POP Forge</button>
         <button className="btn" disabled={st.status !== 'connected'} onClick={() => act('refresh_actors', {}, tr("Acteurs actualisés"))}><RefreshCw size={16} />{tr("Actualiser")}</button>
         {/* Envoi complet (acteurs et Verse) dans la session de test en cours (#5). */}
         <button className="btn" disabled={readOnly} title={tr("Envoie les modifications du niveau dans la session de test en cours")} onClick={() => act('push_session', {}, tr("Envoyé en session de test"))}><Play size={16} />{tr("Envoyer en session")}</button>
@@ -409,7 +409,7 @@ function Pairing({ status, tools, elsewhere }: { status: string; tools: any; els
   </section>
 }
 
-/** Paramètres → UEFN Link (#210) : l'Organiseur est retiré ; restent le relais, les validations de suppression
+/** Paramètres → POP Forge (#210) : l'Organiseur est retiré ; restent le relais, les validations de suppression
  *  demandées par une IA, et le journal des actions UEFN avec l'annulation. */
 export function UefnLinkSettings() {
   const { map, canEdit, role, toast } = useApp()

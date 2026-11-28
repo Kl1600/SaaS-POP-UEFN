@@ -47,7 +47,7 @@ export function useAccountAI(waiting: boolean): AccountAI {
   return { tokens, live, pending, reload, agentsForge }
 }
 
-/** Pastille d'état de l'IA, à côté de celle d'UEFN Link. Sans IA connectée, elle mène à « Mes IA » sur l'accueil. */
+/** Pastille d'état de l'IA, à côté de celle de POP Forge. Sans IA connectée, elle mène à « Mes IA » sur l'accueil. */
 export function AiPill() {
   const nav = useNavigate()
   const ai = useAccountAI(false)

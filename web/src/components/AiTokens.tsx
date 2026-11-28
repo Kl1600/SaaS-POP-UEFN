@@ -43,7 +43,7 @@ export function AccountAI() {
     <section className="card">
       <CardHead title={tr("IA connectées")} sub={tr("Connectez votre IA (Claude, Cursor, Codex…) une seule fois pour tout votre compte : elle voit vos maps perso et celles de vos studios, et choisit elle-même la map sur laquelle travailler.")} />
       <h3 style={{ fontWeight: 500, fontSize: 15, margin: '4px 0 8px' }}>{tr("Vos IA")}</h3>
-      <p className="small muted" style={{ marginTop: 0 }}>{tr("Lecture seule : l’IA voit vos maps sans rien modifier, sur toutes les maps. Les suppressions d’acteurs attendent toujours votre validation dans Paramètres → UEFN Link.")}</p>
+      <p className="small muted" style={{ marginTop: 0 }}>{tr("Lecture seule : l’IA voit vos maps sans rien modifier, sur toutes les maps. Les suppressions d’acteurs attendent toujours votre validation dans Paramètres → POP Forge.")}</p>
       {data && live.length === 0 && <p className="muted">{tr("Aucune IA connectée pour l’instant.")}</p>}
       <div className="list">{live.map(t => (
         <div key={t.id} className="li" style={{ flexWrap: 'wrap' }}>

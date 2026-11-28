@@ -1,4 +1,4 @@
-// Paramètres du compte, en onglets : Mon compte, IA connectées (#205 ; jetons du compte, #145), UEFN Link (#210, pour la map ouverte).
+// Paramètres du compte, en onglets : Mon compte, IA connectées (#205 ; jetons du compte, #145), POP Forge (#210, pour la map ouverte).
 import { useSearchParams } from 'react-router-dom'
 import { CardHead, PageHead, Tabs } from '../components/ui'
 import { PanelLeft } from '../icons'
@@ -21,7 +21,7 @@ export default function Settings() {
   return (
     <main className="content">
       <PageHead title={tr("Paramètres")} help={tr("Votre compte et vos connexions.")} />
-      <Tabs value={tab} onChange={t => setSp(t === 'compte' ? {} : { onglet: t })} items={[['compte', tr("Mon compte")], ['maps', tr("Maps et studios")], ['ia', tr("IA connectées")], ['uefn', tr("UEFN Link")]]} />
+      <Tabs value={tab} onChange={t => setSp(t === 'compte' ? {} : { onglet: t })} items={[['compte', tr("Mon compte")], ['maps', tr("Maps et studios")], ['ia', tr("IA connectées")], ['uefn', tr("POP Forge")]]} />
       {tab === 'compte' && <><BillingSettings /><Account /><Affichage /></>}
       {tab === 'maps' && <MapsStudios />}
       {tab === 'ia' && <><AccountAI /><MapAgents /></>}

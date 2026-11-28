@@ -10,7 +10,7 @@ import { tr, LOCALE } from '../i18n/t'
 const date = (d?: string | null) => d ? new Date(d.replace(' ', 'T') + 'Z').toLocaleDateString(LOCALE, { day: 'numeric', month: 'long', year: 'numeric' }) : ''
 
 const FEATURES: Record<string, string[]> = {
-  starter: [tr("Tâches, planning, pages, tableau blanc"), tr("UEFN Link (vos IA connaissent la map)"), tr("IA connectées (Claude, Cursor, Codex…)"), tr("Lancement, playtests, partage des gains"), tr("Seul ou en équipe, maps illimitées")],
+  starter: [tr("Tâches, planning, pages, tableau blanc"), tr("POP Forge (vos IA connaissent la map)"), tr("IA connectées (Claude, Cursor, Codex…)"), tr("Lancement, playtests, partage des gains"), tr("Seul ou en équipe, maps illimitées")],
   pro: [tr("Tout Starter"), tr("Idées de maps et analyse du marché"), tr("Ça monte maintenant, tendances vidéo"), tr("Onglet Discover et chance de percer"), tr("Chiffres privés du Creator Portal")],
 }
 

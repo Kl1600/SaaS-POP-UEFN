@@ -998,8 +998,8 @@ pub async fn ask(
             ),
             "unlinked" => ls(
                 en,
-                "Aucun projet UEFN n’est relié à cette map : reliez-le avec un code d’appairage (Organiseur → UEFN Link).",
-                "No UEFN project is linked to this map: link it with a pairing code (Organizer → UEFN Link).",
+                "Aucun projet UEFN n’est relié à cette map : reliez-le avec un code d’appairage (Paramètres → POP Forge).",
+                "No UEFN project is linked to this map: link it with a pairing code (Settings → POP Forge).",
             ),
             other => tf!(en, "Relais UEFN : {other}.", "UEFN relay: {other}."),
         };

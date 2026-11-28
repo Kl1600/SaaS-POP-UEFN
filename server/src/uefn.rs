@@ -1,4 +1,4 @@
-//! UEFN Link : connexion du relais local, exécution des actions (journalisées, annulables, mises en attente
+//! POP Forge : connexion du relais local, exécution des actions (journalisées, annulables, mises en attente
 //! quand UEFN est fermé), dernier état connu, verrous Lore.
 use crate::{
     access::{map_ctx, notify, MapCtx, Role},
@@ -225,7 +225,7 @@ pub async fn pair(State(st): State<AppState>, Json(b): Json<PairIn>) -> ApiResul
     let (id, mid) = row.ok_or_else(|| bad("Code invalide ou expiré."))?;
     let token = random_token();
     sqlx::query("UPDATE relay_devices SET token_hash = ?, pair_code_hash = NULL, pair_expires = NULL, name = ? WHERE id = ?")
-        .bind(sha256_hex(&token)).bind(b.name.unwrap_or_else(|| "UEFN Link".into()).chars().take(60).collect::<String>()).bind(id)
+        .bind(sha256_hex(&token)).bind(b.name.unwrap_or_else(|| "POP Forge".into()).chars().take(60).collect::<String>()).bind(id)
         .execute(&st.db).await?;
     let (name,): (String,) = sqlx::query_as("SELECT name FROM maps WHERE id = ?")
         .bind(mid)
