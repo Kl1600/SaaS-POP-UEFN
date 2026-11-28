@@ -342,6 +342,11 @@ function Reglages({ invoke }: { invoke: Invoke | null }) {
       {ligne(tr("Dictée vocale"), tr("Gardez le raccourci appuyé dans un champ pour dicter ; transcrit sur votre PC"), <select className="field" style={{ width: 'auto' }} aria-label={tr("Raccourci de la dictée")} defaultValue={raccourci()} onChange={e => { choisirRaccourci(e.target.value as Raccourci); app.toast(tr("Raccourci de la dictée : {0}", [RACCOURCIS[e.target.value as Raccourci]])) }}>
         {Object.entries(RACCOURCIS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
       </select>)}
+      {ligne(tr("Didacticiels"), tr("Les bulles d’aide de chaque écran de Forge, vues une fois"), <button className="btn" disabled={!(app.me?.ui_prefs?.tours ?? []).some((t: string) => t.startsWith('forge-'))} onClick={async () => {
+        // Comme Paramètres → Affichage sur le site (#533) ; ici, seulement les écrans de Forge (#542).
+        const all = { ...(app.me?.ui_prefs ?? {}), tours: (app.me?.ui_prefs?.tours ?? []).filter((t: string) => !t.startsWith('forge-')) }
+        try { await api.put('/api/me/ui-prefs', all); await app.reload(); app.toast(tr("Les didacticiels reviendront au prochain passage sur chaque écran de Forge.")) } catch (e: any) { app.toast(e.message, true) }
+      }}>{tr("Revoir les didacticiels")}</button>)}
       {ligne(tr("Version"), version ? `POP Forge ${version}` : tr("Version inconnue : réinstallez Forge depuis pop-uefn.com/forge"), version && <button className="btn" disabled={verif === 'encours'} onClick={verifier}>{verif === 'encours' ? tr("Vérification…") : tr("Vérifier les mises à jour")}</button>)}
       {verif === 'ajour' && <p className="small" role="status" style={{ margin: '6px 0 0' }}>{tr("Forge est à jour.")}</p>}
       {ligne(tr("Diagnostic"), tr("État de Forge, du relais et de la map, à coller dans une demande d’aide"), <button className="btn" onClick={async () => {
