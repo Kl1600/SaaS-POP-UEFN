@@ -2,6 +2,11 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-28 · #557 · onglet Nouveautés
+- Fait : web/src/nouveautes.ts (liste des changements livrés, plus récent en tête), pages/Nouveautes.tsx (/nouveautes, groupé par jour, Nouveau / Amélioré / Corrigé), bouton mégaphone dans la barre du haut avec un point tant que ui_prefs.news_seen n'est pas la dernière date ; entrée dans le menu du compte.
+- Pour un changement visible : ajouter une entrée en tête de NOUVEAUTES (et sa traduction dans app-en.ts).
+- Vérifié : Playwright (point avant, 13 entrées sur 4 jours, plus de point après).
+
 ### 2026-11-28 · #554 · vitrine sans maquette du Dashboard
 - Fait : Landing.tsx : AppShot (« pop · Dashboard ») retiré du haut de page, composant supprimé.
 - Vérifié : capture 1440 px.

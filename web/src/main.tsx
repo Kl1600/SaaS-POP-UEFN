@@ -25,6 +25,7 @@ import Money from './pages/Money'
 import Team, { Account } from './pages/Team'
 import { PageHead } from './components/ui'
 import Help from './pages/Help'
+import Nouveautes from './pages/Nouveautes'
 import Settings from './pages/Settings'
 import { Market, Trending, Launches } from './pages/Analysis'
 import Ideas from './pages/Ideas'
@@ -94,6 +95,7 @@ function Gate() {
           <Route path="tendances" element={<Navigate to="../marche?v=videos" replace />} />
         </Route>
         <Route path="aide" element={<Help />} />
+        <Route path="nouveautes" element={<Nouveautes />} />
         <Route path="admin" element={L(Admin)} />
         <Route path="parametres" element={<Settings />} />
         <Route path="analyse/a-faire" element={<AnalyseGate title={tr("Maps à faire")}><MapsToMake /></AnalyseGate>} />

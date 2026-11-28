@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { cssRect } from '../zoom'
 import { LeoVisage } from './LeoVisage'
+import { DERNIERE } from '../nouveautes'
 import { Target,
   Home, FileText, PenTool, CalendarDays, KanbanSquare, Rocket, Coins, Users, Settings, LifeBuoy, PanelLeft,
   Search, Bell, Plus, ChevronDown, Hexagon, LogOut, ListTree, Bot, ChartNoAxesCombined, Layers, Lock, Sun, Moon, GripVertical, Wrench } from '../icons'
@@ -161,7 +162,7 @@ export default function Layout() {
     ...(st ? [[`/studio/${st.id}`, tr("Studio"), sLabel] as [string, string, string]] : []),
     ...(sMarket ? [[sMarket, sLabel, tr("Marché")] as [string, string, string]] : []),
     ...aItems.map(([p, l]) => [p, tr("Analyse"), l] as [string, string, string]),
-    ['/', 'POP', tr("Accueil")], ['/parametres', tr("Compte"), tr("Paramètres")], ['/aide', 'POP', tr("Aide et support")], ['/admin', 'POP', tr("Administration")],
+    ['/', 'POP', tr("Accueil")], ['/parametres', tr("Compte"), tr("Paramètres")], ['/aide', 'POP', tr("Aide et support")], ['/nouveautes', 'POP', tr("Nouveautés")], ['/admin', 'POP', tr("Administration")],
   ]
   const hit = all.filter(([p]) => p === '/' ? loc.pathname === '/' : loc.pathname === p || loc.pathname.startsWith(p + '/')).sort((x, y) => y[0].length - x[0].length)[0]
   const [, group, title] = hit ?? ['', 'POP', tr("Accueil")]
@@ -230,6 +231,7 @@ export default function Layout() {
               <div className="small muted acct-mail" title={app.me?.user.email}>{app.me?.user.email}</div>
               <div className="acct-plan small">{app.me?.trial_until ? tr("Essai Pro jusqu’au {0}", [new Date(app.me.trial_until.replace(' ', 'T') + 'Z').toLocaleDateString(LOCALE, { day: 'numeric', month: 'long' })]) : app.me?.plan === 'pro' ? tr("Plan Pro") : tr("Plan Starter")}</div>
               <button onClick={() => { setAcct(false); nav('/parametres') }}><Settings size={16} />{tr("Paramètres")}</button>
+              <button onClick={() => { setAcct(false); nav('/nouveautes') }}><Megaphone size={16} />{tr("Nouveautés")}</button>
               <button onClick={() => { setAcct(false); nav('/aide') }}><LifeBuoy size={16} />{tr("Aide et support")}</button>
               {(app.me?.admin || app.me?.moderator) && <button onClick={() => { setAcct(false); nav('/admin') }}><ShieldCheck size={16} />{tr("Administration")}{!!app.me.admin_pending && <span className="nav-count">{app.me.admin_pending}</span>}</button>}
               <button onClick={async () => { await api.post('/api/auth/logout'); location.href = '/' }}><LogOut size={16} />{tr("Se déconnecter")}</button>
@@ -247,6 +249,7 @@ export default function Layout() {
           <span className="top-spacer" />
           {app.map && <OuvrirForge mapId={app.map.id} compact />}
           <GlobalSearch />
+          <NouveautesBtn />
           <Notifications />
           <button className="iconbtn" aria-label={app.dark ? tr("Passer en mode clair") : tr("Passer en mode sombre")} data-tip={app.dark ? tr("Mode clair") : tr("Mode sombre")} onClick={app.toggleDark}>{app.dark ? <Sun size={20} strokeWidth={1.5} /> : <Moon size={20} strokeWidth={1.5} />}</button>
           <CreateMenu onTask={app.map && app.canEdit ? () => setNewTask(true) : undefined} />
@@ -382,4 +385,16 @@ function Notifications() {
         </button>)}
     </div>}
   </div>
+}
+
+/** Bouton « Nouveautés » de la barre du haut (#557) : un point tant que la dernière nouveauté n'a pas été vue. */
+function NouveautesBtn() {
+  const app = useApp()
+  const nav = useNav()
+  const [, maj] = useState(0)
+  useEffect(() => { const f = () => maj(x => x + 1); window.addEventListener('pop-nouveautes-vues', f); return () => window.removeEventListener('pop-nouveautes-vues', f) }, [])
+  const neuf = app.me?.ui_prefs?.news_seen !== DERNIERE()
+  return <button className="iconbtn" aria-label={neuf ? tr("Nouveautés (du nouveau)") : tr("Nouveautés")} data-tip={tr("Nouveautés")} onClick={() => nav('/nouveautes')}>
+    <Megaphone size={20} strokeWidth={1.5} />{neuf && <span className="dot" />}
+  </button>
 }
