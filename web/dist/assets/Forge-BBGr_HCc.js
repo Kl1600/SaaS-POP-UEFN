@@ -1,7 +1,10 @@
-import{l as _,r as u,j as e,a9 as Pe,t as s,N as Ye,aa as Se,p as V,n as Me,ab as Ze,ac as Ke,ad as Qe,a5 as es,o as $,V as Ae,ae as ss,af as fe,ag as ae,s as je,Y as me,k as ts,ah as We,ai as as,$ as ns,J as rs,X as qe,aj as ls,Z as ve,ak as is,al as os,am as $e,M as De,w as cs,u as Re,an as us,B as ds,ao as ms,ap as ps,aq as hs,ar as xs,a8 as gs,as as ie,at as Te,au as fs,av as js,C as vs,aw as bs,L as ys}from"./index-Cr8j-hR5.js";import{S as ce,F as Ns}from"./ForgeAgents-Cq7ZYMyW.js";import{M as ws,G as ks,P as Cs,a as Ps,B as Ss,F as Es,O as Ee,C as Fs,b as zs,c as Ls,H as Os,R as Ms,d as As,e as Ws,f as qs,L as $s,W as Ds}from"./wrench-DB1X0lj4.js";const Rs=`# Nouveautés de POP Forge
+import{l as _,r as u,j as e,a9 as Pe,t as s,N as Ye,aa as Se,p as V,n as Me,ab as Ze,ac as Ke,ad as Qe,a5 as es,o as $,V as Ae,ae as ss,af as fe,ag as ae,s as je,Y as me,k as ts,ah as We,ai as as,$ as ns,J as rs,X as qe,aj as ls,Z as ve,ak as is,al as os,am as $e,M as De,w as cs,u as Re,an as us,B as ds,ao as ms,ap as ps,aq as hs,ar as xs,a8 as gs,as as ie,at as Te,au as fs,av as js,C as vs,aw as bs,L as ys}from"./index-DB_3QcbV.js";import{S as ce,F as Ns}from"./ForgeAgents-CtpxP3BG.js";import{M as ws,G as ks,P as Cs,a as Ps,B as Ss,F as Es,O as Ee,C as Fs,b as zs,c as Ls,H as Os,R as Ms,d as As,e as Ws,f as qs,L as $s,W as Ds}from"./wrench-wFz-ihGF.js";const Rs=`# Nouveautés de POP Forge
 
 Une entrée par version de \`forge/tauri.conf.json\` (#437) : \`## version · date\`, puis 1 à 5 lignes en français.
 Le workflow « relais Windows » en tire les notes de la mise à jour ; le CI refuse une version sans entrée.
+
+## 0.3.17 · 28/11/2026
+- Outils → Low Mesh : allégez un modèle 3D (FBX, OBJ, GLB) avant import, avec aperçu et nombre de triangles avant et après ; Forge prévient au-delà de 30 000 sommets.
 
 ## 0.3.16 · 28/11/2026
 - Outils → Texte 3D et 2D : un titre, un panneau ou un logo en mesh 3D (FBX) ou en image transparente (PNG), fait par Blender sur votre PC, avec aperçu, puis importé dans UEFN en un clic.

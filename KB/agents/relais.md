@@ -121,3 +121,11 @@ Fait : link/src/texte3d.rs (réglages en JSON hors du script, Poppins ou Inter, 
 Reste : critères (UEFN) à tester sur le PC de benybens
 Bloque : rien
 ```
+
+```
+EN REVUE | #325 Forge · Outils : Low Mesh (réduire les polygones avant import) | 28/11
+Owner : Kl1600 | Sur la tâche : Claude Code, pour Kl1600
+Fait : link/src/lowmesh.rs (FBX/OBJ/GLB, Decimate de Blender, comptes et aperçus avant/après, export FBX) ; commande lowmesh_reduire (5 min au plus) ; Outils → Low Mesh (alerte au-delà de 30 000 sommets, import par asset_import)
+Reste : critère (UEFN) à tester sur le PC de benybens
+Bloque : rien
+```

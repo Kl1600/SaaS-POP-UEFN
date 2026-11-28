@@ -5,6 +5,7 @@
 //!
 //! `pop-link.exe` (téléchargeable sur le site) est recompilé sous Windows par le workflow « relais Windows » (#358).
 pub mod blender;
+pub mod lowmesh;
 mod digest;
 mod files;
 mod mcpdriver;

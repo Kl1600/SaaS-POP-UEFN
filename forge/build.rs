@@ -31,6 +31,7 @@ fn main() {
             "blender_installer",
             "blender_tester",
             "texte_creer",
+            "lowmesh_reduire",
             "projet_ouvert",
             "liaison",
             "fenetre",

@@ -145,6 +145,7 @@ fn autoriser(app: &AppHandle, u: &Url) {
         .permission("allow-blender-installer")
         .permission("allow-blender-tester")
         .permission("allow-texte-creer")
+        .permission("allow-lowmesh-reduire")
         .permission("allow-importer")
         .permission("allow-projet-ouvert")
         .permission("allow-liaison")
@@ -897,6 +898,66 @@ async fn texte_creer(reglages: pop_link::texte3d::Params) -> Result<serde_json::
     }))
 }
 
+/// Outil Low Mesh (#325) : réduit un modèle avec le Decimate de Blender ; aperçus et comptes avant et après ;
+/// le FBX réduit est gardé dans « POP Forge\creations », prêt à importer.
+#[tauri::command]
+async fn lowmesh_reduire(
+    nom: String,
+    donnees: String,
+    taux: f64,
+) -> Result<serde_json::Value, String> {
+    use base64::Engine;
+    let b64 = base64::engine::general_purpose::STANDARD;
+    let data = b64
+        .decode(donnees.as_bytes())
+        .map_err(|_| "Fichier illisible.".to_string())?;
+    let (script, entrees) =
+        pop_link::lowmesh::script(&nom, data, taux).map_err(|e| e.to_string())?;
+    let r = pop_link::blender::lancer(&script, entrees, std::time::Duration::from_secs(300))
+        .await
+        .map_err(|e| format!("{e:#}"))?;
+    let lire = |n: &str| {
+        r.autres
+            .iter()
+            .find(|(x, _)| x == n)
+            .map(|(_, d)| d.clone())
+    };
+    let fbx = lire("sortie.fbx").ok_or("Blender n'a pas produit le modèle réduit.")?;
+    let comptes: serde_json::Value = lire("sortie.json")
+        .and_then(|d| serde_json::from_slice(&d).ok())
+        .unwrap_or_default();
+    let base: String = nom
+        .rsplit_once('.')
+        .map(|(b, _)| b)
+        .unwrap_or(&nom)
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+        .take(40)
+        .collect();
+    let fichier = format!(
+        "{}_low{}.fbx",
+        base.trim_matches('_'),
+        (taux * 100.0).round() as u32
+    );
+    let dossier = pop_link::blender::dossier()
+        .parent()
+        .map(|p| p.join("creations"))
+        .ok_or("Dossier de Forge introuvable.")?;
+    std::fs::create_dir_all(&dossier).map_err(|e| e.to_string())?;
+    let chemin = dossier.join(&fichier);
+    std::fs::write(&chemin, fbx).map_err(|e| e.to_string())?;
+    let apres_sommets = comptes["apres"]["sommets"].as_u64().unwrap_or(0);
+    Ok(serde_json::json!({
+        "chemin": chemin.to_string_lossy(),
+        "nom": fichier,
+        "avant": comptes["avant"],
+        "apres": comptes["apres"],
+        "apercu_avant": b64.encode(lire("sortie.avant.png").unwrap_or_default()),
+        "apercu_apres": b64.encode(&r.apercu),
+        "trop_lourd": apres_sommets > pop_link::lowmesh::SOMMETS_MAX_CONSEILLES,
+    }))
+}
+
 #[tauri::command]
 fn direct_fermer(d: tauri::State<'_, direct::Directs>, agent: i64) {
     direct::fermer(&d, agent)
@@ -1110,7 +1171,8 @@ fn main() {
             blender_etat,
             blender_installer,
             blender_tester,
-            texte_creer
+            texte_creer,
+            lowmesh_reduire
         ])
         .setup(|app| {
             let h = app.handle().clone();
