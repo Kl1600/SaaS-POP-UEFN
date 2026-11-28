@@ -1,1 +1,1 @@
-{"version": "0.3.18", "date": "2026-11-28", "notes": "· Outils → 3D Studio : décrivez un objet à votre IA ; elle le construit avec Blender sur votre PC, vous voyez l'aperçu et vous l'acceptez avant tout import dans UEFN."}
+{"version": "0.3.19", "date": "2026-11-28", "notes": "· Sécurité : la décompression de Blender utilise une version corrigée de la bibliothèque zip."}

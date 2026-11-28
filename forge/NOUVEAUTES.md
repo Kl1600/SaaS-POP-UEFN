@@ -3,6 +3,9 @@
 Une entrée par version de `forge/tauri.conf.json` (#437) : `## version · date`, puis 1 à 5 lignes en français.
 Le workflow « relais Windows » en tire les notes de la mise à jour ; le CI refuse une version sans entrée.
 
+## 0.3.19 · 28/11/2026
+- Sécurité : la décompression de Blender utilise une version corrigée de la bibliothèque zip.
+
 ## 0.3.18 · 28/11/2026
 - Outils → 3D Studio : décrivez un objet à votre IA ; elle le construit avec Blender sur votre PC, vous voyez l'aperçu et vous l'acceptez avant tout import dans UEFN.
 

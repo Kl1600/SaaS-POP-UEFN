@@ -18,7 +18,7 @@ axum = "0.8"
 anyhow = "1"
 rand = "0.8"
 # Blender (#351) : décompression du zip officiel.
-zip = { version = "2", default-features = false, features = ["deflate"] }
+zip = { version = "9.0.5", default-features = false, features = ["deflate"] }
 
 # Isolation de Blender (#351) : AppContainer et Job Object.
 [target.'cfg(windows)'.dependencies]
