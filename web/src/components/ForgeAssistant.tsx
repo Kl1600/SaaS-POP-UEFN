@@ -47,7 +47,8 @@ export function ForgeAssistant({ invoke, liens, etat }: {
     { id: 'projet', titre: tr("Projet ouvert dans UEFN"), ok: !!ouvert, aide: tr("Ouvrez votre projet dans UEFN. Forge le trouve tout seul.") },
     { id: 'mcp', titre: tr("Serveur MCP d'UEFN démarré"), ok: !!b.mcp, aide: tr("Démarrez-le {0}.", [MCP]) },
     { id: 'auto', titre: tr("Démarrage automatique du serveur MCP"), ok: b.demarrage_auto ?? null,
-      aide: b.demarrage_auto === false ? tr("Il est désactivé : sans lui, il faut démarrer le serveur à la main à chaque lancement.") : tr("Forge n'a pas trouvé ce réglage dans les fichiers d'UEFN : cochez « Auto Start Server » au même endroit que Start Server."),
+      // Réglage absent des fichiers d'UEFN = valeur par défaut, active (#528).
+      aide: b.demarrage_auto === false ? tr("Il est désactivé : sans lui, il faut démarrer le serveur à la main à chaque lancement.") : b.demarrage_auto_defaut ? tr("Actif (réglage par défaut d'UEFN).") : tr("Actif."),
       action: b.demarrage_auto === false ? [tr("Activer"), activer] : undefined },
     { id: 'toolsets', titre: tr("Réglage du projet : UEFN MCP Toolsets"), ok: mcpOff ? null : (b.toolsets ?? 0) > 0, aide: tr("Activez les toolsets MCP d'UEFN dans les paramètres du projet, puis redémarrez le serveur MCP.") },
     { id: 'python', titre: tr("Réglage du projet : Python Editor Scripting"), ok: mcpOff ? null : b.python ?? null, aide: tr("Activez « Enable Project Python Scripts » dans les paramètres du projet, puis redémarrez UEFN.") },
@@ -77,7 +78,7 @@ export function ForgeAssistant({ invoke, liens, etat }: {
         <div style={{ flex: 1 }}>
           <div>{e.titre}</div>
           {e.ok === false && <small className="muted">{e.aide}</small>}
-          {e.ok === null && e.id === 'auto' && <small className="muted">{e.aide}</small>}
+          {(e.ok === null || (e.ok === true && b.demarrage_auto_defaut)) && e.id === 'auto' && <small className="muted">{e.aide}</small>}
         </div>
         {e.action && <button className="btn pri" onClick={e.action[1]}>{e.action[0]}</button>}
       </li>)}

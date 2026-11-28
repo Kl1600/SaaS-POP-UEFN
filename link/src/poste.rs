@@ -104,6 +104,13 @@ pub fn demarrage_auto() -> Option<(PathBuf, bool)> {
     })
 }
 
+/// Démarrage automatique vu par l'assistant (#528). Unreal n'écrit pas un réglage égal à sa valeur par défaut : une
+/// clé absente veut dire « actif (par défaut) ». Seul `False` écrit dans un `.ini` le désactive ; et un serveur MCP qui
+/// répond prouve qu'il marche.
+pub fn demarrage_auto_actif(reglage: Option<bool>, mcp_repond: bool) -> bool {
+    mcp_repond || reglage != Some(false)
+}
+
 /// UEFN est-il ouvert ? (UE réécrit ses réglages en se fermant : on ne les change que s'il est fermé.)
 pub fn uefn_ouvert() -> bool {
     #[cfg(windows)]
@@ -312,7 +319,9 @@ pub async fn bilan(projet: Option<&Path>, mcp_url: Option<&str>) -> Value {
         "mcp": mcp,
         "toolsets": toolsets,
         "python": python,
-        "demarrage_auto": auto.as_ref().map(|a| a.1),
+        "demarrage_auto": demarrage_auto_actif(auto.as_ref().map(|a| a.1), mcp),
+        // Réglage absent des fichiers : UEFN utilise sa valeur par défaut (activé).
+        "demarrage_auto_defaut": auto.is_none(),
         "reglages_uefn": auto.map(|a| a.0.to_string_lossy().to_string()),
     })
 }
@@ -346,6 +355,11 @@ mod tests {
     fn reglage_dans_la_section_mcp() {
         let ini = "[/Script/Autre.Reglages]\nbAutoStart=True\n\n[/Script/AgenticWorkflows.McpServerSettings]\nPort=8000\nbAutoStartServer=False\n";
         assert_eq!(ligne_demarrage_auto(ini), Some((5, false)));
+        // #528 : clé absente = valeur par défaut (actif) ; True = actif ; False = à activer, sauf si le serveur répond.
+        assert!(demarrage_auto_actif(None, false));
+        assert!(demarrage_auto_actif(Some(true), false));
+        assert!(!demarrage_auto_actif(Some(false), false));
+        assert!(demarrage_auto_actif(Some(false), true));
         assert_eq!(
             ligne_demarrage_auto("[/Script/X]\nbAutoStartServer=True\n"),
             None,

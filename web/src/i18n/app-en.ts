@@ -1931,6 +1931,8 @@ const EN: Record<string, string> = {
  "Ctrl/Cmd+clic : ajouter · Maj+clic : plage · Ctrl+Z : annuler": "Ctrl/Cmd+click: add · Shift+click: range · Ctrl+Z: undo",
  "Détails": "Details",
  "Vue du dessus": "Top view",
+ "Actif (réglage par défaut d'UEFN).": "On (UEFN default setting).",
+ "Actif.": "On.",
  "Joueurs des premiers jours": "Players in the first days",
  "Temps de jeu": "Playtime",
  "Progression des premiers jours": "Growth in the first days",

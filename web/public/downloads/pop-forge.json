@@ -1,1 +1,1 @@
-{"version": "0.3.21", "date": "2026-11-28", "notes": "· Même thème que le site : barre latérale avec catégories repliables, onglets à réordonner en tenant ⋮⋮.\n· Didacticiel à la première visite de chaque écran de Forge (Accueil, Agents, Terminal, Outils, Vérifications, Plan 2D, Bibliothèque).\n· Offre Pro présentée comme sur le site : prix par jour, choix annuel, réassurance."}
+{"version": "0.3.22", "date": "2026-11-28", "notes": "· Assistant de liaison : le démarrage automatique du serveur MCP d'UEFN, actif par défaut, n'est plus signalé comme manquant."}
