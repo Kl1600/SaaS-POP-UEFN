@@ -1493,3 +1493,14 @@ details.fold:not([open]) > summary .chead,details.fold:not([open]) > summary > *
 .term-direct{font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;padding:1px 6px;border-radius:6px;background:#ED753E;color:#0c0c0c;font-weight:700}
 .term-pouls{animation:forge-dictee-pouls 1s ease-in-out infinite}
 @media (prefers-reduced-motion: reduce){.term-pouls{animation:none}}
+/* Barre latérale personnalisable (#493) : titres de catégorie cliquables, onglets déplaçables. */
+@layer app{
+.navsec-btn{display:flex;align-items:center;gap:6px;width:100%;background:none;border:0;font:inherit;text-align:left;cursor:pointer}
+.navsec-btn:hover{color:rgb(200,200,200)}
+.navsec-chev{margin-left:auto;transition:transform .15s;opacity:.7}
+.navsec-chev.off{transform:rotate(-90deg)}
+.nav a[draggable=true]{cursor:pointer}
+.nav a.dragging{opacity:.4}
+.nav.nav-drop{border-radius:12px;outline:1px dashed rgba(237,117,62,.45);outline-offset:2px}
+.app.collapsed .navsec-chev{display:none}
+}

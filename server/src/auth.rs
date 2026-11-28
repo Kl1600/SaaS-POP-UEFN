@@ -366,8 +366,35 @@ pub async fn me(State(st): State<AppState>, u: AuthUser) -> ApiResult<Value> {
         }));
     }
     let email_verified = crate::verify::is_verified(&st, u.id).await?;
+    let ui_prefs: String = sqlx::query_scalar("SELECT ui_prefs FROM users WHERE id = ?")
+        .bind(u.id)
+        .fetch_one(&st.db)
+        .await?;
+    let ui_prefs: Value = serde_json::from_str(&ui_prefs).unwrap_or_else(|_| json!({}));
     Ok(Json(
-        json!({ "user": u, "credits": credits, "studios": out, "admin": admin, "moderator": moderator, "admin_pending": pending, "username": username, "must_change_password": must_change == 1, "email_verified": email_verified, "announcement": crate::announce::for_user(&st, u.id).await?,
+        json!({ "user": u, "ui_prefs": ui_prefs, "credits": credits, "studios": out, "admin": admin, "moderator": moderator, "admin_pending": pending, "username": username, "must_change_password": must_change == 1, "email_verified": email_verified, "announcement": crate::announce::for_user(&st, u.id).await?,
         "plan": crate::billing::user_plan(&st, u.id).await?, "trial_until": crate::billing::trial_until(&st, u.id).await?, "billing_state": crate::stripe::access_state(&st, u.id).await?, "analyse": crate::billing::user_analyse(&st, u.id).await?, "current_map": crate::courante::lire(&st, u.id).await?, "forge": crate::billing::has_forge(&st, u.id).await? }),
     ))
+}
+
+/// `PUT /api/me/ui-prefs` : préférences d'affichage du compte (#493), un objet JSON de 8 Ko au plus.
+/// Remplace tout l'objet : l'interface envoie l'objet complet (barre latérale, didacticiels vus…).
+pub async fn set_ui_prefs(
+    State(st): State<AppState>,
+    u: AuthUser,
+    Json(v): Json<Value>,
+) -> ApiResult<Value> {
+    if !v.is_object() {
+        return Err(crate::error::bad("Préférences invalides."));
+    }
+    let txt = v.to_string();
+    if txt.len() > 8192 {
+        return Err(crate::error::bad("Préférences trop grosses."));
+    }
+    sqlx::query("UPDATE users SET ui_prefs = ? WHERE id = ?")
+        .bind(&txt)
+        .bind(u.id)
+        .execute(&st.db)
+        .await?;
+    Ok(Json(json!({ "ok": true })))
 }
