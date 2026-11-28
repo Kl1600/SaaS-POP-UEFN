@@ -21,6 +21,7 @@ import { ForgeScenarios } from '../components/ForgeScenarios'
 import { ForgeAssistant } from '../components/ForgeAssistant'
 import Plan2D from './Plan2D'
 import { Didacticiel } from '../components/Didacticiel'
+import { ForgeApprendre } from '../components/ForgeApprendre'
 import { cssRect } from '../zoom'
 
 type Invoke = <T = any>(cmd: string, args?: Record<string, unknown>) => Promise<T>
@@ -669,6 +670,7 @@ function Telecharger() {
 function Bibliotheque({ mapId, studioId }: { mapId: number | null; studioId: number | null }) {
   const [vue, setVue] = useState<'verse' | 'assets'>('verse')
   return <div className="stack" style={{ gap: 18 }}>
+    {mapId && <ForgeApprendre mapId={mapId} />}
     <div className="tabs" role="tablist" aria-label={tr("Bibliothèque")}>
       <button role="tab" aria-selected={vue === 'verse'} className={vue === 'verse' ? 'on' : ''} onClick={() => setVue('verse')}>{tr("Modules Verse")}</button>
       <button role="tab" aria-selected={vue === 'assets'} className={vue === 'assets' ? 'on' : ''} onClick={() => setVue('assets')}>{tr("Assets")}</button>

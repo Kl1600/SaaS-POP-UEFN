@@ -16,6 +16,7 @@ mod agents;
 mod aide_forge;
 mod analytics;
 mod announce;
+mod apprendre;
 mod assets;
 mod auth;
 mod billing;
@@ -477,6 +478,23 @@ fn api() -> Router<AppState> {
         .route(
             "/api/maps/{mid}/miniatures/{id}/utiliser",
             post(miniature::utiliser),
+        )
+        .route("/api/maps/{mid}/apprendre", get(apprendre::liste))
+        .route(
+            "/api/maps/{mid}/apprendre/verse",
+            post(apprendre::ajouter_verse),
+        )
+        .route(
+            "/api/maps/{mid}/apprendre/verse/ignorer",
+            post(apprendre::ignorer_verse),
+        )
+        .route(
+            "/api/maps/{mid}/apprendre/lecons/{id}/valider",
+            post(apprendre::valider),
+        )
+        .route(
+            "/api/maps/{mid}/apprendre/lecons/{id}/refuser",
+            post(apprendre::refuser),
         )
         .route("/api/maps/{mid}/studio3d", get(studio3d::liste))
         .route(
