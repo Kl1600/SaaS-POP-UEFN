@@ -116,6 +116,56 @@ concernée ; corrigez une ligne fausse en le disant.
 - Annulation depuis le journal (humain) : l'appareil disparaît du niveau. Annulation par une IA (`undo_action`) :
   rien n'est supprimé avant la validation d'un humain (`/api/approvals/{id}/approve`).
 
+## Hauteur des appareils posés par une IA (testé le 22/11/2026, projet GrassCutter, #13)
+
+Une IA qui pose tout à `z = 0` sans regarder les emprises casse le jeu sans aucune erreur. Avant de poser, lire
+l'emprise réelle par Python (`a.get_actor_bounds(False)`, ou `static_mesh.get_bounds()` d'un composant) et caler l'appareil
+sur le **dessus** du sol, pas sur son pivot.
+- Une dalle `CP_ColorGrass_Solid` (échelle Z 1) va de `z = -8` à `z = +4` : son dessus est à +4 cm.
+- **Bouton (`Device_Button_V2_C`)** : son maillage (`SM_MilitarySwitch_01`, 46 cm de haut, 14 cm de large) est
+  **centré sur le pivot**. À `z = 0`, il est à moitié dans le sol. Sa sphère de collision ne fait que 25 cm de rayon, et
+  l'option `InteractionRadius` vaut 0 par défaut (bornes 0 à 2,5) : le bouton est très dur à déclencher. Réglage
+  retenu : pivot à `z = 100` (hauteur de poitrine) et `InteractionRadius = 2.5`, via `update_actors`
+  (`options: { "InteractionRadius": "2.5" }`).
+- **Spawn Pad (`BP_Creative_Player_Spawner_Prop_C`)** : vérifier sa rotation. Un pad avec un roulis de 180° (à
+  l'envers) place son `FortPlayerStartCreative` à `z = -116`, sous le sol : le joueur réapparaît sous la carte et tombe.
+  À l'endroit, posé sur le dessus du sol (`z = 4`), le départ joueur est à `z = +120`. Contrôle :
+  `get_actor_rotation().roll` doit valoir 0 et le `FortPlayerStartCreative` doit être au-dessus du sol.
+- **Un acteur déplacé par Python sans `a.modify()` n'est pas enregistré.** L'éditeur l'affiche bien à sa nouvelle place,
+  mais son paquet `__ExternalActors__/…` n'est pas marqué modifié : `save_current_level()` l'ignore (aucun paquet sale), le
+  fichier garde son ancienne date et la session de test charge l'ancienne position. Vu avec `update_actors` (le
+  `patch` de pop-link fait `set_actor_location` sans `modify()`) : le Spawn Pad corrigé et les boutons remontés
+  restaient à leur ancienne place en jeu. Correctif manuel : `a.modify()` sur chaque acteur, puis
+  `EditorLoadingAndSavingUtils.save_dirty_packages(True, True)` ; vérifier la date du `.uasset` de l'acteur.
+
+## Décor et objet qui suit le joueur (testé le 22/11/2026, projet GrassCutter, #20)
+
+- **Objets du jeu de base interdits** : des props de `/Game/Building/ActorBlueprints/Prop/` se posent sans erreur
+  (`place_device`), mais la session refuse ensuite de démarrer (`Validation failed`, journal `UEFNValidation: Error:
+  Disallowed reference to …`). Refusés : `Utility_Lawnmower_01`, `Tree_Pine_01`, `Tree_Small_1`,
+  `Recreation_Park_Swing01`, `Recreation_Park_Slide01`. Acceptés dans le même dossier : `Tree_04`, `Tree_Small_2`,
+  `Tree_Bush_1a`, `Gnome01/02`, `Prop_Llama_LawnOrnament`, `Picnic_Table`, `Recreation_ParkBench_01`,
+  `MetalBleachers`, `LAb_Stadium_Floodlight`, `Golf_Flag_Pin`, `GolfCourse_Golf_Bag`, `Car_Tractor`. Après une pose,
+  lancer une session (ou chercher `Disallowed reference` dans le journal) avant d'aller plus loin.
+- **Modèle importé (FBX) en prop** : `import_asset` crée un `StaticMesh`, pas un prop. Un Blueprint de parent
+  `unreal.BuildingProp` (`BlueprintFactory`) dont le `static_mesh_component` du CDO reçoit le maillage devient un prop
+  posable ; `place_device` le pose avec le chemin **du Blueprint** (`…/BP_X.BP_X`), pas celui de sa classe (`…_C`, refusé).
+- **Listes `@editable` d'acteurs** : `SetDeviceProperty` refuse une liste de `refPath` (les éléments sont des objets
+  intermédiaires). Le moyen qui marche : un tag Verse (`x := class(tag){}`) posé par `EditorToolset.ActorToolset.AddComponent`
+  (`/Script/VerseTags.VerseTagMarkupComponent`) puis `EditorToolset.ObjectToolset.SetProperties`
+  (`{"internalTags": {"internalTags": [{"internalTag": {"refPath": "/<projet>/_Verse.x"}}]}}`), et en Verse
+  `FindCreativeObjectsWithTag(x)` (le type du tag, pas une instance). `bNoCollision` se règle de la même façon sur l'acteur.
+- **Objet qui suit le joueur** : un `creative_prop` déplacé en boucle (`MoveTo`, même toutes les 0,05 s avec prédiction de
+  la vitesse) traîne et saccade ; il n'existe pas d'attache pour les props. Ce qui marche : la Scene Graph. Une entité
+  (`entity{}`) avec le composant du maillage importé (classe générée dans le digest des assets, ex. `POP.SM_X{Entity := E}`),
+  ajoutée à `GetSimulationEntity[]`, puis `E.SetOrigin(entity_origin{Entity := Perso.GetEntity[]})` et
+  `E.SetLocalTransform(…)` (module `/Verse.org/SpatialMath`, axes `Left/Up/Forward`) : elle suit le personnage à chaque
+  image, fluide pour le joueur lui-même (saccadé pour les autres : bug Epic FORT-1140319, nov. 2026). Seuls les maillages
+  importés ont une classe Verse ; les props des galeries n'en ont pas. **Couper la physique du maillage**
+  (`Collidable`, `Queryable`, `CanAffectNavigation` à `false`, de nouveau après `AddEntities`) : sinon l'objet bloque
+  le personnage qui le porte, qui recule quand il veut avancer. L'origine de l'entité du personnage est au centre du corps
+  (≈ 90 cm au-dessus des pieds).
+
 ## Interface de jeu (HUD, menus) créée par une IA (recherche puis test du 21/11/2026, projet TestPopHub, #115)
 
 - Un Widget Blueprint (UMG) se crée par Python (`AssetTools.create_asset` + `WidgetBlueprintFactory`, à vérifier dans
