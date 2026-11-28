@@ -36,10 +36,14 @@ function Affichage() {
   const nav = me?.ui_prefs?.nav
   const perso = !!nav && ((nav.collapsed ?? []).length > 0 || Object.keys(nav.order ?? {}).length > 0)
   return <section className="card">
-    <CardHead icon={<PanelLeft size={18} />} title={tr("Affichage")} sub={tr("Repliez une catégorie de la barre latérale en cliquant son titre ; glissez un onglet pour le déplacer.")} />
+    <CardHead icon={<PanelLeft size={18} />} title={tr("Affichage")} sub={tr("Repliez une catégorie de la barre latérale en cliquant son titre ; glissez un onglet pour le déplacer. Les didacticiels ne s’affichent qu’une fois par onglet.")} />
     <button className="btn" disabled={!perso} onClick={async () => {
       const all = { ...(me?.ui_prefs ?? {}) }; delete all.nav
       try { await api.put('/api/me/ui-prefs', all); await reload(); toast(tr("Barre latérale rétablie.")) } catch (e: any) { toast(e.message, true) }
     }}>{tr("Rétablir l’ordre d’origine")}</button>
+    <button className="btn" style={{ marginLeft: 8 }} disabled={!(me?.ui_prefs?.tours ?? []).length} onClick={async () => {
+      const all = { ...(me?.ui_prefs ?? {}) }; delete all.tours
+      try { await api.put('/api/me/ui-prefs', all); await reload(); toast(tr("Les didacticiels reviendront au prochain passage sur chaque onglet.")) } catch (e: any) { toast(e.message, true) }
+    }}>{tr("Revoir les didacticiels")}</button>
   </section>
 }
