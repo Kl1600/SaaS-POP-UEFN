@@ -1,1 +1,1 @@
-{"version": "0.3.16", "date": "2026-11-28", "notes": "· Outils → Texte 3D et 2D : un titre, un panneau ou un logo en mesh 3D (FBX) ou en image transparente (PNG), fait par Blender sur votre PC, avec aperçu, puis importé dans UEFN en un clic."}
+{"version": "0.3.17", "date": "2026-11-28", "notes": "· Outils → Low Mesh : allégez un modèle 3D (FBX, OBJ, GLB) avant import, avec aperçu et nombre de triangles avant et après ; Forge prévient au-delà de 30 000 sommets."}
