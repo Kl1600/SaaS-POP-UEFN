@@ -1,1 +1,1 @@
-{"version": "0.3.13", "date": "2026-11-27", "notes": "· Terminal en direct : si Claude Code n'est pas connecté à votre compte, Forge le dit et vous aide à le connecter, puis à le relancer."}
+{"version": "0.3.14", "date": "2026-11-28", "notes": "· Dictée : le texte n'est plus perdu (la transcription rendait souvent un texte vide) ; le texte provisoire est gardé.\n· Dictée : niveau et nom du micro affichés pendant qu'on parle ; si le micro ne capte rien, Forge dit quoi régler dans Windows."}

@@ -36,6 +36,9 @@ struct Enregistrement {
     echantillons: Arc<Mutex<Vec<f32>>>,
     en_cours: Arc<AtomicBool>,
     transcripteur: Option<std::thread::JoinHandle<()>>,
+    /// Nom du micro utilisé (#488), montré pendant la dictée et dans les erreurs.
+    micro: String,
+    taux: Arc<AtomicU64>,
 }
 
 fn chemin(app: &AppHandle) -> Result<PathBuf, String> {
@@ -127,7 +130,7 @@ pub async fn dictee_debut(
         return Ok(());
     }
     let (arret, attente) = mpsc::channel::<()>();
-    let (pret, ok) = mpsc::channel::<Result<(), String>>();
+    let (pret, ok) = mpsc::channel::<Result<String, String>>();
     let echantillons = Arc::new(Mutex::new(Vec::<f32>::new()));
     let taux_partage = Arc::new(AtomicU64::new(0));
     let (ech, tx) = (echantillons.clone(), taux_partage.clone());
@@ -138,7 +141,10 @@ pub async fn dictee_debut(
             let micro = cpal::default_host()
                 .default_input_device()
                 .ok_or("Aucun micro trouvé.")?;
-            let cfg = micro.default_input_config().map_err(|e| e.to_string())?;
+            let nom = micro.name().unwrap_or_else(|_| "micro par défaut".into());
+            let cfg = micro
+                .default_input_config()
+                .map_err(|e| format!("Micro « {nom} » indisponible : {e}"))?;
             let (taux, canaux) = (cfg.sample_rate().0, cfg.channels() as usize);
             let max = taux as usize * SECONDES_MAX;
             let e2 = echantillons.clone();
@@ -190,16 +196,16 @@ pub async fn dictee_debut(
             .map_err(|e| format!("Micro indisponible : {e}"))?;
             flux.play()
                 .map_err(|e| format!("Micro indisponible : {e}"))?;
-            Ok::<_, String>((flux, taux))
+            Ok::<_, String>((flux, taux, nom))
         })();
         match flux {
             Err(e) => {
                 let _ = pret.send(Err(e.clone()));
                 Err(e)
             }
-            Ok((flux, taux)) => {
+            Ok((flux, taux, nom)) => {
                 tx.store(taux as u64, Ordering::SeqCst);
-                let _ = pret.send(Ok(()));
+                let _ = pret.send(Ok(nom));
                 let _ = attente.recv();
                 drop(flux);
                 let v = std::mem::take(&mut *echantillons.lock().unwrap());
@@ -207,7 +213,7 @@ pub async fn dictee_debut(
             }
         }
     });
-    ok.recv().map_err(|e| e.to_string())??;
+    let micro = ok.recv().map_err(|e| e.to_string())??;
     // Transcription en temps réel (#477) : tant qu'on parle, on retranscrit tout ce qui a été dit dès que la
     // transcription précédente est finie (les 30 dernières secondes au plus), et la page affiche ce texte provisoire.
     let partiel = Arc::new(Mutex::new((0u64, String::new(), 0usize)));
@@ -252,6 +258,8 @@ pub async fn dictee_debut(
         echantillons,
         en_cours,
         transcripteur,
+        micro,
+        taux: taux_partage,
     });
     Ok(())
 }
@@ -284,16 +292,42 @@ fn charger(app: &AppHandle, d: &Dictee) -> Result<Arc<WhisperContext>, String> {
 pub struct Partiel {
     version: u64,
     texte: String,
+    /// Niveau du micro sur le dernier dixième de seconde, de 0 à 1 (#488).
+    niveau: f32,
+    /// Plus fort niveau depuis le début.
+    pic: f32,
+    micro: String,
+}
+
+/// Niveau (crête) d'un morceau de son.
+fn crete(son: &[f32]) -> f32 {
+    son.iter().fold(0f32, |m, x| m.max(x.abs()))
+}
+
+/// En dessous, le micro ne capte rien : coupé, muet, ou refusé par Windows (le son reçu est alors du silence pur).
+const SILENCE: f32 = 0.002;
+
+fn muet(micro: &str) -> String {
+    format!("Le micro « {micro} » ne capte aucun son. Vérifiez qu'il n'est pas coupé, puis dans Windows : Paramètres → Confidentialité et sécurité → Microphone → « Autoriser les applications de bureau à accéder au microphone » activé, et Paramètres → Système → Son → Entrée : le bon micro par défaut.")
 }
 
 /// Texte provisoire pendant qu'on parle (#477) : la page le relit et l'écrit dans le champ.
 #[tauri::command]
 pub fn dictee_partiel(d: tauri::State<'_, Dictee>) -> Option<Partiel> {
     let e = d.enregistrement.lock().unwrap();
-    let g = e.as_ref()?.partiel.lock().unwrap().clone();
+    let e = e.as_ref()?;
+    let g = e.partiel.lock().unwrap().clone();
+    let taux = e.taux.load(Ordering::SeqCst) as usize;
+    let (niveau, pic) = {
+        let v = e.echantillons.lock().unwrap();
+        (crete(&v[v.len().saturating_sub(taux / 10)..]), crete(&v))
+    };
     Some(Partiel {
         version: g.0,
         texte: g.1,
+        niveau,
+        pic,
+        micro: e.micro.clone(),
     })
 }
 
@@ -319,7 +353,11 @@ pub async fn dictee_fin(
     // Le fil de transcription s'arrête de lui-même après son passage en cours ; on ne l'attend pas (#484).
     drop(e.transcripteur);
     if son.len() < taux as usize / 4 {
-        return Ok(String::new());
+        return Ok(provisoire);
+    }
+    // Silence pur (#488) : micro coupé ou accès refusé par Windows. On le dit au lieu de « rien entendu ».
+    if crete(&son) < SILENCE {
+        return Err(muet(&e.micro));
     }
     // Le texte provisoire couvre déjà presque tout (à 0,6 s près) : c'est le texte final, tout de suite.
     if !provisoire.is_empty() && dit.saturating_sub(couvert) <= taux as usize * 3 / 5 {
@@ -327,9 +365,11 @@ pub async fn dictee_fin(
     }
     let modele = charger(&app, &d)?;
     let langue = langue_sure(langue);
-    tokio::task::spawn_blocking(move || transcrire(&modele, &a_16k(&son, taux), &langue))
+    let t = tokio::task::spawn_blocking(move || transcrire(&modele, &a_16k(&son, taux), &langue))
         .await
-        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())??;
+    // Transcription finale vide mais texte provisoire : on garde le provisoire (#488).
+    Ok(if t.is_empty() { provisoire } else { t })
 }
 
 fn transcrire(modele: &WhisperContext, son: &[f32], langue: &str) -> Result<String, String> {
@@ -351,8 +391,13 @@ fn transcrire(modele: &WhisperContext, son: &[f32], langue: &str) -> Result<Stri
     p.set_no_timestamps(true);
     p.set_single_segment(true);
     p.set_temperature_inc(0.0);
-    p.set_audio_ctx(contexte_audio(son.len()));
-    etat.full(p, son)
+    // Pas de fenêtre audio réduite (#488) : avec large-v3-turbo, elle rendait souvent un texte vide. Et whisper
+    // ignore un son de moins d'une seconde : on le complète par du silence.
+    let mut son = son.to_vec();
+    if son.len() < 17_600 {
+        son.resize(17_600, 0.0);
+    }
+    etat.full(p, &son)
         .map_err(|e| format!("Transcription impossible : {e}"))?;
     let mut texte = String::new();
     for s in etat.as_iter() {
@@ -360,12 +405,22 @@ fn transcrire(modele: &WhisperContext, son: &[f32], langue: &str) -> Result<Stri
             texte.push_str(&t);
         }
     }
-    Ok(texte.trim().to_string())
+    Ok(nettoyer(&texte))
 }
 
-/// Fenêtre audio de whisper pour `n` échantillons à 16 kHz : 1500 pour 30 s (50 par seconde), plus une marge.
-fn contexte_audio(n: usize) -> i32 {
-    ((n as f64 / 16_000.0 * 50.0).ceil() as i32 + 64).min(1500)
+/// Retire les marques de whisper qui ne sont pas des mots : « [BLANK_AUDIO] », « (musique) »…
+fn nettoyer(t: &str) -> String {
+    let mut out = String::new();
+    let mut prof = 0i32;
+    for c in t.chars() {
+        match c {
+            '[' | '(' => prof += 1,
+            ']' | ')' if prof > 0 => prof -= 1,
+            _ if prof == 0 => out.push(c),
+            _ => {}
+        }
+    }
+    out.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 /// Rééchantillonne en 16 kHz (format attendu par whisper), par interpolation linéaire.
@@ -392,10 +447,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn fenetre_audio() {
-        assert_eq!(contexte_audio(16_000 * 3), 214);
-        assert_eq!(contexte_audio(16_000 * 30), 1500);
-        assert_eq!(contexte_audio(16_000 * 60), 1500);
+    fn marques_retirees() {
+        assert_eq!(nettoyer(" [BLANK_AUDIO]"), "");
+        assert_eq!(nettoyer(" Bonjour (musique) à tous "), "Bonjour à tous");
+        assert!(crete(&[0.0, -0.5, 0.2]) == 0.5);
+        assert!(muet("Micro").contains("Confidentialité"));
     }
 
     #[test]

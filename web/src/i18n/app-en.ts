@@ -1829,6 +1829,8 @@ const EN: Record<string, string> = {
  "Détails": "Details",
  "Vue du dessus": "Top view",
  "Les mêmes que dans POP : clés, lecture seule": "Same as in POP: keys, read-only",
+ "Niveau du micro {0}": "Microphone level {0}",
+ "{0} : aucun son": "{0}: no sound",
  "{0} agent(s) dans Forge": "{0} agent(s) in Forge",
  "Demande Claude Code installé et connecté sur ce PC.": "Needs Claude Code installed and signed in on this PC.",
  "Claude Code n’est pas connecté à votre compte Claude.": "Claude Code isn't signed in to your Claude account.",
