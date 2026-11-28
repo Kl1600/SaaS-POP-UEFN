@@ -2,6 +2,11 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-28 · #508 · icônes Tabler (style Vinteer)
+- Fait : @tabler/icons-react ; web/src/icons.tsx ré-exporte chaque icône sous son ancien nom lucide (props size / strokeWidth / className, trait 1,75 par défaut, classe pi pi-<nom>). Tous les imports passent par ce module ; seul lucideAll.ts (icônes choisies pour les pages) garde lucide.
+- Nouvelle icône : l'ajouter dans icons.tsx (vérifier que IconXxx existe dans @tabler/icons-react).
+- Vérifié : 6 onglets de map + vitrine, aucune icône vide ; JS principal +2 %.
+
 ### 2026-11-28 · #506 · barre latérale façon Vinteer
 - Fait : .side 284 px (≈256 affichés avec zoom 0,9), titres de catégorie en capitales ; tri au pointeur dans Layout.tsx (triDebut/triMove/triFin : setPointerCapture sur la poignée, translateY de l'onglet et des voisins, bornes de la catégorie), plus de glisser-déposer HTML5.
 - Piège : clientY est en pixels écran, translateY en pixels CSS : diviser par le zoom.

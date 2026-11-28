@@ -3,7 +3,7 @@
 // - Onglet « Marché » d'un studio : plan du créateur du studio (studio.analyse) ; les membres y ont accès dans ce studio.
 import type { ReactNode } from 'react'
 import { useSearchParams, Navigate } from 'react-router-dom'
-import { Lock } from 'lucide-react'
+import { Lock } from '../icons'
 import { useApp } from '../state'
 import { PageHead, Tabs } from './ui'
 import { tr } from '../i18n/t'

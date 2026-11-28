@@ -2,7 +2,7 @@
 // Les informations sur l'éditeur viennent de l'Administration (onglet « Infos légales »).
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft } from '../icons'
 
 export const LEGAL_PAGES: [string, string][] = [
   ['/mentions-legales', 'Mentions légales'],

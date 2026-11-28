@@ -1,7 +1,7 @@
 // Vue « Dépendances » des tâches (#163) : qui bloque qui, groupé par fonctionnalité (le lot d'une tâche).
 // Ce qui débloque est à gauche : la colonne d'une tâche est la longueur de la plus longue chaîne de dépendances avant elle.
 import { useMemo, useRef, useState } from 'react'
-import { Check, Lock, Play, Trash2, X } from 'lucide-react'
+import { Check, Lock, Play, Trash2, X } from '../icons'
 import { useLoad } from '../state'
 import { tr } from '../i18n/t'
 import { tagLabel } from './ui'

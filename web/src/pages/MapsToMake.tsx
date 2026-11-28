@@ -3,7 +3,7 @@
 // concurrence, calculée par l'algorithme des niches (ideas.rs : joueurs, fidélité, Discover, nouvelles maps qui
 // percent, élan, et ce dont on parle sur les sources connectées).
 import { useState } from 'react'
-import { ArrowRight, Check, Youtube, Music2, AtSign, MessageCircle, X as Close } from 'lucide-react'
+import { ArrowRight, Check, Youtube, Music2, AtSign, MessageCircle, X as Close } from '../icons'
 import { api } from '../api'
 import { useApp, useLoad } from '../state'
 import { useNav } from '../routes'

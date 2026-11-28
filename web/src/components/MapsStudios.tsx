@@ -1,6 +1,6 @@
 // Paramètres > Maps et studios (#269) : tous ses studios et leurs maps, avec ouvrir, supprimer ou quitter.
 import { useState } from 'react'
-import { Building2, LogOut, Trash2, User } from 'lucide-react'
+import { Building2, LogOut, Trash2, User } from '../icons'
 import { api } from '../api'
 import { useApp } from '../state'
 import { CardHead, ROLE } from './ui'

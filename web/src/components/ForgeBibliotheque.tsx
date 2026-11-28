@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Download, Lock, Globe, PackagePlus, Upload, Box, Music, Image as ImageIcon } from 'lucide-react'
+import { Download, Lock, Globe, PackagePlus, Upload, Box, Music, Image as ImageIcon } from '../icons'
 import { api } from '../api'
 import { useApp, useLoad } from '../state'
 import { tr } from '../i18n/t'

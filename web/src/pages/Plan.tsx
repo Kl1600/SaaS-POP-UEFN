@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Trash2 } from 'lucide-react'
+import { AlertTriangle, Trash2 } from '../icons'
 import { addDays, api, frDate, ymd } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { Avatar, CardHead, PageHead, Tabs, TAGS, tagLabel } from '../components/ui'

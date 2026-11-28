@@ -1,7 +1,7 @@
 // Page « Autoriser » de la connexion OAuth des IA (#285) : l'IA a ouvert POP dans le navigateur, l'utilisateur
 // connecté autorise (ou refuse) et choisit si l'IA peut modifier ou seulement lire.
 import { useEffect, useState } from 'react'
-import { Check, Lock, Unlock } from 'lucide-react'
+import { Check, Lock, Unlock } from '../icons'
 import { api } from '../api'
 import { useApp } from '../state'
 import { tr } from '../i18n/t'

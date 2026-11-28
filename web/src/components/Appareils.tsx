@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Search, Plus, RefreshCw, Link2 } from 'lucide-react'
+import { Search, Plus, RefreshCw, Link2 } from '../icons'
 import { api } from '../api'
 import { tr } from '../i18n/t'
 

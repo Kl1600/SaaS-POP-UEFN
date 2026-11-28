@@ -3,13 +3,15 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import { Target,
   Home, FileText, PenTool, CalendarDays, KanbanSquare, Rocket, Coins, Users, Settings, LifeBuoy, PanelLeft,
-  Search, Bell, Plus, ChevronDown, Hexagon, LogOut, ListTree, Bot, ChartNoAxesCombined, Layers, Lock, Sun, Moon, GripVertical } from 'lucide-react'
+  Search, Bell, Plus, ChevronDown, Hexagon, LogOut, ListTree, Bot, ChartNoAxesCombined, Layers, Lock, Sun, Moon, GripVertical, Wrench } from '../icons'
 import { useApp, studioName } from '../state'
 import { ago, api } from '../api'
 import { Avatar } from './ui'
 import { NewTaskModal } from '../pages/Tasks'
 import { GuideDrawer } from './Guide'
-import { Sparkles, MailCheck, ShieldCheck, Megaphone, AlertTriangle, X } from 'lucide-react'
+// Onglets de la barre latérale : icônes choisies par l'humain (#508).
+import { CalendarDays as LCalendar, KanbanSquare as LKanban, FileText as LPage, Rocket as LRocket, Presentation as LBoard } from 'lucide-react'
+import { Sparkles, MailCheck, ShieldCheck, Megaphone, AlertTriangle, X } from '../icons'
 import { useUefnStatus, STATUS_LABEL } from '../uefnState'
 import { tr, tx, LOCALE } from '../i18n/t'
 import { MapSwitcher, CreateHost, openCreate } from './MapSwitcher'
@@ -23,9 +25,9 @@ type Item = [string, string, any]
 /** Onglets de la map (changent quand on change de map). Le premier groupe n'a pas de titre. */
 const mapGroups = (mid: number): [string, Item[]][] => [
   ['', [[`/map/${mid}`, tr("Dashboard"), Home]]],
-  [tr("Organiser"), [[`/map/${mid}/planifier`, tr("Planifier"), CalendarDays], [`/map/${mid}/taches`, tr("Tâches"), KanbanSquare]]],
-  [tr("Créer"), [[`/map/${mid}/pages`, tr("Pages"), FileText], [`/map/${mid}/tableau`, tr("Tableau blanc"), PenTool]]],
-  [tr("Publier"), [[`/map/${mid}/lancer`, tr("Lancer et suivre"), Rocket], [`/map/${mid}/remunerer`, tr("Rémunérer"), Coins]]],
+  [tr("Organiser"), [[`/map/${mid}/planifier`, tr("Planifier"), LCalendar], [`/map/${mid}/taches`, tr("Tâches"), LKanban]]],
+  [tr("Créer"), [[`/map/${mid}/pages`, tr("Pages"), LPage], [`/map/${mid}/tableau`, tr("Tableau blanc"), LBoard]]],
+  [tr("Publier"), [[`/map/${mid}/lancer`, tr("Lancer et suivre"), LRocket], [`/map/${mid}/remunerer`, tr("Rémunérer"), Coins]]],
 ]
 /** Clés stables des catégories de la map (#493), dans l'ordre de mapGroups sans le premier groupe. */
 const GROUP_KEYS = ['organiser', 'creer', 'publier']
@@ -196,7 +198,7 @@ export default function Layout() {
           {st && <div className="nav">
             <button type="button" className="navsec navsec-btn lbl" aria-expanded={!folded('studio')} onClick={() => fold('studio')}>{tr("Studio")}<ChevronDown size={14} className={'navsec-chev' + (folded('studio') ? ' off' : '')} /></button>
             {!folded('studio') && <>
-            <NavLink to={sHome} className={onStudio ? 'on' : ''} title={sLabel}>{st.personal ? <Layers size={20} strokeWidth={1.5} /> : <Users size={20} strokeWidth={1.5} />}<span className="lbl">{sLabel}</span></NavLink>
+            <NavLink to={sHome} className={onStudio ? 'on' : ''} title={sLabel}>{st.personal ? <Wrench size={20} strokeWidth={1.5} /> : <Users size={20} strokeWidth={1.5} />}<span className="lbl">{sLabel}</span></NavLink>
             {sMarket && <NavLink to={sMarket} className={({ isActive }) => (isActive ? 'on' : '')}><ChartNoAxesCombined size={20} strokeWidth={1.5} /><span className="lbl">{tr("Marché")}</span>{!st.analyse && <Lock size={14} className="nav-lock" />}</NavLink>}
             </>}
           </div>}

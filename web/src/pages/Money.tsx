@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { AlertTriangle, Upload, Trash2 } from 'lucide-react'
+import { AlertTriangle, Upload, Trash2 } from '../icons'
 import { api, euros, frDate } from '../api'
 import { useApp, useLoad } from '../state'
 import { Avatar, CardHead, PageHead } from '../components/ui'

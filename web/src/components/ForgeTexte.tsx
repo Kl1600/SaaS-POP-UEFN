@@ -1,7 +1,7 @@
 // Outil Texte 3D et 2D (#324) : un titre de map, un panneau ou un logo, fait par Blender sur le PC (#351), aperçu,
 // puis import dans le projet UEFN (action journalisée et annulable, #90).
 import { useEffect, useState } from 'react'
-import { Type, Upload } from 'lucide-react'
+import { Type, Upload } from '../icons'
 import { api } from '../api'
 import { useApp } from '../state'
 import { tr } from '../i18n/t'

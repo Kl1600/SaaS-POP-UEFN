@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Folder, FolderOpen, ChevronRight, ChevronDown, Eye, EyeOff, Lock, Copy, Trash2, FolderInput, Pencil, Save, Archive, RotateCcw, RefreshCw, Plus, X, Star, AlertTriangle, Link2, Cpu, Box, Shapes, Code2, Check, Ban, Play,
-} from 'lucide-react'
+} from '../icons'
 import { ago, api } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { CardHead, PageHead, Tabs } from '../components/ui'

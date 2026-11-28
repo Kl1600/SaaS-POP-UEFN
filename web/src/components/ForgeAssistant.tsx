@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { CircleCheck, CircleX, CircleDashed, Copy, RefreshCw, X } from 'lucide-react'
+import { CircleCheck, CircleX, CircleDashed, Copy, RefreshCw, X } from '../icons'
 import { useApp } from '../state'
 import { tr } from '../i18n/t'
 

@@ -3,7 +3,7 @@
 // Forge montre la miniature, « Conforme Discover », et « Utiliser », « Refaire », « Modifier ». Le site montre les
 // versions choisies (`versions`).
 import { useEffect, useRef, useState } from 'react'
-import { Box, Minimize2, Shapes, Type, Check, Download, ImagePlus, RefreshCw, Pencil, Paperclip, X } from 'lucide-react'
+import { Box, Minimize2, Shapes, Type, Check, Download, ImagePlus, RefreshCw, Pencil, Paperclip, X } from '../icons'
 import { ForgeBlender } from './ForgeBlender'
 import { ForgeTexte } from './ForgeTexte'
 import { ForgeLowMesh } from './ForgeLowMesh'

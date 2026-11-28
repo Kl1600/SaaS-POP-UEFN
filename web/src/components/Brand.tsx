@@ -1,7 +1,7 @@
 // Logos des services reliés à POP (#200, #205) : icônes de la bibliothèque simple-icons (CC0), en une couleur
 // (currentColor) pour rester dans le style noir et blanc de POP. Un service sans logo garde une icône générique.
 import { siClaude, siCursor, siDiscord, siEpicgames, siGithub, siGithubcopilot, siGooglegemini, siWindsurf } from 'simple-icons'
-import { Bot } from 'lucide-react'
+import { Bot } from '../icons'
 
 const LOGOS: Record<string, { path: string; title: string }> = {
   discord: siDiscord, github: siGithub, lore: siEpicgames, claude: siClaude, cursor: siCursor,

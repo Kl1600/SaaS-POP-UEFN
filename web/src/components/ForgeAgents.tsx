@@ -3,7 +3,7 @@ import { ago, api } from '../api'
 import { useApp, useLive, useLoad } from '../state'
 import { tr } from '../i18n/t'
 import { Selecteur } from './Selecteur'
-import { ExternalLink, Plus, X } from 'lucide-react'
+import { ExternalLink, Plus, X } from '../icons'
 
 // Écran Agents de Forge (#94) : les IA connectées à la map, leur tâche et son étape, leur résumé en français (#321),
 // leur journal d'appels MCP en direct ; attribuer une tâche, passer en lecture seule ou couper un agent.

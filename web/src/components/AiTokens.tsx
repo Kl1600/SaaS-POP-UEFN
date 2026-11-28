@@ -2,7 +2,7 @@
 // travail elle-même (outils list_maps puis use_map). Depuis #285, l'IA peut aussi se connecter seule par OAuth
 // (on colle l'adresse /mcp, POP demande « Autoriser ») ; la clé API reste pour les autres.
 import { useState } from 'react'
-import { Check, Copy, Trash2, Lock, Unlock, ExternalLink, KeyRound, ChevronDown } from 'lucide-react'
+import { Check, Copy, Trash2, Lock, Unlock, ExternalLink, KeyRound, ChevronDown } from '../icons'
 import { ago, api } from '../api'
 import { useApp, useLoad } from '../state'
 import { CardHead } from './ui'

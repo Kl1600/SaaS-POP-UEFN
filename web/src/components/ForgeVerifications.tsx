@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CircleCheck, CircleAlert, OctagonX, RefreshCw, Crosshair, ExternalLink, Circle } from 'lucide-react'
+import { CircleCheck, CircleAlert, OctagonX, RefreshCw, Crosshair, ExternalLink, Circle } from '../icons'
 import { ago, api } from '../api'
 import { useApp, useLoad } from '../state'
 import { tr } from '../i18n/t'

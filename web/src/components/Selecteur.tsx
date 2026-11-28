@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown } from '../icons'
 
 // Sélecteur au style de POP Forge (#376) : remplace le <select> natif, dont la liste suit le style gris de Windows.
 // Clavier : Entrée, Espace ou Flèche bas ouvre ; Flèches pour se déplacer ; Entrée choisit ; Échap ferme.

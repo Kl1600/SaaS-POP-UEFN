@@ -4,7 +4,7 @@ import {
   MousePointer2, Lasso, StickyNote, Type, Square, Circle, Spline, Pen, Highlighter, Eraser, Frame, ImagePlus, MessageSquarePlus, ThumbsUp,
   Timer, Eye, EyeOff, LayoutGrid, Presentation, Download, Plus, Minus, Maximize, UserRound, ChevronLeft, ChevronRight, X, Network,
   Expand, Shrink, Undo2, Redo2, MoreHorizontal, ExternalLink, Sparkles, Users, Copy, Trash2, BringToFront, SendToBack, AlignStartVertical, AlignStartHorizontal, AlignCenterVertical, AlignCenterHorizontal, Upload, Pencil,
-} from 'lucide-react'
+} from '../icons'
 import { api } from '../api'
 import { useApp, useLoad } from '../state'
 import { PageHead } from '../components/ui'

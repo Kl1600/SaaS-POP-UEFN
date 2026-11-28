@@ -1,7 +1,7 @@
 // Outil Low Mesh (#325) : alléger un modèle 3D avant import. Blender (#351) applique son Decimate sur le PC ; aperçus
 // et comptes avant et après ; Forge prévient au-delà de 30 000 sommets ; import dans UEFN (journalisé, annulable).
 import { useEffect, useRef, useState } from 'react'
-import { FileUp, Minimize2, Upload } from 'lucide-react'
+import { FileUp, Minimize2, Upload } from '../icons'
 import { api } from '../api'
 import { useApp } from '../state'
 import { tr } from '../i18n/t'

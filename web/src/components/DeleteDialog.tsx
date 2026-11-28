@@ -1,7 +1,7 @@
 // Suppression d'une map ou d'un studio (#269) : une fenêtre commune au sélecteur de map, aux Paramètres et à la page
 // du studio. Elle dit ce qui sera perdu, propose d'exporter le studio d'abord, et demande de taper le nom exact.
 import { useState } from 'react'
-import { AlertTriangle, Download, X } from 'lucide-react'
+import { AlertTriangle, Download, X } from '../icons'
 import { api } from '../api'
 import { useApp } from '../state'
 import { Modal } from './ui'

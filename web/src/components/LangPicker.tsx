@@ -1,7 +1,7 @@
 // Choix de la langue : bouton drapeau + code, puis fenêtre avec recherche de pays et grille de drapeaux.
 // Sur le site vitrine, la langue change tout de suite ; dans l'application (`app`), la page se recharge.
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDown, Search, X } from 'lucide-react'
+import { ChevronDown, Search, X } from '../icons'
 import { LANGS, matchLang, setLang, useI18n } from '../i18n'
 import { LANG, setAppLang, tr } from '../i18n/t'
 import './langpicker.css'

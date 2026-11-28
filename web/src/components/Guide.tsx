@@ -1,7 +1,7 @@
 // Popy : assistant intégré (calculs côté serveur sur les données de la map + guide de POP, rien ne sort de POP).
 import { useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { Compass, Play, ArrowRight, X, Send } from 'lucide-react'
+import { Compass, Play, ArrowRight, X, Send } from '../icons'
 import { ask, suggested, type Fiche } from '../guideKB'
 import { api } from '../api'
 import { useApp, useLive, useLoad } from '../state'

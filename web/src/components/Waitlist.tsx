@@ -1,7 +1,7 @@
 // Demande d'accès à la bêta (liste d'attente). Utilisé sur le site vitrine et sur /inscription.
 // Les libellés suivent la langue choisie ; les valeurs envoyées restent en français pour le panel admin.
 import { useEffect, useState } from 'react'
-import { ArrowRight, CheckCircle2, X } from 'lucide-react'
+import { ArrowRight, CheckCircle2, X } from '../icons'
 import { api } from '../api'
 import { useI18n, resetHtmlLang } from '../i18n'
 import fr from '../i18n/fr'
