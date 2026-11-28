@@ -2,6 +2,10 @@
 
 Entrées sur le modèle de `KB/README.md`, la plus récente en haut. Seul l'agent de ce domaine écrit ici.
 
+### 2026-11-28 · #496 · didacticiel au premier passage
+- Fait : components/Didacticiel.tsx : 2 à 4 bulles par onglet (Dashboard, Planifier, Tâches, Pages, Tableau blanc, Lancer et suivre, Rémunérer, Maps à faire), zone visée entourée, Précédent / Suivant / Passer ; onglets vus dans ui_prefs.tours ; Paramètres → Affichage → « Revoir les didacticiels ». Piège : html { zoom: .9 } sur grand écran, il faut diviser getBoundingClientRect et innerWidth par le zoom pour placer un élément fixe.
+- Vérifié : navigateur 1440 px, les 8 onglets.
+
 ### 2026-11-28 · #493 · barre latérale personnalisable
 - Fait : Layout.tsx : titres de catégorie cliquables (replier / déplier, chevron), onglets de la map déplaçables par glisser-déposer entre Organiser, Créer et Publier (arrange() : ordre du compte puis onglets nouveaux à leur place d'origine) ; Studio et Analyse repliables. Préférences dans ui_prefs.nav ({order, collapsed}). Barre en icônes : pas de repli ni de glisser. Paramètres → Mon compte → Affichage : « Rétablir l'ordre d'origine ».
 - Vérifié : navigateur 1440 px (repli, glisser Rémunérer avant Planifier, gardé après rechargement, rétablir) et 900 px.

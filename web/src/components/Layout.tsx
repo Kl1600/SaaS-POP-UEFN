@@ -17,6 +17,7 @@ import { Tooltips } from './Tooltip'
 import { useNav } from '../routes'
 import { IdeaPop } from '../pages/Ideas'
 import { AiPill } from './ConnectAI'
+import { Didacticiel } from './Didacticiel'
 
 type Item = [string, string, any]
 /** Onglets de la map (changent quand on change de map). Le premier groupe n'a pas de titre. */
@@ -144,6 +145,7 @@ export default function Layout() {
   return (
     <div className={'app' + (rail ? ' collapsed' : '') + (phone && drawer ? ' drawer-open' : '') + (app.dark ? ' dark' : '')}>
       {phone && drawer && <div className="side-scrim" onClick={() => setDrawer(false)} aria-hidden="true" />}
+      {showMap || ecran === 'analyse' ? <Didacticiel key={ecran} page={ecran} /> : null}
       <a href="#contenu" className="skip">{tr("Aller au contenu")}</a>
       <aside className="side">
         <div className="brand"><img src="/logo.png" alt="POP" /></div>
