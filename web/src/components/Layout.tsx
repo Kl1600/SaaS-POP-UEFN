@@ -163,7 +163,7 @@ export default function Layout() {
                 {k && !rail ? <span className="nav-grip" draggable title={tr('Glisser pour déplacer dans la catégorie')} aria-hidden
                   onClick={e => { e.preventDefault(); e.stopPropagation() }}
                   onDragStart={e => { setDrag(itemKey(p)); setDragCat(k); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', itemKey(p)); const a = (e.currentTarget as HTMLElement).closest('a'); if (a) e.dataTransfer.setDragImage(a, 20, 16) }}
-                  onDragEnd={() => { setDrag(null); setDragCat(null) }}><GripVertical size={16} strokeWidth={1.75} /></span> : null}</NavLink>)}
+                  onDragEnd={() => { setDrag(null); setDragCat(null) }}><GripVertical size={14} strokeWidth={1.75} /></span> : null}</NavLink>)}
             </div>
           ))}
           {st && <div className="nav">
